@@ -12,9 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('documents', function (Blueprint $table) {
-            $table->unsignedBigInteger('period_id')->nullable()->after('user_id');
+            // Add foreign key constraint for period_id after work_periods table exists
             $table->foreign('period_id')->references('id')->on('work_periods')->onDelete('set null');
-            $table->index('period_id');
         });
     }
 
@@ -25,8 +24,6 @@ return new class extends Migration
     {
         Schema::table('documents', function (Blueprint $table) {
             $table->dropForeign(['period_id']);
-            $table->dropIndex(['period_id']);
-            $table->dropColumn('period_id');
         });
     }
 };

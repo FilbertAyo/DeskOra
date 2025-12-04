@@ -102,15 +102,41 @@ class DocumentController extends Controller
                 ->with('error', 'You do not have permission to create documents.');
         }
 
+        // Get all work periods for dropdown
+        $workPeriods = WorkPeriod::orderBy('year', 'desc')
+            ->orderBy('week_number', 'desc')
+            ->get();
+
+        // Determine default period based on document type
+        $defaultPeriodId = null;
+        $currentPeriod = WorkPeriod::getCurrent();
+        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $relatedPlan = null;
+        
+        if ($selectedType) {
+            if ($selectedType === Document::TYPE_WEEKLY_PLAN && $nextPeriod) {
+                // For weekly plan, default to next week
+                $defaultPeriodId = $nextPeriod->id;
+            } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT && $currentPeriod) {
+                // For weekly report, default to current week
+                $defaultPeriodId = $currentPeriod->id;
+                // Get the related plan for this period to show the main target
+                $relatedPlan = Document::where('user_id', $user->id)
+                    ->where('period_id', $currentPeriod->id)
+                    ->where('type', Document::TYPE_WEEKLY_PLAN)
+                    ->first();
+            }
+        }
+
         // If type is provided in query string, pre-select it
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
             if (Document::canUserCreateType($user, $selectedType)) {
-                return view('documents.create', compact('availableTypes', 'selectedType'));
+                return view('documents.create', compact('availableTypes', 'selectedType', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan'));
             }
         }
 
-        return view('documents.create', compact('availableTypes'));
+        return view('documents.create', compact('availableTypes', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan'));
     }
 
     /**
@@ -120,10 +146,32 @@ class DocumentController extends Controller
     {
         $user = Auth::user();
 
-        $request->validate([
+        // Validate file upload for PDF documents
+        $validationRules = [
             'type' => ['required', 'string', 'in:weekly_plan,weekly_report,monthly_report,weekly_minutes'],
-            'content' => ['required', 'string', 'min:10'],
-        ]);
+            'file' => ['required', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
+            'title' => ['nullable', 'string', 'max:255'],
+        ];
+
+        // Make period_id required for weekly plans and reports
+        if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
+            $validationRules['period_id'] = ['required', 'integer', 'exists:work_periods,id'];
+        } else {
+            $validationRules['period_id'] = ['nullable', 'integer', 'exists:work_periods,id'];
+        }
+
+        // Add validation for main_target for weekly plans
+        if ($request->type === Document::TYPE_WEEKLY_PLAN) {
+            $validationRules['main_target'] = ['required', 'string', 'max:2000'];
+        }
+
+        // Add validation for target accomplishment for weekly reports
+        if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+            $validationRules['target_accomplished'] = ['nullable', 'boolean'];
+            $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
+        }
+
+        $request->validate($validationRules);
 
         // Authorize create action
         $this->authorize('create', Document::class);
@@ -131,9 +179,18 @@ class DocumentController extends Controller
         // Authorize create action with the specific type
         $this->authorize('createType', [Document::class, $request->type]);
 
-        // Get appropriate period based on document type
+        // Get period from request or determine based on document type
         $period = null;
-        if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
+        if ($request->filled('period_id')) {
+            // Use the period selected by user
+            $period = WorkPeriod::find($request->period_id);
+            if (!$period) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Selected work period not found.');
+            }
+        } elseif (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
+            // Fallback to automatic selection if no period_id provided
             if ($request->type === Document::TYPE_WEEKLY_PLAN) {
                 // Plan is for NEXT week (submitted during current week)
                 $currentPeriod = WorkPeriod::getCurrent();
@@ -170,20 +227,138 @@ class DocumentController extends Controller
                 ->with('error', 'This work period is closed. Please contact your administrator.');
         }
 
+        // Check if document already exists for this user, period, and type
+        // Only for weekly plans and reports (one per week period)
+        $existingDocument = null;
+        if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $period) {
+            $existingDocument = Document::where('user_id', $user->id)
+                ->where('period_id', $period->id)
+                ->where('type', $request->type)
+                ->first();
+        }
+
         // Determine state based on action
         $action = $request->input('action', 'draft');
         $state = ($action === 'submit') ? Document::STATE_SUBMITTED : Document::STATE_DRAFT;
 
-        $document = Document::create([
+        // Handle file upload
+        $file = $request->file('file');
+        $originalFilename = $file->getClientOriginalName();
+        $fileSize = $file->getSize();
+        
+        // Generate unique filename
+        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $filePath = $file->storeAs('documents/' . $request->type, $filename, 'public');
+
+        // Generate title if not provided
+        $title = $request->input('title');
+        if (!$title) {
+            $typeName = Document::getTypes()[$request->type] ?? ucwords(str_replace('_', ' ', $request->type));
+            if ($period) {
+                $title = $typeName . ' - Week ' . $period->week_number;
+            } else {
+                $title = $typeName . ' - ' . now()->format('M d, Y');
+            }
+        }
+
+        // If document exists, update it instead of creating a new one
+        if ($existingDocument) {
+            // If document is submitted, we can't update it (policy restriction)
+            if ($existingDocument->isSubmitted()) {
+                // Delete the uploaded file since we won't use it
+                \Storage::disk('public')->delete($filePath);
+                
+                return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+                    ->with('info', 'A ' . str_replace('_', ' ', $request->type) . ' already exists for this week period. You can view it below.');
+            }
+
+            // Check if we can update (authorize update action - only works for drafts)
+            try {
+                $this->authorize('update', $existingDocument);
+            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                // Delete the uploaded file since we won't use it
+                \Storage::disk('public')->delete($filePath);
+                
+                return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+                    ->with('error', 'You do not have permission to update this document.');
+            }
+
+            // If submitting, authorize submit action
+            if ($action === 'submit') {
+                try {
+                    $this->authorize('submit', $existingDocument);
+                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                    // Delete the uploaded file since we won't use it
+                    \Storage::disk('public')->delete($filePath);
+                    
+                    return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+                        ->with('error', 'You do not have permission to submit this document.');
+                }
+            }
+
+            // Delete old file if exists
+            if ($existingDocument->file_path) {
+                \Storage::disk('public')->delete($existingDocument->file_path);
+            }
+
+            // Update document
+            $updateData = [
+                'file_path' => $filePath,
+                'title' => $title,
+                'file_size' => $fileSize,
+                'original_filename' => $originalFilename,
+            ];
+
+            // Add main_target for weekly plans
+            if ($request->type === Document::TYPE_WEEKLY_PLAN && $request->filled('main_target')) {
+                $updateData['main_target'] = $request->main_target;
+            }
+
+            // Add target accomplishment fields for weekly reports
+            if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+                $updateData['target_accomplished'] = $request->has('target_accomplished') ? (bool)$request->target_accomplished : null;
+                $updateData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
+            }
+
+            // Update state if submitting
+            if ($action === 'submit') {
+                $updateData['state'] = Document::STATE_SUBMITTED;
+            }
+
+            $existingDocument->update($updateData);
+
+            $message = ($action === 'submit')
+                ? 'Document updated and submitted successfully.'
+                : 'Document updated successfully.';
+
+            return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+                ->with('success', $message);
+        }
+
+        // Create new document
+        $documentData = [
             'user_id' => $user->id,
             'period_id' => $period?->id,
             'type' => $request->type,
-            'data' => [
-                'content' => $request->input('content'),
-                'title' => $request->input('title', 'Untitled'),
-            ],
+            'file_path' => $filePath,
+            'title' => $title,
+            'file_size' => $fileSize,
+            'original_filename' => $originalFilename,
             'state' => $state,
-        ]);
+        ];
+
+        // Add main_target for weekly plans
+        if ($request->type === Document::TYPE_WEEKLY_PLAN && $request->filled('main_target')) {
+            $documentData['main_target'] = $request->main_target;
+        }
+
+        // Add target accomplishment fields for weekly reports
+        if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+            $documentData['target_accomplished'] = $request->has('target_accomplished') ? (bool)$request->target_accomplished : null;
+            $documentData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
+        }
+
+        $document = Document::create($documentData);
 
         $message = ($action === 'submit')
             ? 'Document submitted successfully.'
@@ -273,10 +448,24 @@ class DocumentController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
-        $request->validate([
-            'content' => ['required', 'string', 'min:10'],
+        // Validate file upload (file is optional for updates, but if provided must be PDF)
+        $validationRules = [
+            'file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
             'title' => ['nullable', 'string', 'max:255'],
-        ]);
+        ];
+
+        // Add validation for main_target for weekly plans
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $validationRules['main_target'] = ['nullable', 'string', 'max:2000'];
+        }
+
+        // Add validation for target accomplishment for weekly reports
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $validationRules['target_accomplished'] = ['nullable', 'boolean'];
+            $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
+        }
+
+        $request->validate($validationRules);
 
         // Determine state based on action
         $action = $request->input('action', 'draft');
@@ -286,13 +475,55 @@ class DocumentController extends Controller
             $this->authorize('submit', $document);
         }
 
-        $data = $document->data ?? [];
-        $data['content'] = $request->input('content');
-        if ($request->filled('title')) {
-            $data['title'] = $request->input('title');
+        $updateData = [];
+
+        // Handle file upload if provided
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $originalFilename = $file->getClientOriginalName();
+            $fileSize = $file->getSize();
+            
+            // Generate unique filename
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $filePath = $file->storeAs('documents/' . $document->type, $filename, 'public');
+
+            // Delete old file if exists
+            if ($document->file_path) {
+                \Storage::disk('public')->delete($document->file_path);
+            }
+
+            $updateData['file_path'] = $filePath;
+            $updateData['file_size'] = $fileSize;
+            $updateData['original_filename'] = $originalFilename;
         }
 
-        $updateData = ['data' => $data];
+        // Update title if provided
+        if ($request->filled('title')) {
+            $updateData['title'] = $request->input('title');
+        }
+
+        // Update main_target for weekly plans
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            if ($request->filled('main_target')) {
+                $updateData['main_target'] = $request->main_target;
+            } elseif ($request->has('main_target')) {
+                // Allow clearing the field
+                $updateData['main_target'] = null;
+            }
+        }
+
+        // Update target accomplishment fields for weekly reports
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            if ($request->has('target_accomplished')) {
+                $updateData['target_accomplished'] = (bool)$request->target_accomplished;
+            }
+            if ($request->filled('target_explanation')) {
+                $updateData['target_explanation'] = $request->target_explanation;
+            } elseif ($request->has('target_explanation')) {
+                // Allow clearing the field
+                $updateData['target_explanation'] = null;
+            }
+        }
 
         // Update state if submitting
         if ($action === 'submit') {
@@ -559,5 +790,159 @@ class DocumentController extends Controller
             'periodFilterId',
             'timelineData'
         ));
+    }
+
+    /**
+     * Display weekly plans page
+     */
+    public function weeklyPlans(Request $request)
+    {
+        $this->authorize('viewAny', Document::class);
+
+        $user = Auth::user();
+        $query = Document::with(['user', 'period'])
+            ->ofType(Document::TYPE_WEEKLY_PLAN);
+
+        // Reviewers and admins can see all documents, others see only their own
+        if (!$user->hasAnyRole(['reviewer', 'admin', 'verifier', 'approver'])) {
+            $query->forUser($user->id);
+        }
+
+        // Get current period for defaults
+        $currentPeriod = WorkPeriod::getCurrent();
+        $currentYear = date('Y');
+
+        // Filter by period - only filter if explicitly provided (not empty)
+        $periodId = $request->input('period_id');
+        if ($periodId && $periodId !== '') {
+            $query->forPeriod($periodId);
+        }
+
+        // Filter by year - only filter if explicitly provided (not empty)
+        $year = $request->input('year');
+        if ($year && $year !== '') {
+            $query->whereHas('period', function($q) use ($year) {
+                $q->where('year', $year);
+            });
+        }
+
+        $documents = $query->latest()->paginate(15)->withQueryString();
+
+        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $deadlineStatuses = null;
+        if ($currentPeriod) {
+            $deadlineStatuses = [
+                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
+                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
+                'plan_due' => $currentPeriod->plan_deadline,
+                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
+                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
+                'report_due' => $currentPeriod->report_deadline,
+            ];
+        }
+
+        $availableTypes = Document::getAvailableTypesForUser($user);
+
+        return view('documents.weekly-plans', [
+            'documents' => $documents,
+            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
+            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
+            'currentPeriod' => $currentPeriod,
+            'nextPeriod' => $nextPeriod,
+            'deadlineStatuses' => $deadlineStatuses,
+            'availableTypes' => $availableTypes,
+        ]);
+    }
+
+    /**
+     * Get plan's main target for a given period (API endpoint)
+     */
+    public function getPlanTarget(Request $request)
+    {
+        $user = Auth::user();
+        $periodId = $request->query('period_id');
+
+        if (!$periodId) {
+            return response()->json(['error' => 'Period ID is required'], 400);
+        }
+
+        $plan = Document::where('user_id', $user->id)
+            ->where('period_id', $periodId)
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->first();
+
+        if ($plan && $plan->main_target) {
+            return response()->json([
+                'main_target' => $plan->main_target,
+                'plan_exists' => true,
+            ]);
+        }
+
+        return response()->json([
+            'main_target' => null,
+            'plan_exists' => false,
+        ]);
+    }
+
+    /**
+     * Display weekly reports page
+     */
+    public function weeklyReports(Request $request)
+    {
+        $this->authorize('viewAny', Document::class);
+
+        $user = Auth::user();
+        $query = Document::with(['user', 'period'])
+            ->ofType(Document::TYPE_WEEKLY_REPORT);
+
+        // Reviewers and admins can see all documents, others see only their own
+        if (!$user->hasAnyRole(['reviewer', 'admin', 'verifier', 'approver'])) {
+            $query->forUser($user->id);
+        }
+
+        // Get current period for defaults
+        $currentPeriod = WorkPeriod::getCurrent();
+        $currentYear = date('Y');
+
+        // Filter by period - only filter if explicitly provided (not empty)
+        $periodId = $request->input('period_id');
+        if ($periodId && $periodId !== '') {
+            $query->forPeriod($periodId);
+        }
+
+        // Filter by year - only filter if explicitly provided (not empty)
+        $year = $request->input('year');
+        if ($year && $year !== '') {
+            $query->whereHas('period', function($q) use ($year) {
+                $q->where('year', $year);
+            });
+        }
+
+        $documents = $query->latest()->paginate(15)->withQueryString();
+
+        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $deadlineStatuses = null;
+        if ($currentPeriod) {
+            $deadlineStatuses = [
+                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
+                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
+                'plan_due' => $currentPeriod->plan_deadline,
+                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
+                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
+                'report_due' => $currentPeriod->report_deadline,
+            ];
+        }
+
+        $availableTypes = Document::getAvailableTypesForUser($user);
+
+        return view('documents.weekly-reports', [
+            'documents' => $documents,
+            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
+            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
+            'currentPeriod' => $currentPeriod,
+            'nextPeriod' => $nextPeriod,
+            'deadlineStatuses' => $deadlineStatuses,
+            'availableTypes' => $availableTypes,
+        ]);
     }
 }

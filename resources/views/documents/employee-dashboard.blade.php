@@ -285,7 +285,7 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <strong>{{ $document->getDataField('title', 'Untitled') }}</strong>
+                                                <strong>{{ $document->display_title }}</strong>
                                             </td>
                                             <td>
                                                 <small class="text-muted">
@@ -374,7 +374,7 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <strong>{{ $document->getDataField('title', 'Untitled') }}</strong>
+                                                <strong>{{ $document->display_title }}</strong>
                                             </td>
                                             <td>
                                                 <small class="text-muted">

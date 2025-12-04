@@ -4,16 +4,27 @@
         <i class="fe fe-menu navbar-toggler-icon"></i>
     </button>
 
-    <div class="d-none d-lg-flex">
-        <div class="input-group">
-            <div class="input-group-prepend">
-                <button type="button" class="btn btn-search pe-1" disabled>
-                    <i class="fe fe-building"></i>
-                </button>
+    <div class="d-none d-lg-flex align-items-center gap-3">
+    
+        @php
+            $currentPeriod = \App\Models\WorkPeriod::getCurrent();
+        @endphp
+        
+        @if($currentPeriod)
+            <div class="d-flex align-items-center text-muted">
+                <span class="small">
+                    Week {{ $currentPeriod->week_number }} • {{ $currentPeriod->date_range }}
+                </span>
+                <span class="badge badge-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }} ml-2">
+                    {{ ucfirst($currentPeriod->status) }}
+                </span>
             </div>
-            <input type="text" class="form-control" disabled
-                placeholder="{{ optional(Auth::user()->department)->name ?? 'No Department' }}" />
-        </div>
+        @else
+            <div class="d-flex align-items-center text-muted">
+                <i class="fe fe-calendar me-2"></i>
+                <span class="small">No active work period</span>
+            </div>
+        @endif
     </div>
 
 
@@ -69,13 +80,6 @@
                         </a>
                     </div>
 
-                    <div class="col-12">
-                        <a href="{{ route('chatify') }}"
-                            class="btn btn-light d-flex align-items-center justify-content-start py-2">
-                            <i class="fe fe-message-circle fs-4 text-success mr-2"></i>
-                            <span>Messages</span>
-                        </a>
-                    </div>
                 </div>
             </div>
         </li>

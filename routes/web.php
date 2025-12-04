@@ -21,6 +21,11 @@ Route::get('/', [DashboardController::class, 'redirect'])->middleware(['auth', '
 Route::get('/dashboard', [DashboardController::class, 'redirect'])
     ->middleware(['auth', 'verified'])->name('dashboard');
 
+// Redirect old employee dashboard to main dashboard
+Route::get('/documents/employee/dashboard', function () {
+    return redirect()->route('dashboard');
+})->middleware(['auth', 'verified']);
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile/settings', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile/settings', [ProfileController::class, 'update'])->name('profile.update');
@@ -30,6 +35,8 @@ Route::middleware('auth')->group(function () {
     // Documents routes
     Route::prefix('documents')->name('documents.')->group(function () {
         Route::get('/', [DocumentController::class, 'index'])->name('index');
+        Route::get('/weekly-plans', [DocumentController::class, 'weeklyPlans'])->name('weekly-plans');
+        Route::get('/weekly-reports', [DocumentController::class, 'weeklyReports'])->name('weekly-reports');
         Route::get('/create', [DocumentController::class, 'create'])->name('create');
         Route::post('/', [DocumentController::class, 'store'])->name('store');
         Route::get('/{id}', [DocumentController::class, 'show'])->name('show');
@@ -40,9 +47,6 @@ Route::middleware('auth')->group(function () {
 
         // Reviewer dashboard
         Route::get('/reviewer/dashboard', [DocumentController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
-
-        // Employee dashboard
-        Route::get('/employee/dashboard', [DocumentController::class, 'employeeDashboard'])->name('employee-dashboard');
     });
 
     // Minutes routes (restricted to minutes_preparer and admin - authorization handled in controller)

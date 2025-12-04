@@ -128,7 +128,7 @@ class PeriodStatsController extends Controller
     {
         return [
             'id' => $document->id,
-            'title' => $document->getDataField('title', 'Untitled'),
+            'title' => $document->display_title,
             'type' => $document->type,
             'state' => $document->state,
             'submitted_at' => $document->state === Document::STATE_SUBMITTED ? $document->updated_at : null,

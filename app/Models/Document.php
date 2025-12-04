@@ -34,7 +34,14 @@ class Document extends Model
         'user_id',
         'period_id',
         'type',
-        'data',
+        'file_path',
+        'title',
+        'file_size',
+        'original_filename',
+        'content',
+        'main_target',
+        'target_accomplished',
+        'target_explanation',
         'state',
     ];
 
@@ -46,7 +53,6 @@ class Document extends Model
     protected function casts(): array
     {
         return [
-            'data' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -89,6 +95,25 @@ class Document extends Model
     public function getTypeNameAttribute(): string
     {
         return self::getTypes()[$this->type] ?? ucwords(str_replace('_', ' ', $this->type));
+    }
+
+    /**
+     * Get display title (use title or generate from type and period)
+     *
+     * @return string
+     */
+    public function getDisplayTitleAttribute(): string
+    {
+        if ($this->title) {
+            return $this->title;
+        }
+
+        $typeName = $this->type_name;
+        if ($this->period) {
+            return $typeName . ' - Week ' . $this->period->week_number;
+        }
+
+        return $typeName;
     }
 
     /**
@@ -142,29 +167,56 @@ class Document extends Model
     }
 
     /**
-     * Get a specific data field
+     * Get the full file path (URL)
      *
-     * @param string $key
-     * @param mixed $default
-     * @return mixed
+     * @return string|null
      */
-    public function getDataField(string $key, $default = null)
+    public function getFileUrlAttribute(): ?string
     {
-        return data_get($this->data, $key, $default);
+        return $this->file_path ? asset('storage/' . $this->file_path) : null;
     }
 
     /**
-     * Set a specific data field
+     * Get the file path for storage
      *
-     * @param string $key
-     * @param mixed $value
-     * @return void
+     * @return string|null
      */
-    public function setDataField(string $key, $value): void
+    public function getStoragePathAttribute(): ?string
     {
-        $data = $this->data ?? [];
-        data_set($data, $key, $value);
-        $this->data = $data;
+        return $this->file_path ? storage_path('app/public/' . $this->file_path) : null;
+    }
+
+    /**
+     * Check if document has a file
+     *
+     * @return bool
+     */
+    public function hasFile(): bool
+    {
+        return !empty($this->file_path) && file_exists($this->storage_path);
+    }
+
+    /**
+     * Get human-readable file size
+     *
+     * @return string
+     */
+    public function getFormattedFileSizeAttribute(): string
+    {
+        if (!$this->file_size) {
+            return '0 B';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $size = $this->file_size;
+        $unit = 0;
+
+        while ($size >= 1024 && $unit < count($units) - 1) {
+            $size /= 1024;
+            $unit++;
+        }
+
+        return round($size, 2) . ' ' . $units[$unit];
     }
 
     /**

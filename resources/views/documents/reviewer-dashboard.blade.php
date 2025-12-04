@@ -212,7 +212,7 @@
                                                 <tr>
                                                     <td class="text-center">{{ $loop->iteration }}</td>
                                                     <td>
-                                                        <strong>{{ $document->getDataField('title', 'Untitled') }}</strong>
+                                                        <strong>{{ $document->display_title }}</strong>
                                                     </td>
                                                     <td>
                                                         <div class="d-flex align-items-center">

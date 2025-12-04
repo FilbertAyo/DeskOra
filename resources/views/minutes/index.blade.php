@@ -82,7 +82,7 @@
                                         <tr>
                                             <td class="text-center">{{ $loop->iteration }}</td>
                                             <td>
-                                                <strong>{{ $document->getDataField('title', 'Untitled Minutes') }}</strong>
+                                                <strong>{{ $document->display_title }}</strong>
                                             </td>
                                             <td>
                                                 @if($document->state === 'draft')

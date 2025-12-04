@@ -79,9 +79,6 @@
                         $available = $dashboardAvailableTypes ?? [];
                     @endphp
                     <div class="d-grid gap-2">
-                        <a href="{{ route('documents.employee-dashboard') }}" class="btn btn-outline-secondary btn-block mb-2">
-                            <i class="fe fe-home me-1"></i> Go to My Dashboard
-                        </a>
                         @if(isset($available['weekly_plan']))
                             <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-outline-info btn-block mb-2">
                                 <i class="fe fe-calendar me-1"></i> New Weekly Plan

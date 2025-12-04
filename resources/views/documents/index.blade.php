@@ -50,11 +50,15 @@
                             <form method="GET" action="{{ route('documents.index') }}" class="row">
                                 <div class="col-md-4 mb-2">
                                     <select name="type" class="form-control">
-                                        <option value="">All Types</option>
-                                        <option value="weekly_plan" {{ request('type') === 'weekly_plan' ? 'selected' : '' }}>Weekly Plans</option>
-                                        <option value="weekly_report" {{ request('type') === 'weekly_report' ? 'selected' : '' }}>Weekly Reports</option>
-                                        <option value="monthly_report" {{ request('type') === 'monthly_report' ? 'selected' : '' }}>Monthly Reports</option>
-                                        <option value="weekly_minutes" {{ request('type') === 'weekly_minutes' ? 'selected' : '' }}>Minutes</option>
+                                        @if(request('type') === 'monthly_report')
+                                            <option value="monthly_report" selected>Monthly Reports</option>
+                                        @else
+                                            <option value="">All Types</option>
+                                            <option value="weekly_plan" {{ request('type') === 'weekly_plan' ? 'selected' : '' }}>Weekly Plans</option>
+                                            <option value="weekly_report" {{ request('type') === 'weekly_report' ? 'selected' : '' }}>Weekly Reports</option>
+                                            <option value="monthly_report" {{ request('type') === 'monthly_report' ? 'selected' : '' }}>Monthly Reports</option>
+                                            <option value="weekly_minutes" {{ request('type') === 'weekly_minutes' ? 'selected' : '' }}>Minutes</option>
+                                        @endif
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-2">
@@ -176,7 +180,7 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <strong>{{ $document->getDataField('title', 'Untitled') }}</strong>
+                                                <strong>{{ $document->display_title }}</strong>
                                             </td>
                                             <td>
                                                 @if($document->user)

@@ -127,12 +127,12 @@
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="fe fe-clipboard me-2"></i>
-                        {{ $document->getDataField('title', 'Weekly Minutes') }}
+                        {{ $document->display_title }}
                     </h5>
                 </div>
                 <div class="card-body">
                     <div class="document-content">
-                        <pre class="bg-light p-3 rounded border" style="white-space: pre-wrap; font-family: inherit; font-size: 14px; line-height: 1.6;">{{ $document->getDataField('content', 'No content available.') }}</pre>
+                        <pre class="bg-light p-3 rounded border" style="white-space: pre-wrap; font-family: inherit; font-size: 14px; line-height: 1.6;">{{ $document->content ?? 'No content available.' }}</pre>
                     </div>
                 </div>
             </div>

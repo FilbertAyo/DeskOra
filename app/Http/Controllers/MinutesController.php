@@ -79,10 +79,8 @@ class MinutesController extends Controller
         $document = Document::create([
             'user_id' => $user->id,
             'type' => Document::TYPE_WEEKLY_MINUTES,
-            'data' => [
-                'content' => $request->content,
-                'title' => $request->title ?? 'Weekly Minutes - ' . now()->format('M d, Y'),
-            ],
+            'content' => $request->content,
+            'title' => $request->title ?? 'Weekly Minutes - ' . now()->format('M d, Y'),
             'state' => $state,
         ]);
 
@@ -172,13 +170,13 @@ class MinutesController extends Controller
             $this->authorize('submit', $document);
         }
 
-        $data = $document->data ?? [];
-        $data['content'] = $request->content;
+        $updateData = [
+            'content' => $request->content,
+        ];
+        
         if ($request->has('title')) {
-            $data['title'] = $request->title;
+            $updateData['title'] = $request->title;
         }
-
-        $updateData = ['data' => $data];
         
         // Update state if submitting
         if ($action === 'submit') {

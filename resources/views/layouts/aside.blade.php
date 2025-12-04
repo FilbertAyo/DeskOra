@@ -50,30 +50,16 @@
                 </li>
             @endif --}}
 
-            @if($showEmployeeDashboard)
-                <li class="nav-item {{ Request::routeIs('documents.employee-dashboard') ? 'active' : '' }}">
-                    <a href="{{ route('documents.employee-dashboard') }}" class="nav-link">
-                        <i class="fe fe-layout fe-16"></i>
-                        <span class="ml-3 item-text">My Weekly Dashboard</span>
-                        @php
-                            $pendingCount = \App\Models\Document::drafts()->forUser(Auth::id())->count();
-                        @endphp
-                        @if($pendingCount > 0)
-                            <span class="badge badge-warning ml-2">{{ $pendingCount }}</span>
-                        @endif
-                    </a>
-                </li>
-            @endif
 
-            <li class="nav-item {{ Request::routeIs('documents.index') && request('type') === 'weekly_plan' ? 'active' : '' }}">
-                <a href="{{ route('documents.index', ['type' => 'weekly_plan']) }}" class="nav-link">
-                    <i class="fe fe-layers fe-16"></i>
+            <li class="nav-item {{ Request::routeIs('documents.weekly-plans') ? 'active' : '' }}">
+                <a href="{{ route('documents.weekly-plans') }}" class="nav-link">
+                    <i class="fe fe-target fe-16"></i>
                     <span class="ml-3 item-text">Weekly Plans</span>
                 </a>
             </li>
-            <li class="nav-item {{ Request::routeIs('documents.index') && request('type') === 'weekly_report' ? 'active' : '' }}">
-                <a href="{{ route('documents.index', ['type' => 'weekly_report']) }}" class="nav-link">
-                    <i class="fe fe-list fe-16"></i>
+            <li class="nav-item {{ Request::routeIs('documents.weekly-reports') ? 'active' : '' }}">
+                <a href="{{ route('documents.weekly-reports') }}" class="nav-link">
+                    <i class="fe fe-activity fe-16"></i>
                     <span class="ml-3 item-text">Weekly Reports</span>
                 </a>
             </li>
@@ -94,8 +80,6 @@
             @endif
         </ul>
 
-        <!-- Monthly Reports -->
-        <p class="text-muted nav-heading mt-4 mb-1"><span>Monthly Reports</span></p>
         <ul class="navbar-nav flex-fill w-100">
             {{-- @if(isset($availableTypes['monthly_report']))
                 <li class="nav-item {{ (Request::routeIs('documents.create') && request('type') === 'monthly_report') ? 'active' : '' }}">

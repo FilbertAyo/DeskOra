@@ -106,7 +106,7 @@
                                             name="title"
                                             id="title"
                                             placeholder="Enter minutes title"
-                                            value="{{ old('title', $document->getDataField('title', '')) }}">
+                                            value="{{ old('title', $document->title ?? '') }}">
                                     </div>
                                     @error('title')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -125,7 +125,7 @@
                                         id="content"
                                         rows="20"
                                         placeholder="Enter the weekly minutes content here..."
-                                        required>{{ old('content', $document->getDataField('content', '')) }}</textarea>
+                                        required>{{ old('content', $document->content ?? '') }}</textarea>
                                     @error('content')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
