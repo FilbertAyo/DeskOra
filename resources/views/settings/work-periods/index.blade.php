@@ -3,7 +3,7 @@
     <!-- Success/Error Messages -->
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fe fe-check-circle me-2"></i>{{ session('success') }}
+            <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
@@ -12,7 +12,7 @@
 
     @if(session('error'))
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fe fe-alert-circle me-2"></i>{{ session('error') }}
+            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
@@ -21,7 +21,7 @@
 
     @if($errors->any())
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fe fe-alert-circle me-2"></i>
+            <i class="ti ti-alert-circle me-2"></i>
             <strong>Please fix the following errors:</strong>
             <ul class="mb-0 mt-2">
                 @foreach($errors->all() as $error)
@@ -34,26 +34,32 @@
         </div>
     @endif
 
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs border-0" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="periods-tab" data-toggle="tab" href="#periods" role="tab"
-                        aria-controls="periods" aria-selected="true">
-                        <i class="fe fe-calendar me-1"></i> Work Periods Management
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="col-auto d-flex align-items-center gap-2">
-            <button type="button" class="btn btn-sm btn-light" onclick="window.location.reload()" title="Refresh">
-                <i class="fe fe-refresh-ccw"></i>
-            </button>
-            @if(Auth::user()->hasRole('admin'))
-                <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#createWorkPeriodModal">
-                    <i class="fe fe-plus-circle me-1"></i> Add Work Period
-                </button>
-            @endif
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Work Periods Management</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('documents.index') }}">Documents</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Work Periods</li>
+                            </ul>
+                        </div>
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-light" onclick="window.location.reload()" title="Refresh">
+                                <i class="ti ti-refresh"></i>
+                            </button>
+                            @if(Auth::user()->hasPermissionTo('approve documents'))
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
+                                    <i class="ti ti-plus-circle me-1"></i> Add Work Period
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -66,7 +72,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <h5 class="mb-1">
-                                <i class="fe fe-calendar me-2 text-primary"></i>
+                                <i class="ti ti-calendar me-2 text-primary"></i>
                                 Current Period: Week {{ $currentPeriod->week_number }} of {{ $currentPeriod->year }}
                             </h5>
                             <p class="mb-0 text-muted">
@@ -119,10 +125,10 @@
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary me-2">
-                                <i class="fe fe-filter me-1"></i> Filter
+                                <i class="ti ti-filter me-1"></i> Filter
                             </button>
                             <a href="{{ route('work-periods.index') }}" class="btn btn-light">
-                                <i class="fe fe-x me-1"></i> Clear
+                                <i class="ti ti-x me-1"></i> Clear
                             </a>
                         </div>
                     </form>
@@ -141,22 +147,24 @@
                 <div class="card-body">
                     @if($periods->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead>
+                            <table class="table table-hover table-bordered">
+                                <thead class="thead-light">
                                     <tr>
+                                        <th class="text-center" style="width: 50px;">No.</th>
                                         <th>Year</th>
                                         <th>Week</th>
                                         <th>Date Range</th>
                                         <th>Plan Deadline</th>
                                         <th>Report Deadline</th>
-                                        <th>Status</th>
-                                        <th>Documents</th>
-                                        <th>Actions</th>
+                                        <th class="text-center" style="width: 110px;">Status</th>
+                                        <th class="text-center" style="width: 110px;">Documents</th>
+                                        <th class="text-center" style="width: 150px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($periods as $period)
+                                    @foreach($periods as $index => $period)
                                         <tr>
+                                            <td class="text-center">{{ ($periods->currentPage() - 1) * $periods->perPage() + $loop->iteration }}</td>
                                             <td><strong>{{ $period->year }}</strong></td>
                                             <td>Week {{ $period->week_number }}</td>
                                             <td>
@@ -165,53 +173,59 @@
                                             <td>
                                                 <small>{{ \Carbon\Carbon::parse($period->plan_deadline)->format('M d, Y') }}</small>
                                                 @if($period->isPlanDeadlineToday())
-                                                    <span class="badge badge-warning ml-1">Today</span>
+                                                    <span class="badge bg-warning ml-1">Today</span>
                                                 @elseif($period->isPlanDeadlinePassed())
-                                                    <span class="badge badge-danger ml-1">Passed</span>
+                                                    <span class="badge bg-danger ml-1">Passed</span>
                                                 @else
-                                                    <span class="badge badge-info ml-1">{{ $period->getDaysUntilPlanDeadline() }} days</span>
+                                                    <span class="badge bg-info ml-1">{{ $period->getDaysUntilPlanDeadline() }} days</span>
                                                 @endif
                                             </td>
                                             <td>
                                                 <small>{{ \Carbon\Carbon::parse($period->report_deadline)->format('M d, Y') }}</small>
                                                 @if($period->isReportDeadlineToday())
-                                                    <span class="badge badge-warning ml-1">Today</span>
+                                                    <span class="badge bg-warning ml-1">Today</span>
                                                 @elseif($period->isReportDeadlinePassed())
-                                                    <span class="badge badge-danger ml-1">Passed</span>
+                                                    <span class="badge bg-danger ml-1">Passed</span>
                                                 @else
-                                                    <span class="badge badge-info ml-1">{{ $period->getDaysUntilReportDeadline() }} days</span>
+                                                    <span class="badge bg-info ml-1">{{ $period->getDaysUntilReportDeadline() }} days</span>
                                                 @endif
                                             </td>
-                                            <td>
+                                            <td class="text-center">
                                                 @if($period->status === 'open')
-                                                    <span class="badge badge-success">Open</span>
+                                                    <span class="badge  bg-success">
+                                                        <i class="ti ti-circle-check me-1"></i>Open
+                                                    </span>
                                                 @elseif($period->status === 'closed')
-                                                    <span class="badge badge-secondary">Closed</span>
+                                                    <span class="badge  bg-secondary">
+                                                        <i class="ti ti-lock me-1"></i>Closed
+                                                    </span>
                                                 @else
-                                                    <span class="badge badge-dark">Archived</span>
+                                                    <span class="badge  bg-dark">
+                                                        <i class="ti ti-archive me-1"></i>Archived
+                                                    </span>
                                                 @endif
                                             </td>
-                                            <td>
-                                                <span class="badge badge-primary">{{ $period->documents()->count() }}</span>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary">{{ $period->documents()->count() }}</span>
                                             </td>
-                                            <td>
-                                                <div class="btn-group" role="group">
+                                            <td class="text-center">
+                                                <div class="btn-group btn-group-sm" role="group">
                                                     <a href="{{ route('work-periods.show', Hashids::encode($period->id)) }}"
-                                                       class="btn btn-sm btn-info" title="View">
-                                                        <i class="fe fe-eye"></i>
+                                                       class="btn btn-info text-white" title="View">
+                                                        <i class="ti ti-eye"></i>
                                                     </a>
-                                                    @if(Auth::user()->hasRole('admin'))
+                                                    @if(Auth::user()->hasPermissionTo('approve documents'))
                                                         <a href="{{ route('work-periods.edit', Hashids::encode($period->id)) }}"
-                                                           class="btn btn-sm btn-warning" title="Edit">
-                                                            <i class="fe fe-edit"></i>
+                                                           class="btn btn-primary text-white" title="Edit">
+                                                            <i class="ti ti-edit"></i>
                                                         </a>
                                                         @if($period->status === 'open')
                                                             <form action="{{ route('work-periods.close', Hashids::encode($period->id)) }}"
                                                                   method="POST" class="d-inline"
                                                                   onsubmit="return confirm('Are you sure you want to close this period?');">
                                                                 @csrf
-                                                                <button type="submit" class="btn btn-sm btn-secondary" title="Close">
-                                                                    <i class="fe fe-lock"></i>
+                                                                <button type="submit" class="btn btn-secondary" title="Close">
+                                                                    <i class="ti ti-lock"></i>
                                                                 </button>
                                                             </form>
                                                         @endif
@@ -230,11 +244,11 @@
                         </div>
                     @else
                         <div class="text-center py-5">
-                            <i class="fe fe-calendar fs-1 text-muted"></i>
+                            <i class="ti ti-calendar fs-1 text-muted"></i>
                             <p class="text-muted mt-3">No work periods found.</p>
-                            @if(Auth::user()->hasRole('admin'))
-                                <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#createWorkPeriodModal">
-                                    <i class="fe fe-plus-circle me-1"></i> Create First Work Period
+                            @if(Auth::user()->hasPermissionTo('approve documents'))
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
+                                    <i class="ti ti-plus-circle me-1"></i> Create First Work Period
                                 </button>
                             @endif
                         </div>
@@ -245,7 +259,7 @@
     </div>
 
     <!-- Create Work Period Modal -->
-    @if(Auth::user()->hasRole('admin'))
+    @if(Auth::user()->hasPermissionTo('approve documents'))
     <div class="modal fade" id="createWorkPeriodModal" tabindex="-1" role="dialog" aria-labelledby="createWorkPeriodModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
@@ -253,21 +267,19 @@
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title" id="createWorkPeriodModalLabel">
-                            <i class="fe fe-calendar me-2"></i>Create Work Period
+                            <i class="ti ti-calendar me-2"></i>Create Work Period
                         </h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-info">
-                            <i class="fe fe-info me-2"></i>
+                            <i class="ti ti-info me-2"></i>
                             <strong>Important:</strong>
                             <ul class="mb-0 mt-2">
                                 <li>Week will run from Monday to Sunday</li>
                                 <li>Plan deadline: Friday (to submit plan for the NEXT week)</li>
                                 <li>Report deadline: Saturday (to submit report for THIS week)</li>
-                                <li>After creating this period, future weeks will be created automatically every Sunday</li>
+                                <li>Next week is auto-created every Thursday (one week ahead only)</li>
                             </ul>
                         </div>
 
@@ -280,7 +292,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-calendar"></i>
+                                            <i class="ti ti-calendar"></i>
                                         </span>
                                         <input type="number"
                                             class="form-control @error('year') is-invalid @enderror"
@@ -288,7 +300,8 @@
                                             id="modal_year"
                                             min="2020"
                                             max="2100"
-                                            value="{{ old('year', $currentYear ?? date('Y')) }}"
+                                            value="{{ old('year', $nextWeekYear) }}"
+                                            readonly
                                             required>
                                     </div>
                                     @error('year')
@@ -305,7 +318,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-hash"></i>
+                                            <i class="ti ti-hash"></i>
                                         </span>
                                         <input type="number"
                                             class="form-control @error('week_number') is-invalid @enderror"
@@ -313,7 +326,8 @@
                                             id="modal_week_number"
                                             min="1"
                                             max="53"
-                                            value="{{ old('week_number', isset($lastPeriod) && $lastPeriod ? ($lastPeriod->year == date('Y') ? $lastPeriod->week_number + 1 : 1) : 1) }}"
+                                            value="{{ old('week_number', $nextWeekNumber) }}"
+                                            readonly
                                             required>
                                     </div>
                                     @error('week_number')
@@ -331,31 +345,34 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-calendar"></i>
+                                            <i class="ti ti-calendar"></i>
                                         </span>
                                         <input type="date"
                                             class="form-control @error('week_start_date') is-invalid @enderror"
                                             name="week_start_date"
                                             id="modal_week_start_date"
-                                            value="{{ old('week_start_date', isset($lastPeriod) && $lastPeriod ? \Carbon\Carbon::parse($lastPeriod->week_end_date)->addDay()->format('Y-m-d') : '') }}"
+                                            value="{{ old('week_start_date', $nextWeekStartDate->format('Y-m-d')) }}"
+                                            min="{{ $nextWeekStartDate->format('Y-m-d') }}"
+                                            max="{{ $nextWeekStartDate->format('Y-m-d') }}"
+                                            readonly
                                             required>
                                     </div>
                                     @error('week_start_date')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
                                     <small class="form-text text-muted">
-                                        The Monday of the week. End date and deadlines will be calculated automatically.
+                                        Fixed to next Monday only (you cannot create two weeks ahead).
                                     </small>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-dismiss="modal">
-                            <i class="fe fe-x me-1"></i> Cancel
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="ti ti-x me-1"></i> Cancel
                         </button>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fe fe-save me-1"></i> Create Work Period
+                            <i class="ti ti-save me-1"></i> Create Work Period
                         </button>
                     </div>
                 </form>
@@ -364,21 +381,69 @@
     </div>
     @endif
 
+    <div id="periodScriptData"
+        data-has-errors="{{ ($errors->any()) ? '1' : '0' }}"
+        data-has-success="{{ session('success') ? '1' : '0' }}"
+        data-next-week-year="{{ $nextWeekYear }}"
+        data-next-week-number="{{ $nextWeekNumber }}"
+        data-next-week-start="{{ $nextWeekStartDate->format('Y-m-d') }}"
+        class="d-none"></div>
+
     @push('scripts')
     <script>
+        const periodScriptData = document.getElementById('periodScriptData');
+        const hasPeriodFormErrors = periodScriptData?.dataset?.hasErrors === '1';
+        const hasPeriodSuccess = periodScriptData?.dataset?.hasSuccess === '1';
+        const nextWeekYear = periodScriptData?.dataset?.nextWeekYear;
+        const nextWeekNumber = periodScriptData?.dataset?.nextWeekNumber;
+        const nextWeekStart = periodScriptData?.dataset?.nextWeekStart;
+
+        const yearInput = document.getElementById('modal_year');
+        const weekInput = document.getElementById('modal_week_number');
+        const weekStartInput = document.getElementById('modal_week_start_date');
+
+        function enforceNextWeekOnlyValues() {
+            if (yearInput && nextWeekYear) {
+                yearInput.value = nextWeekYear;
+            }
+            if (weekInput && nextWeekNumber) {
+                weekInput.value = nextWeekNumber;
+            }
+            if (weekStartInput && nextWeekStart) {
+                weekStartInput.value = nextWeekStart;
+                weekStartInput.min = nextWeekStart;
+                weekStartInput.max = nextWeekStart;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            enforceNextWeekOnlyValues();
+
+            const modalEl = document.getElementById('createWorkPeriodModal');
+            if (modalEl) {
+                modalEl.addEventListener('shown.bs.modal', function () {
+                    enforceNextWeekOnlyValues();
+                });
+            }
+        });
+
         // Open modal if there are validation errors
-        @if($errors->any() || session('error'))
-            $(document).ready(function() {
-                $('#createWorkPeriodModal').modal('show');
-            });
-        @endif
+        if (hasPeriodFormErrors) {
+            const modalEl = document.getElementById('createWorkPeriodModal');
+            if (modalEl && window.bootstrap?.Modal) {
+                const modal = new window.bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        }
 
         // Close modal on successful submission (if no errors)
-        @if(session('success'))
-            $(document).ready(function() {
-                $('#createWorkPeriodModal').modal('hide');
-            });
-        @endif
+        if (hasPeriodSuccess) {
+            const modalEl = document.getElementById('createWorkPeriodModal');
+            if (modalEl && window.bootstrap?.Modal) {
+                const modal = window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl);
+                modal.hide();
+            }
+        }
     </script>
     @endpush
 

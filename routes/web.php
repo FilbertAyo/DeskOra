@@ -6,7 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DepositController;
 use App\Http\Controllers\DocumentController;
-use App\Http\Controllers\MinutesController;
+use App\Http\Controllers\ActionLogController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PettyController;
 use App\Http\Controllers\ProfileController;
@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [DocumentController::class, 'index'])->name('index');
         Route::get('/weekly-plans', [DocumentController::class, 'weeklyPlans'])->name('weekly-plans');
         Route::get('/weekly-reports', [DocumentController::class, 'weeklyReports'])->name('weekly-reports');
+        Route::get('/plan-target', [DocumentController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentController::class, 'create'])->name('create');
         Route::post('/', [DocumentController::class, 'store'])->name('store');
         Route::get('/{id}', [DocumentController::class, 'show'])->name('show');
@@ -44,20 +45,21 @@ Route::middleware('auth')->group(function () {
         Route::put('/{id}', [DocumentController::class, 'update'])->name('update');
         Route::delete('/{id}', [DocumentController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/submit', [DocumentController::class, 'submit'])->name('submit');
+        Route::post('/{id}/reject', [DocumentController::class, 'reject'])->name('reject');
 
         // Reviewer dashboard
         Route::get('/reviewer/dashboard', [DocumentController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
     });
 
-    // Minutes routes (restricted to minutes_preparer and admin - authorization handled in controller)
-    Route::prefix('minutes')->name('minutes.')->group(function () {
-        Route::get('/', [MinutesController::class, 'index'])->name('index');
-        Route::get('/create', [MinutesController::class, 'create'])->name('create');
-        Route::post('/', [MinutesController::class, 'store'])->name('store');
-        Route::get('/{id}', [MinutesController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [MinutesController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [MinutesController::class, 'update'])->name('update');
-        Route::delete('/{id}', [MinutesController::class, 'destroy'])->name('destroy');
+    // Action Logs routes (restricted to minutes_preparer and admin - authorization handled in controller)
+    Route::prefix('action-logs')->name('action-logs.')->group(function () {
+        Route::get('/', [ActionLogController::class, 'index'])->name('index');
+        Route::get('/create', [ActionLogController::class, 'create'])->name('create');
+        Route::post('/', [ActionLogController::class, 'store'])->name('store');
+        Route::get('/{id}', [ActionLogController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [ActionLogController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [ActionLogController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ActionLogController::class, 'destroy'])->name('destroy');
     });
 
     // Comments routes

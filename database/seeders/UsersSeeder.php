@@ -6,7 +6,7 @@ use App\Models\Department;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class UsersSeeder extends Seeder
 {
@@ -38,15 +38,36 @@ class UsersSeeder extends Seeder
         $hrDept = Department::where('name', 'Human Resources')->first();
         $itDept = Department::where('name', 'IT')->first();
 
-        // Get roles
-        $adminRole = Role::where('name', 'admin')->first();
-        $staffRole = Role::where('name', 'staff')->first();
-        $minutesPreparerRole = Role::where('name', 'minutes_preparer')->first();
-        $verifierRole = Role::where('name', 'verifier')->first();
-        $approverRole = Role::where('name', 'approver')->first();
+        // Define permission sets
+        $adminPermissions = Permission::all()->pluck('name')->toArray();
+        
+        $staffPermissions = [
+            'create weekly plan',
+            'create weekly report',
+            'create monthly report',
+            'view own documents',
+            'edit own documents',
+            'delete own documents',
+            'submit documents',
+            'view dashboard',
+            'request pettycash',
+        ];
+
+        $actionLogPermissions = [
+            'view own documents',
+            'edit own documents',
+            'delete own documents',
+            'submit documents',
+            'view action logs',
+            'create action logs',
+            'manage action logs',
+            'view dashboard',
+        ];
+
+        $approverPermissions = Permission::all()->pluck('name')->toArray();
 
         // ============================================
-        // ADMIN USERS
+        // ADMIN USERS (All permissions)
         // ============================================
         $adminUsers = [
             [
@@ -56,26 +77,24 @@ class UsersSeeder extends Seeder
                 'phone' => '0712345678',
                 'department_id' => $adminDept->id,
                 'status' => 'active',
-                'role' => $adminRole,
+                'permissions' => $adminPermissions,
             ],
         ];
 
         foreach ($adminUsers as $userData) {
-            $role = $userData['role'];
-            unset($userData['role']);
+            $permissions = $userData['permissions'];
+            unset($userData['permissions']);
 
             $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
 
-            if (!$user->hasRole($role->name)) {
-                $user->assignRole($role);
-            }
+            $user->syncPermissions($permissions);
         }
 
         // ============================================
-        // STAFF USERS (Write weekly plan, weekly report, monthly report)
+        // STAFF USERS (Create documents - initial permissions)
         // ============================================
         $staffUsers = [
             [
@@ -85,7 +104,7 @@ class UsersSeeder extends Seeder
                 'phone' => '0711111111',
                 'department_id' => $opsDept->id,
                 'status' => 'active',
-                'role' => $staffRole,
+                'permissions' => $staffPermissions,
             ],
             [
                 'name' => 'Jane Smith',
@@ -94,7 +113,7 @@ class UsersSeeder extends Seeder
                 'phone' => '0711111112',
                 'department_id' => $opsDept->id,
                 'status' => 'active',
-                'role' => $staffRole,
+                'permissions' => $staffPermissions,
             ],
             [
                 'name' => 'Michael Johnson',
@@ -103,7 +122,7 @@ class UsersSeeder extends Seeder
                 'phone' => '0711111113',
                 'department_id' => $financeDept->id,
                 'status' => 'active',
-                'role' => $staffRole,
+                'permissions' => $staffPermissions,
             ],
             [
                 'name' => 'Sarah Williams',
@@ -112,28 +131,26 @@ class UsersSeeder extends Seeder
                 'phone' => '0711111114',
                 'department_id' => $hrDept->id,
                 'status' => 'active',
-                'role' => $staffRole,
+                'permissions' => $staffPermissions,
             ],
         ];
 
         foreach ($staffUsers as $userData) {
-            $role = $userData['role'];
-            unset($userData['role']);
+            $permissions = $userData['permissions'];
+            unset($userData['permissions']);
 
             $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
 
-            if (!$user->hasRole($role->name)) {
-                $user->assignRole($role);
-            }
+            $user->syncPermissions($permissions);
         }
 
         // ============================================
-        // MINUTES_PREPARER USERS (Prepare minutes and action logs)
+        // ACTION LOG USERS (Create/manage action logs)
         // ============================================
-        $minutesPreparerUsers = [
+        $actionLogUsers = [
             [
                 'name' => 'David Brown',
                 'email' => 'minutes1@example.com',
@@ -141,7 +158,7 @@ class UsersSeeder extends Seeder
                 'phone' => '0722222221',
                 'department_id' => $adminDept->id,
                 'status' => 'active',
-                'role' => $minutesPreparerRole,
+                'permissions' => $actionLogPermissions,
             ],
             [
                 'name' => 'Emily Davis',
@@ -150,73 +167,24 @@ class UsersSeeder extends Seeder
                 'phone' => '0722222222',
                 'department_id' => $opsDept->id,
                 'status' => 'active',
-                'role' => $minutesPreparerRole,
+                'permissions' => $actionLogPermissions,
             ],
         ];
 
-        foreach ($minutesPreparerUsers as $userData) {
-            $role = $userData['role'];
-            unset($userData['role']);
+        foreach ($actionLogUsers as $userData) {
+            $permissions = $userData['permissions'];
+            unset($userData['permissions']);
 
             $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
 
-            if (!$user->hasRole($role->name)) {
-                $user->assignRole($role);
-            }
+            $user->syncPermissions($permissions);
         }
 
         // ============================================
-        // VERIFIER USERS (Staff + Minutes Preparer + Verify permissions)
-        // ============================================
-        $verifierUsers = [
-            [
-                'name' => 'Robert Wilson',
-                'email' => 'verifier1@example.com',
-                'password' => Hash::make('password'),
-                'phone' => '0733333331',
-                'department_id' => $opsDept->id,
-                'status' => 'active',
-                'role' => $verifierRole,
-            ],
-            [
-                'name' => 'Lisa Anderson',
-                'email' => 'verifier2@example.com',
-                'password' => Hash::make('password'),
-                'phone' => '0733333332',
-                'department_id' => $financeDept->id,
-                'status' => 'active',
-                'role' => $verifierRole,
-            ],
-            [
-                'name' => 'James Taylor',
-                'email' => 'verifier3@example.com',
-                'password' => Hash::make('password'),
-                'phone' => '0733333333',
-                'department_id' => $itDept->id,
-                'status' => 'active',
-                'role' => $verifierRole,
-            ],
-        ];
-
-        foreach ($verifierUsers as $userData) {
-            $role = $userData['role'];
-            unset($userData['role']);
-
-            $user = User::firstOrCreate(
-                ['email' => $userData['email']],
-                $userData
-            );
-
-            if (!$user->hasRole($role->name)) {
-                $user->assignRole($role);
-            }
-        }
-
-        // ============================================
-        // APPROVER USERS (Boss role - can do everything)
+        // APPROVER USERS (Can approve documents - all permissions)
         // ============================================
         $approverUsers = [
             [
@@ -226,7 +194,7 @@ class UsersSeeder extends Seeder
                 'phone' => '0744444441',
                 'department_id' => $adminDept->id,
                 'status' => 'active',
-                'role' => $approverRole,
+                'permissions' => $approverPermissions,
             ],
             [
                 'name' => 'Operations Manager',
@@ -235,7 +203,7 @@ class UsersSeeder extends Seeder
                 'phone' => '0744444442',
                 'department_id' => $opsDept->id,
                 'status' => 'active',
-                'role' => $approverRole,
+                'permissions' => $approverPermissions,
             ],
             [
                 'name' => 'Finance Director',
@@ -244,22 +212,20 @@ class UsersSeeder extends Seeder
                 'phone' => '0744444443',
                 'department_id' => $financeDept->id,
                 'status' => 'active',
-                'role' => $approverRole,
+                'permissions' => $approverPermissions,
             ],
         ];
 
         foreach ($approverUsers as $userData) {
-            $role = $userData['role'];
-            unset($userData['role']);
+            $permissions = $userData['permissions'];
+            unset($userData['permissions']);
 
             $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
 
-            if (!$user->hasRole($role->name)) {
-                $user->assignRole($role);
-            }
+            $user->syncPermissions($permissions);
         }
 
         $this->command->info('Users seeded successfully!');

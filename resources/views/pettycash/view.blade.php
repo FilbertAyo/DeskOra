@@ -13,7 +13,7 @@
         </div>
         <div class="col-auto">
             <a href="{{ route('petty.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="fe fe-arrow-left me-2"></i>Back to Requests
+                <i class="ti ti-arrow-left me-2"></i>Back to Requests
             </a>
         </div>
     </div>
@@ -23,14 +23,14 @@
         <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none" role="alert">
             <div class="d-flex align-items-center flex-grow-1">
                 <div class="alert-icon me-3">
-                    <i class="fe fe-alert-triangle fs-3"></i>
+                    <i class="ti ti-alert-triangle fs-3"></i>
                 </div>
                 <div class="flex-grow-1">
                     <h6 class="alert-heading mb-1">Attachment Required</h6>
                     <p class="mb-0">Please upload the required attachment for this transport request.</p>
                 </div>
                 <button class="btn btn-warning ms-3" data-toggle="modal" data-target="#uploadAttachmentModal">
-                    <i class="fe fe-upload me-2"></i>Upload Now
+                    <i class="ti ti-upload me-2"></i>Upload Now
                 </button>
             </div>
             <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -39,14 +39,14 @@
         <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none" role="alert">
             <div class="d-flex align-items-center flex-grow-1">
                 <div class="alert-icon me-3">
-                    <i class="fe fe-alert-triangle fs-3"></i>
+                    <i class="ti ti-alert-triangle fs-3"></i>
                 </div>
                 <div class="flex-grow-1">
                     <h6 class="alert-heading mb-1">Attachment Required</h6>
                     <p class="mb-0">Please upload the required attachment for your office supplies request.</p>
                 </div>
                 <button class="btn btn-warning ms-3" data-toggle="modal" data-target="#uploadAttachmentModal">
-                    <i class="fe fe-upload me-2"></i>Upload Now
+                    <i class="ti ti-upload me-2"></i>Upload Now
                 </button>
             </div>
             <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -61,7 +61,7 @@
                 @method('POST')
                 <div class="modal-header bg-light border-bottom-0">
                     <h5 class="modal-title fw-bold d-flex align-items-center" id="uploadAttachmentModalLabel">
-                        <i class="fe fe-upload me-2 text-primary"></i>
+                        <i class="ti ti-upload me-2 text-primary"></i>
                         <span>Upload Attachment</span>
                     </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -78,7 +78,7 @@
                 <div class="modal-footer border-top-0">
                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary d-flex align-items-center">
-                        <i class="fe fe-upload me-2"></i>Upload
+                        <i class="ti ti-upload me-2"></i>Upload
                     </button>
                 </div>
             </form>
@@ -98,12 +98,12 @@
                         <div class="d-flex gap-2">
                             @if ($request->status == 'approved' || $request->status == 'paid')
                                 <button type="button" class="btn btn-outline-success d-flex align-items-center" data-toggle="modal" data-target="#pettyCashModal">
-                                    <i class="fe fe-download me-2"></i>Download PDF
+                                    <i class="ti ti-download me-2"></i>Download PDF
                                 </button>
                             @endif
                             @if ($request->status == 'pending' || $request->status == 'resubmission')
                                 <a href="{{ route('petty.edit.step1', \Vinkla\Hashids\Facades\Hashids::encode($request->id)) }}" class="btn btn-outline-warning d-flex align-items-center">
-                                    <i class="fe fe-edit me-2"></i>Edit Request
+                                    <i class="ti ti-edit me-2"></i>Edit Request
                                 </a>
                             @endif
                         </div>
@@ -151,7 +151,7 @@
                                 @endphp
                                 @if ($request->status == 'resubmission')
                                     <a href="{{ route('petty.edit.step1', \Vinkla\Hashids\Facades\Hashids::encode($request->id)) }}" class="btn btn-{{ $statusInfo['class'] }} text-white d-inline-flex align-items-center px-3 py-2">
-                                        <i class="fe fe-edit me-2"></i>
+                                        <i class="ti ti-edit me-2"></i>
                                         Edit & Resubmit
                                     </a>
                                 @else
@@ -172,7 +172,7 @@
                         <div class="col-12">
                             <div class="alert alert-primary border-0 text-center py-4 mb-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                                 <div class="d-flex align-items-center justify-content-center">
-                                    <i class="fe fe-dollar-sign fs-1 me-3"></i>
+                                    <i class="ti ti-dollar-sign fs-1 me-3"></i>
                                     <div>
                                         <h4 class="mb-1 fw-bold">Total Amount</h4>
                                         <h2 class="mb-0">TZS {{ number_format($request->amount, 2) }}</h2>

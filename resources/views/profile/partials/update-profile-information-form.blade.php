@@ -10,12 +10,12 @@
                             <img src="{{ asset(Auth::user()->file ?? 'image/prof.jpeg') }}" alt="Profile Picture"
                                 class="avatar-img rounded-circle shadow-sm" style="width: 150px; height: 150px; object-fit: cover;" />
                             <div class="avatar-overlay">
-                                <i class="fe fe-camera"></i>
+                                <i class="ti ti-camera"></i>
                             </div>
                         </a>
                     </div>
                     <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#exampleModal">
-                        <i class="fe fe-edit-2 mr-1"></i>Change Photo
+                        <i class="ti ti-edit-2 mr-1"></i>Change Photo
                     </button>
                     <p class="text-muted small mt-2 mb-0">JPG, PNG or JPEG. Max 2MB</p>
                 </div>
@@ -31,11 +31,11 @@
                         <h3 class="mb-2">{{ $user->name }}</h3>
                         <div class="d-flex flex-wrap gap-3 text-muted">
                             <div class="d-flex align-items-center mr-4">
-                                <i class="fe fe-mail mr-2 text-primary"></i>
+                                <i class="ti ti-mail mr-2 text-primary"></i>
                                 <span>{{ $user->email }}</span>
                             </div>
                             <div class="d-flex align-items-center">
-                                <i class="fe fe-phone mr-2 text-primary"></i>
+                                <i class="ti ti-phone mr-2 text-primary"></i>
                                 <span>{{ $user->phone }}</span>
                             </div>
                         </div>
@@ -48,14 +48,14 @@
                         @csrf
                         @method('PATCH')
                         <div class="form-row">
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-12">
                                 <label for="name">Full Name</label>
                                 <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name', $user->name) }}" required>
                                 @error('name')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-12">
                                 <label for="email">Email</label>
                                 <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email', $user->email) }}" required>
                                 @error('email')
@@ -64,14 +64,14 @@
                             </div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-12">
                                 <label for="phone">Phone</label>
                                 <input type="text" class="form-control @error('phone') is-invalid @enderror" id="phone" name="phone" value="{{ old('phone', $user->phone) }}" placeholder="0XXXXXXXXX">
                                 @error('phone')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-12">
                                 <label for="notification_channel">Notification Channel</label>
                                 <select id="notification_channel" name="notification_channel" class="form-control @error('notification_channel') is-invalid @enderror">
                                     @php($currentChannel = old('notification_channel', $user->notification_channel ?? 'sms'))
@@ -86,7 +86,7 @@
                         </div>
                         <div class="text-right">
                             <button type="submit" class="btn btn-primary">
-                                <i class="fe fe-save mr-1"></i>Save Changes
+                                <i class="ti ti-save mr-1"></i>Save Changes
                             </button>
                         </div>
                     </form>
@@ -96,9 +96,7 @@
                         <div class="col-md-6 mb-3">
                             <div class="info-item p-3 bg-light rounded">
                                 <div class="d-flex align-items-center">
-                                    <div class="icon-circle bg-white shadow-sm mr-3">
-                                        <i class="fe fe-briefcase text-primary"></i>
-                                    </div>
+                                    
                                     <div>
                                         <small class="text-muted d-block">Department</small>
                                         <strong class="text-dark">{{ $user->department->name ?? 'N/A' }}</strong>
@@ -111,9 +109,7 @@
                         <div class="col-md-6 mb-3">
                             <div class="info-item p-3 bg-light rounded">
                                 <div class="d-flex align-items-center">
-                                    <div class="icon-circle bg-white shadow-sm mr-3">
-                                        <i class="fe fe-calendar text-primary"></i>
-                                    </div>
+                                  
                                     <div>
                                         <small class="text-muted d-block">Member Since</small>
                                         <strong class="text-dark">{{ $user->created_at->format('M d, Y') }}</strong>
@@ -133,7 +129,7 @@
             <div class="modal-content">
                 <div class="modal-header border-0">
                     <h5 class="modal-title" id="exampleModalLabel">
-                        <i class="fe fe-image mr-2"></i>Upload Profile Image
+                        <i class="ti ti-image mr-2"></i>Upload Profile Image
                     </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -150,7 +146,7 @@
                                 <label class="custom-file-label" for="profile_image">Select file...</label>
                             </div>
                             <small class="form-text text-muted">
-                                <i class="fe fe-info mr-1"></i>Accepted formats: JPG, JPEG, PNG. Maximum size: 2MB
+                                <i class="ti ti-info mr-1"></i>Accepted formats: JPG, JPEG, PNG. Maximum size: 2MB
                             </small>
                         </div>
                         <div class="text-right mt-4">

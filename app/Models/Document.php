@@ -17,13 +17,14 @@ class Document extends Model
     public const TYPE_WEEKLY_PLAN = 'weekly_plan';
     public const TYPE_WEEKLY_REPORT = 'weekly_report';
     public const TYPE_MONTHLY_REPORT = 'monthly_report';
-    public const TYPE_WEEKLY_MINUTES = 'weekly_minutes';
+    public const TYPE_ACTION_LOG = 'action_log';
 
     /**
      * Document State Constants
      */
     public const STATE_DRAFT = 'draft';
     public const STATE_SUBMITTED = 'submitted';
+    public const REVIEW_REJECTION_PREFIX = '[REJECT_TO_DRAFT] ';
 
     /**
      * The attributes that are mass assignable.
@@ -35,6 +36,9 @@ class Document extends Model
         'period_id',
         'type',
         'file_path',
+        'attachment',
+        'month',
+        'year',
         'title',
         'file_size',
         'original_filename',
@@ -56,6 +60,8 @@ class Document extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
+            // Used for template-based weekly_plan/weekly_report forms.
+            'content' => 'array',
         ];
     }
 
@@ -70,7 +76,7 @@ class Document extends Model
             self::TYPE_WEEKLY_PLAN => 'Weekly Plan',
             self::TYPE_WEEKLY_REPORT => 'Weekly Report',
             self::TYPE_MONTHLY_REPORT => 'Monthly Report',
-            self::TYPE_WEEKLY_MINUTES => 'Weekly Minutes',
+            self::TYPE_ACTION_LOG => 'Action Log',
         ];
     }
 
@@ -341,14 +347,14 @@ class Document extends Model
     }
 
     /**
-     * Scope: Get weekly minutes
+     * Scope: Get action logs
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeWeeklyMinutes($query)
+    public function scopeActionLogs($query)
     {
-        return $query->where('type', self::TYPE_WEEKLY_MINUTES);
+        return $query->where('type', self::TYPE_ACTION_LOG);
     }
 
     /**
@@ -364,17 +370,6 @@ class Document extends Model
             self::TYPE_WEEKLY_REPORT,
             self::TYPE_MONTHLY_REPORT,
         ]);
-    }
-
-    /**
-     * Scope: Get documents for minutes preparer
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeMinutesDocuments($query)
-    {
-        return $query->where('type', self::TYPE_WEEKLY_MINUTES);
     }
 
     /**
@@ -422,8 +417,8 @@ class Document extends Model
      */
     public static function canUserCreateType(User $user, string $type, ?WorkPeriod $period = null): bool
     {
-        // For weekly plans and reports, check if period is open
-        if (in_array($type, [self::TYPE_WEEKLY_PLAN, self::TYPE_WEEKLY_REPORT])) {
+        // For weekly plans, reports, and minutes, check if period is open
+        if (in_array($type, [self::TYPE_WEEKLY_PLAN, self::TYPE_WEEKLY_REPORT, self::TYPE_ACTION_LOG])) {
             // If period is provided, check if it's open
             if ($period && !$period->isOpen()) {
                 return false;
@@ -438,23 +433,24 @@ class Document extends Model
             }
         }
 
-        // Staff can create plans and reports
-        if ($user->hasRole('staff')) {
-            return in_array($type, [
-                self::TYPE_WEEKLY_PLAN,
-                self::TYPE_WEEKLY_REPORT,
-                self::TYPE_MONTHLY_REPORT,
-            ]);
-        }
-
-        // Minutes preparer can only create weekly minutes
-        if ($user->hasRole('minutes_preparer')) {
-            return $type === self::TYPE_WEEKLY_MINUTES;
-        }
-
-        // Admin and approver can create any type
-        if ($user->hasAnyRole(['admin', 'approver'])) {
+        // Users with approve documents permission can create any type
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
+        }
+
+        // Check specific create permissions for each document type
+        switch ($type) {
+            case self::TYPE_WEEKLY_PLAN:
+            case self::TYPE_WEEKLY_REPORT:
+            case self::TYPE_MONTHLY_REPORT:
+                return $user->hasAnyPermission([
+                    'create weekly plan',
+                    'create weekly report',
+                    'create monthly report'
+                ]);
+            
+            case self::TYPE_ACTION_LOG:
+                return $user->hasPermissionTo('create action logs');
         }
 
         return false;
@@ -508,5 +504,33 @@ class Document extends Model
     public function canBeDeleted(): bool
     {
         return $this->isDraft();
+    }
+
+    /**
+     * Get latest rejection reason if document was returned to draft.
+     */
+    public function latestRejectionReason(): ?string
+    {
+        $latestComment = $this->relationLoaded('comments')
+            ? $this->comments->first()
+            : $this->comments()->first();
+
+        if (!$latestComment || !is_string($latestComment->comment)) {
+            return null;
+        }
+
+        if (!str_starts_with($latestComment->comment, self::REVIEW_REJECTION_PREFIX)) {
+            return null;
+        }
+
+        return trim(substr($latestComment->comment, strlen(self::REVIEW_REJECTION_PREFIX)));
+    }
+
+    /**
+     * Check if this draft document was returned for revision by reviewer.
+     */
+    public function isReturnedForRevision(): bool
+    {
+        return $this->isDraft() && $this->latestRejectionReason() !== null;
     }
 }

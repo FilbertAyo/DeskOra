@@ -1,58 +1,128 @@
 <x-guest-layout>
+    <!-- [ Pre-loader ] start -->
+    <div class="loader-bg">
+        <div class="loader-track">
+            <div class="loader-fill"></div>
+        </div>
+    </div>
+    <!-- [ Pre-loader ] End -->
 
-    <div class="container-fluid vh-100">
-        <div class="row h-100 justify-content-center align-items-center">
-            <div class="col-12 d-flex flex-column justify-content-center align-items-center">
+    <div class="auth-main">
+        <div class="auth-wrapper v3">
+            <div class="auth-form">
+                <div class="auth-header">
+                    <a href="#">
+                        <img src="{{ asset('assets/images/logo-dark.svg') }}" alt="img">
+                    </a>
+                </div>
 
-                <div class="card text-center p-5 w-100" style="max-width: 500px;">
-                    <x-auth-session-status class="mb-4" :status="session('status')" />
-                    <div class="brand-logo mb-2">
-                        <img src="{{ asset('image/logo-dark.png') }}" style="height: 50px;">
-                    </div>
-                    <form method="POST" action="{{ route('login') }}" class="pt-3">
-                        @csrf
-                        <div class="form-group">
-                            <input id="email" class="form-control" type="email" name="email"
-                                placeholder="Username" value="{{ old('email') }}" required autofocus
-                                autocomplete="username">
-                            @error('email')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
+                <div class="card my-5">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-end mb-4">
+                            <h3 class="mb-0">
+                                <b>Login</b>
+                            </h3>
+                      </div>
 
-                        <div class="form-group">
-                            <div class="input-group">
-                                <input id="password" class="form-control" type="password" placeholder="********"
-                                    name="password" required autocomplete="current-password">
+                        <x-auth-session-status class="mb-4" :status="session('status')" />
 
+                        <form method="POST" action="{{ route('login') }}" class="pt-3">
+                            @csrf
+
+                            <div class="form-group mb-3">
+                                <label class="form-label" for="email">Email Address</label>
+                                <input
+                                    id="email"
+                                    class="form-control"
+                                    type="email"
+                                    name="email"
+                                    placeholder="Email Address"
+                                    value="{{ old('email') }}"
+                                    required
+                                    autofocus
+                                    autocomplete="username"
+                                >
+                                @error('email')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
                             </div>
-                            @error('password')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
 
-                            <x-primary-button label='Sign in' class="mb-3 w-100" />
-
-                        <div class="my-2 d-flex justify-content-between align-items-center">
-                            <div class="form-check">
-                                <label class="form-check-label text-muted">
-                                    <input type="checkbox" class="form-check-input"> Keep me signed in </label>
+                            <div class="form-group mb-3">
+                                <label class="form-label" for="password">Password</label>
+                                <input
+                                    id="password"
+                                    class="form-control"
+                                    type="password"
+                                    name="password"
+                                    placeholder="Password"
+                                    required
+                                    autocomplete="current-password"
+                                >
+                                @error('password')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
                             </div>
-                            @if (Route::has('password.request'))
-                                <a class="text-sm text-danger hover:text-gray-900"
-                                    href="{{ route('password.request') }}">
-                                    {{ __('Forgot your password?') }}
+
+                            <div class="d-flex mt-1 justify-content-between">
+                                <div class="form-check">
+                                    <input
+                                        type="checkbox"
+                                        class="form-check-input input-primary"
+                                        id="remember"
+                                        name="remember"
+                                        {{ old('remember') ? 'checked' : '' }}
+                                    >
+                                    <label class="form-check-label text-muted" for="remember">
+                                        Keep me sign in
+                                    </label>
+                                </div>
+
+                                @if (Route::has('password.request'))
+                                    <h5 class="text-secondary f-w-400 mb-0">
+                                        <a
+                                            href="{{ route('password.request') }}"
+                                            class="text-secondary f-w-400 text-decoration-none"
+                                        >
+                                            Forgot Password?
+                                        </a>
+                                    </h5>
+                                @endif
+                            </div>
+
+                            <div class="d-grid mt-4">
+                                <button type="submit" class="btn btn-primary">
+                                    Login
+                                </button>
+                            </div>
+
+                    
+                        </form>
+                        <div class="auth-bottom">
+                            <div class="text-center mt-4 font-weight-light">
+                                Don't have an account?
+                                <a href="https://wa.me/255741400900" target="_blank" class="text-primary">
+                                    Contact Admin
                                 </a>
-                            @endif
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="text-center mt-4 font-weight-light"> Don't have an account? <a
-                                href="https://wa.me/255741400900" target="_blank" class="text-primary">Contact Admin</a>
-                        </div>
-                    </form>
+                <div class="auth-footer row">
+                    <div class="col my-1">
+                        <p class="m-0">
+                            Copyright &copy; <a href="#">Filbert Ayo</a>
+                        </p>
+                    </div>
+                    <div class="col-auto my-1">
+                        <ul class="list-inline footer-link mb-0">
+                            <li class="list-inline-item"><a href="#">Home</a></li>
+                            <li class="list-inline-item"><a href="#">Privacy Policy</a></li>
+                            <li class="list-inline-item"><a href="#">Contact us</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
 </x-guest-layout>

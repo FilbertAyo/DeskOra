@@ -12,7 +12,7 @@
         </div>
         <div class="col-auto">
             <button type="button" class="btn btn-sm" onclick="reloadPage()">
-                <i class="fe fe-16 fe-refresh-ccw text-muted"></i>
+                <i class="ti ti-16 fe-refresh-ccw text-muted"></i>
             </button>
 
             <a href="{{ route('reports.transaction.download', ['type' => 'pdf'] + request()->all()) }}"

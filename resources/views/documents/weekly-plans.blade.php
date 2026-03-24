@@ -1,51 +1,39 @@
 <x-app-layout>
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs border-0" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="plans-tab" data-toggle="tab" href="#plans" role="tab"
-                        aria-controls="plans" aria-selected="true">
-                        <i class="fe fe-target me-1"></i> Weekly Plans
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="col-auto">
-            <div class="btn-group">
-               
-                <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-sm btn-info">
-                    <i class="fe fe-plus-circle me-1"></i> New Weekly Plan
-                </a>
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Weekly Plans</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="javascript: void(0)">Documents</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Weekly Plans</li>
+                            </ul>
+                        </div>
+
+                        <div class="col-auto">
+                            @if(isset($availableTypes['weekly_plan']))
+                                <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-info btn-sm">
+                                    <i class="ti ti-circle-plus me-1"></i> New Weekly Plan
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fe fe-check-circle me-2"></i>{{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fe fe-alert-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
     <div class="row">
         <div class="col-md-12">
-            <div class="card shadow-none border mb-4">
+            <div class="card tbl-card mb-4">
                 <div class="card-header bg-white border-bottom">
                     <div class="row align-items-center">
                         <div class="col-md-6">
                             <h5 class="mb-0">
-                                <i class="fe fe-target me-2 text-info"></i>Weekly Plans
+                                <i class="ti ti-target me-2 text-info"></i>Weekly Plans
                             </h5>
                         </div>
                         <div class="col-md-6">
@@ -82,6 +70,14 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                <div class="col-md-12 mb-2">
+                                    <select name="review_status" class="form-control" onchange="document.getElementById('filterForm').submit();">
+                                        <option value="">All Review Statuses</option>
+                                        <option value="returned" {{ request('review_status') === 'returned' ? 'selected' : '' }}>
+                                            Returned for Revision
+                                        </option>
+                                    </select>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -93,21 +89,14 @@
                             <div class="row align-items-center">
                                 <div class="col-md-8">
                                     <h6 class="mb-1">
-                                        <i class="fe fe-clock me-2"></i>Weekly Plan Deadline
+                                        Weekly Plan Deadline
                                     </h6>
                                     <p class="mb-0">
                                         <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y') }}</strong>
-                                        <span class="badge {{ $deadlineStatuses['plan_badge'] }} ml-2">
+                                        <span class="badge bg-danger {{ $deadlineStatuses['plan_badge'] }} ml-2">
                                             {{ $deadlineStatuses['plan_text'] }}
                                         </span>
                                     </p>
-                                </div>
-                                <div class="col-md-4 text-right">
-                                    @if(isset($availableTypes['weekly_plan']))
-                                        <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-info">
-                                            <i class="fe fe-plus-circle me-1"></i> Create New Plan
-                                        </a>
-                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -169,12 +158,17 @@
                                             </td>
                                             <td class="text-center">
                                                 @if($document->state === 'draft')
-                                                    <span class="badge badge-warning">
-                                                        <i class="fe fe-edit me-1"></i>Draft
+                                                    <span class="badge bg-warning">
+                                                        <i class="ti ti-edit me-1"></i>Draft
                                                     </span>
+                                                    @if(isset($returnedDocumentMap[$document->id]))
+                                                        <span class="badge bg-danger mt-1">
+                                                            <i class="ti ti-arrow-back-up me-1"></i>Returned
+                                                        </span>
+                                                    @endif
                                                 @else
-                                                    <span class="badge badge-success">
-                                                        <i class="fe fe-check-circle me-1"></i>Submitted
+                                                    <span class="badge bg-success">
+                                                        <i class="ti ti-circle-check me-1"></i>Submitted
                                                     </span>
                                                 @endif
                                             </td>
@@ -182,12 +176,12 @@
                                                 <div class="btn-group btn-group-sm" role="group">
                                                     <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
                                                         class="btn btn-info text-white" title="View">
-                                                        <i class="fe fe-eye"></i>
+                                                        <i class="ti ti-eye"></i>
                                                     </a>
                                                     @if($document->canBeEdited())
                                                         <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
                                                             class="btn btn-primary text-white" title="Edit">
-                                                            <i class="fe fe-edit"></i>
+                                                            <i class="ti ti-edit"></i>
                                                         </a>
                                                     @endif
                                                     @if($document->period)
@@ -200,7 +194,7 @@
                                                         @if($relatedReport)
                                                             <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($relatedReport->id)) }}"
                                                                 class="btn btn-outline-primary" title="View Related Report">
-                                                                <i class="fe fe-activity"></i>
+                                                                <i class="ti ti-activity"></i>
                                                             </a>
                                                         @endif
                                                     @endif
@@ -217,7 +211,7 @@
                         </div>
                     @else
                         <div class="text-center py-5">
-                            <i class="fe fe-target fs-1 text-muted"></i>
+                            <i class="ti ti-target fs-1 text-muted"></i>
                             <p class="text-muted mb-3 mt-3">No weekly plans found</p>
                             <p class="text-muted small">
                                 @if(request('period_id'))
@@ -228,7 +222,7 @@
                             </p>
                             @if(isset($availableTypes['weekly_plan']))
                                 <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-info">
-                                    <i class="fe fe-plus-circle me-1"></i>Create New Weekly Plan
+                                    <i class="ti ti-circle-plus me-1"></i>Create New Weekly Plan
                                 </a>
                             @endif
                         </div>
@@ -238,13 +232,5 @@
         </div>
     </div>
 
-    <style>
-        .bg-info-light {
-            background-color: #e7f3ff;
-        }
-        .bg-primary-light {
-            background-color: #f0f4ff;
-        }
-    </style>
 </x-app-layout>
 

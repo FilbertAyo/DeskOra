@@ -14,7 +14,6 @@ class DocumentPolicy
      * Rules:
      * - Employees: Can view their own documents
      * - Reviewers: Can view all documents
-     * - Minutes Preparer: Can view their own documents
      * - Admin: Can view all documents
      */
     public function viewAny(User $user): bool
@@ -30,18 +29,25 @@ class DocumentPolicy
      * Rules:
      * - Employees: Can view their own documents
      * - Reviewers: Can view all documents
-     * - Minutes Preparer: Can view their own documents
      * - Admin: Can view all documents
      */
     public function view(User $user, Document $document): bool
     {
+        if ($document->type === Document::TYPE_ACTION_LOG) {
+            if ($user->hasPermissionTo('view all documents') || $this->isActionLogManager($user) || $document->user_id === $user->id) {
+                return true;
+            }
+
+            return $this->isUserAssignedToActionLog($user, $document);
+        }
+
         // User owns the document
         if ($document->user_id === $user->id) {
             return true;
         }
 
-        // Reviewers and admins can view all documents
-        if ($user->hasAnyRole(['reviewer', 'admin'])) {
+        // Users with 'view all documents' permission can view all documents
+        if ($user->hasPermissionTo('view all documents')) {
             return true;
         }
 
@@ -53,19 +59,18 @@ class DocumentPolicy
      * 
      * Rules:
      * - Employees: Can create weekly_plan, weekly_report, monthly_report
-     * - Minutes Preparer: Can create weekly_minutes only
      * - Reviewers: Cannot create (read-only)
      * - Admin: Can create any type
      */
     public function create(User $user): bool
     {
         // Admin can create any type
-        if ($user->hasRole('admin')) {
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 
-        // Reviewers cannot create documents (read-only)
-        if ($user->hasRole('reviewer')) {
+        // Users who only have 'view all documents' permission cannot create (read-only)
+        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs'])) {
             return false;
         }
 
@@ -80,12 +85,12 @@ class DocumentPolicy
     public function createType(User $user, string $type): bool
     {
         // Admin can create any type
-        if ($user->hasRole('admin')) {
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 
-        // Reviewers cannot create documents (read-only)
-        if ($user->hasRole('reviewer')) {
+        // Users who only have 'view all documents' permission cannot create (read-only)
+        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs'])) {
             return false;
         }
 
@@ -98,14 +103,27 @@ class DocumentPolicy
      * 
      * Rules:
      * - Employees: Can update their own draft documents
-     * - Minutes Preparer: Can update their own draft documents
      * - Reviewers: Cannot update (read-only)
      * - Admin: Can update any draft document
      */
     public function update(User $user, Document $document): bool
     {
-        // Reviewers cannot update documents (read-only)
-        if ($user->hasRole('reviewer')) {
+        if ($document->type === Document::TYPE_ACTION_LOG) {
+            if (!$this->hasOpenPeriod($document)) {
+                return false;
+            }
+
+            if ($this->isActionLogManager($user)) {
+                // Managers keep full-edit on draft logs only.
+                return $document->isDraft();
+            }
+
+            // Assigned staff can update their own rows even after submission.
+            return $this->isUserAssignedToActionLog($user, $document);
+        }
+
+        // Users who only have 'view all documents' permission cannot update (read-only)
+        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
             return false;
         }
 
@@ -122,7 +140,7 @@ class DocumentPolicy
             return true;
         }
 
-        if ($user->hasRole('admin')) {
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 
@@ -134,14 +152,21 @@ class DocumentPolicy
      * 
      * Rules:
      * - Employees: Can delete their own draft documents
-     * - Minutes Preparer: Can delete their own draft documents
      * - Reviewers: Cannot delete (read-only)
      * - Admin: Can delete any draft document
      */
     public function delete(User $user, Document $document): bool
     {
-        // Reviewers cannot delete documents (read-only)
-        if ($user->hasRole('reviewer')) {
+        if ($document->type === Document::TYPE_ACTION_LOG) {
+            if (!$document->isDraft() || !$this->hasOpenPeriod($document)) {
+                return false;
+            }
+
+            return $this->isActionLogManager($user);
+        }
+
+        // Users who only have 'view all documents' permission cannot delete (read-only)
+        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
             return false;
         }
 
@@ -158,7 +183,7 @@ class DocumentPolicy
             return true;
         }
 
-        if ($user->hasRole('admin')) {
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 
@@ -170,14 +195,21 @@ class DocumentPolicy
      * 
      * Rules:
      * - Employees: Can submit their own draft documents
-     * - Minutes Preparer: Can submit their own draft documents
      * - Reviewers: Cannot submit (read-only)
      * - Admin: Can submit any draft document
      */
     public function submit(User $user, Document $document): bool
     {
-        // Reviewers cannot submit documents (read-only)
-        if ($user->hasRole('reviewer')) {
+        if ($document->type === Document::TYPE_ACTION_LOG) {
+            if (!$document->isDraft() || !$this->hasOpenPeriod($document)) {
+                return false;
+            }
+
+            return $this->isActionLogManager($user);
+        }
+
+        // Users who only have 'view all documents' permission cannot submit (read-only)
+        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
             return false;
         }
 
@@ -194,7 +226,7 @@ class DocumentPolicy
             return true;
         }
 
-        if ($user->hasRole('admin')) {
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 
@@ -202,12 +234,32 @@ class DocumentPolicy
     }
 
     /**
+     * Determine whether reviewer/admin can return a submitted weekly document to draft.
+     */
+    public function reject(User $user, Document $document): bool
+    {
+        if (!in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return false;
+        }
+
+        if (!$document->isSubmitted()) {
+            return false;
+        }
+
+        if (!$this->hasOpenPeriod($document)) {
+            return false;
+        }
+
+        return $user->hasAnyPermission(['view all documents', 'approve documents']);
+    }
+
+    /**
      * Determine whether the user can restore the model.
      */
     public function restore(User $user, Document $document): bool
     {
-        // Only admin can restore deleted documents
-        return $user->hasRole('admin');
+        // Only users with 'approve documents' permission can restore deleted documents
+        return $user->hasPermissionTo('approve documents');
     }
 
     /**
@@ -215,8 +267,8 @@ class DocumentPolicy
      */
     public function forceDelete(User $user, Document $document): bool
     {
-        // Only admin can permanently delete documents
-        return $user->hasRole('admin');
+        // Only users with 'approve documents' permission can permanently delete documents
+        return $user->hasPermissionTo('approve documents');
     }
 
     /**
@@ -232,10 +284,40 @@ class DocumentPolicy
             Document::TYPE_WEEKLY_PLAN,
             Document::TYPE_WEEKLY_REPORT,
             Document::TYPE_MONTHLY_REPORT,
+            Document::TYPE_ACTION_LOG,
         ])) {
             return $document->period->isOpen();
         }
 
         return true;
+    }
+
+    private function isActionLogManager(User $user): bool
+    {
+        return $user->hasAnyPermission(['create action logs', 'approve documents']);
+    }
+
+    private function isUserAssignedToActionLog(User $user, Document $document): bool
+    {
+        $content = is_array($document->content) ? $document->content : [];
+        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+
+        foreach ($tasks as $task) {
+            if (!is_array($task)) {
+                continue;
+            }
+
+            $responsibleIds = $task['responsible_user_ids'] ?? [];
+            if (!is_array($responsibleIds)) {
+                continue;
+            }
+
+            $ids = array_map('intval', $responsibleIds);
+            if (in_array((int) $user->id, $ids, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

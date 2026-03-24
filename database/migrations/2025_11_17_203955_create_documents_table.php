@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('period_id')->nullable();
-            $table->enum('type', ['weekly_plan', 'weekly_report', 'monthly_report', 'weekly_minutes']);
+            $table->enum('type', ['weekly_plan', 'weekly_report', 'monthly_report', 'action_log']);
             $table->string('file_path')->nullable();
             $table->string('title')->nullable();
             $table->unsignedBigInteger('file_size')->nullable();

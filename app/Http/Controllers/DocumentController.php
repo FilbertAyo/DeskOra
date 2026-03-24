@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Comment;
 use App\Models\Document;
+use App\Models\User;
 use App\Models\WorkPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Vinkla\Hashids\Facades\Hashids;
 
 class DocumentController extends Controller
@@ -17,11 +20,12 @@ class DocumentController extends Controller
     {
         $this->authorize('viewAny', Document::class);
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $query = Document::with(['user', 'period']);
 
-        // Reviewers and admins can see all documents, others see only their own
-        if (!$user->hasAnyRole(['reviewer', 'admin', 'verifier', 'approver'])) {
+        // Users with 'view all documents' permission can see all documents, others see only their own
+        if (!$user->hasPermissionTo('view all documents')) {
             $query->forUser($user->id);
         }
 
@@ -34,27 +38,32 @@ class DocumentController extends Controller
             $query->ofType($request->type);
         }
 
-        // Filter by period - default to current period if not specified
+        // Filter by period only when explicitly selected.
         $periodId = $request->input('period_id');
-        if (!$periodId && $currentPeriod) {
-            $periodId = $currentPeriod->id;
-        }
         if ($periodId) {
             $query->forPeriod($periodId);
         }
 
-        // Filter by year - default to current year if not specified
+        // Filter by year only when explicitly selected.
         $year = $request->input('year');
-        if (!$year) {
-            $year = $currentYear;
-        }
         if ($year) {
             $query->whereHas('period', function($q) use ($year) {
                 $q->where('year', $year);
             });
         }
 
+        if ($request->input('review_status') === 'returned') {
+            $query->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+                ->where('state', Document::STATE_DRAFT)
+                ->whereHas('comments', function ($commentQuery) {
+                    $commentQuery->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%');
+                });
+        }
+
         $documents = $query->latest()->paginate(15)->withQueryString();
+        $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
+            $documents->getCollection()->pluck('id')->all()
+        );
 
         $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
         $deadlineStatuses = null;
@@ -76,6 +85,7 @@ class DocumentController extends Controller
             'currentPeriod' => $currentPeriod,
             'nextPeriod' => $nextPeriod,
             'deadlineStatuses' => $deadlineStatuses,
+            'returnedDocumentMap' => $returnedDocumentMap,
         ]);
     }
 
@@ -84,6 +94,7 @@ class DocumentController extends Controller
      */
     public function create(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $selectedType = $request->query('type');
 
@@ -132,11 +143,13 @@ class DocumentController extends Controller
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
             if (Document::canUserCreateType($user, $selectedType)) {
-                return view('documents.create', compact('availableTypes', 'selectedType', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan'));
+                $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+                return view('documents.create', compact('availableTypes', 'selectedType', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan', 'teamUsers'));
             }
         }
 
-        return view('documents.create', compact('availableTypes', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan'));
+        $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+        return view('documents.create', compact('availableTypes', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan', 'teamUsers'));
     }
 
     /**
@@ -144,12 +157,15 @@ class DocumentController extends Controller
      */
     public function store(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         // Validate file upload for PDF documents
         $validationRules = [
-            'type' => ['required', 'string', 'in:weekly_plan,weekly_report,monthly_report,weekly_minutes'],
-            'file' => ['required', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
+            'type' => ['required', 'string', 'in:weekly_plan,weekly_report,monthly_report,action_log'],
+            // weekly_plan/weekly_report are filled online (no PDF upload).
+            // monthly_report still uses a PDF upload.
+            'file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
             'title' => ['nullable', 'string', 'max:255'],
         ];
 
@@ -160,9 +176,69 @@ class DocumentController extends Controller
             $validationRules['period_id'] = ['nullable', 'integer', 'exists:work_periods,id'];
         }
 
+        // Add validation for monthly reports
+        if ($request->type === Document::TYPE_MONTHLY_REPORT) {
+            $validationRules['month'] = ['required', 'integer', 'min:1', 'max:12'];
+            $validationRules['year'] = ['required', 'integer', 'min:2000', 'max:2100'];
+            $validationRules['attachment'] = ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240']; // Max 10MB
+
+            // monthly_report requires a PDF.
+            $validationRules['file'] = ['required', 'file', 'mimes:pdf', 'max:10240']; // Max 10MB
+        }
+
         // Add validation for main_target for weekly plans
         if ($request->type === Document::TYPE_WEEKLY_PLAN) {
             $validationRules['main_target'] = ['required', 'string', 'max:2000'];
+        }
+
+        // Online template content (weekly_plan/weekly_report)
+        $validationRules['content'] = ['nullable', 'array'];
+
+        if ($request->type === Document::TYPE_WEEKLY_PLAN) {
+            $validationRules['content.objective.description'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.objective.status'] = ['nullable', 'string', 'in:Not started,Completed,Carried,In Progress'];
+            $validationRules['content.objective.reflection_progress'] = ['nullable', 'string', 'max:4000'];
+
+            $validationRules['content.planned_activities'] = ['nullable', 'array'];
+            $validationRules['content.planned_activities.*.day'] = ['nullable', 'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'];
+            $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'integer', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
+
+            $validationRules['content.key_meetings'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
+            $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.participants'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
+
+            $validationRules['content.budget'] = ['nullable', 'array'];
+            $validationRules['content.budget.*.item'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.budget.*.description_purpose'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.budget.*.amount'] = ['nullable', 'string', 'max:60'];
+        }
+
+        if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+            $validationRules['content.summary'] = ['nullable', 'string', 'max:5000'];
+
+            $validationRules['content.activity_progress'] = ['nullable', 'array'];
+            $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
+            $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.key_achievements'] = ['nullable', 'array'];
+            $validationRules['content.key_achievements.*'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.challenges_mitigation'] = ['nullable', 'array'];
+            $validationRules['content.challenges_mitigation.*.challenge'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.challenges_mitigation.*.action_taken_planned'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.budget_statuses'] = ['nullable', 'array'];
+            $validationRules['content.budget_statuses.*.status'] = ['nullable', 'string', 'in:Not started,Pending,Received,Paid'];
+            $validationRules['content.budget_statuses.*.notes'] = ['nullable', 'string', 'max:2000'];
         }
 
         // Add validation for target accomplishment for weekly reports
@@ -172,6 +248,12 @@ class DocumentController extends Controller
         }
 
         $request->validate($validationRules);
+
+        // Normalize and trim template payload to avoid storing empty rows.
+        $templateContent = null;
+        if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $request->has('content') && is_array($request->input('content'))) {
+            $templateContent = $this->normalizeTemplateContent($request->input('content'), $request->type);
+        }
 
         // Authorize create action
         $this->authorize('create', Document::class);
@@ -219,36 +301,56 @@ class DocumentController extends Controller
             // Monthly report uses current period
             $period = WorkPeriod::getCurrent();
         }
-        // weekly_minutes doesn't require a period (can be null)
-
         if ($period && !$period->isOpen()) {
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'This work period is closed. Please contact your administrator.');
         }
 
-        // Check if document already exists for this user, period, and type
-        // Only for weekly plans and reports (one per week period)
+        // Check if document already exists for this user, period/month/year, and type
         $existingDocument = null;
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $period) {
+            // For weekly plans and reports - one per week period
             $existingDocument = Document::where('user_id', $user->id)
                 ->where('period_id', $period->id)
                 ->where('type', $request->type)
+                ->first();
+        } elseif ($request->type === Document::TYPE_MONTHLY_REPORT) {
+            // For monthly reports - one per month/year combination
+            $existingDocument = Document::where('user_id', $user->id)
+                ->where('type', Document::TYPE_MONTHLY_REPORT)
+                ->where('month', $request->month)
+                ->where('year', $request->year)
                 ->first();
         }
 
         // Determine state based on action
         $action = $request->input('action', 'draft');
+        // Ensure action is either 'submit' or 'draft'
+        $action = in_array($action, ['submit', 'draft']) ? $action : 'draft';
         $state = ($action === 'submit') ? Document::STATE_SUBMITTED : Document::STATE_DRAFT;
 
-        // Handle file upload
-        $file = $request->file('file');
-        $originalFilename = $file->getClientOriginalName();
-        $fileSize = $file->getSize();
-        
-        // Generate unique filename
-        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-        $filePath = $file->storeAs('documents/' . $request->type, $filename, 'public');
+        // Handle file upload (monthly_report only; weekly_plan/weekly_report are online forms).
+        $filePath = null;
+        $originalFilename = null;
+        $fileSize = null;
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $originalFilename = $file->getClientOriginalName();
+            $fileSize = $file->getSize();
+
+            // Generate unique filename
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $filePath = $file->storeAs('documents/' . $request->type, $filename, 'public');
+        }
+
+        // Handle attachment upload for monthly reports
+        $attachmentPath = null;
+        if ($request->type === Document::TYPE_MONTHLY_REPORT && $request->hasFile('attachment')) {
+            $attachmentFile = $request->file('attachment');
+            $attachmentFilename = time() . '_' . uniqid() . '_attachment.' . $attachmentFile->getClientOriginalExtension();
+            $attachmentPath = $attachmentFile->storeAs('documents/monthly_reports/attachments', $attachmentFilename, 'public');
+        }
 
         // Generate title if not provided
         $title = $request->input('title');
@@ -256,6 +358,9 @@ class DocumentController extends Controller
             $typeName = Document::getTypes()[$request->type] ?? ucwords(str_replace('_', ' ', $request->type));
             if ($period) {
                 $title = $typeName . ' - Week ' . $period->week_number;
+            } elseif ($request->type === Document::TYPE_MONTHLY_REPORT) {
+                $monthName = \Carbon\Carbon::create($request->year, $request->month, 1)->format('F');
+                $title = $typeName . ' - ' . $monthName . ' ' . $request->year;
             } else {
                 $title = $typeName . ' - ' . now()->format('M d, Y');
             }
@@ -266,7 +371,9 @@ class DocumentController extends Controller
             // If document is submitted, we can't update it (policy restriction)
             if ($existingDocument->isSubmitted()) {
                 // Delete the uploaded file since we won't use it
-                \Storage::disk('public')->delete($filePath);
+                if ($filePath) {
+                    Storage::disk('public')->delete($filePath);
+                }
                 
                 return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
                     ->with('info', 'A ' . str_replace('_', ' ', $request->type) . ' already exists for this week period. You can view it below.');
@@ -277,7 +384,9 @@ class DocumentController extends Controller
                 $this->authorize('update', $existingDocument);
             } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
                 // Delete the uploaded file since we won't use it
-                \Storage::disk('public')->delete($filePath);
+                if ($filePath) {
+                    Storage::disk('public')->delete($filePath);
+                }
                 
                 return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
                     ->with('error', 'You do not have permission to update this document.');
@@ -289,7 +398,9 @@ class DocumentController extends Controller
                     $this->authorize('submit', $existingDocument);
                 } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
                     // Delete the uploaded file since we won't use it
-                    \Storage::disk('public')->delete($filePath);
+                    if ($filePath) {
+                        Storage::disk('public')->delete($filePath);
+                    }
                     
                     return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
                         ->with('error', 'You do not have permission to submit this document.');
@@ -297,17 +408,42 @@ class DocumentController extends Controller
             }
 
             // Delete old file if exists
-            if ($existingDocument->file_path) {
-                \Storage::disk('public')->delete($existingDocument->file_path);
+            if ($existingDocument->file_path && $filePath) {
+                Storage::disk('public')->delete($existingDocument->file_path);
+            }
+
+            // Delete old attachment if exists and new one is uploaded
+            if ($existingDocument->attachment && $attachmentPath) {
+                Storage::disk('public')->delete($existingDocument->attachment);
             }
 
             // Update document
             $updateData = [
-                'file_path' => $filePath,
                 'title' => $title,
-                'file_size' => $fileSize,
-                'original_filename' => $originalFilename,
             ];
+
+            // Only replace the PDF if a new one was uploaded.
+            if ($filePath) {
+                $updateData['file_path'] = $filePath;
+                $updateData['file_size'] = $fileSize;
+                $updateData['original_filename'] = $originalFilename;
+            }
+
+            // Save template content when provided (weekly_plan/weekly_report)
+            if ($templateContent !== null) {
+                $updateData['content'] = $templateContent;
+            }
+
+            // Add attachment for monthly reports
+            if ($request->type === Document::TYPE_MONTHLY_REPORT && $attachmentPath) {
+                $updateData['attachment'] = $attachmentPath;
+            }
+
+            // Add month and year for monthly reports
+            if ($request->type === Document::TYPE_MONTHLY_REPORT) {
+                $updateData['month'] = $request->month;
+                $updateData['year'] = $request->year;
+            }
 
             // Add main_target for weekly plans
             if ($request->type === Document::TYPE_WEEKLY_PLAN && $request->filled('main_target')) {
@@ -347,6 +483,17 @@ class DocumentController extends Controller
             'state' => $state,
         ];
 
+        // Add attachment for monthly reports
+        if ($request->type === Document::TYPE_MONTHLY_REPORT && $attachmentPath) {
+            $documentData['attachment'] = $attachmentPath;
+        }
+
+        // Add month and year for monthly reports
+        if ($request->type === Document::TYPE_MONTHLY_REPORT) {
+            $documentData['month'] = $request->month;
+            $documentData['year'] = $request->year;
+        }
+
         // Add main_target for weekly plans
         if ($request->type === Document::TYPE_WEEKLY_PLAN && $request->filled('main_target')) {
             $documentData['main_target'] = $request->main_target;
@@ -356,6 +503,11 @@ class DocumentController extends Controller
         if ($request->type === Document::TYPE_WEEKLY_REPORT) {
             $documentData['target_accomplished'] = $request->has('target_accomplished') ? (bool)$request->target_accomplished : null;
             $documentData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
+        }
+
+        // Save template content when provided (weekly_plan/weekly_report)
+        if ($templateContent !== null) {
+            $documentData['content'] = $templateContent;
         }
 
         $document = Document::create($documentData);
@@ -399,6 +551,7 @@ class DocumentController extends Controller
             }
 
             if (!$relatedDocument) {
+                /** @var \App\Models\User $user */
                 $user = Auth::user();
                 if ($document->type === Document::TYPE_WEEKLY_PLAN &&
                     Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT, $document->period)) {
@@ -434,7 +587,8 @@ class DocumentController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
-        return view('documents.edit', compact('document'));
+        $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+        return view('documents.edit', compact('document', 'teamUsers'));
     }
 
     /**
@@ -452,20 +606,77 @@ class DocumentController extends Controller
         $validationRules = [
             'file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
             'title' => ['nullable', 'string', 'max:255'],
+            // Online template content (weekly_plan/weekly_report)
+            'content' => ['nullable', 'array'],
         ];
 
         // Add validation for main_target for weekly plans
         if ($document->type === Document::TYPE_WEEKLY_PLAN) {
             $validationRules['main_target'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.objective.description'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.objective.status'] = ['nullable', 'string', 'in:Not started,Completed,Carried,In Progress'];
+            $validationRules['content.objective.reflection_progress'] = ['nullable', 'string', 'max:4000'];
+
+            $validationRules['content.planned_activities'] = ['nullable', 'array'];
+            $validationRules['content.planned_activities.*.day'] = ['nullable', 'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'];
+            $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'integer', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
+
+            $validationRules['content.key_meetings'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
+            $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.participants'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
+
+            $validationRules['content.budget'] = ['nullable', 'array'];
+            $validationRules['content.budget.*.item'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.budget.*.description_purpose'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.budget.*.amount'] = ['nullable', 'string', 'max:60'];
         }
 
         // Add validation for target accomplishment for weekly reports
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             $validationRules['target_accomplished'] = ['nullable', 'boolean'];
             $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.summary'] = ['nullable', 'string', 'max:5000'];
+
+            $validationRules['content.activity_progress'] = ['nullable', 'array'];
+            $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
+            $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.key_achievements'] = ['nullable', 'array'];
+            $validationRules['content.key_achievements.*'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.challenges_mitigation'] = ['nullable', 'array'];
+            $validationRules['content.challenges_mitigation.*.challenge'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.challenges_mitigation.*.action_taken_planned'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.budget_statuses'] = ['nullable', 'array'];
+            $validationRules['content.budget_statuses.*.status'] = ['nullable', 'string', 'in:Not started,Pending,Received,Paid'];
+            $validationRules['content.budget_statuses.*.notes'] = ['nullable', 'string', 'max:2000'];
+        }
+
+        // Add validation for monthly reports
+        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
+            $validationRules['month'] = ['nullable', 'integer', 'min:1', 'max:12'];
+            $validationRules['year'] = ['nullable', 'integer', 'min:2000', 'max:2100'];
+            $validationRules['attachment'] = ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240'];
         }
 
         $request->validate($validationRules);
+
+        $templateContent = null;
+        if ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
+            $templateContent = $this->normalizeTemplateContent($request->input('content'), $document->type);
+        }
 
         // Determine state based on action
         $action = $request->input('action', 'draft');
@@ -489,7 +700,7 @@ class DocumentController extends Controller
 
             // Delete old file if exists
             if ($document->file_path) {
-                \Storage::disk('public')->delete($document->file_path);
+                Storage::disk('public')->delete($document->file_path);
             }
 
             $updateData['file_path'] = $filePath;
@@ -497,9 +708,33 @@ class DocumentController extends Controller
             $updateData['original_filename'] = $originalFilename;
         }
 
+        // Handle attachment upload for monthly reports
+        if ($document->type === Document::TYPE_MONTHLY_REPORT && $request->hasFile('attachment')) {
+            $attachmentFile = $request->file('attachment');
+            $attachmentFilename = time() . '_' . uniqid() . '_attachment.' . $attachmentFile->getClientOriginalExtension();
+            $attachmentPath = $attachmentFile->storeAs('documents/monthly_reports/attachments', $attachmentFilename, 'public');
+            
+            // Delete old attachment if exists
+            if ($document->attachment) {
+                Storage::disk('public')->delete($document->attachment);
+            }
+            
+            $updateData['attachment'] = $attachmentPath;
+        }
+
         // Update title if provided
         if ($request->filled('title')) {
             $updateData['title'] = $request->input('title');
+        }
+
+        // Update month and year for monthly reports
+        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
+            if ($request->filled('month')) {
+                $updateData['month'] = $request->month;
+            }
+            if ($request->filled('year')) {
+                $updateData['year'] = $request->year;
+            }
         }
 
         // Update main_target for weekly plans
@@ -523,6 +758,11 @@ class DocumentController extends Controller
                 // Allow clearing the field
                 $updateData['target_explanation'] = null;
             }
+        }
+
+        // Save template content when provided (weekly_plan/weekly_report)
+        if ($templateContent !== null) {
+            $updateData['content'] = $templateContent;
         }
 
         // Update state if submitting
@@ -575,14 +815,43 @@ class DocumentController extends Controller
     }
 
     /**
+     * Return submitted weekly plan/report to draft with required review reason.
+     */
+    public function reject(Request $request, string $id)
+    {
+        $decodedId = Hashids::decode($id);
+        $document = Document::findOrFail($decodedId[0] ?? null);
+
+        $this->authorize('reject', $document);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ]);
+
+        $reason = trim($validated['reason']);
+
+        $document->revertToDraft();
+
+        Comment::create([
+            'document_id' => $document->id,
+            'user_id' => Auth::id(),
+            'comment' => Document::REVIEW_REJECTION_PREFIX . $reason,
+        ]);
+
+        return redirect()->route('documents.show', $id)
+            ->with('warning', 'Document returned to draft. Staff can now update and re-submit after addressing the review reason.');
+    }
+
+    /**
      * Reviewer dashboard - Show all submitted documents grouped by type
      */
     public function reviewerDashboard(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // Only reviewers and admins can access this
-        if (!$user->hasAnyRole(['reviewer', 'admin'])) {
+        // Only users with 'view all documents' permission can access this
+        if (!$user->hasPermissionTo('view all documents')) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -628,12 +897,25 @@ class DocumentController extends Controller
 
         $allDocuments = (clone $baseQuery)->latest()->get();
 
+        $mergedWeeklyRows = $allDocuments
+            ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+            ->groupBy(fn ($doc) => ($doc->period_id ?? 'none') . '_' . ($doc->user_id ?? 'none'))
+            ->map(function ($items) {
+                $plan = $items->firstWhere('type', Document::TYPE_WEEKLY_PLAN);
+                $report = $items->firstWhere('type', Document::TYPE_WEEKLY_REPORT);
+                return [
+                    'plan' => $plan,
+                    'report' => $report,
+                    'period' => $plan?->period ?? $report?->period,
+                    'user' => $plan?->user ?? $report?->user,
+                    'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
+                ];
+            })
+            ->values();
+
         // Group documents by type
         $groupedDocuments = [
-            'weekly_plan' => $allDocuments->where('type', Document::TYPE_WEEKLY_PLAN),
-            'weekly_report' => $allDocuments->where('type', Document::TYPE_WEEKLY_REPORT),
-            'monthly_report' => $allDocuments->where('type', Document::TYPE_MONTHLY_REPORT),
-            'weekly_minutes' => $allDocuments->where('type', Document::TYPE_WEEKLY_MINUTES),
+            'action_log' => $allDocuments->where('type', Document::TYPE_ACTION_LOG),
         ];
 
         // Filter by type if provided (for single type view)
@@ -648,8 +930,7 @@ class DocumentController extends Controller
             'total_submitted' => $statsQuery->count(),
             'weekly_plans' => (clone $statsQuery)->weeklyPlans()->count(),
             'weekly_reports' => (clone $statsQuery)->weeklyReports()->count(),
-            'monthly_reports' => (clone $statsQuery)->monthlyReports()->count(),
-            'weekly_minutes' => (clone $statsQuery)->weeklyMinutes()->count(),
+            'action_logs' => (clone $statsQuery)->actionLogs()->count(),
         ];
 
         $usersWithDocuments = \App\Models\User::whereHas('documents', function($q) {
@@ -664,6 +945,7 @@ class DocumentController extends Controller
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
         return view('documents.reviewer-dashboard', compact(
+            'mergedWeeklyRows',
             'groupedDocuments',
             'stats',
             'usersWithDocuments',
@@ -678,12 +960,20 @@ class DocumentController extends Controller
      */
     public function employeeDashboard(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // Allow employees and admins (admins can see their own dashboard too)
-        // Restrict reviewers and minutes_preparer (unless they're also admin)
-        if (!$user->hasRole('admin') && $user->hasAnyRole(['reviewer', 'minutes_preparer'])) {
-            abort(403, 'Unauthorized access. This dashboard is for employees only.');
+        // Allow users who can create documents (have initial permissions)
+        // Restrict users who only have approval/view permissions
+        $canCreateDocs = $user->hasAnyPermission([
+            'create weekly plan',
+            'create weekly report',
+            'create monthly report',
+            'create action logs'
+        ]);
+        
+        if (!$canCreateDocs && !$user->hasPermissionTo('approve documents')) {
+            abort(403, 'Unauthorized access. This dashboard is for document creators only.');
         }
 
         $availableTypes = Document::getAvailableTypesForUser($user);
@@ -799,12 +1089,13 @@ class DocumentController extends Controller
     {
         $this->authorize('viewAny', Document::class);
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $query = Document::with(['user', 'period'])
             ->ofType(Document::TYPE_WEEKLY_PLAN);
 
-        // Reviewers and admins can see all documents, others see only their own
-        if (!$user->hasAnyRole(['reviewer', 'admin', 'verifier', 'approver'])) {
+        // Users with 'view all documents' permission can see all documents, others see only their own
+        if (!$user->hasPermissionTo('view all documents')) {
             $query->forUser($user->id);
         }
 
@@ -826,7 +1117,17 @@ class DocumentController extends Controller
             });
         }
 
+        if ($request->input('review_status') === 'returned') {
+            $query->where('state', Document::STATE_DRAFT)
+                ->whereHas('comments', function ($commentQuery) {
+                    $commentQuery->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%');
+                });
+        }
+
         $documents = $query->latest()->paginate(15)->withQueryString();
+        $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
+            $documents->getCollection()->pluck('id')->all()
+        );
 
         $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
         $deadlineStatuses = null;
@@ -851,6 +1152,7 @@ class DocumentController extends Controller
             'nextPeriod' => $nextPeriod,
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
+            'returnedDocumentMap' => $returnedDocumentMap,
         ]);
     }
 
@@ -869,18 +1171,61 @@ class DocumentController extends Controller
         $plan = Document::where('user_id', $user->id)
             ->where('period_id', $periodId)
             ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->orderByRaw("CASE WHEN state = ? THEN 0 ELSE 1 END", [Document::STATE_SUBMITTED])
+            ->latest('id')
             ->first();
 
-        if ($plan && $plan->main_target) {
+        if ($plan) {
+            $budgetItems = [];
+            if (is_array($plan->content) && !empty($plan->content['budget']) && is_array($plan->content['budget'])) {
+                // Normalize into a simple array for the UI.
+                $budgetItems = array_values(array_map(function ($row) {
+                    if (!is_array($row)) return null;
+                    return [
+                        'item' => $row['item'] ?? null,
+                        'description_purpose' => $row['description_purpose'] ?? null,
+                        'amount' => $row['amount'] ?? null,
+                    ];
+                }, $plan->content['budget']));
+                // Remove empty rows (e.g., all fields blank)
+                $budgetItems = array_values(array_filter($budgetItems, function ($row) {
+                    if (!is_array($row)) return false;
+                    return !empty($row['item']) || !empty($row['description_purpose']) || !empty($row['amount']);
+                }));
+            }
+
+            $plannedActivities = [];
+            if (is_array($plan->content) && !empty($plan->content['planned_activities']) && is_array($plan->content['planned_activities'])) {
+                $plannedActivities = array_values(array_filter(array_map(function ($row) {
+                    if (!is_array($row)) {
+                        return null;
+                    }
+                    $activity = trim((string) ($row['activity'] ?? ''));
+                    if ($activity === '') {
+                        return null;
+                    }
+                    $day = trim((string) ($row['day'] ?? ''));
+                    return [
+                        'day' => $day,
+                        'activity' => $activity,
+                        'label' => $day !== '' ? ($day . ' - ' . $activity) : $activity,
+                    ];
+                }, $plan->content['planned_activities'])));
+            }
+
             return response()->json([
                 'main_target' => $plan->main_target,
                 'plan_exists' => true,
+                'budget_items' => $budgetItems,
+                'planned_activities' => $plannedActivities,
             ]);
         }
 
         return response()->json([
             'main_target' => null,
             'plan_exists' => false,
+            'budget_items' => [],
+            'planned_activities' => [],
         ]);
     }
 
@@ -891,12 +1236,13 @@ class DocumentController extends Controller
     {
         $this->authorize('viewAny', Document::class);
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $query = Document::with(['user', 'period'])
             ->ofType(Document::TYPE_WEEKLY_REPORT);
 
-        // Reviewers and admins can see all documents, others see only their own
-        if (!$user->hasAnyRole(['reviewer', 'admin', 'verifier', 'approver'])) {
+        // Users with 'view all documents' permission can see all documents, others see only their own
+        if (!$user->hasPermissionTo('view all documents')) {
             $query->forUser($user->id);
         }
 
@@ -918,7 +1264,17 @@ class DocumentController extends Controller
             });
         }
 
+        if ($request->input('review_status') === 'returned') {
+            $query->where('state', Document::STATE_DRAFT)
+                ->whereHas('comments', function ($commentQuery) {
+                    $commentQuery->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%');
+                });
+        }
+
         $documents = $query->latest()->paginate(15)->withQueryString();
+        $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
+            $documents->getCollection()->pluck('id')->all()
+        );
 
         $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
         $deadlineStatuses = null;
@@ -943,6 +1299,117 @@ class DocumentController extends Controller
             'nextPeriod' => $nextPeriod,
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
+            'returnedDocumentMap' => $returnedDocumentMap,
         ]);
+    }
+
+    /**
+     * Build document_id => latest rejection reason map for visible documents.
+     */
+    private function getReturnedDocumentMapForIds(array $documentIds): array
+    {
+        if (empty($documentIds)) {
+            return [];
+        }
+
+        $latestByDocument = Comment::whereIn('document_id', $documentIds)
+            ->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('document_id');
+
+        $map = [];
+        foreach ($latestByDocument as $comment) {
+            $reason = trim(substr((string) $comment->comment, strlen(Document::REVIEW_REJECTION_PREFIX)));
+            $map[(int) $comment->document_id] = $reason;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Normalize + trim template payload before saving.
+     * - removes empty rows so weekly_report budget loads cleanly
+     * - trims string values to reduce accidental whitespace-only entries
+     */
+    private function normalizeTemplateContent(array $content, string $type): array
+    {
+        $content = $this->trimDeep($content);
+
+        if ($type === Document::TYPE_WEEKLY_PLAN) {
+            $content['planned_activities'] = $this->filterNonEmptyRows(
+                $content['planned_activities'] ?? [],
+                ['day', 'activity', 'location', 'team_member_ids', 'notes_inclusion']
+            );
+
+            $content['key_meetings'] = $this->filterNonEmptyRows(
+                $content['key_meetings'] ?? [],
+                ['date', 'meeting', 'participants', 'location', 'reactions_notes']
+            );
+
+            $content['budget'] = $this->filterNonEmptyRows(
+                $content['budget'] ?? [],
+                ['item', 'description_purpose', 'amount']
+            );
+        }
+
+        if ($type === Document::TYPE_WEEKLY_REPORT) {
+            $content['key_achievements'] = array_values(array_filter(
+                is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [],
+                fn ($item) => is_string($item) && $item !== ''
+            ));
+
+            $content['activity_progress'] = $this->filterNonEmptyRows(
+                $content['activity_progress'] ?? [],
+                ['activity_output', 'progress', 'remarks_challenges', 'next_step']
+            );
+
+            $content['challenges_mitigation'] = $this->filterNonEmptyRows(
+                $content['challenges_mitigation'] ?? [],
+                ['challenge', 'action_taken_planned']
+            );
+
+            unset($content['lessons_recommendations']);
+
+            $content['budget_statuses'] = $this->filterNonEmptyRows(
+                $content['budget_statuses'] ?? [],
+                ['status', 'notes']
+            );
+        }
+
+        return $content;
+    }
+
+    private function trimDeep(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                $value[$k] = $this->trimDeep($v);
+            }
+            return $value;
+        }
+
+        return is_string($value) ? trim($value) : $value;
+    }
+
+    private function filterNonEmptyRows(mixed $rows, array $keys): array
+    {
+        if (!is_array($rows)) return [];
+
+        return array_values(array_filter($rows, function ($row) use ($keys) {
+            if (!is_array($row)) return false;
+
+            foreach ($keys as $key) {
+                if (!array_key_exists($key, $row)) continue;
+                $v = $row[$key];
+                if (is_array($v)) {
+                    if (!empty($v)) return true;
+                    continue;
+                }
+                if ($v !== null && $v !== '') return true;
+            }
+
+            return false;
+        }));
     }
 }

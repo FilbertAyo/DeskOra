@@ -20,7 +20,7 @@ class WorkPeriodAutoCreate extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically create next work period and close current week (runs every Sunday)';
+    protected $description = 'Automatically create next work period (next week only) and close ended week';
 
     /**
      * WorkPeriodService instance

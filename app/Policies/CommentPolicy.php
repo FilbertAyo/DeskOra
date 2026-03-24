@@ -17,8 +17,8 @@ class CommentPolicy
      */
     public function create(User $user): bool
     {
-        // Only reviewers and admins can create comments
-        return $user->hasAnyRole(['reviewer', 'admin']);
+        // Users with 'view all documents' or 'approve documents' permission can create comments
+        return $user->hasAnyPermission(['view all documents', 'approve documents']);
     }
 
     /**
@@ -35,8 +35,8 @@ class CommentPolicy
             return true;
         }
 
-        // Admin can update any comment
-        if ($user->hasRole('admin')) {
+        // Users with 'approve documents' permission can update any comment
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 
@@ -57,8 +57,8 @@ class CommentPolicy
             return true;
         }
 
-        // Admin can delete any comment
-        if ($user->hasRole('admin')) {
+        // Users with 'approve documents' permission can delete any comment
+        if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
 

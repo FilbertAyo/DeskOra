@@ -3,7 +3,7 @@
     @if ($request->request_for == 'Sales Delivery')
         <div class="mt-4">
             <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                <i class="fe fe-paperclip me-2 text-primary"></i>
+                <i class="ti ti-paperclip me-2 text-primary"></i>
                 Delivery Attachments
             </h5>
 
@@ -27,7 +27,7 @@
                                 <td class="fw-semibold text-muted">{{ $loop->iteration }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <i class="fe fe-user text-primary me-2"></i>
+                                        <i class="ti ti-user text-primary me-2"></i>
                                         <span class="fw-medium">{{ $attachment->name }}</span>
                                     </div>
                                 </td>
@@ -39,7 +39,7 @@
                                 <td class="text-center">
                                     <a href="{{ $imageUrl }}" target="_blank" rel="noopener noreferrer"
                                         class="btn btn-primary btn-sm d-inline-flex align-items-center">
-                                        <i class="fe fe-eye me-1"></i>
+                                        <i class="ti ti-eye me-1"></i>
                                         <span>View</span>
                                     </a>
                                 </td>
@@ -54,7 +54,7 @@
     @if ($request->request_for == 'Office Supplies')
         <div class="mt-4">
             <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                <i class="fe fe-shopping-cart me-2 text-primary"></i>
+                <i class="ti ti-shopping-cart me-2 text-primary"></i>
                 List of Items
             </h5>
 
@@ -75,7 +75,7 @@
                                     <td class="fw-semibold text-muted">{{ $loop->iteration }}</td>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            <i class="fe fe-box text-primary me-2"></i>
+                                            <i class="ti ti-box text-primary me-2"></i>
                                             <span class="fw-medium">{{ $item->item_name }}</span>
                                         </div>
                                     </td>
@@ -91,7 +91,7 @@
     @elseif($request->request_for == 'Sales Delivery' || $request->request_for == 'Transport')
         <div class="mt-4">
             <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                <i class="fe fe-map-pin me-2 text-primary"></i>
+                <i class="ti ti-map-pin me-2 text-primary"></i>
                 Transport Route
             </h5>
             <div class="row g-3">
@@ -103,7 +103,7 @@
                                     <div class="me-3">
                                         <div class="bg-success rounded-circle d-flex align-items-center justify-content-center"
                                              style="width: 40px; height: 40px;">
-                                            <i class="fe fe-flag text-white"></i>
+                                            <i class="ti ti-flag text-white"></i>
                                         </div>
                                     </div>
                                     <div class="flex-grow-1">
@@ -122,7 +122,7 @@
                                         <div class="me-3">
                                             <div class="bg-{{ $loop->last ? 'danger' : 'primary' }} rounded-circle d-flex align-items-center justify-content-center"
                                                  style="width: 40px; height: 40px;">
-                                                <i class="fe fe-{{ $loop->last ? 'map-pin' : 'navigation' }} text-white"></i>
+                                                <i class="ti ti-{{ $loop->last ? 'map-pin' : 'navigation' }} text-white"></i>
                                             </div>
                                         </div>
                                         <div class="flex-grow-1">
@@ -141,7 +141,7 @@
 
             <div class="mt-4">
                 <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                    <i class="fe fe-truck me-2 text-primary"></i>
+                    <i class="ti ti-truck me-2 text-primary"></i>
                     Transport Mode
                 </h5>
                 <div class="card border shadow-none" style="max-width: 300px;">
@@ -150,7 +150,7 @@
                             <div class="me-3">
                                 <div class="bg-info rounded-circle d-flex align-items-center justify-content-center"
                                      style="width: 50px; height: 50px;">
-                                    <i class="fe fe-truck text-white fs-5"></i>
+                                    <i class="ti ti-truck text-white fs-5"></i>
                                 </div>
                             </div>
                             <div>
@@ -167,18 +167,18 @@
     @if ($request->is_transporter == true)
         <div class="mt-4">
             <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                <i class="fe fe-file me-2 text-primary"></i>
+                <i class="ti ti-file me-2 text-primary"></i>
                 Transport Attachment
             </h5>
             @if (!empty($request->attachment))
                 <a href="{{ asset($request->attachment) }}" download
                     class="btn btn-primary d-inline-flex align-items-center shadow-sm">
-                    <i class="fe fe-download me-2"></i>
+                    <i class="ti ti-download me-2"></i>
                     <span>Download Attachment</span>
                 </a>
             @else
                 <div class="alert alert-danger d-flex align-items-center border-0">
-                    <i class="fe fe-alert-circle me-2 fs-5"></i>
+                    <i class="ti ti-alert-circle me-2 fs-5"></i>
                     <span>No attachment available</span>
                 </div>
             @endif
@@ -186,18 +186,18 @@
     @elseif($request->request_for == 'Office Supplies')
         <div class="mt-4">
             <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                <i class="fe fe-file me-2 text-primary"></i>
+                <i class="ti ti-file me-2 text-primary"></i>
                 Supporting Document
             </h5>
             @if (!empty($request->attachment))
                 <a href="{{ asset($request->attachment) }}" download
                     class="btn btn-primary d-inline-flex align-items-center shadow-sm">
-                    <i class="fe fe-download me-2"></i>
+                    <i class="ti ti-download me-2"></i>
                     <span>Download Attachment</span>
                 </a>
             @else
                 <div class="alert alert-danger d-flex align-items-center border-0">
-                    <i class="fe fe-alert-circle me-2 fs-5"></i>
+                    <i class="ti ti-alert-circle me-2 fs-5"></i>
                     <span>No attachment available</span>
                 </div>
             @endif
@@ -206,12 +206,12 @@
         @if (!empty($request->attachment))
             <div class="mt-4">
                 <h5 class="text-dark mb-3 fw-bold d-flex align-items-center">
-                    <i class="fe fe-file me-2 text-primary"></i>
+                    <i class="ti ti-file me-2 text-primary"></i>
                     Attachment
                 </h5>
                 <a href="{{ asset($request->attachment) }}" download
                     class="btn btn-primary d-inline-flex align-items-center shadow-sm">
-                    <i class="fe fe-download me-2"></i>
+                    <i class="ti ti-download me-2"></i>
                     <span>Download Attachment</span>
                 </a>
             </div>

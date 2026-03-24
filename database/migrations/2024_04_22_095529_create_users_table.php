@@ -17,10 +17,10 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->unsignedBigInteger('department_id')->nullable();
-            $table->string('notification_channel')->default('sms')->after('phone');
             $table->string('file')->nullable();
             $table->string('signature')->nullable();
             $table->string('phone');
+            $table->string('notification_channel')->default('sms');
             // Use enum for status
             $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
             // password is fine as string, standard for Laravel

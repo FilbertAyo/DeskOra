@@ -3,7 +3,7 @@
          <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="pcvModalLabel"><button class="btn btn-secondary" onclick="printPCV()"><i
-                            class="fe fe-printer"></i></button></h5>
+                            class="ti ti-printer"></i></button></h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
              <div class="modal-body">

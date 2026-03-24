@@ -1,20 +1,26 @@
 <x-app-layout>
 
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs border-0" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab"
-                        aria-controls="home" aria-selected="true">
-                        <i class="fe fe-user-plus me-1"></i> Create New User
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="col-auto">
-            <a href="{{ route('admin.index') }}" class="btn btn-sm btn-light">
-                <i class="fe fe-arrow-left me-1"></i> Back to Users
-            </a>
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Create New User</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('admin.index') }}">Users</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Create</li>
+                            </ul>
+                        </div>
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <a href="{{ route('admin.index') }}" class="btn btn-sm btn-light">
+                                <i class="ti ti-arrow-left me-1"></i> Back to Users
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -23,6 +29,16 @@
             <form method="POST" action="{{ route('admin.store') }}" id="createUserForm">
                 @csrf
                 <div class="card shadow-none border">
+                    <div class="card-header bg-white border-bottom">
+                        <div class="row align-items-center">
+                            <div class="col-md-6 mb-2 mb-md-0">
+                                <h5 class="mb-0"><i class="ti ti-user-plus me-2"></i>User Information</h5>
+                            </div>
+                            <div class="col-md-6 text-md-end">
+                                <small class="text-muted">Fill details to create a new user account.</small>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="card-body">
                         <div class="row">
@@ -34,7 +50,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-user"></i>
+                                            <i class="ti ti-user"></i>
                                         </span>
                                         <input type="text"
                                             class="form-control @error('name') is-invalid @enderror"
@@ -58,7 +74,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-mail"></i>
+                                            <i class="ti ti-mail"></i>
                                         </span>
                                         <input type="email"
                                             class="form-control @error('email') is-invalid @enderror"
@@ -83,7 +99,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-phone"></i>
+                                            <i class="ti ti-phone"></i>
                                         </span>
                                         <input type="text"
                                             class="form-control @error('phone') is-invalid @enderror"
@@ -109,7 +125,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-briefcase"></i>
+                                            <i class="ti ti-briefcase"></i>
                                         </span>
                                         <select class="form-control @error('department_id') is-invalid @enderror"
                                             name="department_id"
@@ -140,7 +156,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-shield"></i>
+                                            <i class="ti ti-shield"></i>
                                         </span>
                                         <select class="form-control @error('role') is-invalid @enderror"
                                             name="role"
@@ -167,7 +183,7 @@
                             <!-- Status Info Alert -->
                             <div class="col-12">
                                 <div class="alert alert-info d-flex align-items-center" role="alert">
-                                    <i class="fe fe-info me-2"></i>
+                                    <i class="ti ti-info me-2"></i>
                                     <div>
                                         <strong>Note:</strong> The user will be created with <strong>Active</strong> status
                                         and will receive an email with auto-generated login credentials.
@@ -180,15 +196,15 @@
                     <div class="card-footer bg-light">
                         <div class="d-flex justify-content-between align-items-center">
                             <a href="{{ route('admin.index') }}" class="btn btn-secondary">
-                                <i class="fe fe-x me-1"></i> Cancel
+                                <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             @can('users management settings')
                                 <button type="submit" class="btn btn-primary" id="submitBtn">
-                                    <i class="fe fe-check-circle me-1"></i> Create User
+                                    <i class="ti ti-check-circle me-1"></i> Create User
                                 </button>
                             @else
                                 <button type="button" class="btn btn-primary permission-alert">
-                                    <i class="fe fe-check-circle me-1"></i> Create User
+                                    <i class="ti ti-check-circle me-1"></i> Create User
                                 </button>
                             @endcan
                         </div>
@@ -230,7 +246,7 @@
             form.addEventListener('submit', function(e) {
                 if (submitBtn) {
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fe fe-loader spinning me-1"></i> Creating User...';
+                    submitBtn.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Creating User...';
                 }
             });
 

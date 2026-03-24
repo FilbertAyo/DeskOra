@@ -15,7 +15,7 @@
             @can('request pettycash')
                 <a href="{{ route('petty.create') }}" class="btn mb-2 btn-primary btn-sm">
                     <span class="btn-label">
-                        <i class="fe fe-plus-circle"></i>
+                        <i class="ti ti-plus-circle"></i>
                     </span>
                     New Request
                 </a>
@@ -25,7 +25,7 @@
 
    
     <div class="row my-2">
-        @include('elements.spinner')
+       
         <div class="col-md-12">
             <div class="card shadow-none border">
                 <div class="card-body">
@@ -71,7 +71,7 @@
                                             <td>
                                                 <a href="{{ route('petty.show', \Vinkla\Hashids\Facades\Hashids::encode($item->id)) }}"
                                                     class="btn btn-sm btn-secondary text-white">
-                                                    <i class="fe fe-eye"></i></a>
+                                                    <i class="ti ti-eye"></i></a>
                                             </td>
                                         </tr>
                                         @else
@@ -101,7 +101,7 @@
                                             <td>
                                                 <a href="{{ route('petty.show', \Vinkla\Hashids\Facades\Hashids::encode($item->id)) }}"
                                                     class="btn btn-sm btn-secondary text-white">
-                                                    <i class="fe fe-eye"></i></a>
+                                                    <i class="ti ti-eye"></i></a>
                                             </td>
                                         </tr>
 
@@ -125,7 +125,7 @@
                      role="alert"
                      style="top: 20px; right: 20px; z-index: 9999; min-width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                     <div class="d-flex align-items-center">
-                        <i class="fe fe-alert-circle fs-3 me-3"></i>
+                        <i class="ti ti-alert-circle fs-3 me-3"></i>
                         <div>
                             <strong class="d-block">Edit Blocked!</strong>
                             <span>You cannot edit this request because it's already being processed.</span>

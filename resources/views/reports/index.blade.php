@@ -12,7 +12,7 @@
         </div>
         <div class="col-auto">
             <button type="button" class="btn btn-sm" onclick="reloadPage()">
-                <i class="fe fe-16 fe-refresh-ccw text-muted"></i>
+                <i class="ti ti-16 fe-refresh-ccw text-muted"></i>
             </button>
         </div>
     </div>
@@ -28,7 +28,7 @@
                             <div class="row">
                                 <div class="col-3">
                                     <div class="icon-big text-center">
-                                        <i class="fe fe-16 fe-credit-card"></i>
+                                        <i class="ti ti-16 fe-credit-card"></i>
                                     </div>
                                 </div>
                                 <div class="col-9 col-stats">
@@ -50,7 +50,7 @@
                         <div class="row">
                             <div class="col-3">
                                 <div class="icon-big text-center">
-                                    <i class="fe fe-16 fe-users"></i>
+                                    <i class="ti ti-16 fe-users"></i>
                                 </div>
                             </div>
                             <div class="col-9 col-stats">
@@ -71,7 +71,7 @@
                         <div class="row">
                             <div class="col-3">
                                 <div class="icon-big text-center">
-                                    <i class="fe fe-16 fe-dollar-sign"></i>
+                                    <i class="ti ti-16 fe-dollar-sign"></i>
                                 </div>
                             </div>
                             <div class="col-9 col-stats">

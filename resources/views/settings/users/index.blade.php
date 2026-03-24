@@ -1,70 +1,28 @@
 <x-app-layout>
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Users Management</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="javascript: void(0)">Settings</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Users</li>
+                            </ul>
+                        </div>
 
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs border-0" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="users-tab" data-toggle="tab" href="#users" role="tab"
-                        aria-controls="users" aria-selected="true">
-                        <i class="fe fe-users me-1"></i> Users Management
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="col-auto d-flex align-items-center gap-2">
-            <button type="button" class="btn btn-sm btn-light" onclick="reloadPage()" title="Refresh">
-                <i class="fe fe-refresh-ccw"></i>
-            </button>
-            @can('users management settings')
-                <a href="{{ route('admin.create') }}" class="btn btn-primary btn-sm">
-                    <i class="fe fe-plus-circle me-1"></i> New User
-                </a>
-            @endcan
-        </div>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="row mb-3">
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card borde shadow-none">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <span class="text-muted d-block">Total Users</span>
-                            <h3 class="mb-0">{{ $user->count() }}</h3>
-                        </div>
-                        <div class="text-primary">
-                            <i class="fe fe-users fs-1"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card borde shadow-none">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <span class="text-muted d-block">Active Users</span>
-                            <h3 class="mb-0 text-success">{{ $user->where('status', 'active')->count() }}</h3>
-                        </div>
-                        <div class="text-success">
-                            <i class="fe fe-user-check fs-1"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card borde shadow-none">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <span class="text-muted d-block">Inactive Users</span>
-                            <h3 class="mb-0 text-danger">{{ $user->where('status', 'inactive')->count() }}</h3>
-                        </div>
-                        <div class="text-danger">
-                            <i class="fe fe-user-x fs-1"></i>
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-light" onclick="reloadPage()"
+                                title="Refresh">
+                                <i class="ti ti-refresh"></i>
+                            </button>
+                            @can('users management settings')
+                                <a href="{{ route('admin.create') }}" class="btn btn-primary btn-sm">
+                                    <i class="ti ti-circle-plus me-1"></i> New User
+                                </a>
+                            @endcan
                         </div>
                     </div>
                 </div>
@@ -72,19 +30,19 @@
         </div>
     </div>
 
-    <div class="row my-2">
-        @include('elements.spinner')
+    <div class="row">
+       
         <div class="col-md-12">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom">
                     <div class="row align-items-center">
                         <div class="col-md-6 mb-2 mb-md-0">
-                            <h5 class="mb-0"><i class="fe fe-list me-2"></i>Users List</h5>
+                            <h5 class="mb-0"><i class="ti ti-list me-2"></i>Users List</h5>
                         </div>
                         <div class="col-md-6">
                             <div class="input-group">
                                 <span class="input-group-text bg-white">
-                                    <i class="fe fe-search"></i>
+                                    <i class="ti ti-search"></i>
                                 </span>
                                 <input type="text" class="form-control border-start-0" id="searchInput"
                                     placeholder="Search users by name, email, phone...">
@@ -124,7 +82,7 @@
                         </div>
                         <div class="col-md-3 mb-2">
                             <button class="btn btn-sm btn-secondary w-100" onclick="resetFilters()">
-                                <i class="fe fe-rotate-ccw me-1"></i> Reset Filters
+                                <i class="ti ti-rotate me-1"></i> Reset Filters
                             </button>
                         </div>
                     </div>
@@ -148,12 +106,7 @@
                                     <tr>
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
-                                            <div class="d-flex align-items-center">
-
-                                                <div>
-                                                    <strong>{{ $u->name }}</strong>
-                                                </div>
-                                            </div>
+                                        {{ $u->name }}
                                         </td>
                                         <td>
                                             {{ $u->email }}
@@ -170,21 +123,21 @@
                                         <td>
                                             @if($u->roles->count() > 0)
                                                 @foreach($u->roles as $role)
-                                                    <span class="badge badge-primary badge-pill mb-1">
-                                                        <i class="fe fe-shield me-1"></i>
+                                                    <span class="badge bg-primary mb-1">
+                                                        <i class="ti ti-shield me-1"></i>
                                                         {{ ucwords(str_replace('_', ' ', $role->name)) }}
                                                     </span>
                                                 @endforeach
                                             @else
                                                 <span class="text-muted">
-                                                    <i class="fe fe-shield-off me-1"></i>
+                                                    <i class="ti ti-shield-off me-1"></i>
                                                     No role
                                                 </span>
                                             @endif
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge badge-pill {{ $u->status === 'active' ? 'badge-success' : 'badge-danger' }}">
-                                                <i class="fe fe-{{ $u->status === 'active' ? 'check-circle' : 'x-circle' }} me-1"></i>
+                                            <span class="badge {{ $u->status === 'active' ? 'bg-success' : 'bg-danger' }}">
+                                                <i class="ti {{ $u->status === 'active' ? 'ti-circle-check' : 'ti-circle-x' }} me-1"></i>
                                                 {{ ucfirst($u->status) }}
                                             </span>
                                         </td>
@@ -192,12 +145,12 @@
                                             <div class="btn-group btn-group-sm" role="group">
                                                 <a href="{{ route('admin.show', Hashids::encode($u->id)) }}"
                                                     class="btn btn-info text-white" title="View Details">
-                                                    <i class="fe fe-eye"></i>
+                                                    <i class="ti ti-eye"></i>
                                                 </a>
                                                 @can('users management settings')
                                                     <a href="{{ route('admin.edit', Hashids::encode($u->id)) }}"
                                                         class="btn btn-primary text-white" title="Edit User">
-                                                        <i class="fe fe-edit"></i>
+                                                        <i class="ti ti-edit"></i>
                                                     </a>
                                                 @endcan
                                             </div>
@@ -206,7 +159,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="9" class="text-center py-4">
-                                            <i class="fe fe-users fs-1 text-muted"></i>
+                                            <i class="ti ti-users fs-1 text-muted"></i>
                                             <p class="text-muted mb-0">No users found</p>
                                         </td>
                                     </tr>

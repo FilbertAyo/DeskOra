@@ -9,24 +9,14 @@ class WorkPeriodService
 {
     /**
      * Create the next work period automatically
-     * This is called every Sunday to create the upcoming week
+     * This creates only the immediate next week from "now"
      *
      * @return WorkPeriod|null
      */
     public function createNextWeek(): ?WorkPeriod
     {
-        // Get the last period
-        $lastPeriod = WorkPeriod::orderBy('year', 'desc')
-            ->orderBy('week_number', 'desc')
-            ->first();
-
-        if (!$lastPeriod) {
-            // No periods exist yet, cannot create next week automatically
-            return null;
-        }
-
-        // Calculate next week
-        $nextWeekStart = Carbon::parse($lastPeriod->week_end_date)->addDay(); // Next Monday
+        // Calculate immediate next week from current date (prevents creating two+ weeks ahead)
+        $nextWeekStart = Carbon::now()->startOfWeek(Carbon::MONDAY)->addWeek(); // Next Monday
         $nextWeekEnd = $nextWeekStart->copy()->addDays(6); // Next Sunday
 
         // Determine ISO week year and number
@@ -126,7 +116,7 @@ class WorkPeriodService
     /**
      * Process weekly automation
      * This method handles both closing the current week and creating the next week
-     * Called every Sunday at midnight
+     * Called by scheduler (creation should run every Thursday)
      *
      * @return array
      */

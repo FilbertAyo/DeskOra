@@ -35,9 +35,10 @@ class AdminController extends Controller
     public function create()
     {
         $departments = Department::where('status', 'active')->get();
+        $permissions = Permission::all();
         $roles = Role::all();
 
-        return view('settings.users.create', compact('departments', 'roles'));
+        return view('settings.users.create', compact('departments', 'permissions', 'roles'));
     }
 
     /**
@@ -50,7 +51,8 @@ class AdminController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
             'phone' => ['required', 'regex:/^0[76][0-9]{8}$/'],
             'department_id' => ['required', 'string', 'max:255'],
-            'role' => ['nullable', 'string', 'exists:roles,name'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['exists:permissions,name'],
         ]);
 
         $randomNo = Str::random(6);
@@ -65,10 +67,10 @@ class AdminController extends Controller
             'file' => null, //Default value if no file is uploaded
         ]);
 
-        // Assign default role (employee) if no role is specified
-        $roleName = $request->input('role', 'employee');
-        $role = Role::firstOrCreate(['name' => $roleName]);
-        $user->assignRole($role);
+        // Assign permissions if provided
+        if ($request->has('permissions')) {
+            $user->syncPermissions($request->input('permissions', []));
+        }
 
         event(new Registered($user));
         // Send notification email
@@ -89,9 +91,8 @@ class AdminController extends Controller
         $id = Hashids::decode($hashid);
         $user = User::findOrFail($id[0]);
         $permissions = Permission::all();
-        $roles = Role::all();
 
-        return view('settings.users.view', compact('user', 'permissions', 'roles'));
+        return view('settings.users.view', compact('user', 'permissions'));
     }
 
     public function assignPermissions(Request $request, $id)
@@ -113,8 +114,9 @@ class AdminController extends Controller
 
         $user = User::findOrFail($id[0]);
         $departments = Department::where('status', 'active')->get();
+        $permissions = Permission::all();
         $roles = Role::all();
-        return view('settings.users.edit', compact('user', 'departments', 'roles'));
+        return view('settings.users.edit', compact('user', 'departments', 'permissions', 'roles'));
     }
     public function update(Request $request, $id)
     {
@@ -125,7 +127,8 @@ class AdminController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'phone' => ['required', 'regex:/^0[76][0-9]{8}$/'],
             'department_id' => ['required', 'string', 'max:255'],
-            'role' => ['nullable', 'string', 'exists:roles,name'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['exists:permissions,name'],
         ]);
 
         $user->update([
@@ -135,11 +138,9 @@ class AdminController extends Controller
             'department_id' => $request->department_id,
         ]);
 
-        // Update user role if provided
-        if ($request->has('role')) {
-            $roleName = $request->input('role');
-            $role = Role::firstOrCreate(['name' => $roleName]);
-            $user->syncRoles([$role]);
+        // Update user permissions if provided
+        if ($request->has('permissions')) {
+            $user->syncPermissions($request->input('permissions', []));
         }
 
         return redirect()->back()->with('success', 'User updated successfully');

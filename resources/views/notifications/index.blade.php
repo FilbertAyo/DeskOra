@@ -2,7 +2,7 @@
     <div class="row align-items-center mb-4">
         <div class="col">
             <h2 class="h3 mb-0 page-title">
-                <i class="fe fe-bell mr-2"></i>Notifications
+                <i class="ti ti-bell mr-2"></i>Notifications
             </h2>
             <p class="text-muted mt-1 mb-0">Manage how you receive notifications</p>
         </div>
@@ -14,7 +14,7 @@
             <div class="card shadow-none border">
                 <div class="card-header text-white">
                     <h5 class="card-title mb-0">
-                        <i class="fe fe-message-circle mr-2"></i>SMS Account Information
+                        <i class="ti ti-message-circle mr-2"></i>SMS Account Information
                     </h5>
                 </div>
                 <div class="card-body">
@@ -28,7 +28,7 @@
                             </div>
                             @if($smsInfo['balance'] < 100)
                                 <div class="alert alert-warning mt-2 mb-0 py-2">
-                                    <i class="fe fe-alert-triangle mr-1"></i>
+                                    <i class="ti ti-alert-triangle mr-1"></i>
                                     <small>Low SMS balance. Please top up your account.</small>
                                 </div>
                             @endif
@@ -47,13 +47,13 @@
                         </div>
 
                         <div class="mt-3">
-                            <span class="badge badge-success">
-                                <i class="fe fe-check-circle mr-1"></i>Connected
+                            <span class="badge bg-success">
+                                <i class="ti ti-check-circle mr-1"></i>Connected
                             </span>
                         </div>
                     @else
                         <div class="alert alert-warning mb-0">
-                            <i class="fe fe-alert-triangle mr-2"></i>
+                            <i class="ti ti-alert-triangle mr-2"></i>
                             Unable to retrieve SMS balance. Please check your Beem API credentials.
                         </div>
                     @endif
@@ -66,13 +66,13 @@
             <div class="card shadow-none border">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="fe fe-settings mr-2"></i>Notification Preferences
+                        <i class="ti ti-settings mr-2"></i>Notification Preferences
                     </h5>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Manage how you receive notifications for petty cash requests and other updates.</p>
                     <a class="btn btn-primary" href="{{ route('profile.edit') }}">
-                        <i class="fe fe-settings mr-1"></i>Go to Profile Settings
+                        <i class="ti ti-settings mr-1"></i>Go to Profile Settings
                     </a>
 
                     <hr class="my-4">
@@ -80,15 +80,15 @@
                     <h6 class="mb-3">Notification Channels</h6>
                     <ul class="list-unstyled mb-0">
                         <li class="mb-2">
-                            <i class="fe fe-check text-success mr-2"></i>
+                            <i class="ti ti-check text-success mr-2"></i>
                             <strong>SMS:</strong> Receive text messages on your phone
                         </li>
                         <li class="mb-2">
-                            <i class="fe fe-check text-success mr-2"></i>
+                            <i class="ti ti-check text-success mr-2"></i>
                             <strong>Email:</strong> Receive email notifications
                         </li>
                         <li class="mb-2">
-                            <i class="fe fe-check text-success mr-2"></i>
+                            <i class="ti ti-check text-success mr-2"></i>
                             <strong>Both:</strong> Receive notifications via SMS and Email
                         </li>
                     </ul>
@@ -103,7 +103,7 @@
             <div class="card shadow-none border">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="fe fe-info mr-2"></i>About SMS Notifications
+                        <i class="ti ti-info mr-2"></i>About SMS Notifications
                     </h5>
                 </div>
                 <div class="card-body">

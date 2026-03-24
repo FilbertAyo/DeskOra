@@ -11,12 +11,12 @@ use Vinkla\Hashids\Facades\Hashids;
 class WorkPeriodController extends Controller
 {
     /**
-     * Check if user is admin (for create/edit/delete operations)
+     * Check if user has admin permissions (for create/edit/delete operations)
      */
     private function checkAdmin()
     {
-        if (!Auth::user()->hasRole('admin')) {
-            abort(403, 'Unauthorized access. Only administrators can manage work periods.');
+        if (!Auth::user()->hasPermissionTo('approve documents')) {
+            abort(403, 'Unauthorized access. Only users with approve permissions can manage work periods.');
         }
     }
 
@@ -26,7 +26,7 @@ class WorkPeriodController extends Controller
      */
     public function index(Request $request)
     {
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasPermissionTo('approve documents')) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -59,15 +59,23 @@ class WorkPeriodController extends Controller
         // Get current period
         $currentPeriod = WorkPeriod::getCurrent();
 
-        // Get the last period to suggest next week (for modal)
-        $lastPeriod = WorkPeriod::orderBy('year', 'desc')
-            ->orderBy('week_number', 'desc')
-            ->first();
-
         // Get current year for modal
         $currentYear = Carbon::now()->year;
 
-        return view('settings.work-periods.index', compact('periods', 'years', 'currentPeriod', 'lastPeriod', 'currentYear'));
+        // Only allow creating the immediate next week (one week ahead)
+        $nextWeekStartDate = Carbon::now()->startOfWeek(Carbon::MONDAY)->addWeek();
+        $nextWeekYear = $nextWeekStartDate->isoWeekYear();
+        $nextWeekNumber = $nextWeekStartDate->isoWeek();
+
+        return view('settings.work-periods.index', compact(
+            'periods',
+            'years',
+            'currentPeriod',
+            'currentYear',
+            'nextWeekStartDate',
+            'nextWeekYear',
+            'nextWeekNumber'
+        ));
     }
 
     /**
@@ -98,13 +106,31 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
         
-        abort_unless(Auth::user()->hasRole('admin'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
         $request->validate([
             'year' => ['required', 'integer', 'min:2020', 'max:2100'],
             'week_number' => ['required', 'integer', 'min:1', 'max:53'],
             'week_start_date' => ['required', 'date'],
         ]);
+
+        // Enforce "next week only" creation rule
+        $expectedStartDate = Carbon::now()->startOfWeek(Carbon::MONDAY)->addWeek();
+        $expectedYear = $expectedStartDate->isoWeekYear();
+        $expectedWeekNumber = $expectedStartDate->isoWeek();
+        $submittedStartDate = Carbon::parse($request->week_start_date)->startOfDay();
+
+        if (
+            (int) $request->year !== $expectedYear ||
+            (int) $request->week_number !== $expectedWeekNumber ||
+            !$submittedStartDate->isSameDay($expectedStartDate)
+        ) {
+            return redirect()->route('work-periods.index')
+                ->withInput()
+                ->withErrors([
+                    'week_start_date' => "You can only create the immediate next week: Week {$expectedWeekNumber} of {$expectedYear} ({$expectedStartDate->format('Y-m-d')}).",
+                ]);
+        }
 
         // Check if period already exists
         $exists = WorkPeriod::where('year', $request->year)
@@ -114,7 +140,9 @@ class WorkPeriodController extends Controller
         if ($exists) {
             return redirect()->route('work-periods.index')
                 ->withInput()
-                ->with('error', "Week {$request->week_number} of {$request->year} already exists.");
+                ->withErrors([
+                    'week_number' => "Week {$request->week_number} of {$request->year} already exists.",
+                ]);
         }
 
         // Calculate week end date (6 days after start = Sunday to Saturday)
@@ -164,7 +192,7 @@ class WorkPeriodController extends Controller
      */
     public function show(string $id)
     {
-        abort_unless(Auth::user()->hasRole('admin'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
         $decodedId = Hashids::decode($id);
         $period = WorkPeriod::with(['documents.user', 'weeklyPlans.user', 'weeklyReports.user'])
@@ -176,7 +204,6 @@ class WorkPeriodController extends Controller
             'weekly_plans' => $period->weeklyPlans()->count(),
             'weekly_reports' => $period->weeklyReports()->count(),
             'monthly_reports' => $period->monthlyReports()->count(),
-            'weekly_minutes' => $period->weeklyMinutes()->count(),
         ];
 
         return view('settings.work-periods.show', compact('period', 'stats'));
@@ -190,7 +217,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
         
-        abort_unless(Auth::user()->hasRole('admin'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
         $decodedId = Hashids::decode($id);
         $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
@@ -206,7 +233,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
         
-        abort_unless(Auth::user()->hasRole('admin'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
         $decodedId = Hashids::decode($id);
         $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
@@ -242,7 +269,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
         
-        abort_unless(Auth::user()->hasRole('admin'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
         $decodedId = Hashids::decode($id);
         $period = WorkPeriod::findOrFail($decodedId[0] ?? null);

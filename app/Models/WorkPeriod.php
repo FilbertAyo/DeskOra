@@ -111,16 +111,6 @@ class WorkPeriod extends Model
     }
 
     /**
-     * Get weekly minutes for this period
-     *
-     * @return HasMany
-     */
-    public function weeklyMinutes(): HasMany
-    {
-        return $this->hasMany(Document::class, 'period_id')->where('type', Document::TYPE_WEEKLY_MINUTES);
-    }
-
-    /**
      * Scope: Get current open period
      *
      * @param \Illuminate\Database\Eloquent\Builder $query

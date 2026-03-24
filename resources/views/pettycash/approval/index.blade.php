@@ -17,7 +17,7 @@
 
     <div class="row my-2">
 
-        @include('elements.spinner')
+       
         <div class="col-md-12">
             <div class="card shadow-none border">
                 <div class="card-body">
@@ -65,7 +65,7 @@
                                             <td>
                                                 <a href="{{ route('petty.details', Hashids::encode($item->id)) }}"
                                                     class="btn btn-sm btn-secondary text-white">
-                                                    <i class="fe fe-eye"></i></a>
+                                                    <i class="ti ti-eye"></i></a>
                                             </td>
                                         </tr>
                                         @else
@@ -98,7 +98,7 @@
                                             <td>
                                                 <a href="{{ route('petty.details', Hashids::encode($item->id)) }}"
                                                     class="btn btn-sm btn-secondary text-white">
-                                                    <i class="fe fe-eye"></i></a>
+                                                    <i class="ti ti-eye"></i></a>
                                             </td>
                                         </tr>
 

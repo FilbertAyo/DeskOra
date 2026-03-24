@@ -1,17 +1,16 @@
- <footer class="footer">
-     <div class="container-fluid d-flex justify-content-between">
-         <nav class="pull-left">
-             <ul class="nav">
-
-                 <li class="nav-item">
-                     <a class="nav-link" href="https://wa.me/255741400900"> Help </a>
-                 </li>
-             </ul>
-         </nav>
-
-         <div>
-             Owned by
-             <a href="#">Mars Communications Ltd</a>.
-         </div>
-     </div>
- </footer>
+<footer class="pc-footer">
+    <div class="footer-wrapper container-fluid">
+        <div class="row">
+            <div class="col-sm my-1">
+                <p class="m-0">
+                  Distributed by <a href="https://Soscom.com/">Soscom</a>.
+                </p>
+            </div>
+            <div class="col-auto my-1">
+                <ul class="list-inline footer-link mb-0">
+                    <li class="list-inline-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</footer>

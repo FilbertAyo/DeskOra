@@ -2,7 +2,7 @@
 <div class="card border-0 shadow-sm mt-3">
     <div class="card-header bg-white border-bottom">
         <div class="d-flex align-items-center">
-            <i class="fe fe-check-circle me-2 text-primary"></i>
+            <i class="ti ti-check-circle me-2 text-primary"></i>
             <h5 class="mb-0 fw-bold">Approval Timeline</h5>
         </div>
     </div>
@@ -10,13 +10,13 @@
         <ul class="timeline-horizontal">
             <li class="timeline-item">
                 <div class="timeline-badge bg-primary text-white">
-                    <i class="fe fe-clipboard"></i>
+                    <i class="ti ti-clipboard"></i>
                 </div>
                 <div class="timeline-panel">
                     <div class="timeline-heading">
                         <h6 class="timeline-title mb-1 fw-bold">{{ $request->request_for }}</h6>
                         <small class="text-muted">
-                            <i class="fe fe-clock me-1"></i>
+                            <i class="ti ti-clock me-1"></i>
                             {{ $request->created_at->format('d M, Y h:i A') }}
                         </small>
                         <br>
@@ -50,12 +50,12 @@
                         <div class="timeline-heading">
                             <h6 class="timeline-title mb-1 fw-bold">{{ $actionText }}</h6>
                             <small class="text-muted">
-                                <i class="fe fe-user me-1"></i>
+                                <i class="ti ti-user me-1"></i>
                                 {{ $approval->user->name }}
                             </small>
                             <br>
                             <small class="text-muted">
-                                <i class="fe fe-clock me-1"></i>
+                                <i class="ti ti-clock me-1"></i>
                                 {{ $approval->created_at->format('d M, Y h:i A') }}
                             </small>
                         </div>

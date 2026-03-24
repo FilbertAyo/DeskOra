@@ -3,7 +3,7 @@
     <div class="row align-items-center mb-3 border-bottom no-gutters">
         <div class="col">
             <div class="page-header-title d-flex align-items-center">
-                <i class="fe fe-dollar-sign me-2 text-primary"></i>
+                <i class="ti ti-dollar-sign me-2 text-primary"></i>
                 <h5 class="mb-0 text-muted">
                     Request by <strong>{{ $request->user->name }}</strong>
                 </h5>
@@ -16,7 +16,7 @@
                     @can('first pettycash approval')
                         <button class="btn btn-primary btn-sm d-flex align-items-center shadow-sm" data-toggle="modal"
                             data-target="#approvalModal">
-                            <i class="fe fe-check-circle me-2"></i>
+                            <i class="ti ti-check-circle me-2"></i>
                             <span>Review Request</span>
                         </button>
                     @endcan
@@ -26,7 +26,7 @@
                     @can('last pettycash approval')
                         <button class="btn btn-primary btn-sm d-flex align-items-center shadow-sm" data-toggle="modal"
                             data-target="#approvalModal">
-                            <i class="fe fe-check-circle me-2"></i>
+                            <i class="ti ti-check-circle me-2"></i>
                             <span>Review Request</span>
                         </button>
                     @endcan
@@ -36,12 +36,12 @@
                     @can('approve petycash payments')
                         <button class="btn btn-outline-primary btn-sm d-flex align-items-center shadow-sm"
                             data-toggle="modal" data-target="#approvalModal">
-                            <i class="fe fe-eye me-2"></i>
+                            <i class="ti ti-eye me-2"></i>
                             <span>View Details</span>
                         </button>
                         <a href="javascript:void(0);" class="btn btn-success btn-sm d-flex align-items-center shadow-sm"
                             onclick="confirmApproval('{{ route('c_approve.approve', ['id' => $request->id]) }}')">
-                            <i class="fe fe-credit-card me-2"></i>
+                            <i class="ti ti-credit-card me-2"></i>
                             <span>Pay Now</span>
                         </a>
                     @endcan
@@ -49,7 +49,7 @@
 
                 <button type="button" class="btn btn-outline-secondary d-flex align-items-center shadow-sm"
                     data-toggle="modal" data-target="#pettyCashModal">
-                    <i class="fe fe-printer me-2"></i>
+                    <i class="ti ti-printer me-2"></i>
                     <span>Print</span>
                 </button>
             </div>
@@ -62,7 +62,7 @@
             role="alert">
             <div class="d-flex align-items-center">
                 <div class="alert-icon me-3">
-                    <i class="fe fe-check-circle fs-3"></i>
+                    <i class="ti ti-check-circle fs-3"></i>
                 </div>
                 <div>
                     <h6 class="alert-heading mb-1">Request Approved</h6>
@@ -77,7 +77,7 @@
             role="alert">
             <div class="d-flex align-items-center">
                 <div class="alert-icon me-3">
-                    <i class="fe fe-x-circle fs-3"></i>
+                    <i class="ti ti-x-circle fs-3"></i>
                 </div>
                 <div>
                     <h6 class="alert-heading mb-1">Request Rejected</h6>
@@ -92,7 +92,7 @@
             role="alert">
             <div class="d-flex align-items-center">
                 <div class="alert-icon me-3">
-                    <i class="fe fe-check-circle fs-3"></i>
+                    <i class="ti ti-check-circle fs-3"></i>
                 </div>
                 <div>
                     <h6 class="alert-heading mb-1">Payment Completed</h6>
@@ -186,7 +186,7 @@
                         <div class="col-12">
                             <div class="alert alert-primary bg-gradient border-0 text-center py-3 mb-0">
                                 <h5 class="mb-0 d-flex align-items-center justify-content-center">
-                                    <i class="fe fe-dollar-sign me-2"></i>
+                                    <i class="ti ti-dollar-sign me-2"></i>
                                     <span>Total Amount: <strong>TZS
                                             {{ number_format($request->amount, 2) }}/=</strong></span>
                                 </h5>
@@ -211,7 +211,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-light border-bottom-0">
                     <h5 class="modal-title fw-bold d-flex align-items-center" id="approvalModalLabel">
-                        <i class="fe fe-user-check me-2 text-primary"></i>
+                        <i class="ti ti-user-check me-2 text-primary"></i>
                         <span>Request Approval</span>
                     </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -223,7 +223,7 @@
                     <div id="step-approval">
                         <div class="text-center mb-4">
                             <div class="mb-3">
-                                <i class="fe fe-file-text text-primary" style="font-size: 3rem;"></i>
+                                <i class="ti ti-file-text text-primary" style="font-size: 3rem;"></i>
                             </div>
                             <p class=" mb-0">
                                 After reviewing <strong class="text-dark">{{ $request->user->name }}</strong>'s
@@ -234,7 +234,7 @@
                         <div class="d-flex gap-2 justify-content-center">
                             <button class="btn btn-danger d-flex align-items-center mx-4"
                                 onclick="goToRejectStep()">
-                                <i class="fe fe-x-circle me-2"></i>
+                                <i class="ti ti-x-circle me-2"></i>
                                 <span>Reject</span>
                             </button>
                             <form
@@ -285,7 +285,7 @@
                             <div class="d-flex gap-2 justify-content-between">
                                 <button type="button" class="btn btn-outline-secondary d-flex align-items-center"
                                     onclick="backToApprovalStep()">
-                                    <i class="fe fe-arrow-left me-2"></i>
+                                    <i class="ti ti-arrow-left me-2"></i>
                                     <span>Back</span>
                                 </button>
                               <x-primary-button label="Submit" />

@@ -12,20 +12,20 @@
                     </div>
                     <div class="col-auto">
                         <button type="button" class="btn btn-sm" onclick="reloadPage()">
-                            <i class="fe fe-16 fe-refresh-ccw text-muted"></i>
+                            <i class="ti ti-16 fe-refresh-ccw text-muted"></i>
                         </button>
                         @can('approve petycash payments')
                             <button type="button" class="btn mb-2 btn-primary btn-sm"
                                 data-toggle="modal" data-target="#staticBackdrop"
                                 onclick="openNewDepositModal()">
-                                New deposit<span class="fe fe-plus fe-16 ml-2"></span>
+                                New deposit<span class="ti ti-plus fe-16 ml-2"></span>
                             </button>
                         @endcan
                     </div>
                 </div>
 
                 <div class="row my-2">
-                    @include('elements.spinner')
+                   
                     <div class="col-md-12">
                         <div class="card shadow-none border">
                             <div class="card-header mb-1" style="display: flex;justify-content: space-between;">
@@ -75,7 +75,7 @@
                                                         data-by="{{ $deposit->user->name }}"
                                                         data-description="{{ $deposit->description ?? 'No description provided' }}"
                                                         onclick="openDepositModal('{{ number_format($deposit->deposit, 0, '.', ',') }}/=', '{{ number_format($deposit->remaining, 0, '.', ',') }}/=', '{{ $deposit->created_at }}', '{{ $deposit->user->name }}', '{{ $deposit->description ?? 'No description provided' }}')">
-                                                        <i class="fe fe-eye"></i>
+                                                        <i class="ti ti-eye"></i>
                                                     </button>
                                                 </td>
                                             </tr>

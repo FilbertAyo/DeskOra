@@ -1,23 +1,30 @@
 <x-app-layout>
 
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs border-0" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab"
-                        aria-controls="home" aria-selected="true">
-                        <i class="fe fe-edit me-1"></i> Edit User
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="col-auto">
-            <a href="{{ route('admin.show', Hashids::encode($user->id)) }}" class="btn btn-sm btn-info text-white me-1">
-                <i class="fe fe-eye me-1"></i> View Profile
-            </a>
-            <a href="{{ route('admin.index') }}" class="btn btn-sm btn-light">
-                <i class="fe fe-arrow-left me-1"></i> Back to Users
-            </a>
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Edit User</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('admin.index') }}">Users</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('admin.show', Hashids::encode($user->id)) }}">Profile</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Edit</li>
+                            </ul>
+                        </div>
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <a href="{{ route('admin.show', Hashids::encode($user->id)) }}" class="btn btn-sm btn-info text-white">
+                                <i class="ti ti-eye me-1"></i> View Profile
+                            </a>
+                            <a href="{{ route('admin.index') }}" class="btn btn-sm btn-light">
+                                <i class="ti ti-arrow-left me-1"></i> Back to Users
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -28,6 +35,16 @@
                 @method('PUT')
 
                 <div class="card shadow-none border">
+                    <div class="card-header bg-white border-bottom">
+                        <div class="row align-items-center">
+                            <div class="col-md-7 mb-2 mb-md-0">
+                                <h5 class="mb-0"><i class="ti ti-edit me-2"></i>Update User Information</h5>
+                            </div>
+                            <div class="col-md-5 text-md-end">
+                                <small class="text-muted">Make changes, then save user profile updates.</small>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="card-body">
 
@@ -41,7 +58,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-user"></i>
+                                            <i class="ti ti-user"></i>
                                         </span>
                                         <input type="text"
                                             class="form-control @error('name') is-invalid @enderror"
@@ -65,7 +82,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-mail"></i>
+                                            <i class="ti ti-mail"></i>
                                         </span>
                                         <input type="email"
                                             class="form-control @error('email') is-invalid @enderror"
@@ -89,7 +106,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-phone"></i>
+                                            <i class="ti ti-phone"></i>
                                         </span>
                                         <input type="text"
                                             class="form-control @error('phone') is-invalid @enderror"
@@ -115,7 +132,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-briefcase"></i>
+                                            <i class="ti ti-briefcase"></i>
                                         </span>
                                         <select class="form-control @error('department_id') is-invalid @enderror"
                                             name="department_id"
@@ -148,7 +165,7 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <i class="fe fe-shield"></i>
+                                            <i class="ti ti-shield"></i>
                                         </span>
                                         <select class="form-control @error('role') is-invalid @enderror"
                                             name="role"
@@ -176,13 +193,13 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <small class="text-muted">
-                                                <i class="fe fe-clock me-1"></i>
+                                                <i class="ti ti-clock me-1"></i>
                                                 <strong>Created:</strong> {{ $user->created_at->format('M d, Y h:i A') }}
                                             </small>
                                         </div>
                                         <div class="col-md-6">
                                             <small class="text-muted">
-                                                <i class="fe fe-refresh-cw me-1"></i>
+                                                <i class="ti ti-refresh-cw me-1"></i>
                                                 <strong>Last Updated:</strong> {{ $user->updated_at->format('M d, Y h:i A') }}
                                             </small>
                                         </div>
@@ -195,16 +212,16 @@
                     <div class="card-footer bg-light">
                         <div class="d-flex justify-content-between align-items-center">
                             <a href="{{ route('admin.index') }}" class="btn btn-secondary">
-                                <i class="fe fe-x me-1"></i> Cancel
+                                <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div>
                                 @can('users management settings')
                                     <button type="submit" class="btn btn-primary" id="submitBtn">
-                                        <i class="fe fe-save me-1"></i> Update User
+                                        <i class="ti ti-save me-1"></i> Update User
                                     </button>
                                 @else
                                     <button type="button" class="btn btn-primary permission-alert">
-                                        <i class="fe fe-save me-1"></i> Update User
+                                        <i class="ti ti-save me-1"></i> Update User
                                     </button>
                                 @endcan
                             </div>
@@ -247,7 +264,7 @@
             form.addEventListener('submit', function(e) {
                 if (submitBtn) {
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fe fe-loader spinning me-1"></i> Updating User...';
+                    submitBtn.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Updating User...';
                 }
             });
 

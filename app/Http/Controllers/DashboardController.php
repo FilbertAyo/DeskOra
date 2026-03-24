@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Vinkla\Hashids\Facades\Hashids;
 
 class DashboardController extends Controller
 {
@@ -126,6 +127,7 @@ class DashboardController extends Controller
             ->get();
 
         // Document/Work Period related data for dashboard
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $currentPeriod = WorkPeriod::getCurrent();
         $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
@@ -158,10 +160,14 @@ class DashboardController extends Controller
         ];
 
         // Check if user can see weekly dashboard
-        // Only employees and admins can see (exclude reviewers and minutes_preparer unless admin)
-        $canSeeWeeklyDashboard = !$user->hasRole('admin') && $user->hasAnyRole(['reviewer', 'minutes_preparer'])
-            ? false
-            : true;
+        // Users who can create documents can see the dashboard
+        $canSeeWeeklyDashboard = $user->hasAnyPermission([
+            'create weekly plan',
+            'create weekly report',
+            'create monthly report',
+            'create action logs',
+            'approve documents'
+        ]);
 
         // Prepare weekly dashboard data if applicable
         $weeklyDashboardData = null;
@@ -225,6 +231,8 @@ class DashboardController extends Controller
             ];
         }
 
+        $actionLogProgress = $this->buildActionLogProgressForUser($user);
+
         return view('dashboard', compact(
             'userNo',
             'pettyNo',
@@ -253,8 +261,118 @@ class DashboardController extends Controller
             'dashboardAvailableTypes',
             'dashboardPendingDocs',
             'canSeeWeeklyDashboard',
-            'weeklyDashboardData'
+            'weeklyDashboardData',
+            'actionLogProgress'
         ));
+    }
+
+    private function buildActionLogProgressForUser(User $user): array
+    {
+        $documents = Document::with('period')
+            ->where('type', Document::TYPE_ACTION_LOG)
+            ->whereNotNull('period_id')
+            ->get();
+
+        if ($documents->isEmpty()) {
+            return [
+                'activeTasks' => [],
+                'currentDraftId' => null,
+            ];
+        }
+
+        // Keep one document per period: submitted first, otherwise latest draft.
+        $selectedByPeriod = $documents
+            ->groupBy('period_id')
+            ->map(function ($periodDocs) {
+                return $periodDocs
+                    ->sortByDesc(function ($doc) {
+                        $isSubmitted = $doc->state === Document::STATE_SUBMITTED ? 1 : 0;
+                        return ($isSubmitted * 1000000000) + (int) $doc->id;
+                    })
+                    ->first();
+            })
+            ->filter()
+            ->sortBy(fn ($doc) => optional($doc->period)->week_start_date?->timestamp ?? 0)
+            ->values();
+
+        $currentPeriod = WorkPeriod::getCurrent();
+        $currentDraftDoc = $currentPeriod
+            ? $selectedByPeriod->first(fn ($doc) => (int) $doc->period_id === (int) $currentPeriod->id && $doc->isDraft())
+            : null;
+
+        $taskTimeline = [];
+        foreach ($selectedByPeriod as $document) {
+            if (!$document || !$document->period) {
+                continue;
+            }
+
+            $content = is_array($document->content) ? $document->content : [];
+            $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+            if (empty($tasks)) {
+                continue;
+            }
+
+            foreach ($tasks as $task) {
+                if (!is_array($task)) {
+                    continue;
+                }
+
+                $responsibleIds = $task['responsible_user_ids'] ?? [];
+                if (!is_array($responsibleIds)) {
+                    $responsibleIds = [];
+                }
+                $responsibleIds = array_map('intval', $responsibleIds);
+                if (!in_array((int) $user->id, $responsibleIds, true)) {
+                    continue;
+                }
+
+                $taskLabel = trim((string) ($task['task'] ?? ''));
+                if ($taskLabel === '') {
+                    continue;
+                }
+
+                $taskKey = trim((string) ($task['task_uid'] ?? ''));
+                if ($taskKey === '') {
+                    $taskKey = md5($taskLabel . '|' . implode(',', $responsibleIds));
+                }
+
+                $taskTimeline[$taskKey]['task'] = $taskLabel;
+                $taskTimeline[$taskKey]['history'][] = [
+                    'period_label' => 'Week ' . $document->period->week_number . ' of ' . $document->period->year,
+                    'period_range' => $document->period->date_range,
+                    'progress' => $task['progress'] ?? 'Not Started',
+                    'notes_progress' => $task['notes_progress'] ?? '',
+                    'due_date' => $task['due_date'] ?? null,
+                    'compilation_date' => $task['compilation_date'] ?? null,
+                    'is_current_period' => $currentPeriod && (int) $document->period_id === (int) $currentPeriod->id,
+                    'document_hashid' => Hashids::encode($document->id),
+                ];
+            }
+        }
+
+        $activeTasks = collect($taskTimeline)
+            ->map(function ($taskData) {
+                $history = collect($taskData['history'] ?? [])->values();
+                $latest = $history->last();
+                if (!$latest) {
+                    return null;
+                }
+
+                return [
+                    'task' => $taskData['task'] ?? '',
+                    'latest_progress' => $latest['progress'] ?? 'Not Started',
+                    'history' => $history->all(),
+                ];
+            })
+            ->filter(fn ($row) => $row && ($row['latest_progress'] ?? 'Not Started') !== 'Done')
+            ->sortBy('task')
+            ->values()
+            ->all();
+
+        return [
+            'activeTasks' => $activeTasks,
+            'currentDraftId' => $currentDraftDoc ? Hashids::encode($currentDraftDoc->id) : null,
+        ];
     }
 
 

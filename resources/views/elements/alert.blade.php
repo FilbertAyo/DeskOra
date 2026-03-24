@@ -1,8 +1,8 @@
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        document.body.addEventListener("click", function(event) {
+    document.addEventListener("DOMContentLoaded", function () {
+        document.body.addEventListener("click", function (event) {
             if (event.target.closest(".permission-alert")) {
                 Swal.fire({
                     icon: "error",
@@ -14,97 +14,95 @@
     });
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+@php
+    $globalToasts = [];
 
-<style>
+    if (session('success')) {
+        $globalToasts[] = [
+            'title' => 'Success',
+            'message' => session('success'),
+            'icon' => 'ti ti-circle-check text-success',
+            'delay' => 4500,
+        ];
+    }
 
-    .toast-container {
-  position: relative;
-  width: 100%;
-}
+    if (session('error')) {
+        $globalToasts[] = [
+            'title' => 'Error',
+            'message' => session('error'),
+            'icon' => 'ti ti-alert-circle text-danger',
+            'delay' => 5500,
+        ];
+    }
 
-.toast {
-  position: absolute;
-  top: 10px;
-  right: 30px;
-  z-index: 1050;
-  width: auto;
-}
+    if (session('warning')) {
+        $globalToasts[] = [
+            'title' => 'Warning',
+            'message' => session('warning'),
+            'icon' => 'ti ti-alert-triangle text-warning',
+            'delay' => 5000,
+        ];
+    }
 
-</style>
+    if (session('info')) {
+        $globalToasts[] = [
+            'title' => 'Info',
+            'message' => session('info'),
+            'icon' => 'ti ti-info-circle text-info',
+            'delay' => 5000,
+        ];
+    }
 
-@if (session('success'))
+    if (isset($errors) && $errors->any()) {
+        foreach ($errors->all() as $validationError) {
+            $globalToasts[] = [
+                'title' => 'Validation Error',
+                'message' => $validationError,
+                'icon' => 'ti ti-alert-circle text-danger',
+                'delay' => 6000,
+            ];
+        }
+    }
+@endphp
 
-<div class="toast-container">
-    <div class="toast fade show bg-success" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="toast-header">
-        <strong class="mr-auto">Success!</strong>
-        <small>Now</small>
-
-      </div>
-      <div class="toast-body bg-white">{{ session('success') }}</div>
-    </div>
-  </div>
-@elseif (session('error'))
-<div class="toast-container">
-    <div class="toast fade show bg-danger" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="toast-header">
-        <strong class="mr-auto">Error!</strong>
-        <small>Now</small>
-
-      </div>
-      <div class="toast-body bg-white">{{ session('error') }} </div>
-    </div>
-  </div>
-@elseif (session('warning'))
-<div class="toast-container">
-    <div class="toast fade show bg-warning" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="toast-header">
-        <strong class="mr-auto">Warning!</strong>
-        <small>Now</small>
-
-      </div>
-      <div class="toast-body bg-white">{{ session('warning') }} </div>
-    </div>
-  </div>
-@endif
-
-@if (isset($errors) && $errors->any())
-    <div class="toast-container">
-        @foreach ($errors->all() as $error)
-            <div class="toast fade show bg-danger mb-2" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header">
-                    <strong class="mr-auto">Validation Error!</strong>
-                    <small>Now</small>
+@if(!empty($globalToasts))
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 1090; width: min(92vw, 360px);">
+        <div class="toast-container w-100">
+            @foreach($globalToasts as $toast)
+                <div class="toast hide w-100 mb-2 shadow-sm border-0 js-global-live-toast"
+                     role="alert"
+                     aria-live="assertive"
+                     aria-atomic="true"
+                     data-delay="{{ $toast['delay'] }}">
+                    <div class="toast-header">
+                        <i class="{{ $toast['icon'] }} me-2"></i>
+                        <strong class="me-auto">{{ $toast['title'] }}</strong>
+                        <small>Now</small>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        {{ $toast['message'] }}
+                    </div>
                 </div>
-                <div class="toast-body bg-white">
-                    {{ $error }}
-                </div>
-            </div>
-        @endforeach
+            @endforeach
+        </div>
     </div>
-@endif
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var toasts = document.querySelectorAll('.toast');
-        if (!toasts || toasts.length === 0) return;
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toasts = document.querySelectorAll('.js-global-live-toast');
+            if (!toasts || toasts.length === 0) return;
 
-        toasts.forEach(function (el) {
-            try {
+            toasts.forEach(function (el) {
                 if (window.bootstrap && bootstrap.Toast) {
-                    var t = new bootstrap.Toast(el, { autohide: true, delay: 4000 });
-                    t.show();
-                } else {
-                    setTimeout(function () {
-                        el.classList.remove('show');
-                        el.classList.add('hide');
-                        if (el && el.parentNode) {
-                            el.parentNode.removeChild(el);
-                        }
-                    }, 5000);
+                    const delay = parseInt(el.getAttribute('data-delay') || '4500', 10);
+                    const instance = new bootstrap.Toast(el, {
+                        autohide: true,
+                        delay: Number.isNaN(delay) ? 4500 : delay
+                    });
+                    instance.show();
                 }
-            } catch (e) {}
+            });
         });
-    });
-</script>
+    </script>
+@endif

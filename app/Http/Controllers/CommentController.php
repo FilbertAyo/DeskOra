@@ -31,12 +31,6 @@ class CommentController extends Controller
             'comment' => $request->comment,
         ]);
 
-        // Redirect based on document type
-        if ($document->type === Document::TYPE_WEEKLY_MINUTES) {
-            return redirect()->route('minutes.show', $documentId)
-                ->with('success', 'Comment added successfully.');
-        }
-
         return redirect()->route('documents.show', $documentId)
             ->with('success', 'Comment added successfully.');
     }
@@ -63,12 +57,6 @@ class CommentController extends Controller
         $document = $comment->document;
         $documentId = Hashids::encode($document->id);
 
-        // Redirect based on document type
-        if ($document->type === Document::TYPE_WEEKLY_MINUTES) {
-            return redirect()->route('minutes.show', $documentId)
-                ->with('success', 'Comment updated successfully.');
-        }
-
         return redirect()->route('documents.show', $documentId)
             ->with('success', 'Comment updated successfully.');
     }
@@ -87,12 +75,6 @@ class CommentController extends Controller
         $document = $comment->document;
         $documentId = Hashids::encode($document->id);
         $comment->delete();
-
-        // Redirect based on document type
-        if ($document->type === Document::TYPE_WEEKLY_MINUTES) {
-            return redirect()->route('minutes.show', $documentId)
-                ->with('success', 'Comment deleted successfully.');
-        }
 
         return redirect()->route('documents.show', $documentId)
             ->with('success', 'Comment deleted successfully.');
