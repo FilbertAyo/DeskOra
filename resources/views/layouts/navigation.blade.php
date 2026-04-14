@@ -42,24 +42,8 @@
         <!-- [Mobile Media Block end] -->
 
         @php
-            $currentPeriod = \App\Models\WorkPeriod::getCurrent();
-            $matrixRows = collect();
-            if ($currentPeriod) {
-                $matrixRows = \App\Models\Document::query()
-                    ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
-                    ->where('state', \App\Models\Document::STATE_SUBMITTED)
-                    ->where('period_id', $currentPeriod->id)
-                    ->whereNotNull('main_target')
-                    ->where('main_target', '!=', '')
-                    ->with('user:id,name')
-                    ->latest('updated_at')
-                    ->get(['user_id', 'main_target', 'updated_at'])
-                    ->groupBy('user_id')
-                    ->map(fn($plans) => $plans->first())
-                    ->values()
-                    ->sortBy(fn($plan) => strtolower($plan->user?->name ?? ''))
-                    ->values();
-            }
+            $currentPeriod = $currentPeriod ?? null;
+            $matrixRows = $matrixRows ?? collect();
         @endphp
 
         @if($currentPeriod)

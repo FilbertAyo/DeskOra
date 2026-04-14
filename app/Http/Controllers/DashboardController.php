@@ -34,33 +34,43 @@ class DashboardController extends Controller
         $authUser = Auth::user();
         $departmentScopeIds = $authUser->departmentScopeIds();
 
-        $userNo = User::all()->count();
+        $userNo = User::count();
         $pettyNo = Petty::whereIn('department_id', $departmentScopeIds)->count();
         $paidAmount = Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->sum('amount');
         $myExpense = Petty::where('user_id', Auth::user()->id)->where('status', 'paid')->sum('amount');
 
-        $departmentNo = Department::all()->count();
+        $departmentNo = Department::count();
 
         // Status breakdown for pie chart
+        $statusTotals = Petty::query()
+            ->whereIn('department_id', $departmentScopeIds)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
         $statusBreakdown = [
-            'pending' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'pending')->count(),
-            'approved' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'approved')->count(),
-            'paid' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->count(),
-            'rejected' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'rejected')->count(),
-            'resubmission' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'resubmission')->count(),
+            'pending' => (int) ($statusTotals['pending'] ?? 0),
+            'approved' => (int) ($statusTotals['approved'] ?? 0),
+            'paid' => (int) ($statusTotals['paid'] ?? 0),
+            'rejected' => (int) ($statusTotals['rejected'] ?? 0),
+            'resubmission' => (int) ($statusTotals['resubmission'] ?? 0),
         ];
 
         // Monthly expense trend (last 6 months)
         $monthlyExpenses = [];
         $monthLabels = [];
+        $monthlyExpenseByKey = Petty::query()
+            ->where('status', 'paid')
+            ->whereIn('department_id', $departmentScopeIds)
+            ->whereDate('paid_date', '>=', Carbon::now()->subMonths(5)->startOfMonth())
+            ->selectRaw('YEAR(paid_date) as y, MONTH(paid_date) as m, SUM(amount) as total')
+            ->groupBy('y', 'm')
+            ->get()
+            ->keyBy(fn ($row) => $row->y.'-'.$row->m);
         for ($i = 5; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
             $monthLabels[] = $date->format('M Y');
-            $monthlyExpenses[] = Petty::where('status', 'paid')
-                ->whereIn('department_id', $departmentScopeIds)
-                ->whereYear('paid_date', $date->year)
-                ->whereMonth('paid_date', $date->month)
-                ->sum('amount');
+            $key = $date->year.'-'.$date->month;
+            $monthlyExpenses[] = (float) ($monthlyExpenseByKey->get($key)->total ?? 0);
         }
 
         // Top 5 departments by spending
@@ -106,28 +116,38 @@ class DashboardController extends Controller
 
         // Individual user analytics
         $myTotalRequests = Petty::where('user_id', Auth::user()->id)->count();
-        $myApprovedRequests = Petty::where('user_id', Auth::user()->id)->where('status', 'approved')->count();
-        $myPendingRequests = Petty::where('user_id', Auth::user()->id)->where('status', 'pending')->count();
+        $myStatusTotals = Petty::query()
+            ->where('user_id', Auth::user()->id)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+        $myApprovedRequests = (int) ($myStatusTotals['approved'] ?? 0);
+        $myPendingRequests = (int) ($myStatusTotals['pending'] ?? 0);
 
         // My status breakdown
         $myStatusBreakdown = [
-            'pending' => Petty::where('user_id', Auth::user()->id)->where('status', 'pending')->count(),
-            'approved' => Petty::where('user_id', Auth::user()->id)->where('status', 'approved')->count(),
-            'paid' => Petty::where('user_id', Auth::user()->id)->where('status', 'paid')->count(),
-            'rejected' => Petty::where('user_id', Auth::user()->id)->where('status', 'rejected')->count(),
-            'resubmission' => Petty::where('user_id', Auth::user()->id)->where('status', 'resubmission')->count(),
+            'pending' => (int) ($myStatusTotals['pending'] ?? 0),
+            'approved' => (int) ($myStatusTotals['approved'] ?? 0),
+            'paid' => (int) ($myStatusTotals['paid'] ?? 0),
+            'rejected' => (int) ($myStatusTotals['rejected'] ?? 0),
+            'resubmission' => (int) ($myStatusTotals['resubmission'] ?? 0),
         ];
 
         // My monthly request trend (last 6 months)
         $myMonthlyRequests = [];
         $myMonthLabels = [];
+        $myMonthlyRequestsByKey = Petty::query()
+            ->where('user_id', Auth::user()->id)
+            ->whereDate('created_at', '>=', Carbon::now()->subMonths(5)->startOfMonth())
+            ->selectRaw('YEAR(created_at) as y, MONTH(created_at) as m, COUNT(*) as total')
+            ->groupBy('y', 'm')
+            ->get()
+            ->keyBy(fn ($row) => $row->y.'-'.$row->m);
         for ($i = 5; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
             $myMonthLabels[] = $date->format('M Y');
-            $myMonthlyRequests[] = Petty::where('user_id', Auth::user()->id)
-                ->whereYear('created_at', $date->year)
-                ->whereMonth('created_at', $date->month)
-                ->count();
+            $key = $date->year.'-'.$date->month;
+            $myMonthlyRequests[] = (int) ($myMonthlyRequestsByKey->get($key)->total ?? 0);
         }
 
         // My recent requests (last 10)
@@ -182,20 +202,21 @@ class DashboardController extends Controller
                 ->latest()
                 ->get();
 
-            $timelineData = WorkPeriod::orderBy('year', 'desc')
+            $timelinePeriods = WorkPeriod::orderBy('year', 'desc')
                 ->orderBy('week_number', 'desc')
                 ->take(6)
+                ->get();
+            $timelineDocs = Document::query()
+                ->forUser($user->id)
+                ->whereIn('period_id', $timelinePeriods->pluck('id'))
+                ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
                 ->get()
-                ->map(function ($period) use ($user) {
-                    $plan = Document::where('user_id', $user->id)
-                        ->where('period_id', $period->id)
-                        ->where('type', Document::TYPE_WEEKLY_PLAN)
-                        ->first();
+                ->groupBy(fn ($doc) => $doc->period_id.'-'.$doc->type);
 
-                    $report = Document::where('user_id', $user->id)
-                        ->where('period_id', $period->id)
-                        ->where('type', Document::TYPE_WEEKLY_REPORT)
-                        ->first();
+            $timelineData = $timelinePeriods
+                ->map(function ($period) use ($timelineDocs) {
+                    $plan = $timelineDocs->get($period->id.'-'.Document::TYPE_WEEKLY_PLAN)?->first();
+                    $report = $timelineDocs->get($period->id.'-'.Document::TYPE_WEEKLY_REPORT)?->first();
 
                     return [
                         'period' => $period,
@@ -270,6 +291,7 @@ class DashboardController extends Controller
     {
         $documents = Document::with('period')
             ->where('type', Document::TYPE_ACTION_LOG)
+            ->forUser($user->id)
             ->whereNotNull('period_id')
             ->get();
 

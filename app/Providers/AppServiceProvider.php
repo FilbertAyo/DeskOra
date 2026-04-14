@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Data\WeeklySubmissionReminder;
+use App\Models\Document;
 use App\Models\Petty;
+use App\Models\WorkPeriod;
 use App\Services\WeeklySubmissionReminderService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -32,24 +35,59 @@ class AppServiceProvider extends ServiceProvider
             if (Auth::check()) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
-                $departmentIds = $user->departmentScopeIds();
+                $counts = Cache::remember('petty-nav-counts-user-'.$user->id, now()->addSeconds(45), function () use ($user) {
+                    return Petty::query()
+                        ->whereIn('department_id', $user->departmentScopeIds())
+                        ->whereIn('status', ['pending', 'approved'])
+                        ->selectRaw('status, COUNT(*) as total')
+                        ->groupBy('status')
+                        ->pluck('total', 'status');
+                });
 
-                $pendingCount = Petty::whereIn('department_id', $departmentIds)
-                    ->where('status', 'pending')
-                    ->count();
-
-                $approvedCount = Petty::whereIn('department_id', $departmentIds)
-                    ->where('status', 'approved')
-                    ->count();
+                $pendingCount = (int) ($counts['pending'] ?? 0);
+                $approvedCount = (int) ($counts['approved'] ?? 0);
             }
 
-            // This one doesn't depend on user
-            $processingCount = Petty::where('status', 'processing')->count();
+            // This one doesn't depend on user.
+            $processingCount = Cache::remember('petty-nav-count-processing', now()->addSeconds(45), function () {
+                return Petty::where('status', 'processing')->count();
+            });
 
             $view->with([
                 'pendingPettiesCount' => $pendingCount,
                 'processingPettiesCount' => $processingCount,
                 'approvedPettiesCount' => $approvedCount,
+            ]);
+        });
+
+        View::composer('layouts.navigation', function ($view) {
+            $currentPeriod = Cache::remember('current-work-period-nav', now()->addSeconds(60), function () {
+                return WorkPeriod::getCurrent();
+            });
+
+            $matrixRows = collect();
+            if ($currentPeriod) {
+                $matrixRows = Cache::remember('weekly-objective-matrix-'.$currentPeriod->id, now()->addMinutes(5), function () use ($currentPeriod) {
+                    return Document::query()
+                        ->where('type', Document::TYPE_WEEKLY_PLAN)
+                        ->where('state', Document::STATE_SUBMITTED)
+                        ->where('period_id', $currentPeriod->id)
+                        ->whereNotNull('main_target')
+                        ->where('main_target', '!=', '')
+                        ->with('user:id,name,sub_department')
+                        ->latest('updated_at')
+                        ->get(['user_id', 'main_target', 'updated_at'])
+                        ->groupBy('user_id')
+                        ->map(fn ($plans) => $plans->first())
+                        ->values()
+                        ->sortBy(fn ($plan) => strtolower($plan->user?->name ?? ''))
+                        ->values();
+                });
+            }
+
+            $view->with([
+                'currentPeriod' => $currentPeriod,
+                'matrixRows' => $matrixRows,
             ]);
         });
 
