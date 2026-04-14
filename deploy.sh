@@ -39,8 +39,6 @@ echo "==> Installing production dependencies..."
 echo "==> Running database migrations..."
 "$PHP_BIN" artisan migrate --force
 
-echo "==> Seeding database..."
-"$PHP_BIN" artisan db:seed --force
 
 echo "==> Clearing old caches..."
 "$PHP_BIN" artisan optimize:clear
