@@ -2,7 +2,7 @@
     <div class="navbar-wrapper">
         <div class="m-header">
             <a href="{{ route('dashboard') }}" class="b-brand text-primary">
-                <img src="{{ asset('image/logo-dark.png') }}" class="img-fluid logo-lg" alt="logo">
+                <img src="{{ asset('assets/images/logo.png') }}" class="img-fluid logo-lg p-2" alt="logo">
             </a>
         </div>
 
@@ -15,7 +15,14 @@
                         <span class="pc-mtext">Dashboard</span>
                     </a>
                 </li>
-
+               
+                    <li class="pc-item {{ Request::routeIs('year-plan.*') ? 'active' : '' }}">
+                        <a href="{{ route('year-plan.index') }}" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-chart-line"></i></span>
+                            <span class="pc-mtext">Year Plan</span>
+                        </a>
+                    </li>
+              
                 <!-- Weekly Plans & Reports -->
                 <li class="pc-item pc-caption">
                     <label>Activities</label>
@@ -60,7 +67,7 @@
                     class="pc-item {{ Request::routeIs('documents.index') && request('type') === 'monthly_report' ? 'active' : '' }}">
                     <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-folder"></i></span>
-                        <span class="pc-mtext">Monthly Reports Archive</span>
+                        <span class="pc-mtext">Monthly Reports </span>
                     </a>
                 </li>
                 <li class="pc-item {{ Request::routeIs('documents.index') && !request()->has('type') ? 'active' : '' }}">
@@ -149,17 +156,14 @@
                         <span class="pc-mtext">Manage Work Periods</span>
                     </a>
                 </li>
-
-                @can('view reports')
+               
                     <li class="pc-item {{ Request::routeIs('reports') ? 'active' : '' }}">
                         <a href="{{ route('reports') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-box"></i></span>
                             <span class="pc-mtext">Reports</span>
                         </a>
                     </li>
-                @endcan
-
-                @can('view settings')
+             
                     <li
                         class="pc-item pc-hasmenu {{ Request::routeIs('admin.index') || Request::routeIs('departments') || Request::routeIs('settings.*') ? 'pc-triggered' : '' }}">
                         <a href="#!" class="pc-link">
@@ -183,10 +187,20 @@
                                     <span class="pc-mtext">Notifications</span>
                                 </a>
                             </li>
+                            @can('view activity log')
+                                <li class="pc-item {{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
+                                    <a href="{{ route('activity-log.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Activity log</span>
+                                    </a>
+                                </li>
+                            @endcan
                         </ul>
                     </li>
-                @endcan
+               
             </ul>
+            <div class="px-3 py-3 border-top border-secondary border-opacity-10 mt-2">
+                <x-deskora-credit compact class="flex-wrap" />
+            </div>
         </div>
     </div>
 </nav>

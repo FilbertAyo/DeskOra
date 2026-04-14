@@ -84,70 +84,20 @@
 
         <div class="ms-auto">
             <ul class="list-unstyled">
-                <li class="dropdown pc-h-item">
-                    <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
-                        role="button" aria-haspopup="false" aria-expanded="false">
-                        <i class="ti ti-layers"></i>
-                    </a>
-
-                    <div class="dropdown-menu dropdown-notification dropdown-menu-end pc-h-dropdown">
-                        <div class="dropdown-header d-flex align-items-center justify-content-between">
-                            <h5 class="m-0">Quick Actions</h5>
-                            <a href="#!" class="pc-head-link bg-transparent"><i class="ti ti-x text-danger"></i></a>
+                @can('manage anonymous feedback')
+                    <li class="dropdown pc-h-item">
+                        <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
+                            role="button" aria-haspopup="false" aria-expanded="false" title="Resources">
+                            <i class="ti ti-book"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end pc-h-dropdown">
+                            <a href="{{ route('anonymous-feedback.index') }}" class="dropdown-item">
+                                <i class="ti ti-message-circle me-2"></i>
+                                Anonymous feedback inbox
+                            </a>
                         </div>
-                        <div class="dropdown-divider"></div>
-
-                        <div class="dropdown-header px-0 text-wrap header-notification-scroll position-relative"
-                            style="max-height: calc(100vh - 215px)">
-                            <div class="p-2">
-                                <div class="row g-2">
-                                    @can('request pettycash')
-                                        <div class="col-12">
-                                            <a href="{{ route('petty.create') }}"
-                                                class="btn btn-light d-flex align-items-center justify-content-start py-2 w-100">
-                                                <i class="ti ti-file-text fs-4 text-warning mr-2"></i>
-                                                <span>New Petty Cash</span>
-                                            </a>
-                                        </div>
-                                    @endcan
-
-                                    @can('view reports')
-                                        <div class="col-12">
-                                            <a href="{{ route('reports') }}"
-                                                class="btn btn-light d-flex align-items-center justify-content-start py-2 w-100">
-                                                <i class="ti ti-book fs-4 text-info mr-2"></i>
-                                                <span>Reports</span>
-                                            </a>
-                                        </div>
-                                    @endcan
-
-                                    @can('view cashflow movements')
-                                        <div class="col-12">
-                                            <a href="{{ route('deposit.index') }}"
-                                                class="btn btn-light d-flex align-items-center justify-content-start py-2 w-100">
-                                                <i class="ti ti-credit-card fs-4 text-secondary mr-2"></i>
-                                                <span>Payments</span>
-                                            </a>
-                                        </div>
-                                    @endcan
-
-                                    <div class="col-12">
-                                        <a href="{{ route('notification.index') }}"
-                                            class="btn btn-light d-flex align-items-center justify-content-start py-2 w-100">
-                                            <i class="ti ti-bell fs-4 text-primary mr-2"></i>
-                                            <span>Notifications</span>
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="dropdown-divider"></div>
-                        <div class="text-center py-2">
-                            <a href="{{ route('dashboard') }}" class="link-primary">Go to Dashboard</a>
-                        </div>
-                    </div>
-                </li>
+                    </li>
+                @endcan
 
                 <li class="pc-h-item">
                     <button type="button" class="pc-head-link border-0 bg-transparent me-0"
@@ -160,7 +110,7 @@
                 <li class="dropdown pc-h-item header-user-profile">
                     <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
                         role="button" aria-haspopup="false" data-bs-auto-close="outside" aria-expanded="false">
-                        <img src="{{ asset(Auth::user()->file ?? 'image/prof.jpeg') }}" alt="user-image" class="user-avtar">
+                        <img src="{{ asset(Auth::user()->file ?? 'assets/images/profile.png') }}" alt="user-image" class="user-avtar">
                         <span>{{ Auth::user()->name }}</span>
                     </a>
 
@@ -168,7 +118,7 @@
                         <div class="dropdown-header">
                             <div class="d-flex mb-1">
                                 <div class="flex-shrink-0">
-                                    <img src="{{ asset(Auth::user()->file ?? 'image/prof.jpeg') }}" alt="user-image"
+                                    <img src="{{ asset(Auth::user()->file ?? 'assets/images/profile.png') }}" alt="user-image"
                                         class="user-avtar wid-35">
                                 </div>
                                 <div class="flex-grow-1 ms-3">
@@ -204,12 +154,7 @@
 
                             <div class="tab-pane fade" id="drp-tab-2" role="tabpanel" aria-labelledby="drp-t2"
                                 tabindex="0">
-                                @can('view settings')
-                                    <a href="{{ route('admin.index') }}" class="dropdown-item">
-                                        <i class="ti ti-lock"></i>
-                                        <span>Admin Settings</span>
-                                    </a>
-                                @endcan
+                             
 
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
@@ -264,21 +209,16 @@
                     <table class="table table-bordered table-hover align-middle">
                         <thead>
                             <tr>
-                                <th style="width: 70px;">No</th>
                                 <th style="width: 240px;">Staff</th>
-                                <th style="width: 220px;">Week</th>
+                                <th style="width: 220px;">Sub department</th>
                                 <th>Main Objective</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($matrixRows as $plan)
                                 <tr>
-                                    <td>{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">{{ $plan->user?->name ?? 'Unknown Staff' }}</td>
-                                    <td>
-                                        Week {{ $currentPeriod->week_number }}
-                                        <div class="text-muted small">{{ $currentPeriod->date_range }}</div>
-                                    </td>
+                                    <td>{{ $plan->user?->sub_department ?? 'Unknown Sub Department' }}</td>
                                     <td>{{ $plan->main_target }}</td>
                                 </tr>
                             @endforeach

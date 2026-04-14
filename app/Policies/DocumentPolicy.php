@@ -4,13 +4,12 @@ namespace App\Policies;
 
 use App\Models\Document;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class DocumentPolicy
 {
     /**
      * Determine whether the user can view any models.
-     * 
+     *
      * Rules:
      * - Employees: Can view their own documents
      * - Reviewers: Can view all documents
@@ -25,7 +24,7 @@ class DocumentPolicy
 
     /**
      * Determine whether the user can view the model.
-     * 
+     *
      * Rules:
      * - Employees: Can view their own documents
      * - Reviewers: Can view all documents
@@ -56,7 +55,7 @@ class DocumentPolicy
 
     /**
      * Determine whether the user can create models.
-     * 
+     *
      * Rules:
      * - Employees: Can create weekly_plan, weekly_report, monthly_report
      * - Reviewers: Cannot create (read-only)
@@ -70,13 +69,14 @@ class DocumentPolicy
         }
 
         // Users who only have 'view all documents' permission cannot create (read-only)
-        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs'])) {
+        if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs'])) {
             return false;
         }
 
         // Check if user has any available document types
         $availableTypes = Document::getAvailableTypesForUser($user);
-        return !empty($availableTypes);
+
+        return ! empty($availableTypes);
     }
 
     /**
@@ -90,7 +90,7 @@ class DocumentPolicy
         }
 
         // Users who only have 'view all documents' permission cannot create (read-only)
-        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs'])) {
+        if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs'])) {
             return false;
         }
 
@@ -100,7 +100,7 @@ class DocumentPolicy
 
     /**
      * Determine whether the user can update the model.
-     * 
+     *
      * Rules:
      * - Employees: Can update their own draft documents
      * - Reviewers: Cannot update (read-only)
@@ -109,13 +109,13 @@ class DocumentPolicy
     public function update(User $user, Document $document): bool
     {
         if ($document->type === Document::TYPE_ACTION_LOG) {
-            if (!$this->hasOpenPeriod($document)) {
+            if (! $this->hasOpenPeriod($document)) {
                 return false;
             }
 
             if ($this->isActionLogManager($user)) {
-                // Managers keep full-edit on draft logs only.
-                return $document->isDraft();
+                // Managers can keep updating shared weekly logs while period remains open.
+                return true;
             }
 
             // Assigned staff can update their own rows even after submission.
@@ -123,16 +123,16 @@ class DocumentPolicy
         }
 
         // Users who only have 'view all documents' permission cannot update (read-only)
-        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
+        if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
             return false;
         }
 
         // Only draft documents can be updated
-        if (!$document->isDraft()) {
+        if (! $document->isDraft()) {
             return false;
         }
 
-        if (!$this->hasOpenPeriod($document)) {
+        if (! $this->hasOpenPeriod($document)) {
             return false;
         }
 
@@ -149,7 +149,7 @@ class DocumentPolicy
 
     /**
      * Determine whether the user can delete the model.
-     * 
+     *
      * Rules:
      * - Employees: Can delete their own draft documents
      * - Reviewers: Cannot delete (read-only)
@@ -158,7 +158,7 @@ class DocumentPolicy
     public function delete(User $user, Document $document): bool
     {
         if ($document->type === Document::TYPE_ACTION_LOG) {
-            if (!$document->isDraft() || !$this->hasOpenPeriod($document)) {
+            if (! $document->isDraft() || ! $this->hasOpenPeriod($document)) {
                 return false;
             }
 
@@ -166,16 +166,16 @@ class DocumentPolicy
         }
 
         // Users who only have 'view all documents' permission cannot delete (read-only)
-        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
+        if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
             return false;
         }
 
         // Only draft documents can be deleted
-        if (!$document->isDraft()) {
+        if (! $document->isDraft()) {
             return false;
         }
 
-        if (!$this->hasOpenPeriod($document)) {
+        if (! $this->hasOpenPeriod($document)) {
             return false;
         }
 
@@ -192,7 +192,7 @@ class DocumentPolicy
 
     /**
      * Determine whether the user can submit the document.
-     * 
+     *
      * Rules:
      * - Employees: Can submit their own draft documents
      * - Reviewers: Cannot submit (read-only)
@@ -201,7 +201,7 @@ class DocumentPolicy
     public function submit(User $user, Document $document): bool
     {
         if ($document->type === Document::TYPE_ACTION_LOG) {
-            if (!$document->isDraft() || !$this->hasOpenPeriod($document)) {
+            if (! $document->isDraft() || ! $this->hasOpenPeriod($document)) {
                 return false;
             }
 
@@ -209,16 +209,16 @@ class DocumentPolicy
         }
 
         // Users who only have 'view all documents' permission cannot submit (read-only)
-        if ($user->hasPermissionTo('view all documents') && !$user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
+        if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
             return false;
         }
 
         // Only draft documents can be submitted
-        if (!$document->isDraft()) {
+        if (! $document->isDraft()) {
             return false;
         }
 
-        if (!$this->hasOpenPeriod($document)) {
+        if (! $this->hasOpenPeriod($document)) {
             return false;
         }
 
@@ -238,15 +238,15 @@ class DocumentPolicy
      */
     public function reject(User $user, Document $document): bool
     {
-        if (!in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
             return false;
         }
 
-        if (!$document->isSubmitted()) {
+        if (! $document->isSubmitted()) {
             return false;
         }
 
-        if (!$this->hasOpenPeriod($document)) {
+        if (! $this->hasOpenPeriod($document)) {
             return false;
         }
 
@@ -276,7 +276,7 @@ class DocumentPolicy
      */
     private function hasOpenPeriod(Document $document): bool
     {
-        if (!$document->period) {
+        if (! $document->period) {
             return true;
         }
 
@@ -303,17 +303,17 @@ class DocumentPolicy
         $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
 
         foreach ($tasks as $task) {
-            if (!is_array($task)) {
+            if (! is_array($task)) {
                 continue;
             }
 
             $responsibleIds = $task['responsible_user_ids'] ?? [];
-            if (!is_array($responsibleIds)) {
+            if (! is_array($responsibleIds)) {
                 continue;
             }
 
-            $ids = array_map('intval', $responsibleIds);
-            if (in_array((int) $user->id, $ids, true)) {
+            $ids = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
+            if (in_array((string) $user->id, $ids, true)) {
                 return true;
             }
         }

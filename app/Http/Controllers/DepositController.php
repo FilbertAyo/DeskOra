@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\RunningBalanceExport;
 use App\Models\Deposit;
 use App\Models\Petty;
-use Illuminate\Http\Request;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\RunningBalanceExport;
-use App\Models\ApprovalLog;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DepositController extends Controller
 {
@@ -18,31 +17,31 @@ class DepositController extends Controller
      */
     public function index()
     {
-        $deposits = Deposit::orderBy('id', 'desc')->where(
-            'department_id',
-            Auth::user()->department_id
-        )->get();
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $scopeIds = $user->departmentScopeIds();
+        $deposits = Deposit::orderBy('id', 'desc')
+            ->whereIn('department_id', $scopeIds)
+            ->get();
 
         // Get the latest deposit entry to access the 'remaining' value
-        $latestDeposit = Deposit::orderBy('id', 'desc')->where(
-            'department_id',
-            Auth::user()->department_id
-        )->first();
+        $latestDeposit = Deposit::orderBy('id', 'desc')
+            ->whereIn('department_id', $scopeIds)
+            ->first();
         $remaining = $latestDeposit ? $latestDeposit->remaining : 0;
 
-        return view("pettycash.finance.cashier", compact("deposits", "remaining"));
+        return view('pettycash.finance.cashier', compact('deposits', 'remaining'));
     }
-
 
     private function getCashflowTransactions($filterType)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
-        $departmentId = $user->department_id;
-        $userId = $user->id;
+        $departmentIds = $user->departmentScopeIds();
 
-        $allDeposits = Deposit::where('department_id', $departmentId)->get();
+        $allDeposits = Deposit::whereIn('department_id', $departmentIds)->get();
         $allPetty = Petty::with('user')
-            ->where('department_id', $departmentId)
+            ->whereIn('department_id', $departmentIds)
             ->where('status', 'paid')
             ->get();
 
@@ -114,6 +113,7 @@ class DepositController extends Controller
                 $runningBalance -= $tx['deduction'];
             }
             $tx['remaining'] = $runningBalance;
+
             return $tx;
         });
 
@@ -124,7 +124,6 @@ class DepositController extends Controller
         ];
     }
 
-
     public function cashflow(Request $request)
     {
         $filterType = $request->input('filter_type');
@@ -132,7 +131,6 @@ class DepositController extends Controller
 
         return view('pettycash.finance.cashflow', $data);
     }
-
 
     public function download(Request $request)
     {
@@ -170,12 +168,10 @@ class DepositController extends Controller
         return back()->with('error', 'Invalid format requested.');
     }
 
-
     public function create()
     {
         //
     }
-
 
     public function store(Request $request)
     {
@@ -202,7 +198,6 @@ class DepositController extends Controller
 
         return redirect()->back()->with('success', 'Fund deposited successfully with updated balance.');
     }
-
 
     /**
      * Display the specified resource.

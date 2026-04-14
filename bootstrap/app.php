@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAnonymousFeedbackToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,10 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-      $middleware->alias([ // Use 'alias' for route middleware
+        $middleware->alias([ // Use 'alias' for route middleware
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'feedback.token' => EnsureAnonymousFeedbackToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -29,7 +29,7 @@
             <div class="d-flex flex-wrap align-items-center justify-content-between">
                 <div>
                     <h5 class="mb-1">Keep your profile up to date</h5>
-                    <p class="text-muted mb-0 small">Update contacts, password, and signature to improve report and approval workflow.</p>
+                    <p class="text-muted mb-0 small">Update contacts and signature to improve report and approval workflow.</p>
                 </div>
                 <span class="badge bg-light-primary border border-primary mt-2 mt-md-0">Account Security Enabled</span>
             </div>
@@ -42,20 +42,13 @@
         @include('profile.partials.update-profile-information-form')
     </div>
 
-    <!-- Update Password Section -->
     <div class="card shadow-none border mb-4">
         <div class="card-header bg-white border-bottom">
-            <div class="d-flex align-items-center">
-              
-                <div>
-                    <h5 class="card-title mb-0">Update Password</h5>
-                    <p class="text-muted small mb-0">Ensure your account is using a long, random password to stay secure
-                    </p>
-                </div>
-            </div>
+            <h5 class="card-title mb-0">Signature</h5>
+            <p class="text-muted small mb-0">Used on reports and approvals</p>
         </div>
         <div class="card-body p-4">
-            @include('profile.partials.update-password-form')
+            @include('profile.partials.upload-signature-form')
         </div>
     </div>
 

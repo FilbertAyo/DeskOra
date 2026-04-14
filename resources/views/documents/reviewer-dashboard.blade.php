@@ -50,7 +50,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-2 col-sm-6 mb-3">
+        <div class="col-md-3 col-sm-6 mb-3">
             <div class="card border shadow-none">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -65,7 +65,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-2 col-sm-6 mb-3">
+        <div class="col-md-3 col-sm-6 mb-3">
             <div class="card border shadow-none">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -254,13 +254,13 @@
                                             <td class="text-center">
                                                 <div class="d-flex flex-wrap gap-1 justify-content-center">
                                                     @if($planDoc)
-                                                        <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($planDoc->id)) }}"
+                                                        <a href="{{ route('documents.show', $planDoc->id) }}"
                                                             class="btn btn-info btn-sm text-white" title="View Plan">
                                                             <i class="ti ti-eye"></i> Plan
                                                         </a>
                                                     @endif
                                                     @if($reportDoc)
-                                                        <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($reportDoc->id)) }}"
+                                                        <a href="{{ route('documents.show', $reportDoc->id) }}"
                                                             class="btn btn-primary btn-sm text-white" title="View Report">
                                                             <i class="ti ti-eye"></i> Report
                                                         </a>
@@ -305,7 +305,6 @@
                                                 <th>Title</th>
                                                 <th>Created By</th>
                                                 <th>Submitted</th>
-                                                <th>Comments</th>
                                                 <th class="text-center" style="width: 150px;">Actions</th>
                                             </tr>
                                         </thead>
@@ -327,18 +326,13 @@
                                                         </small>
                                                     </td>
                                                     <td class="text-center">
-                                                        <span class="badge bg-primary rounded-pill">
-                                                            {{ $document->comments->count() }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="text-center">
                                                         @if($document->type === \App\Models\Document::TYPE_ACTION_LOG)
-                                                            <a href="{{ route('action-logs.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                            <a href="{{ route('action-logs.show', $document->id) }}"
                                                                 class="btn btn-info btn-sm text-white" title="View">
                                                                 <i class="ti ti-eye"></i>
                                                             </a>
                                                         @else
-                                                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                            <a href="{{ route('documents.show', $document->id) }}"
                                                                 class="btn btn-info btn-sm text-white" title="View">
                                                                 <i class="ti ti-eye"></i>
                                                             </a>

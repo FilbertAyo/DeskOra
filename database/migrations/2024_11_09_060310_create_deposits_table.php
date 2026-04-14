@@ -6,15 +6,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('deposits', function (Blueprint $table) {
-            $table->id();
-              $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('department_id')->nullable();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUlid('department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->string('deposit');
             $table->text('description')->nullable();
             $table->string('remaining');
@@ -22,9 +19,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('deposits');

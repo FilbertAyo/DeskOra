@@ -1,9 +1,9 @@
 <x-guest-layout>
-    <div class="container-fluid vh-100">
-        <div class="row h-100">
-            <div class="col-md-12 d-flex justify-content-center align-items-center">
-                <div class="card shadow-lg p-4" style="width: 100%; max-width: 500px; border-radius: 15px;">
-                    <div class="text-center mb-4">
+ 
+<div class="card my-5">
+    <div class="card-body">
+
+                <div class="text-center mb-4">
                         <h3 class="fw-bold text-dark">Reset Your Password</h3>
                         <p class="text-muted">
                             Please enter your email address, a new password, and confirm your password to reset it.
@@ -71,6 +71,5 @@
                     </form>
                 </div>
             </div>
-        </div>
-    </div>
+   
 </x-guest-layout>

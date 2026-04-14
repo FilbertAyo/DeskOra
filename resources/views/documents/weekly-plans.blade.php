@@ -28,7 +28,7 @@
 
     <div class="row">
         <div class="col-md-12">
-            <div class="card tbl-card mb-4">
+            <div class="card tbl-card mb-2">
                 <div class="card-header bg-white border-bottom">
                     <div class="row align-items-center">
                         <div class="col-md-6">
@@ -70,14 +70,7 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-md-12 mb-2">
-                                    <select name="review_status" class="form-control" onchange="document.getElementById('filterForm').submit();">
-                                        <option value="">All Review Statuses</option>
-                                        <option value="returned" {{ request('review_status') === 'returned' ? 'selected' : '' }}>
-                                            Returned for Revision
-                                        </option>
-                                    </select>
-                                </div>
+                            
                             </form>
                         </div>
                     </div>
@@ -90,6 +83,9 @@
                                 <div class="col-md-8">
                                     <h6 class="mb-1">
                                         Weekly Plan Deadline
+                                        @isset($nextPeriod)
+                                            <span class="text-muted fw-normal">(for Week {{ $nextPeriod->week_number }})</span>
+                                        @endisset
                                     </h6>
                                     <p class="mb-0">
                                         <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y') }}</strong>
@@ -174,12 +170,12 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                    <a href="{{ route('documents.show', $document->id) }}"
                                                         class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
                                                     @if($document->canBeEdited())
-                                                        <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                        <a href="{{ route('documents.edit', $document->id) }}"
                                                             class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
                                                         </a>
@@ -192,7 +188,7 @@
                                                                 ->first();
                                                         @endphp
                                                         @if($relatedReport)
-                                                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($relatedReport->id)) }}"
+                                                            <a href="{{ route('documents.show', $relatedReport->id) }}"
                                                                 class="btn btn-outline-primary" title="View Related Report">
                                                                 <i class="ti ti-activity"></i>
                                                             </a>
@@ -213,18 +209,6 @@
                         <div class="text-center py-5">
                             <i class="ti ti-target fs-1 text-muted"></i>
                             <p class="text-muted mb-3 mt-3">No weekly plans found</p>
-                            <p class="text-muted small">
-                                @if(request('period_id'))
-                                    No plans found for the selected week period. Try selecting a different week or create a new plan.
-                                @else
-                                    Try adjusting your filters or create a new weekly plan.
-                                @endif
-                            </p>
-                            @if(isset($availableTypes['weekly_plan']))
-                                <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-info">
-                                    <i class="ti ti-circle-plus me-1"></i>Create New Weekly Plan
-                                </a>
-                            @endif
                         </div>
                     @endif
                 </div>

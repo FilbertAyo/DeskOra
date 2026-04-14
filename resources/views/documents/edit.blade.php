@@ -9,12 +9,12 @@
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item"><a href="{{ route('documents.index') }}">Documents</a></li>
-                                <li class="breadcrumb-item"><a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}">View</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('documents.show', $document->id) }}">View</a></li>
                                 <li class="breadcrumb-item" aria-current="page">Edit</li>
             </ul>
         </div>
                         <div class="col-auto d-flex align-items-center gap-2">
-                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" class="btn btn-sm btn-info text-white">
+                            <a href="{{ route('documents.show', $document->id) }}" class="btn btn-sm btn-info text-white">
                 <i class="ti ti-eye me-1"></i> View Document
             </a>
             <a href="{{ route('documents.index') }}" class="btn btn-sm btn-light">
@@ -53,7 +53,7 @@
 
     <div class="row">
         <div class="col-md-12">
-            <form method="POST" action="{{ route('documents.update', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" id="editDocumentForm" enctype="multipart/form-data">
+            <form method="POST" action="{{ route('documents.update', $document->id) }}" id="editDocumentForm" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="action" id="hiddenAction" value="draft">
@@ -102,55 +102,6 @@
                                     <small class="form-text text-muted">Current document state</small>
                                 </div>
                             </div>
-
-                            @if($document->type === 'monthly_report')
-                            <!-- Current File -->
-                            @if($document->file_path)
-                            <div class="col-12 mb-3">
-                                <div class="alert alert-info">
-                                    <h6 class="mb-2">
-                                        <i class="ti ti-file me-2"></i>Current PDF File
-                                    </h6>
-                                    <p class="mb-2">
-                                        <strong>File:</strong> {{ $document->original_filename ?? 'Document.pdf' }}<br>
-                                        <strong>Size:</strong> {{ $document->formatted_file_size }}<br>
-                                        <strong>Uploaded:</strong> {{ $document->created_at->format('M d, Y H:i') }}
-                                    </p>
-                                    <a href="{{ $document->file_url }}" target="_blank" class="btn btn-sm btn-info">
-                                        <i class="ti ti-download me-1"></i> View/Download Current File
-                                    </a>
-                                </div>
-                            </div>
-                            @endif
-
-                            <!-- PDF File Upload (Optional - to replace existing file) -->
-                            <div class="col-12 mb-3">
-                                <div class="form-group">
-                                    <label for="file" class="form-label">
-                                        Replace PDF File <span class="text-muted">(Optional)</span>
-                                    </label>
-                                    <div class="input-group">
-                                        <div class="custom-file">
-                                            <input type="file"
-                                                class="custom-file-input @error('file') is-invalid @enderror"
-                                                name="file"
-                                                id="file"
-                                                accept=".pdf">
-                                            <label class="custom-file-label" for="file" id="fileLabel">
-                                                Choose new PDF file...
-                                            </label>
-                                        </div>
-                                    </div>
-                                    @error('file')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
-                                    <small class="form-text text-muted">
-                                        <i class="ti ti-info me-1"></i>
-                                        Only PDF files are allowed. Maximum file size: 10MB. Leave empty to keep current file.
-                                    </small>
-                                </div>
-                            </div>
-                            @endif
 
                             <!-- Online Weekly Plan Template -->
                             @if($document->type === 'weekly_plan')
@@ -433,111 +384,192 @@
                             </div>
                             @endif
 
-                            <!-- Month and Year (for monthly reports) -->
                             @if($document->type === 'monthly_report')
-                            <div class="col-md-6 mb-3">
-                                <div class="form-group">
-                                    <label for="month" class="form-label">
-                                        Month
-                                    </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-calendar"></i>
-                                        </span>
-                                        <select class="form-control @error('month') is-invalid @enderror"
-                                            name="month"
-                                            id="month">
-                                            <option value="">-- Select Month --</option>
-                                            @php
-                                                $months = [
-                                                    1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
-                                                    5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-                                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
-                                                ];
-                                                $selectedMonth = old('month', $document->month ?? date('n'));
-                                            @endphp
-                                            @foreach($months as $num => $name)
-                                                <option value="{{ $num }}" {{ $selectedMonth == $num ? 'selected' : '' }}>
-                                                    {{ $name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
+                            @php
+                                $dContent = is_array($document->content) ? $document->content : [];
+                                $mPlannedOld = old('content.planned', $dContent['planned'] ?? []);
+                                $mOffPlanOld = old('content.off_plan', $dContent['off_plan'] ?? [['title' => '', 'description' => '', 'status' => '', 'notes' => '']]);
+                                if (! is_array($mOffPlanOld) || count($mOffPlanOld) === 0) {
+                                    $mOffPlanOld = [['title' => '', 'description' => '', 'status' => '', 'notes' => '']];
+                                }
+                                $implStatuses = ['Not started', 'In progress', 'Completed', 'Deferred', 'Not applicable'];
+                                $editMonthName = \Carbon\Carbon::create((int) $document->year, (int) $document->month, 1)->format('F Y');
+                            @endphp
+                            <input type="hidden" name="month" value="{{ $document->month }}">
+                            <input type="hidden" name="year" value="{{ $document->year }}">
+                            <div class="col-12 mb-3">
+                                <p class="text-muted mb-0">
+                                    <i class="ti ti-calendar me-1"></i><strong>Reporting period:</strong> {{ $editMonthName }}
+                                    <span class="mx-2">|</span>
+                                    <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}">Monthly archive</a>
+                                </p>
+                            </div>
+
+                            <div class="col-12 mb-3">
+                                <div class="card border-primary shadow-none">
+                                    <div class="card-header bg-white border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <h6 class="mb-0"><i class="ti ti-chart-line me-2"></i>Monthly report vs year plan</h6>
+                                            <small class="text-muted">Planned activities for this month in the author’s sub-departments</small>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @if($monthlyYearPlan)
+                                                <a href="{{ route('year-plan.show', $monthlyYearPlan->year) }}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="ti ti-external-link me-1"></i> Year plan {{ $monthlyYearPlan->year }}
+                                                </a>
+                                            @else
+                                                <a href="{{ route('year-plan.index') }}" class="btn btn-sm btn-outline-secondary">Year plans</a>
+                                            @endif
+                                        </div>
                                     </div>
-                                    @error('month')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
+                                    <div class="card-body">
+                                        @if(!$monthlyYearPlan)
+                                            <div class="alert alert-warning mb-3">No year plan exists for calendar year <strong>{{ $document->year }}</strong>.</div>
+                                        @endif
+                                        @if(empty($monthlyHasSubDepartments))
+                                            <div class="alert alert-warning mb-3">This user is not assigned to any sub-department. Planned rows may be empty; off-plan reporting still applies.</div>
+                                        @endif
+
+                                        @if($monthlyPlannedActivities->isNotEmpty())
+                                            <h6 class="text-primary mb-2">Planned activities (year plan)</h6>
+                                            <div class="table-responsive mb-4">
+                                                <table class="table table-bordered align-middle">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th style="min-width: 72px;">Code</th>
+                                                            <th style="min-width: 200px;">Sub-department / activity</th>
+                                                            <th style="min-width: 140px;">Status</th>
+                                                            <th>Achievements / progress</th>
+                                                            <th>Challenges</th>
+                                                            <th>Next steps</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($monthlyPlannedActivities as $idx => $activity)
+                                                            @php
+                                                                $row = collect($mPlannedOld)->firstWhere('year_plan_activity_id', $activity->id);
+                                                                $row = is_array($row) ? $row : [];
+                                                            @endphp
+                                                            <tr>
+                                                                <td class="fw-semibold">{{ $activity->displayCode() }}</td>
+                                                                <td>
+                                                                    @if($activity->department?->parent)
+                                                                        <span class="text-muted small">{{ $activity->department->parent->name }}</span><br>
+                                                                    @endif
+                                                                    <span class="fw-medium">{{ $activity->department?->name ?? '—' }}</span>
+                                                                    <p class="small text-muted mb-0 mt-1">{{ \Illuminate\Support\Str::limit($activity->description, 220) }}</p>
+                                                                    <input type="hidden" name="content[planned][{{ $idx }}][year_plan_activity_id]" value="{{ $activity->id }}">
+                                                                </td>
+                                                                <td>
+                                                                    <select class="form-select form-select-sm" name="content[planned][{{ $idx }}][implementation_status]">
+                                                                        @foreach($implStatuses as $opt)
+                                                                            <option value="{{ $opt }}" {{ ($row['implementation_status'] ?? 'Not started') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                </td>
+                                                                <td><textarea class="form-control form-control-sm" rows="2" name="content[planned][{{ $idx }}][achievements]" placeholder="What was delivered?">{{ $row['achievements'] ?? '' }}</textarea></td>
+                                                                <td><textarea class="form-control form-control-sm" rows="2" name="content[planned][{{ $idx }}][challenges]" placeholder="Risks / blockers">{{ $row['challenges'] ?? '' }}</textarea></td>
+                                                                <td><textarea class="form-control form-control-sm" rows="2" name="content[planned][{{ $idx }}][next_steps]" placeholder="Next month">{{ $row['next_steps'] ?? '' }}</textarea></td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        @elseif($monthlyYearPlan && $monthlyHasSubDepartments)
+                                            <p class="text-muted mb-4">No year plan lines for this month in the author’s sub-departments.</p>
+                                        @endif
+
+                                        <h6 class="text-primary mb-2">Month summary</h6>
+                                        <div class="mb-4">
+                                            <textarea class="form-control @error('content.month_summary') is-invalid @enderror" name="content[month_summary]" rows="4" placeholder="Overall narrative">{{ old('content.month_summary', $dContent['month_summary'] ?? '') }}</textarea>
+                                            @error('content.month_summary')
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                            <h6 class="text-primary mb-0">Work outside the year plan</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="editAddMonthlyOffPlanRow">
+                                                <i class="ti ti-plus me-1"></i> Add row
+                                            </button>
+                                        </div>
+                                        <div class="table-responsive mb-2">
+                                            <table class="table table-bordered align-middle">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Title</th>
+                                                        <th>Description</th>
+                                                        <th style="min-width: 120px;">Status</th>
+                                                        <th>Notes</th>
+                                                        <th style="width: 48px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="editMonthlyOffPlanBody">
+                                                    @foreach($mOffPlanOld as $oi => $orow)
+                                                        @php $orow = is_array($orow) ? $orow : []; @endphp
+                                                        <tr>
+                                                            <td><input type="text" class="form-control form-control-sm" name="content[off_plan][{{ $oi }}][title]" value="{{ $orow['title'] ?? '' }}"></td>
+                                                            <td><textarea class="form-control form-control-sm" rows="2" name="content[off_plan][{{ $oi }}][description]">{{ $orow['description'] ?? '' }}</textarea></td>
+                                                            <td><input type="text" class="form-control form-control-sm" name="content[off_plan][{{ $oi }}][status]" value="{{ $orow['status'] ?? '' }}"></td>
+                                                            <td><textarea class="form-control form-control-sm" rows="2" name="content[off_plan][{{ $oi }}][notes]">{{ $orow['notes'] ?? '' }}</textarea></td>
+                                                            <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger js-edit-remove-off-plan-row">&times;</button></td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        @error('content.planned')
+                                            <div class="text-danger small mb-2">{{ $message }}</div>
+                                        @enderror
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="col-md-6 mb-3">
-                                <div class="form-group">
-                                    <label for="year" class="form-label">
-                                        Year
-                                    </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-calendar"></i>
-                                        </span>
-                                        <select class="form-control @error('year') is-invalid @enderror"
-                                            name="year"
-                                            id="year">
-                                            <option value="">-- Select Year --</option>
-                                            @php
-                                                $currentYear = date('Y');
-                                                $selectedYear = old('year', $document->year ?? $currentYear);
-                                            @endphp
-                                            @for($y = $currentYear; $y >= $currentYear - 5; $y--)
-                                                <option value="{{ $y }}" {{ $selectedYear == $y ? 'selected' : '' }}>
-                                                    {{ $y }}
-                                                </option>
-                                            @endfor
-                                        </select>
-                                    </div>
-                                    @error('year')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <!-- Current Attachment -->
-                            @if($document->attachment)
+                            @if($document->file_path)
                             <div class="col-12 mb-3">
                                 <div class="alert alert-info">
-                                    <h6 class="mb-2">
-                                        <i class="ti ti-paperclip me-2"></i>Current Attachment
-                                    </h6>
-                                    <p class="mb-2">
-                                        <strong>Attachment:</strong> <a href="{{ asset('storage/' . $document->attachment) }}" target="_blank">View Current Attachment</a>
-                                    </p>
+                                    <h6 class="mb-2"><i class="ti ti-file me-2"></i>Optional PDF on file</h6>
+                                    <a href="{{ $document->file_url }}" target="_blank" class="btn btn-sm btn-info text-white">
+                                        <i class="ti ti-download me-1"></i> View / download
+                                    </a>
                                 </div>
                             </div>
                             @endif
-
-                            <!-- Attachment Upload (Optional - to replace existing attachment) -->
-                            <div class="col-12 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <div class="form-group">
-                                    <label for="attachment" class="form-label">
-                                        Replace Monthly Archive/Attachment <span class="text-muted">(Optional)</span>
-                                    </label>
+                                    <label for="file" class="form-label">Replace PDF <span class="text-muted">(optional)</span></label>
                                     <div class="input-group">
                                         <div class="custom-file">
-                                            <input type="file"
-                                                class="custom-file-input @error('attachment') is-invalid @enderror"
-                                                name="attachment"
-                                                id="attachment"
-                                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx,.xls">
-                                            <label class="custom-file-label" for="attachment" id="attachmentLabel">
-                                                Choose new attachment file...
-                                            </label>
+                                            <input type="file" class="custom-file-input @error('file') is-invalid @enderror" name="file" id="file" accept=".pdf">
+                                            <label class="custom-file-label" for="file" id="fileLabel">Choose PDF…</label>
+                                        </div>
+                                    </div>
+                                    @error('file')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            @if($document->attachment)
+                            <div class="col-12 mb-3">
+                                <div class="alert alert-light border">
+                                    <strong>Current attachment:</strong>
+                                    <a href="{{ asset('storage/' . $document->attachment) }}" target="_blank">Open</a>
+                                </div>
+                            </div>
+                            @endif
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    <label for="attachment" class="form-label">Replace attachment <span class="text-muted">(optional)</span></label>
+                                    <div class="input-group">
+                                        <div class="custom-file">
+                                            <input type="file" class="custom-file-input @error('attachment') is-invalid @enderror" name="attachment" id="attachment" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx,.xls">
+                                            <label class="custom-file-label" for="attachment" id="attachmentLabel">Choose file…</label>
                                         </div>
                                     </div>
                                     @error('attachment')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
-                                    <small class="form-text text-muted">
-                                        <i class="ti ti-info me-1"></i>
-                                        Accepted formats: PDF, Images, Word, Excel. Maximum file size: 10MB. Leave empty to keep current attachment.
-                                    </small>
                                 </div>
                             </div>
                             @endif
@@ -897,7 +929,7 @@
 
                     <div class="card-footer bg-light border-top">
                         <div class="d-flex justify-content-between align-items-center">
-                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" class="btn btn-secondary">
+                            <a href="{{ route('documents.show', $document->id) }}" class="btn btn-secondary">
                                 <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div class="btn-group">
@@ -925,10 +957,34 @@
             const attachmentLabel = document.getElementById('attachmentLabel');
 
             // Update file label when file is selected
-            if (fileInput) {
+            if (fileInput && fileLabel) {
                 fileInput.addEventListener('change', function(e) {
                     const fileName = e.target.files[0]?.name || 'Choose new PDF file...';
                     fileLabel.textContent = fileName;
+                });
+            }
+
+            const editMonthlyOffPlanBody = document.getElementById('editMonthlyOffPlanBody');
+            const editAddMonthlyOffPlanRow = document.getElementById('editAddMonthlyOffPlanRow');
+            if (editAddMonthlyOffPlanRow && editMonthlyOffPlanBody) {
+                editAddMonthlyOffPlanRow.addEventListener('click', function () {
+                    const idx = editMonthlyOffPlanBody.querySelectorAll('tr').length;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><input type="text" class="form-control form-control-sm" name="content[off_plan][${idx}][title]"></td>
+                        <td><textarea class="form-control form-control-sm" rows="2" name="content[off_plan][${idx}][description]"></textarea></td>
+                        <td><input type="text" class="form-control form-control-sm" name="content[off_plan][${idx}][status]"></td>
+                        <td><textarea class="form-control form-control-sm" rows="2" name="content[off_plan][${idx}][notes]"></textarea></td>
+                        <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger js-edit-remove-off-plan-row">&times;</button></td>
+                    `;
+                    editMonthlyOffPlanBody.appendChild(tr);
+                });
+                editMonthlyOffPlanBody.addEventListener('click', function (e) {
+                    const btn = e.target.closest('.js-edit-remove-off-plan-row');
+                    if (!btn) return;
+                    const rows = editMonthlyOffPlanBody.querySelectorAll('tr');
+                    if (rows.length <= 1) return;
+                    btn.closest('tr').remove();
                 });
             }
 

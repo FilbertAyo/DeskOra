@@ -2,17 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Comment;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\MonthlyReportYearPlanActivities;
+use App\Services\WeeklySubmissionReminderService;
+use App\Services\WorkPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Vinkla\Hashids\Facades\Hashids;
+use Illuminate\Validation\ValidationException;
 
 class DocumentController extends Controller
 {
+    public function __construct(
+        private readonly WorkPeriodService $workPeriodService,
+        private readonly WeeklySubmissionReminderService $weeklySubmissionReminderService,
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -25,12 +32,12 @@ class DocumentController extends Controller
         $query = Document::with(['user', 'period']);
 
         // Users with 'view all documents' permission can see all documents, others see only their own
-        if (!$user->hasPermissionTo('view all documents')) {
+        if (! $user->hasPermissionTo('view all documents')) {
             $query->forUser($user->id);
         }
 
         // Get current period for defaults
-        $currentPeriod = WorkPeriod::getCurrent();
+        $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
         $currentYear = date('Y');
 
         // Filter by type if provided (default: all types)
@@ -47,17 +54,24 @@ class DocumentController extends Controller
         // Filter by year only when explicitly selected.
         $year = $request->input('year');
         if ($year) {
-            $query->whereHas('period', function($q) use ($year) {
-                $q->where('year', $year);
-            });
+            if ($request->input('type') === Document::TYPE_MONTHLY_REPORT) {
+                $query->where('year', $year);
+            } else {
+                $query->whereHas('period', function ($q) use ($year) {
+                    $q->where('year', $year);
+                });
+            }
+        }
+
+        if ($request->filled('month') && $request->input('type') === Document::TYPE_MONTHLY_REPORT) {
+            $query->where('month', (int) $request->input('month'));
         }
 
         if ($request->input('review_status') === 'returned') {
             $query->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
                 ->where('state', Document::STATE_DRAFT)
-                ->whereHas('comments', function ($commentQuery) {
-                    $commentQuery->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%');
-                });
+                ->whereNotNull('review_rejection_reason')
+                ->where('review_rejection_reason', '!=', '');
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
@@ -65,23 +79,24 @@ class DocumentController extends Controller
             $documents->getCollection()->pluck('id')->all()
         );
 
-        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
-        $deadlineStatuses = null;
-        if ($currentPeriod) {
-            $deadlineStatuses = [
-                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
-                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $currentPeriod->plan_deadline,
-                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
-                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
-                'report_due' => $currentPeriod->report_deadline,
-            ];
+        $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
+        if ($request->input('type') === Document::TYPE_MONTHLY_REPORT) {
+            $reportYears = Document::query()
+                ->where('type', Document::TYPE_MONTHLY_REPORT)
+                ->whereNotNull('year')
+                ->distinct()
+                ->orderByDesc('year')
+                ->pluck('year');
+            $years = $reportYears->merge($years)->unique()->sortDesc()->values();
         }
+
+        $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
+        $deadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
         return view('documents.index', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
-            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
+            'years' => $years,
             'currentPeriod' => $currentPeriod,
             'nextPeriod' => $nextPeriod,
             'deadlineStatuses' => $deadlineStatuses,
@@ -120,10 +135,10 @@ class DocumentController extends Controller
 
         // Determine default period based on document type
         $defaultPeriodId = null;
-        $currentPeriod = WorkPeriod::getCurrent();
-        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
+        $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $relatedPlan = null;
-        
+
         if ($selectedType) {
             if ($selectedType === Document::TYPE_WEEKLY_PLAN && $nextPeriod) {
                 // For weekly plan, default to next week
@@ -139,17 +154,67 @@ class DocumentController extends Controller
             }
         }
 
+        $monthlyYearPlan = null;
+        $monthlyPlannedActivities = collect();
+        $monthlyHasSubDepartments = $user->subDepartments()->exists();
+        $ref = now()->startOfMonth()->subMonth();
+        $monthlyDefaultMonth = (int) $ref->month;
+        $monthlyDefaultYear = (int) $ref->year;
+        $monthlyYearChoices = collect(range((int) date('Y') + 1, (int) date('Y') - 5));
+
+        if ($selectedType === Document::TYPE_MONTHLY_REPORT && isset($availableTypes[$selectedType])) {
+            $prefillMonth = $request->query('month');
+            $prefillYear = $request->query('year');
+            $monthlyDefaultMonth = (int) old('month', ($prefillMonth !== null && $prefillMonth !== '') ? (int) $prefillMonth : $ref->month);
+            $monthlyDefaultYear = (int) old('year', ($prefillYear !== null && $prefillYear !== '') ? (int) $prefillYear : $ref->year);
+            $monthlyYearPlan = MonthlyReportYearPlanActivities::yearPlanForCalendarYear($monthlyDefaultYear);
+            $monthlyPlannedActivities = MonthlyReportYearPlanActivities::plannedForUserMonth($user, $monthlyDefaultYear, $monthlyDefaultMonth);
+            $planYears = \App\Models\YearPlan::query()->orderByDesc('year')->pluck('year');
+            $monthlyYearChoices = $planYears->merge($monthlyYearChoices)->unique()->sortDesc()->values();
+        }
+
         // If type is provided in query string, pre-select it
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
             if (Document::canUserCreateType($user, $selectedType)) {
                 $teamUsers = User::select('id', 'name')->orderBy('name')->get();
-                return view('documents.create', compact('availableTypes', 'selectedType', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan', 'teamUsers'));
+
+                return view('documents.create', compact(
+                    'availableTypes',
+                    'selectedType',
+                    'workPeriods',
+                    'defaultPeriodId',
+                    'currentPeriod',
+                    'nextPeriod',
+                    'relatedPlan',
+                    'teamUsers',
+                    'monthlyYearPlan',
+                    'monthlyPlannedActivities',
+                    'monthlyDefaultMonth',
+                    'monthlyDefaultYear',
+                    'monthlyYearChoices',
+                    'monthlyHasSubDepartments'
+                ));
             }
         }
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
-        return view('documents.create', compact('availableTypes', 'workPeriods', 'defaultPeriodId', 'currentPeriod', 'nextPeriod', 'relatedPlan', 'teamUsers'));
+
+        return view('documents.create', compact(
+            'availableTypes',
+            'workPeriods',
+            'defaultPeriodId',
+            'currentPeriod',
+            'nextPeriod',
+            'relatedPlan',
+            'teamUsers',
+            'monthlyYearPlan',
+            'monthlyPlannedActivities',
+            'monthlyDefaultMonth',
+            'monthlyDefaultYear',
+            'monthlyYearChoices',
+            'monthlyHasSubDepartments'
+        ));
     }
 
     /**
@@ -164,26 +229,25 @@ class DocumentController extends Controller
         $validationRules = [
             'type' => ['required', 'string', 'in:weekly_plan,weekly_report,monthly_report,action_log'],
             // weekly_plan/weekly_report are filled online (no PDF upload).
-            // monthly_report still uses a PDF upload.
+            // monthly_report: structured form; PDF and attachment are optional.
             'file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
             'title' => ['nullable', 'string', 'max:255'],
         ];
 
         // Make period_id required for weekly plans and reports
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
-            $validationRules['period_id'] = ['required', 'integer', 'exists:work_periods,id'];
+            $validationRules['period_id'] = ['required', 'string', 'ulid', 'exists:work_periods,id'];
         } else {
-            $validationRules['period_id'] = ['nullable', 'integer', 'exists:work_periods,id'];
+            $validationRules['period_id'] = ['nullable', 'string', 'ulid', 'exists:work_periods,id'];
         }
 
         // Add validation for monthly reports
         if ($request->type === Document::TYPE_MONTHLY_REPORT) {
             $validationRules['month'] = ['required', 'integer', 'min:1', 'max:12'];
             $validationRules['year'] = ['required', 'integer', 'min:2000', 'max:2100'];
-            $validationRules['attachment'] = ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240']; // Max 10MB
-
-            // monthly_report requires a PDF.
-            $validationRules['file'] = ['required', 'file', 'mimes:pdf', 'max:10240']; // Max 10MB
+            $validationRules['attachment'] = ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240'];
+            $validationRules['file'] = ['nullable', 'file', 'mimes:pdf', 'max:10240'];
+            $validationRules['content'] = ['nullable', 'array'];
         }
 
         // Add validation for main_target for weekly plans
@@ -204,7 +268,7 @@ class DocumentController extends Controller
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
-            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'integer', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
             $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
@@ -249,10 +313,24 @@ class DocumentController extends Controller
 
         $request->validate($validationRules);
 
+        $action = $request->input('action', 'draft');
+        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+
         // Normalize and trim template payload to avoid storing empty rows.
         $templateContent = null;
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $request->has('content') && is_array($request->input('content'))) {
             $templateContent = $this->normalizeTemplateContent($request->input('content'), $request->type);
+        }
+
+        $monthlyContent = null;
+        if ($request->type === Document::TYPE_MONTHLY_REPORT) {
+            $monthlyContent = $this->normalizeMonthlyReportContent(
+                $user,
+                (int) $request->year,
+                (int) $request->month,
+                is_array($request->input('content')) ? $request->input('content') : [],
+                $action
+            );
         }
 
         // Authorize create action
@@ -266,7 +344,7 @@ class DocumentController extends Controller
         if ($request->filled('period_id')) {
             // Use the period selected by user
             $period = WorkPeriod::find($request->period_id);
-            if (!$period) {
+            if (! $period) {
                 return redirect()->back()
                     ->withInput()
                     ->with('error', 'Selected work period not found.');
@@ -275,33 +353,42 @@ class DocumentController extends Controller
             // Fallback to automatic selection if no period_id provided
             if ($request->type === Document::TYPE_WEEKLY_PLAN) {
                 // Plan is for NEXT week (submitted during current week)
-                $currentPeriod = WorkPeriod::getCurrent();
-                if ($currentPeriod) {
-                    $period = $currentPeriod->getNextPeriod();
-                    if (!$period) {
-                        return redirect()->back()
-                            ->withInput()
-                            ->with('error', 'Next week period not found. Please contact administrator.');
-                    }
-                } else {
+                $period = $this->workPeriodService->periodForWeeklyPlanSubmission();
+                if (! $period) {
                     return redirect()->back()
                         ->withInput()
-                        ->with('error', 'No current work period found. Please contact administrator.');
+                        ->with('error', 'Next week period not found. Please contact administrator.');
                 }
             } elseif ($request->type === Document::TYPE_WEEKLY_REPORT) {
                 // Report is for CURRENT week
-                $period = WorkPeriod::getCurrent();
-                if (!$period) {
+                $period = $this->workPeriodService->periodForWeeklyReportSubmission();
+                if (! $period) {
                     return redirect()->back()
                         ->withInput()
                         ->with('error', 'No current work period found. Please contact administrator.');
                 }
             }
         } elseif ($request->type === Document::TYPE_MONTHLY_REPORT) {
-            // Monthly report uses current period
-            $period = WorkPeriod::getCurrent();
+            $period = null;
         }
-        if ($period && !$period->isOpen()) {
+
+        if ($period && in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            $expectedPeriod = $request->type === Document::TYPE_WEEKLY_PLAN
+                ? $this->workPeriodService->periodForWeeklyPlanSubmission()
+                : $this->workPeriodService->periodForWeeklyReportSubmission();
+
+            if (! $expectedPeriod || $period->id !== $expectedPeriod->id) {
+                $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
+                    ? 'Weekly plan must be submitted for next week.'
+                    : 'Weekly report must be submitted for the current week.';
+
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', $errorMessage);
+            }
+        }
+
+        if ($period && ! $period->isOpen()) {
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'This work period is closed. Please contact your administrator.');
@@ -324,10 +411,19 @@ class DocumentController extends Controller
                 ->first();
         }
 
-        // Determine state based on action
-        $action = $request->input('action', 'draft');
-        // Ensure action is either 'submit' or 'draft'
-        $action = in_array($action, ['submit', 'draft']) ? $action : 'draft';
+        if ($period && in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            if (! $existingDocument && $this->weeklySubmissionReminderService->blocksNewWeeklyDocument($request->type, $period)) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'The submission window for this weekly document has closed.');
+            }
+            if ($existingDocument && $action === 'submit' && ! $this->weeklySubmissionReminderService->allowsSubmitWeeklyDocument($existingDocument)) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'The submission deadline has passed. You can no longer submit this document.');
+            }
+        }
+
         $state = ($action === 'submit') ? Document::STATE_SUBMITTED : Document::STATE_DRAFT;
 
         // Handle file upload (monthly_report only; weekly_plan/weekly_report are online forms).
@@ -340,29 +436,29 @@ class DocumentController extends Controller
             $fileSize = $file->getSize();
 
             // Generate unique filename
-            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $filePath = $file->storeAs('documents/' . $request->type, $filename, 'public');
+            $filename = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
+            $filePath = $file->storeAs('documents/'.$request->type, $filename, 'public');
         }
 
         // Handle attachment upload for monthly reports
         $attachmentPath = null;
         if ($request->type === Document::TYPE_MONTHLY_REPORT && $request->hasFile('attachment')) {
             $attachmentFile = $request->file('attachment');
-            $attachmentFilename = time() . '_' . uniqid() . '_attachment.' . $attachmentFile->getClientOriginalExtension();
+            $attachmentFilename = time().'_'.uniqid().'_attachment.'.$attachmentFile->getClientOriginalExtension();
             $attachmentPath = $attachmentFile->storeAs('documents/monthly_reports/attachments', $attachmentFilename, 'public');
         }
 
         // Generate title if not provided
         $title = $request->input('title');
-        if (!$title) {
+        if (! $title) {
             $typeName = Document::getTypes()[$request->type] ?? ucwords(str_replace('_', ' ', $request->type));
             if ($period) {
-                $title = $typeName . ' - Week ' . $period->week_number;
+                $title = $typeName.' - Week '.$period->week_number;
             } elseif ($request->type === Document::TYPE_MONTHLY_REPORT) {
-                $monthName = \Carbon\Carbon::create($request->year, $request->month, 1)->format('F');
-                $title = $typeName . ' - ' . $monthName . ' ' . $request->year;
+                $monthName = \Carbon\Carbon::create((int) $request->year, (int) $request->month, 1)->format('F');
+                $title = $typeName.' - '.$monthName.' '.$request->year;
             } else {
-                $title = $typeName . ' - ' . now()->format('M d, Y');
+                $title = $typeName.' - '.now()->format('M d, Y');
             }
         }
 
@@ -374,9 +470,9 @@ class DocumentController extends Controller
                 if ($filePath) {
                     Storage::disk('public')->delete($filePath);
                 }
-                
-                return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
-                    ->with('info', 'A ' . str_replace('_', ' ', $request->type) . ' already exists for this week period. You can view it below.');
+
+                return redirect()->route('documents.show', $existingDocument)
+                    ->with('info', 'A '.str_replace('_', ' ', $request->type).' already exists for this week period. You can view it below.');
             }
 
             // Check if we can update (authorize update action - only works for drafts)
@@ -387,8 +483,8 @@ class DocumentController extends Controller
                 if ($filePath) {
                     Storage::disk('public')->delete($filePath);
                 }
-                
-                return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+
+                return redirect()->route('documents.show', $existingDocument)
                     ->with('error', 'You do not have permission to update this document.');
             }
 
@@ -401,8 +497,8 @@ class DocumentController extends Controller
                     if ($filePath) {
                         Storage::disk('public')->delete($filePath);
                     }
-                    
-                    return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+
+                    return redirect()->route('documents.show', $existingDocument)
                         ->with('error', 'You do not have permission to submit this document.');
                 }
             }
@@ -429,8 +525,9 @@ class DocumentController extends Controller
                 $updateData['original_filename'] = $originalFilename;
             }
 
-            // Save template content when provided (weekly_plan/weekly_report)
-            if ($templateContent !== null) {
+            if ($request->type === Document::TYPE_MONTHLY_REPORT && $monthlyContent !== null) {
+                $updateData['content'] = $monthlyContent;
+            } elseif ($templateContent !== null) {
                 $updateData['content'] = $templateContent;
             }
 
@@ -452,13 +549,14 @@ class DocumentController extends Controller
 
             // Add target accomplishment fields for weekly reports
             if ($request->type === Document::TYPE_WEEKLY_REPORT) {
-                $updateData['target_accomplished'] = $request->has('target_accomplished') ? (bool)$request->target_accomplished : null;
+                $updateData['target_accomplished'] = $request->has('target_accomplished') ? (bool) $request->target_accomplished : null;
                 $updateData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
             }
 
             // Update state if submitting
             if ($action === 'submit') {
                 $updateData['state'] = Document::STATE_SUBMITTED;
+                $updateData['review_rejection_reason'] = null;
             }
 
             $existingDocument->update($updateData);
@@ -467,7 +565,7 @@ class DocumentController extends Controller
                 ? 'Document updated and submitted successfully.'
                 : 'Document updated successfully.';
 
-            return redirect()->route('documents.show', Hashids::encode($existingDocument->id))
+            return redirect()->route('documents.show', $existingDocument)
                 ->with('success', $message);
         }
 
@@ -501,12 +599,13 @@ class DocumentController extends Controller
 
         // Add target accomplishment fields for weekly reports
         if ($request->type === Document::TYPE_WEEKLY_REPORT) {
-            $documentData['target_accomplished'] = $request->has('target_accomplished') ? (bool)$request->target_accomplished : null;
+            $documentData['target_accomplished'] = $request->has('target_accomplished') ? (bool) $request->target_accomplished : null;
             $documentData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
         }
 
-        // Save template content when provided (weekly_plan/weekly_report)
-        if ($templateContent !== null) {
+        if ($request->type === Document::TYPE_MONTHLY_REPORT && $monthlyContent !== null) {
+            $documentData['content'] = $monthlyContent;
+        } elseif ($templateContent !== null) {
             $documentData['content'] = $templateContent;
         }
 
@@ -516,18 +615,16 @@ class DocumentController extends Controller
             ? 'Document submitted successfully.'
             : 'Document saved as draft.';
 
-        return redirect()->route('documents.show', Hashids::encode($document->id))
+        return redirect()->route('documents.show', $document)
             ->with('success', $message);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Document $document)
     {
-        $decodedId = Hashids::decode($id);
-        $document = Document::with(['user', 'period', 'comments.user'])
-            ->findOrFail($decodedId[0] ?? null);
+        $document->load(['user', 'period']);
 
         // Authorize view action
         $this->authorize('view', $document);
@@ -550,7 +647,7 @@ class DocumentController extends Controller
                     ->first();
             }
 
-            if (!$relatedDocument) {
+            if (! $relatedDocument) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
                 if ($document->type === Document::TYPE_WEEKLY_PLAN &&
@@ -559,7 +656,7 @@ class DocumentController extends Controller
                         'type' => Document::TYPE_WEEKLY_REPORT,
                         'label' => 'Create Weekly Report for this Week',
                         'route' => route('documents.create', ['type' => Document::TYPE_WEEKLY_REPORT]),
-                        'description' => 'Weekly report is due on ' . $document->period->report_deadline->format('M d, Y'),
+                        'description' => 'Weekly report is due on '.$document->period->report_deadline->format('M d, Y'),
                     ];
                 } elseif ($document->type === Document::TYPE_WEEKLY_REPORT &&
                     Document::canUserCreateType($user, Document::TYPE_WEEKLY_PLAN, $document->period)) {
@@ -579,25 +676,37 @@ class DocumentController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(Document $document)
     {
-        $decodedId = Hashids::decode($id);
-        $document = Document::findOrFail($decodedId[0] ?? null);
 
         // Authorize update action
         $this->authorize('update', $document);
 
+        $document->loadMissing('user');
+        $monthlyYearPlan = null;
+        $monthlyPlannedActivities = collect();
+        $monthlyHasSubDepartments = false;
+        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
+            $owner = $document->user;
+            $monthlyHasSubDepartments = $owner->subDepartments()->exists();
+            $monthlyYearPlan = MonthlyReportYearPlanActivities::yearPlanForCalendarYear((int) $document->year);
+            $monthlyPlannedActivities = MonthlyReportYearPlanActivities::plannedForUserMonth(
+                $owner,
+                (int) $document->year,
+                (int) $document->month
+            );
+        }
+
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
-        return view('documents.edit', compact('document', 'teamUsers'));
+
+        return view('documents.edit', compact('document', 'teamUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Document $document)
     {
-        $decodedId = Hashids::decode($id);
-        $document = Document::findOrFail($decodedId[0] ?? null);
 
         // Authorize update action
         $this->authorize('update', $document);
@@ -623,7 +732,7 @@ class DocumentController extends Controller
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
-            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'integer', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
             $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
@@ -673,17 +782,35 @@ class DocumentController extends Controller
 
         $request->validate($validationRules);
 
-        $templateContent = null;
-        if ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
-            $templateContent = $this->normalizeTemplateContent($request->input('content'), $document->type);
-        }
-
-        // Determine state based on action
         $action = $request->input('action', 'draft');
+        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
 
-        // If submitting, authorize submit action
         if ($action === 'submit') {
             $this->authorize('submit', $document);
+        }
+
+        if ($action === 'submit'
+            && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)
+            && ! $this->weeklySubmissionReminderService->allowsSubmitWeeklyDocument($document)) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'The submission deadline has passed. You can no longer submit this document.');
+        }
+
+        $document->loadMissing('user');
+
+        $templateContent = null;
+        $monthlyContent = null;
+        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
+            $monthlyContent = $this->normalizeMonthlyReportContent(
+                $document->user,
+                (int) $document->year,
+                (int) $document->month,
+                is_array($request->input('content')) ? $request->input('content') : [],
+                $action
+            );
+        } elseif ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
+            $templateContent = $this->normalizeTemplateContent($request->input('content'), $document->type);
         }
 
         $updateData = [];
@@ -693,10 +820,10 @@ class DocumentController extends Controller
             $file = $request->file('file');
             $originalFilename = $file->getClientOriginalName();
             $fileSize = $file->getSize();
-            
+
             // Generate unique filename
-            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $filePath = $file->storeAs('documents/' . $document->type, $filename, 'public');
+            $filename = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
+            $filePath = $file->storeAs('documents/'.$document->type, $filename, 'public');
 
             // Delete old file if exists
             if ($document->file_path) {
@@ -711,30 +838,20 @@ class DocumentController extends Controller
         // Handle attachment upload for monthly reports
         if ($document->type === Document::TYPE_MONTHLY_REPORT && $request->hasFile('attachment')) {
             $attachmentFile = $request->file('attachment');
-            $attachmentFilename = time() . '_' . uniqid() . '_attachment.' . $attachmentFile->getClientOriginalExtension();
+            $attachmentFilename = time().'_'.uniqid().'_attachment.'.$attachmentFile->getClientOriginalExtension();
             $attachmentPath = $attachmentFile->storeAs('documents/monthly_reports/attachments', $attachmentFilename, 'public');
-            
+
             // Delete old attachment if exists
             if ($document->attachment) {
                 Storage::disk('public')->delete($document->attachment);
             }
-            
+
             $updateData['attachment'] = $attachmentPath;
         }
 
         // Update title if provided
         if ($request->filled('title')) {
             $updateData['title'] = $request->input('title');
-        }
-
-        // Update month and year for monthly reports
-        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
-            if ($request->filled('month')) {
-                $updateData['month'] = $request->month;
-            }
-            if ($request->filled('year')) {
-                $updateData['year'] = $request->year;
-            }
         }
 
         // Update main_target for weekly plans
@@ -750,7 +867,7 @@ class DocumentController extends Controller
         // Update target accomplishment fields for weekly reports
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             if ($request->has('target_accomplished')) {
-                $updateData['target_accomplished'] = (bool)$request->target_accomplished;
+                $updateData['target_accomplished'] = (bool) $request->target_accomplished;
             }
             if ($request->filled('target_explanation')) {
                 $updateData['target_explanation'] = $request->target_explanation;
@@ -760,14 +877,16 @@ class DocumentController extends Controller
             }
         }
 
-        // Save template content when provided (weekly_plan/weekly_report)
-        if ($templateContent !== null) {
+        if ($monthlyContent !== null) {
+            $updateData['content'] = $monthlyContent;
+        } elseif ($templateContent !== null) {
             $updateData['content'] = $templateContent;
         }
 
         // Update state if submitting
         if ($action === 'submit') {
             $updateData['state'] = Document::STATE_SUBMITTED;
+            $updateData['review_rejection_reason'] = null;
         }
 
         $document->update($updateData);
@@ -776,17 +895,15 @@ class DocumentController extends Controller
             ? 'Document submitted successfully.'
             : 'Document updated successfully.';
 
-        return redirect()->route('documents.show', $id)
+        return redirect()->route('documents.show', $document)
             ->with('success', $message);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Document $document)
     {
-        $decodedId = Hashids::decode($id);
-        $document = Document::findOrFail($decodedId[0] ?? null);
 
         // Authorize delete action
         $this->authorize('delete', $document);
@@ -800,27 +917,23 @@ class DocumentController extends Controller
     /**
      * Submit a document (change state from draft to submitted)
      */
-    public function submit(Request $request, string $id)
+    public function submit(Request $request, Document $document)
     {
-        $decodedId = Hashids::decode($id);
-        $document = Document::findOrFail($decodedId[0] ?? null);
 
         // Authorize submit action
         $this->authorize('submit', $document);
 
         $document->submit();
 
-        return redirect()->route('documents.show', $id)
+        return redirect()->route('documents.show', $document)
             ->with('success', 'Document submitted successfully.');
     }
 
     /**
      * Return submitted weekly plan/report to draft with required review reason.
      */
-    public function reject(Request $request, string $id)
+    public function reject(Request $request, Document $document)
     {
-        $decodedId = Hashids::decode($id);
-        $document = Document::findOrFail($decodedId[0] ?? null);
 
         $this->authorize('reject', $document);
 
@@ -830,15 +943,9 @@ class DocumentController extends Controller
 
         $reason = trim($validated['reason']);
 
-        $document->revertToDraft();
+        $document->revertToDraft($reason);
 
-        Comment::create([
-            'document_id' => $document->id,
-            'user_id' => Auth::id(),
-            'comment' => Document::REVIEW_REJECTION_PREFIX . $reason,
-        ]);
-
-        return redirect()->route('documents.show', $id)
+        return redirect()->route('documents.show', $document->id)
             ->with('warning', 'Document returned to draft. Staff can now update and re-submit after addressing the review reason.');
     }
 
@@ -851,11 +958,11 @@ class DocumentController extends Controller
         $user = Auth::user();
 
         // Only users with 'view all documents' permission can access this
-        if (!$user->hasPermissionTo('view all documents')) {
+        if (! $user->hasPermissionTo('view all documents')) {
             abort(403, 'Unauthorized access.');
         }
 
-        $baseQuery = Document::with(['user', 'comments'])
+        $baseQuery = Document::with(['user'])
             ->submitted();
 
         // Filter by user if provided
@@ -869,12 +976,12 @@ class DocumentController extends Controller
             if ($period === 'this_week') {
                 $baseQuery->whereBetween('updated_at', [
                     now()->startOfWeek(),
-                    now()->endOfWeek()
+                    now()->endOfWeek(),
                 ]);
             } elseif ($period === 'last_week') {
                 $baseQuery->whereBetween('updated_at', [
                     now()->subWeek()->startOfWeek(),
-                    now()->subWeek()->endOfWeek()
+                    now()->subWeek()->endOfWeek(),
                 ]);
             } elseif ($period === 'this_month') {
                 $baseQuery->whereMonth('updated_at', now()->month)
@@ -890,7 +997,7 @@ class DocumentController extends Controller
         }
 
         if ($request->has('year') && $request->year) {
-            $baseQuery->whereHas('period', function($q) use ($request) {
+            $baseQuery->whereHas('period', function ($q) use ($request) {
                 $q->where('year', $request->year);
             });
         }
@@ -899,10 +1006,11 @@ class DocumentController extends Controller
 
         $mergedWeeklyRows = $allDocuments
             ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
-            ->groupBy(fn ($doc) => ($doc->period_id ?? 'none') . '_' . ($doc->user_id ?? 'none'))
+            ->groupBy(fn ($doc) => ($doc->period_id ?? 'none').'_'.($doc->user_id ?? 'none'))
             ->map(function ($items) {
                 $plan = $items->firstWhere('type', Document::TYPE_WEEKLY_PLAN);
                 $report = $items->firstWhere('type', Document::TYPE_WEEKLY_REPORT);
+
                 return [
                     'plan' => $plan,
                     'report' => $report,
@@ -933,7 +1041,7 @@ class DocumentController extends Controller
             'action_logs' => (clone $statsQuery)->actionLogs()->count(),
         ];
 
-        $usersWithDocuments = \App\Models\User::whereHas('documents', function($q) {
+        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) {
             $q->submitted();
         })->orderBy('name')->get();
 
@@ -969,16 +1077,16 @@ class DocumentController extends Controller
             'create weekly plan',
             'create weekly report',
             'create monthly report',
-            'create action logs'
+            'create action logs',
         ]);
-        
-        if (!$canCreateDocs && !$user->hasPermissionTo('approve documents')) {
+
+        if (! $canCreateDocs && ! $user->hasPermissionTo('approve documents')) {
             abort(403, 'Unauthorized access. This dashboard is for document creators only.');
         }
 
         $availableTypes = Document::getAvailableTypesForUser($user);
-        $currentPeriod = WorkPeriod::getCurrent();
-        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
+        $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
 
         $periodFilterId = $request->input('period_id');
         $periodOptions = WorkPeriod::orderBy('year', 'desc')
@@ -986,25 +1094,15 @@ class DocumentController extends Controller
             ->take(20)
             ->get();
 
-        $deadlineStatuses = null;
-        if ($currentPeriod) {
-            $deadlineStatuses = [
-                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
-                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $currentPeriod->plan_deadline,
-                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
-                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
-                'report_due' => $currentPeriod->report_deadline,
-            ];
-        }
+        $deadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
         // Get pending submissions (draft documents)
-        $pendingDocumentsQuery = Document::with('comments')
+        $pendingDocumentsQuery = Document::query()
             ->forUser($user->id)
             ->drafts()
             ->latest();
 
-        $allDocumentsQuery = Document::with('comments')
+        $allDocumentsQuery = Document::query()
             ->forUser($user->id)
             ->latest();
 
@@ -1095,12 +1193,12 @@ class DocumentController extends Controller
             ->ofType(Document::TYPE_WEEKLY_PLAN);
 
         // Users with 'view all documents' permission can see all documents, others see only their own
-        if (!$user->hasPermissionTo('view all documents')) {
+        if (! $user->hasPermissionTo('view all documents')) {
             $query->forUser($user->id);
         }
 
         // Get current period for defaults
-        $currentPeriod = WorkPeriod::getCurrent();
+        $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
         $currentYear = date('Y');
 
         // Filter by period - only filter if explicitly provided (not empty)
@@ -1112,16 +1210,15 @@ class DocumentController extends Controller
         // Filter by year - only filter if explicitly provided (not empty)
         $year = $request->input('year');
         if ($year && $year !== '') {
-            $query->whereHas('period', function($q) use ($year) {
+            $query->whereHas('period', function ($q) use ($year) {
                 $q->where('year', $year);
             });
         }
 
         if ($request->input('review_status') === 'returned') {
             $query->where('state', Document::STATE_DRAFT)
-                ->whereHas('comments', function ($commentQuery) {
-                    $commentQuery->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%');
-                });
+                ->whereNotNull('review_rejection_reason')
+                ->where('review_rejection_reason', '!=', '');
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
@@ -1129,16 +1226,14 @@ class DocumentController extends Controller
             $documents->getCollection()->pluck('id')->all()
         );
 
-        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $deadlineStatuses = null;
-        if ($currentPeriod) {
+        // Plan submissions target the next work period; use that period's plan_deadline for the banner.
+        if ($nextPeriod) {
             $deadlineStatuses = [
-                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
-                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $currentPeriod->plan_deadline,
-                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
-                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
-                'report_due' => $currentPeriod->report_deadline,
+                'plan_badge' => $nextPeriod->getPlanDeadlineBadgeClass(),
+                'plan_text' => $nextPeriod->getDeadlineStatusText('plan'),
+                'plan_due' => $nextPeriod->plan_deadline,
             ];
         }
 
@@ -1164,23 +1259,26 @@ class DocumentController extends Controller
         $user = Auth::user();
         $periodId = $request->query('period_id');
 
-        if (!$periodId) {
+        if (! $periodId) {
             return response()->json(['error' => 'Period ID is required'], 400);
         }
 
         $plan = Document::where('user_id', $user->id)
             ->where('period_id', $periodId)
             ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->orderByRaw("CASE WHEN state = ? THEN 0 ELSE 1 END", [Document::STATE_SUBMITTED])
+            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [Document::STATE_SUBMITTED])
             ->latest('id')
             ->first();
 
         if ($plan) {
             $budgetItems = [];
-            if (is_array($plan->content) && !empty($plan->content['budget']) && is_array($plan->content['budget'])) {
+            if (is_array($plan->content) && ! empty($plan->content['budget']) && is_array($plan->content['budget'])) {
                 // Normalize into a simple array for the UI.
                 $budgetItems = array_values(array_map(function ($row) {
-                    if (!is_array($row)) return null;
+                    if (! is_array($row)) {
+                        return null;
+                    }
+
                     return [
                         'item' => $row['item'] ?? null,
                         'description_purpose' => $row['description_purpose'] ?? null,
@@ -1189,15 +1287,18 @@ class DocumentController extends Controller
                 }, $plan->content['budget']));
                 // Remove empty rows (e.g., all fields blank)
                 $budgetItems = array_values(array_filter($budgetItems, function ($row) {
-                    if (!is_array($row)) return false;
-                    return !empty($row['item']) || !empty($row['description_purpose']) || !empty($row['amount']);
+                    if (! is_array($row)) {
+                        return false;
+                    }
+
+                    return ! empty($row['item']) || ! empty($row['description_purpose']) || ! empty($row['amount']);
                 }));
             }
 
             $plannedActivities = [];
-            if (is_array($plan->content) && !empty($plan->content['planned_activities']) && is_array($plan->content['planned_activities'])) {
+            if (is_array($plan->content) && ! empty($plan->content['planned_activities']) && is_array($plan->content['planned_activities'])) {
                 $plannedActivities = array_values(array_filter(array_map(function ($row) {
-                    if (!is_array($row)) {
+                    if (! is_array($row)) {
                         return null;
                     }
                     $activity = trim((string) ($row['activity'] ?? ''));
@@ -1205,10 +1306,11 @@ class DocumentController extends Controller
                         return null;
                     }
                     $day = trim((string) ($row['day'] ?? ''));
+
                     return [
                         'day' => $day,
                         'activity' => $activity,
-                        'label' => $day !== '' ? ($day . ' - ' . $activity) : $activity,
+                        'label' => $day !== '' ? ($day.' - '.$activity) : $activity,
                     ];
                 }, $plan->content['planned_activities'])));
             }
@@ -1242,12 +1344,12 @@ class DocumentController extends Controller
             ->ofType(Document::TYPE_WEEKLY_REPORT);
 
         // Users with 'view all documents' permission can see all documents, others see only their own
-        if (!$user->hasPermissionTo('view all documents')) {
+        if (! $user->hasPermissionTo('view all documents')) {
             $query->forUser($user->id);
         }
 
         // Get current period for defaults
-        $currentPeriod = WorkPeriod::getCurrent();
+        $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
         $currentYear = date('Y');
 
         // Filter by period - only filter if explicitly provided (not empty)
@@ -1259,16 +1361,15 @@ class DocumentController extends Controller
         // Filter by year - only filter if explicitly provided (not empty)
         $year = $request->input('year');
         if ($year && $year !== '') {
-            $query->whereHas('period', function($q) use ($year) {
+            $query->whereHas('period', function ($q) use ($year) {
                 $q->where('year', $year);
             });
         }
 
         if ($request->input('review_status') === 'returned') {
             $query->where('state', Document::STATE_DRAFT)
-                ->whereHas('comments', function ($commentQuery) {
-                    $commentQuery->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%');
-                });
+                ->whereNotNull('review_rejection_reason')
+                ->where('review_rejection_reason', '!=', '');
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
@@ -1276,18 +1377,8 @@ class DocumentController extends Controller
             $documents->getCollection()->pluck('id')->all()
         );
 
-        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
-        $deadlineStatuses = null;
-        if ($currentPeriod) {
-            $deadlineStatuses = [
-                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
-                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $currentPeriod->plan_deadline,
-                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
-                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
-                'report_due' => $currentPeriod->report_deadline,
-            ];
-        }
+        $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
+        $deadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
         $availableTypes = Document::getAvailableTypesForUser($user);
 
@@ -1312,19 +1403,117 @@ class DocumentController extends Controller
             return [];
         }
 
-        $latestByDocument = Comment::whereIn('document_id', $documentIds)
-            ->where('comment', 'like', Document::REVIEW_REJECTION_PREFIX . '%')
-            ->orderByDesc('id')
-            ->get()
-            ->unique('document_id');
+        return Document::query()
+            ->whereIn('id', $documentIds)
+            ->whereNotNull('review_rejection_reason')
+            ->where('review_rejection_reason', '!=', '')
+            ->get(['id', 'review_rejection_reason'])
+            ->mapWithKeys(function (Document $doc) {
+                return [(string) $doc->id => trim((string) $doc->review_rejection_reason)];
+            })
+            ->all();
+    }
 
-        $map = [];
-        foreach ($latestByDocument as $comment) {
-            $reason = trim(substr((string) $comment->comment, strlen(Document::REVIEW_REJECTION_PREFIX)));
-            $map[(int) $comment->document_id] = $reason;
+    private const MONTHLY_IMPLEMENTATION_STATUSES = [
+        'Not started',
+        'In progress',
+        'Completed',
+        'Deferred',
+        'Not applicable',
+    ];
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array{planned: list<array<string, mixed>>, off_plan: list<array<string, mixed>>, month_summary: string}
+     */
+    private function normalizeMonthlyReportContent(
+        User $owner,
+        int $calendarYear,
+        int $month,
+        array $input,
+        string $action
+    ): array {
+        $activities = MonthlyReportYearPlanActivities::plannedForUserMonth($owner, $calendarYear, $month);
+        $rawPlanned = collect($input['planned'] ?? [])->keyBy(fn ($r) => (int) (is_array($r) ? ($r['year_plan_activity_id'] ?? 0) : 0));
+
+        $planned = [];
+        foreach ($activities as $act) {
+            $row = $rawPlanned->get($act->id);
+            if (! is_array($row)) {
+                $row = [];
+            }
+            $status = $row['implementation_status'] ?? 'Not started';
+            if (! in_array($status, self::MONTHLY_IMPLEMENTATION_STATUSES, true)) {
+                throw ValidationException::withMessages([
+                    'content.planned' => 'Invalid implementation status for a year plan activity.',
+                ]);
+            }
+            $planned[] = [
+                'year_plan_activity_id' => $act->id,
+                'implementation_status' => $status,
+                'achievements' => $this->clipString(trim((string) ($row['achievements'] ?? '')), 5000),
+                'challenges' => $this->clipString(trim((string) ($row['challenges'] ?? '')), 5000),
+                'next_steps' => $this->clipString(trim((string) ($row['next_steps'] ?? '')), 4000),
+            ];
         }
 
-        return $map;
+        $offPlan = [];
+        foreach ($input['off_plan'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $title = trim((string) ($row['title'] ?? ''));
+            $description = trim((string) ($row['description'] ?? ''));
+            if ($title === '' && $description === '') {
+                continue;
+            }
+            $offPlan[] = [
+                'title' => $this->clipString($title, 500),
+                'description' => $this->clipString($description, 4000),
+                'status' => $this->clipString(trim((string) ($row['status'] ?? '')), 100),
+                'notes' => $this->clipString(trim((string) ($row['notes'] ?? '')), 4000),
+            ];
+        }
+
+        $summary = $this->clipString(trim((string) ($input['month_summary'] ?? '')), 10000);
+
+        if ($action === 'submit') {
+            if ($planned !== []) {
+                foreach ($planned as $p) {
+                    $idle = $p['implementation_status'] === 'Not started'
+                        && $p['achievements'] === ''
+                        && $p['challenges'] === ''
+                        && $p['next_steps'] === '';
+                    if ($idle) {
+                        throw ValidationException::withMessages([
+                            'content.planned' => 'For each year plan activity, select a status or describe achievements, challenges, or next steps.',
+                        ]);
+                    }
+                }
+            } elseif ($summary === '' && $offPlan === []) {
+                throw ValidationException::withMessages([
+                    'content.month_summary' => 'Add a month summary, off-plan work, or assign sub-departments with planned activities for this month in the year plan.',
+                ]);
+            }
+        }
+
+        return [
+            'planned' => $planned,
+            'off_plan' => $offPlan,
+            'month_summary' => $summary,
+        ];
+    }
+
+    private function clipString(string $value, int $max): string
+    {
+        if ($max <= 0) {
+            return '';
+        }
+        if (function_exists('mb_strlen') && function_exists('mb_substr') && mb_strlen($value) > $max) {
+            return mb_substr($value, 0, $max);
+        }
+
+        return strlen($value) > $max ? substr($value, 0, $max) : $value;
     }
 
     /**
@@ -1386,6 +1575,7 @@ class DocumentController extends Controller
             foreach ($value as $k => $v) {
                 $value[$k] = $this->trimDeep($v);
             }
+
             return $value;
         }
 
@@ -1394,19 +1584,30 @@ class DocumentController extends Controller
 
     private function filterNonEmptyRows(mixed $rows, array $keys): array
     {
-        if (!is_array($rows)) return [];
+        if (! is_array($rows)) {
+            return [];
+        }
 
         return array_values(array_filter($rows, function ($row) use ($keys) {
-            if (!is_array($row)) return false;
+            if (! is_array($row)) {
+                return false;
+            }
 
             foreach ($keys as $key) {
-                if (!array_key_exists($key, $row)) continue;
-                $v = $row[$key];
-                if (is_array($v)) {
-                    if (!empty($v)) return true;
+                if (! array_key_exists($key, $row)) {
                     continue;
                 }
-                if ($v !== null && $v !== '') return true;
+                $v = $row[$key];
+                if (is_array($v)) {
+                    if (! empty($v)) {
+                        return true;
+                    }
+
+                    continue;
+                }
+                if ($v !== null && $v !== '') {
+                    return true;
+                }
             }
 
             return false;

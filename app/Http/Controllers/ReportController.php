@@ -3,16 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Exports\PettyExport;
-use App\Models\User;
-use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\UserExport;
 use App\Models\Petty;
-use App\Models\StartPoint;
-use App\Models\Stop;
-use App\Models\Trip;
+use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
@@ -31,7 +28,7 @@ class ReportController extends Controller
 
             $query->whereBetween('created_at', [$from, $to]);
         }
-        $users = $query->get();
+        $users = $query->latest()->get();
 
         return view('reports.users.list', compact('users'));
     }
@@ -47,15 +44,16 @@ class ReportController extends Controller
             $query->whereBetween('created_at', [$from, $to]);
         }
 
-        $users = $query->get();
+        $users = $query->latest()->get();
 
         if ($type === 'pdf') {
             $pdf = Pdf::loadView('reports.users.pdf', compact('users'));
+
             return $pdf->download('USERS_LIST.pdf');
         }
 
         if (in_array($type, ['excel', 'csv'])) {
-            return Excel::download(new UserExport($request->from, $request->to), 'USERS_LIST.' . ($type === 'csv' ? 'csv' : 'xlsx'));
+            return Excel::download(new UserExport($request->from, $request->to), 'USERS_LIST.'.($type === 'csv' ? 'csv' : 'xlsx'));
         }
 
         return back();
@@ -86,8 +84,6 @@ class ReportController extends Controller
         return view('reports.petty.list', compact('petties'));
     }
 
-
-
     public function downloadPetty(Request $request, $type)
     {
         $query = Petty::query();
@@ -115,6 +111,7 @@ class ReportController extends Controller
         // Export to PDF
         if ($type === 'pdf') {
             $pdf = Pdf::loadView('reports.petty.pdf', compact('petties'));
+
             return $pdf->download('PETTY CASH.pdf');
         }
 
@@ -125,7 +122,6 @@ class ReportController extends Controller
 
         return back();
     }
-
 
     public function transactionReport(Request $request)
     {
@@ -163,11 +159,10 @@ class ReportController extends Controller
         // Export to PDF
         if ($type === 'pdf') {
             $pdf = Pdf::loadView('reports.transactions.pdf', compact('transactions'));
+
             return $pdf->download('TRANSACTIONS.pdf');
         }
 
         return back();
     }
-
-
 }

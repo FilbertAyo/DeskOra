@@ -66,7 +66,7 @@
         <div class="email-footer">
             <p>Thank you! 🚀</p>
             <p>
-                This is an automated message sent from <strong>noreply@marscommltd.com</strong>. Please do not reply to
+                This is an automated message sent from <strong>portal@adilisha.or.tz</strong>. Please do not reply to
                 this email.
             </p>
 

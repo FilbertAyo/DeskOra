@@ -6,29 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('approval_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('petty_id')->nullable()->constrained()->onDelete('cascade');
-          
+            $table->ulid('id')->primary();
+            $table->foreignUlid('petty_id')->nullable()->constrained('petties')->cascadeOnDelete();
+            $table->foreignUlid('replenishment_id')->nullable()->constrained('replenishments')->nullOnDelete();
             $table->unsignedBigInteger('item_id')->nullable();
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->enum('action', ['approved', 'rejected','resubmission','resubmitted','paid']);
+            $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
+            $table->enum('action', ['approved', 'rejected', 'resubmission', 'resubmitted', 'paid', 'created']);
             $table->text('comment')->nullable();
             $table->timestamps();
-
-            // $table->foreign('replenishment_id')->references('id')->on('replenishments')->nullOnDelete();
-
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('approval_logs');

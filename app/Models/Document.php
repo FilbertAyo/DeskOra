@@ -2,29 +2,57 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Document extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUlids, LogsActivity, SoftDeletes;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('documents')
+            ->logOnly([
+                'user_id',
+                'period_id',
+                'type',
+                'title',
+                'state',
+                'month',
+                'year',
+                'main_target',
+                'target_accomplished',
+                'target_explanation',
+                'file_path',
+                'original_filename',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     /**
      * Document Types Constants
      */
     public const TYPE_WEEKLY_PLAN = 'weekly_plan';
+
     public const TYPE_WEEKLY_REPORT = 'weekly_report';
+
     public const TYPE_MONTHLY_REPORT = 'monthly_report';
+
     public const TYPE_ACTION_LOG = 'action_log';
 
     /**
      * Document State Constants
      */
     public const STATE_DRAFT = 'draft';
+
     public const STATE_SUBMITTED = 'submitted';
-    public const REVIEW_REJECTION_PREFIX = '[REJECT_TO_DRAFT] ';
 
     /**
      * The attributes that are mass assignable.
@@ -47,6 +75,7 @@ class Document extends Model
         'target_accomplished',
         'target_explanation',
         'state',
+        'review_rejection_reason',
     ];
 
     /**
@@ -67,8 +96,6 @@ class Document extends Model
 
     /**
      * Get all available document types
-     *
-     * @return array
      */
     public static function getTypes(): array
     {
@@ -82,8 +109,6 @@ class Document extends Model
 
     /**
      * Get all available document states
-     *
-     * @return array
      */
     public static function getStates(): array
     {
@@ -95,8 +120,6 @@ class Document extends Model
 
     /**
      * Get human-readable type name
-     *
-     * @return string
      */
     public function getTypeNameAttribute(): string
     {
@@ -105,8 +128,6 @@ class Document extends Model
 
     /**
      * Get display title (use title or generate from type and period)
-     *
-     * @return string
      */
     public function getDisplayTitleAttribute(): string
     {
@@ -116,7 +137,7 @@ class Document extends Model
 
         $typeName = $this->type_name;
         if ($this->period) {
-            return $typeName . ' - Week ' . $this->period->week_number;
+            return $typeName.' - Week '.$this->period->week_number;
         }
 
         return $typeName;
@@ -124,8 +145,6 @@ class Document extends Model
 
     /**
      * Get human-readable state name
-     *
-     * @return string
      */
     public function getStateNameAttribute(): string
     {
@@ -134,8 +153,6 @@ class Document extends Model
 
     /**
      * Check if document is draft
-     *
-     * @return bool
      */
     public function isDraft(): bool
     {
@@ -144,8 +161,6 @@ class Document extends Model
 
     /**
      * Check if document is submitted
-     *
-     * @return bool
      */
     public function isSubmitted(): bool
     {
@@ -154,62 +169,58 @@ class Document extends Model
 
     /**
      * Submit the document
-     *
-     * @return bool
      */
     public function submit(): bool
     {
-        return $this->update(['state' => self::STATE_SUBMITTED]);
+        return $this->update([
+            'state' => self::STATE_SUBMITTED,
+            'review_rejection_reason' => null,
+        ]);
     }
 
     /**
-     * Revert document to draft
-     *
-     * @return bool
+     * Revert document to draft. Pass a reason when returning a submission for revision.
      */
-    public function revertToDraft(): bool
+    public function revertToDraft(?string $reviewRejectionReason = null): bool
     {
-        return $this->update(['state' => self::STATE_DRAFT]);
+        $data = ['state' => self::STATE_DRAFT];
+        if ($reviewRejectionReason !== null) {
+            $data['review_rejection_reason'] = $reviewRejectionReason;
+        }
+
+        return $this->update($data);
     }
 
     /**
      * Get the full file path (URL)
-     *
-     * @return string|null
      */
     public function getFileUrlAttribute(): ?string
     {
-        return $this->file_path ? asset('storage/' . $this->file_path) : null;
+        return $this->file_path ? asset('storage/'.$this->file_path) : null;
     }
 
     /**
      * Get the file path for storage
-     *
-     * @return string|null
      */
     public function getStoragePathAttribute(): ?string
     {
-        return $this->file_path ? storage_path('app/public/' . $this->file_path) : null;
+        return $this->file_path ? storage_path('app/public/'.$this->file_path) : null;
     }
 
     /**
      * Check if document has a file
-     *
-     * @return bool
      */
     public function hasFile(): bool
     {
-        return !empty($this->file_path) && file_exists($this->storage_path);
+        return ! empty($this->file_path) && file_exists($this->storage_path);
     }
 
     /**
      * Get human-readable file size
-     *
-     * @return string
      */
     public function getFormattedFileSizeAttribute(): string
     {
-        if (!$this->file_size) {
+        if (! $this->file_size) {
             return '0 B';
         }
 
@@ -222,13 +233,11 @@ class Document extends Model
             $unit++;
         }
 
-        return round($size, 2) . ' ' . $units[$unit];
+        return round($size, 2).' '.$units[$unit];
     }
 
     /**
      * Relationship: Document belongs to User
-     *
-     * @return BelongsTo
      */
     public function user(): BelongsTo
     {
@@ -237,8 +246,6 @@ class Document extends Model
 
     /**
      * Relationship: Document belongs to WorkPeriod
-     *
-     * @return BelongsTo
      */
     public function period(): BelongsTo
     {
@@ -246,20 +253,9 @@ class Document extends Model
     }
 
     /**
-     * Relationship: Document has many Comments
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function comments()
-    {
-        return $this->hasMany(Comment::class)->latest();
-    }
-
-    /**
      * Scope: Filter by type
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $type
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeOfType($query, string $type)
@@ -270,8 +266,7 @@ class Document extends Model
     /**
      * Scope: Filter by state
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $state
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeOfState($query, string $state)
@@ -282,11 +277,10 @@ class Document extends Model
     /**
      * Scope: Filter by user
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param int $userId
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeForUser($query, int $userId)
+    public function scopeForUser($query, string $userId)
     {
         return $query->where('user_id', $userId);
     }
@@ -294,7 +288,7 @@ class Document extends Model
     /**
      * Scope: Get only draft documents
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeDrafts($query)
@@ -305,7 +299,7 @@ class Document extends Model
     /**
      * Scope: Get only submitted documents
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeSubmitted($query)
@@ -316,7 +310,7 @@ class Document extends Model
     /**
      * Scope: Get weekly plans
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeWeeklyPlans($query)
@@ -327,7 +321,7 @@ class Document extends Model
     /**
      * Scope: Get weekly reports
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeWeeklyReports($query)
@@ -338,7 +332,7 @@ class Document extends Model
     /**
      * Scope: Get monthly reports
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeMonthlyReports($query)
@@ -349,7 +343,7 @@ class Document extends Model
     /**
      * Scope: Get action logs
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeActionLogs($query)
@@ -360,7 +354,7 @@ class Document extends Model
     /**
      * Scope: Get documents for employees (plans and reports)
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeEmployeeDocuments($query)
@@ -375,8 +369,7 @@ class Document extends Model
     /**
      * Scope: Recent documents (last N days)
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param int $days
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeRecent($query, int $days = 30)
@@ -387,7 +380,7 @@ class Document extends Model
     /**
      * Scope: Order by most recent
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeLatest($query)
@@ -398,36 +391,30 @@ class Document extends Model
     /**
      * Scope: Filter by period
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param int $periodId
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeForPeriod($query, int $periodId)
+    public function scopeForPeriod($query, string $periodId)
     {
         return $query->where('period_id', $periodId);
     }
 
     /**
      * Check if a user can create this document type based on their role
-     *
-     * @param User $user
-     * @param string $type
-     * @param WorkPeriod|null $period
-     * @return bool
      */
     public static function canUserCreateType(User $user, string $type, ?WorkPeriod $period = null): bool
     {
         // For weekly plans, reports, and minutes, check if period is open
         if (in_array($type, [self::TYPE_WEEKLY_PLAN, self::TYPE_WEEKLY_REPORT, self::TYPE_ACTION_LOG])) {
             // If period is provided, check if it's open
-            if ($period && !$period->isOpen()) {
+            if ($period && ! $period->isOpen()) {
                 return false;
             }
-            
+
             // If no period provided, try to get current period
-            if (!$period) {
+            if (! $period) {
                 $period = WorkPeriod::getCurrent();
-                if (!$period || !$period->isOpen()) {
+                if (! $period || ! $period->isOpen()) {
                     return false;
                 }
             }
@@ -446,9 +433,9 @@ class Document extends Model
                 return $user->hasAnyPermission([
                     'create weekly plan',
                     'create weekly report',
-                    'create monthly report'
+                    'create monthly report',
                 ]);
-            
+
             case self::TYPE_ACTION_LOG:
                 return $user->hasPermissionTo('create action logs');
         }
@@ -458,9 +445,6 @@ class Document extends Model
 
     /**
      * Get document types available for a specific user role
-     *
-     * @param User $user
-     * @return array
      */
     public static function getAvailableTypesForUser(User $user): array
     {
@@ -478,8 +462,6 @@ class Document extends Model
 
     /**
      * Check if document can be edited (only drafts can be edited)
-     *
-     * @return bool
      */
     public function canBeEdited(): bool
     {
@@ -488,8 +470,6 @@ class Document extends Model
 
     /**
      * Check if document can be submitted (only drafts can be submitted)
-     *
-     * @return bool
      */
     public function canBeSubmitted(): bool
     {
@@ -498,8 +478,6 @@ class Document extends Model
 
     /**
      * Check if document can be deleted (only drafts can be deleted)
-     *
-     * @return bool
      */
     public function canBeDeleted(): bool
     {
@@ -511,19 +489,12 @@ class Document extends Model
      */
     public function latestRejectionReason(): ?string
     {
-        $latestComment = $this->relationLoaded('comments')
-            ? $this->comments->first()
-            : $this->comments()->first();
-
-        if (!$latestComment || !is_string($latestComment->comment)) {
+        $raw = $this->review_rejection_reason;
+        if (! is_string($raw) || trim($raw) === '') {
             return null;
         }
 
-        if (!str_starts_with($latestComment->comment, self::REVIEW_REJECTION_PREFIX)) {
-            return null;
-        }
-
-        return trim(substr($latestComment->comment, strlen(self::REVIEW_REJECTION_PREFIX)));
+        return trim($raw);
     }
 
     /**

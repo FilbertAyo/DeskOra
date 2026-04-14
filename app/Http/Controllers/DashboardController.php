@@ -2,25 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Document;
 use App\Models\Petty;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\WorkPeriodService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Vinkla\Hashids\Facades\Hashids;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly WorkPeriodService $workPeriodService) {}
+
     public function redirect()
     {
 
-        //This is very important but later should be moved to Console/Command for automatic update
+        // This is very important but later should be moved to Console/Command for automatic update
         DB::table('petties')
             ->where('status', 'resubmission')
             ->where('updated_at', '<', now()->subDay())
@@ -28,22 +29,25 @@ class DashboardController extends Controller
 
         Log::info('Dashboard-triggered auto-reject of stale petty cash requests.');
 
-        //End of it
+        // End of it
+        /** @var \App\Models\User $authUser */
+        $authUser = Auth::user();
+        $departmentScopeIds = $authUser->departmentScopeIds();
 
         $userNo = User::all()->count();
-        $pettyNo = Petty::all()->count();
-        $paidAmount = Petty::where('status', 'paid')->sum('amount');
+        $pettyNo = Petty::whereIn('department_id', $departmentScopeIds)->count();
+        $paidAmount = Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->sum('amount');
         $myExpense = Petty::where('user_id', Auth::user()->id)->where('status', 'paid')->sum('amount');
 
         $departmentNo = Department::all()->count();
 
         // Status breakdown for pie chart
         $statusBreakdown = [
-            'pending' => Petty::where('status', 'pending')->count(),
-            'approved' => Petty::where('status', 'approved')->count(),
-            'paid' => Petty::where('status', 'paid')->count(),
-            'rejected' => Petty::where('status', 'rejected')->count(),
-            'resubmission' => Petty::where('status', 'resubmission')->count(),
+            'pending' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'pending')->count(),
+            'approved' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'approved')->count(),
+            'paid' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->count(),
+            'rejected' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'rejected')->count(),
+            'resubmission' => Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'resubmission')->count(),
         ];
 
         // Monthly expense trend (last 6 months)
@@ -53,6 +57,7 @@ class DashboardController extends Controller
             $date = Carbon::now()->subMonths($i);
             $monthLabels[] = $date->format('M Y');
             $monthlyExpenses[] = Petty::where('status', 'paid')
+                ->whereIn('department_id', $departmentScopeIds)
                 ->whereYear('paid_date', $date->year)
                 ->whereMonth('paid_date', $date->month)
                 ->sum('amount');
@@ -60,6 +65,7 @@ class DashboardController extends Controller
 
         // Top 5 departments by spending
         $topDepartments = Petty::where('petties.status', 'paid')
+            ->whereIn('petties.department_id', $departmentScopeIds)
             ->join('departments', 'petties.department_id', '=', 'departments.id')
             ->select('departments.name', DB::raw('SUM(petties.amount) as total'))
             ->groupBy('departments.id', 'departments.name')
@@ -69,17 +75,20 @@ class DashboardController extends Controller
 
         // Recent requests (last 5)
         $recentRequests = Petty::with(['user', 'department'])
+            ->whereIn('department_id', $departmentScopeIds)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
 
         // Current month statistics
         $currentMonthTotal = Petty::where('status', 'paid')
+            ->whereIn('department_id', $departmentScopeIds)
             ->whereYear('paid_date', Carbon::now()->year)
             ->whereMonth('paid_date', Carbon::now()->month)
             ->sum('amount');
 
         $lastMonthTotal = Petty::where('status', 'paid')
+            ->whereIn('department_id', $departmentScopeIds)
             ->whereYear('paid_date', Carbon::now()->subMonth()->year)
             ->whereMonth('paid_date', Carbon::now()->subMonth()->month)
             ->sum('amount');
@@ -90,6 +99,7 @@ class DashboardController extends Controller
 
         // Active users (users who made requests this month)
         $activeUsers = Petty::whereYear('created_at', Carbon::now()->year)
+            ->whereIn('department_id', $departmentScopeIds)
             ->whereMonth('created_at', Carbon::now()->month)
             ->distinct('user_id')
             ->count('user_id');
@@ -129,21 +139,11 @@ class DashboardController extends Controller
         // Document/Work Period related data for dashboard
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $currentPeriod = WorkPeriod::getCurrent();
-        $nextPeriod = $currentPeriod ? $currentPeriod->getNextPeriod() : null;
+        $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
+        $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
 
-        // Calculate deadline statuses
-        $periodDeadlineStatuses = null;
-        if ($currentPeriod) {
-            $periodDeadlineStatuses = [
-                'plan_badge' => $currentPeriod->getPlanDeadlineBadgeClass(),
-                'plan_text' => $currentPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $currentPeriod->plan_deadline,
-                'report_badge' => $currentPeriod->getReportDeadlineBadgeClass(),
-                'report_text' => $currentPeriod->getDeadlineStatusText('report'),
-                'report_due' => $currentPeriod->report_deadline,
-            ];
-        }
+        // Plan deadline applies to next week; report deadline to current week
+        $periodDeadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
         // Get available document types for user
         $dashboardAvailableTypes = Document::getAvailableTypesForUser($user);
@@ -166,7 +166,7 @@ class DashboardController extends Controller
             'create weekly report',
             'create monthly report',
             'create action logs',
-            'approve documents'
+            'approve documents',
         ]);
 
         // Prepare weekly dashboard data if applicable
@@ -177,7 +177,7 @@ class DashboardController extends Controller
                 ->take(20)
                 ->get();
 
-            $allDocuments = Document::with('comments')
+            $allDocuments = Document::query()
                 ->forUser($user->id)
                 ->latest()
                 ->get();
@@ -287,7 +287,8 @@ class DashboardController extends Controller
                 return $periodDocs
                     ->sortByDesc(function ($doc) {
                         $isSubmitted = $doc->state === Document::STATE_SUBMITTED ? 1 : 0;
-                        return ($isSubmitted * 1000000000) + (int) $doc->id;
+
+                        return [$isSubmitted, $doc->id];
                     })
                     ->first();
             })
@@ -297,12 +298,12 @@ class DashboardController extends Controller
 
         $currentPeriod = WorkPeriod::getCurrent();
         $currentDraftDoc = $currentPeriod
-            ? $selectedByPeriod->first(fn ($doc) => (int) $doc->period_id === (int) $currentPeriod->id && $doc->isDraft())
+            ? $selectedByPeriod->first(fn ($doc) => $doc->period_id === $currentPeriod->id && $doc->isDraft())
             : null;
 
         $taskTimeline = [];
         foreach ($selectedByPeriod as $document) {
-            if (!$document || !$document->period) {
+            if (! $document || ! $document->period) {
                 continue;
             }
 
@@ -313,16 +314,16 @@ class DashboardController extends Controller
             }
 
             foreach ($tasks as $task) {
-                if (!is_array($task)) {
+                if (! is_array($task)) {
                     continue;
                 }
 
                 $responsibleIds = $task['responsible_user_ids'] ?? [];
-                if (!is_array($responsibleIds)) {
+                if (! is_array($responsibleIds)) {
                     $responsibleIds = [];
                 }
-                $responsibleIds = array_map('intval', $responsibleIds);
-                if (!in_array((int) $user->id, $responsibleIds, true)) {
+                $responsibleIds = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
+                if (! in_array((string) $user->id, $responsibleIds, true)) {
                     continue;
                 }
 
@@ -333,19 +334,19 @@ class DashboardController extends Controller
 
                 $taskKey = trim((string) ($task['task_uid'] ?? ''));
                 if ($taskKey === '') {
-                    $taskKey = md5($taskLabel . '|' . implode(',', $responsibleIds));
+                    $taskKey = md5($taskLabel.'|'.implode(',', $responsibleIds));
                 }
 
                 $taskTimeline[$taskKey]['task'] = $taskLabel;
                 $taskTimeline[$taskKey]['history'][] = [
-                    'period_label' => 'Week ' . $document->period->week_number . ' of ' . $document->period->year,
+                    'period_label' => 'Week '.$document->period->week_number.' of '.$document->period->year,
                     'period_range' => $document->period->date_range,
                     'progress' => $task['progress'] ?? 'Not Started',
                     'notes_progress' => $task['notes_progress'] ?? '',
                     'due_date' => $task['due_date'] ?? null,
                     'compilation_date' => $task['compilation_date'] ?? null,
-                    'is_current_period' => $currentPeriod && (int) $document->period_id === (int) $currentPeriod->id,
-                    'document_hashid' => Hashids::encode($document->id),
+                    'is_current_period' => $currentPeriod && $document->period_id === $currentPeriod->id,
+                    'document_id' => $document->id,
                 ];
             }
         }
@@ -354,7 +355,7 @@ class DashboardController extends Controller
             ->map(function ($taskData) {
                 $history = collect($taskData['history'] ?? [])->values();
                 $latest = $history->last();
-                if (!$latest) {
+                if (! $latest) {
                     return null;
                 }
 
@@ -371,9 +372,7 @@ class DashboardController extends Controller
 
         return [
             'activeTasks' => $activeTasks,
-            'currentDraftId' => $currentDraftDoc ? Hashids::encode($currentDraftDoc->id) : null,
+            'currentDraftId' => $currentDraftDoc?->id,
         ];
     }
-
-
 }

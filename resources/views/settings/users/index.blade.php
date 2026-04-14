@@ -1,4 +1,6 @@
 <x-app-layout>
+
+
     <div class="page-header">
         <div class="page-block">
             <div class="row align-items-center">
@@ -51,41 +53,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Filters -->
-                    <div class="row mb-3">
-                        <div class="col-md-3 mb-2">
-                            <select class="form-control form-control-sm" id="statusFilter">
-                                <option value="">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <select class="form-control form-control-sm" id="branchFilter">
-                                <option value="">All Branches</option>
-                                @foreach ($user->pluck('branch')->unique('id')->sortBy('name') as $branch)
-                                    @if($branch)
-                                        <option value="{{ $branch->name }}">{{ $branch->name }}</option>
-                                    @endif
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <select class="form-control form-control-sm" id="departmentFilter">
-                                <option value="">All Departments</option>
-                                @foreach ($user->pluck('department')->unique('id')->sortBy('name') as $department)
-                                    @if($department)
-                                        <option value="{{ $department->name }}">{{ $department->name }}</option>
-                                    @endif
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <button class="btn btn-sm btn-secondary w-100" onclick="resetFilters()">
-                                <i class="ti ti-rotate me-1"></i> Reset Filters
-                            </button>
-                        </div>
-                    </div>
+                 
 
                     <div class="table-responsive">
                         <table class="table table-hover table-bordered" id="usersTable">
@@ -96,7 +64,8 @@
                                     <th>Email</th>
                                     <th>Phone Number</th>
                                     <th>Department</th>
-                                    <th>Role</th>
+                                    <th>Sub-Departments</th>
+                                    <!-- <th>Role</th> -->
                                     <th class="text-center" style="width: 100px;">Status</th>
                                     <th class="text-center" style="width: 150px;">Action</th>
                                 </tr>
@@ -119,8 +88,18 @@
                                             <span class="badge bg-light text-dark">
                                                 {{ $u->department->name ?? 'N/A' }}
                                             </span>
+                                            @if(optional($u->department)->head_user_id === $u->id)
+                                                <span class="badge bg-warning text-dark ms-1">HOD</span>
+                                            @endif
                                         </td>
                                         <td>
+                                            @if($u->subDepartments->isNotEmpty())
+                                                {{ $u->subDepartments->pluck('name')->implode(', ') }}
+                                            @else
+                                                <span class="text-muted">All / Not assigned</span>
+                                            @endif
+                                        </td>
+                                        <!-- <td>
                                             @if($u->roles->count() > 0)
                                                 @foreach($u->roles as $role)
                                                     <span class="badge bg-primary mb-1">
@@ -134,7 +113,7 @@
                                                     No role
                                                 </span>
                                             @endif
-                                        </td>
+                                        </td> -->
                                         <td class="text-center">
                                             <span class="badge {{ $u->status === 'active' ? 'bg-success' : 'bg-danger' }}">
                                                 <i class="ti {{ $u->status === 'active' ? 'ti-circle-check' : 'ti-circle-x' }} me-1"></i>
@@ -143,12 +122,12 @@
                                         </td>
                                         <td class="text-center">
                                             <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{{ route('admin.show', Hashids::encode($u->id)) }}"
+                                                <a href="{{ route('admin.show', $u->id) }}"
                                                     class="btn btn-info text-white" title="View Details">
                                                     <i class="ti ti-eye"></i>
                                                 </a>
                                                 @can('users management settings')
-                                                    <a href="{{ route('admin.edit', Hashids::encode($u->id)) }}"
+                                                    <a href="{{ route('admin.edit', $u->id) }}"
                                                         class="btn btn-primary text-white" title="Edit User">
                                                         <i class="ti ti-edit"></i>
                                                     </a>
@@ -158,7 +137,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="text-center py-4">
+                                        <td colspan="10" class="text-center py-4">
                                             <i class="ti ti-users fs-1 text-muted"></i>
                                             <p class="text-muted mb-0">No users found</p>
                                         </td>
@@ -172,103 +151,5 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchInput = document.getElementById('searchInput');
-            const statusFilter = document.getElementById('statusFilter');
-            const branchFilter = document.getElementById('branchFilter');
-            const departmentFilter = document.getElementById('departmentFilter');
-            const table = document.getElementById('usersTable');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-
-            function filterTable() {
-                const searchTerm = searchInput.value.toLowerCase();
-                const statusValue = statusFilter.value.toLowerCase();
-                const branchValue = branchFilter.value.toLowerCase();
-                const departmentValue = departmentFilter.value.toLowerCase();
-
-                rows.forEach(row => {
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length === 1) return; // Skip empty state row
-
-                    const name = cells[1].textContent.toLowerCase();
-                    const email = cells[2].textContent.toLowerCase();
-                    const phone = cells[3].textContent.toLowerCase();
-                    const branch = cells[4].textContent.toLowerCase();
-                    const department = cells[5].textContent.toLowerCase();
-                    const role = cells[6].textContent.toLowerCase();
-                    const status = cells[7].textContent.toLowerCase();
-
-                    const matchesSearch = name.includes(searchTerm) ||
-                                        email.includes(searchTerm) ||
-                                        phone.includes(searchTerm);
-                    const matchesStatus = !statusValue || status.includes(statusValue);
-                    const matchesBranch = !branchValue || branch.includes(branchValue);
-                    const matchesDepartment = !departmentValue || department.includes(departmentValue);
-
-                    if (matchesSearch && matchesStatus && matchesBranch && matchesDepartment) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-
-                updateRowNumbers();
-            }
-
-            function updateRowNumbers() {
-                let visibleIndex = 1;
-                rows.forEach(row => {
-                    if (row.style.display !== 'none' && row.querySelectorAll('td').length > 1) {
-                        row.querySelector('td:first-child').textContent = visibleIndex++;
-                    }
-                });
-            }
-
-            searchInput.addEventListener('keyup', filterTable);
-            statusFilter.addEventListener('change', filterTable);
-            branchFilter.addEventListener('change', filterTable);
-            departmentFilter.addEventListener('change', filterTable);
-        });
-
-        function resetFilters() {
-            document.getElementById('searchInput').value = '';
-            document.getElementById('statusFilter').value = '';
-            document.getElementById('branchFilter').value = '';
-            document.getElementById('departmentFilter').value = '';
-
-            const event = new Event('change');
-            document.getElementById('statusFilter').dispatchEvent(event);
-        }
-
-        function reloadPage() {
-            location.reload();
-        }
-    </script>
-
-    <style>
-        .avatar {
-            width: 32px;
-            height: 32px;
-        }
-        .avatar-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .avatar-title {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .table-hover tbody tr:hover {
-            background-color: rgba(0, 123, 255, 0.05);
-        }
-    </style>
-
+    
 </x-app-layout>

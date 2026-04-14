@@ -52,28 +52,14 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Filters -->
-                    <div class="row mb-3">
-                        <div class="col-md-6 mb-2">
-                            <select class="form-control form-control-sm" id="statusFilter">
-                                <option value="">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-2">
-                            <button class="btn btn-sm btn-secondary w-100" onclick="resetFilters()">
-                                <i class="ti ti-rotate me-1"></i> Reset Filters
-                            </button>
-                        </div>
-                    </div>
-
+                   
                     <div class="table-responsive">
                         <table class="table table-hover table-bordered" id="departmentsTable">
                             <thead class="thead-light">
                                 <tr>
                                     <th class="text-center" style="width: 50px;">No.</th>
                                     <th>Department Name</th>
+                                    <th>Head of Department</th>
                                     <th class="text-center">Users</th>
                                     <th class="text-center" style="width: 100px;">Status</th>
                                     <th class="text-center" style="width: 180px;">Action</th>
@@ -86,10 +72,9 @@
                                         <td>
                                             {{ $department->name }}
                                         </td>
+                                        <td>{{ $department->head?->name ?? '-' }}</td>
                                         <td class="text-center">
-                                            
-                                                {{ $department->users_count }}
-                                           
+                                            {{ $department->users_count }}
                                         </td>
                                         <td class="text-center">
                                             <span class="badge {{ $department->status == 'active' ? 'bg-success' : 'bg-secondary' }}">
@@ -99,24 +84,23 @@
                                         </td>
                                         <td class="text-center">
                                             <div class="btn-group btn-group-sm" role="group">
-                                                <button type="button"
-                                                    class="btn btn-info text-white view-btn"
-                                                    data-name="{{ $department->name }}"
-                                                    data-status="{{ $department->status }}"
-                                                    data-users-count="{{ $department->users_count }}"
+                                                <a href="{{ route('department.show', $department->id) }}"
+                                                    class="btn btn-info text-white"
                                                     title="View Details">
                                                     <i class="ti ti-eye"></i>
-                                                </button>
+                                                </a>
                                                 @can('update other settings')
                                                     <button type="button" class="btn btn-primary edit-btn"
-                                                        data-id="{{ Hashids::encode($department->id) }}"
+                                                        data-id="{{ $department->id }}"
                                                         data-name="{{ $department->name }}"
                                                         data-status="{{ $department->status }}"
+                                                        data-parent-id="{{ $department->parent_id }}"
+                                                        data-head-user-id="{{ $department->head_user_id }}"
                                                         title="Edit Department">
                                                         <i class="ti ti-edit"></i>
                                                     </button>
                                                     <button type="button" class="btn btn-danger delete-btn"
-                                                        data-id="{{ Hashids::encode($department->id) }}"
+                                                        data-id="{{ $department->id }}"
                                                         data-name="{{ $department->name }}"
                                                         title="Delete Department">
                                                         <i class="ti ti-trash"></i>
@@ -127,7 +111,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center py-4">
+                                        <td colspan="6" class="text-center py-4">
                                             <i class="ti ti-briefcase fs-1 text-muted"></i>
                                             <p class="text-muted mb-0">No departments found</p>
                                         </td>
@@ -198,6 +182,65 @@
                                     <div class="invalid-feedback d-block">{{ $message }}</div>
                                 @enderror
                             </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="departmentType" class="form-label">
+                                    Create As <span class="text-danger">*</span>
+                                </label>
+                                <select id="departmentType" class="form-control">
+                                    <option value="department">Department</option>
+                                    <option value="sub_department">Sub-Department</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3 d-none" id="parentDepartmentWrapper">
+                                <label for="parentDepartment" class="form-label">
+                                    Parent Department <span class="text-danger">*</span>
+                                </label>
+                                <select name="parent_id"
+                                    id="parentDepartment"
+                                    class="form-control @error('parent_id') is-invalid @enderror">
+                                    <option value="">-- Select Parent Department --</option>
+                                    @foreach($parentDepartments as $parentDepartment)
+                                        <option value="{{ $parentDepartment->id }}" {{ old('parent_id') == $parentDepartment->id ? 'selected' : '' }}>
+                                            {{ $parentDepartment->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('parent_id')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-md-6 mb-3 d-none" id="planSectionNumberWrapper">
+                                <label for="planSectionNumber" class="form-label">Year plan section #</label>
+                                <input type="number" name="plan_section_number" id="planSectionNumber" min="1" max="999"
+                                    class="form-control @error('plan_section_number') is-invalid @enderror"
+                                    value="{{ old('plan_section_number') }}"
+                                    placeholder="e.g. 4 → codes 4.1, 4.2">
+                                <p class="text-muted small mb-0">For sub-departments only: matches spreadsheet section numbers.</p>
+                                @error('plan_section_number')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-md-12 mb-3">
+                                <label for="headUserId" class="form-label">Head of Department</label>
+                                <select name="head_user_id"
+                                    id="headUserId"
+                                    class="form-control @error('head_user_id') is-invalid @enderror">
+                                    <option value="">-- Select Head (Optional) --</option>
+                                    @foreach($departmentHeads as $head)
+                                        <option value="{{ $head->id }}" {{ old('head_user_id') == $head->id ? 'selected' : '' }}>
+                                            {{ $head->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('head_user_id')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+
                         </div>
 
                         <div class="d-flex justify-content-end gap-2">
@@ -215,39 +258,6 @@
                             @endcan
                         </div>
                     </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Department Modal -->
-    <div class="modal fade" id="viewDepartmentModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="ti ti-eye me-2"></i>Department Details
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="text-muted d-block mb-1">Department Name</label>
-                        <div class="fw-semibold" id="viewDepartmentName">-</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="text-muted d-block mb-1">Status</label>
-                        <span class="badge" id="viewDepartmentStatus">-</span>
-                    </div>
-                    <div>
-                        <label class="text-muted d-block mb-1">Users Count</label>
-                        <div class="fw-semibold" id="viewDepartmentUsers">0</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                        <i class="ti ti-x me-1"></i> Close
-                    </button>
                 </div>
             </div>
         </div>
@@ -321,8 +331,31 @@
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
             const formModal = new bootstrap.Modal(document.getElementById('departmentFormModal'));
-            const viewModal = new bootstrap.Modal(document.getElementById('viewDepartmentModal'));
             const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            const departmentType = document.getElementById('departmentType');
+            const parentDepartmentWrapper = document.getElementById('parentDepartmentWrapper');
+            const parentDepartment = document.getElementById('parentDepartment');
+
+            const planSectionNumberWrapper = document.getElementById('planSectionNumberWrapper');
+            const planSectionNumber = document.getElementById('planSectionNumber');
+
+            function toggleParentDepartment() {
+                const isSub = departmentType && departmentType.value === 'sub_department';
+
+                if (!parentDepartmentWrapper || !parentDepartment) return;
+
+                parentDepartmentWrapper.classList.toggle('d-none', !isSub);
+                if (planSectionNumberWrapper) {
+                    planSectionNumberWrapper.classList.toggle('d-none', !isSub);
+                }
+                if (isSub) {
+                    parentDepartment.setAttribute('required', 'required');
+                } else {
+                    parentDepartment.removeAttribute('required');
+                    parentDepartment.value = '';
+                    if (planSectionNumber) planSectionNumber.value = '';
+                }
+            }
 
             // Show form for new department
             if (newDepartmentBtn) {
@@ -342,22 +375,12 @@
                     document.getElementById('departmentId').value = id;
                     document.getElementById('departmentName').value = this.dataset.name;
                     document.getElementById('departmentStatus').value = this.dataset.status;
-
+                    document.getElementById('headUserId').value = this.dataset.headUserId || '';
+                    parentDepartment.value = this.dataset.parentId || '';
+                    departmentType.value = this.dataset.parentId ? 'sub_department' : 'department';
+                    toggleParentDepartment();
                     formTitle.innerHTML = '<i class="ti ti-edit me-2"></i>Edit Department';
                     formModal.show();
-                });
-            });
-
-            // View department
-            document.querySelectorAll('.view-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const status = this.dataset.status;
-                    const statusBadge = document.getElementById('viewDepartmentStatus');
-                    document.getElementById('viewDepartmentName').textContent = this.dataset.name || '-';
-                    document.getElementById('viewDepartmentUsers').textContent = this.dataset.usersCount || '0';
-                    statusBadge.textContent = status ? (status.charAt(0).toUpperCase() + status.slice(1)) : '-';
-                    statusBadge.className = `badge ${status === 'active' ? 'bg-success' : 'bg-secondary'}`;
-                    viewModal.show();
                 });
             });
 
@@ -382,7 +405,7 @@
                     if (cells.length === 1) return; // Skip empty state row
 
                     const name = cells[1].textContent.toLowerCase();
-                    const status = cells[3].textContent.toLowerCase();
+                    const status = cells[4].textContent.toLowerCase();
 
                     const matchesSearch = name.includes(searchTerm);
                     const matchesStatus = !statusValue || status.includes(statusValue);
@@ -411,23 +434,40 @@
                 departmentForm.action = departmentScriptData?.dataset?.storeRoute || '';
                 document.getElementById('formMethod').value = 'POST';
                 document.getElementById('departmentId').value = '';
+                document.getElementById('headUserId').value = '';
+                if (planSectionNumber) planSectionNumber.value = '';
+                if (departmentType) {
+                    departmentType.value = 'department';
+                }
+                toggleParentDepartment();
             }
 
             searchInput.addEventListener('keyup', filterTable);
-            statusFilter.addEventListener('change', filterTable);
+            if (departmentType) {
+                departmentType.addEventListener('change', toggleParentDepartment);
+            }
+            if (statusFilter) {
+                statusFilter.addEventListener('change', filterTable);
+            }
 
             // Show form if there are validation errors
             if (departmentScriptData?.dataset?.hasErrors === '1') {
+                if (parentDepartment && parentDepartment.value) {
+                    departmentType.value = 'sub_department';
+                }
+                toggleParentDepartment();
                 formModal.show();
             }
         });
 
         function resetFilters() {
             document.getElementById('searchInput').value = '';
-            document.getElementById('statusFilter').value = '';
-
-            const event = new Event('change');
-            document.getElementById('statusFilter').dispatchEvent(event);
+            const statusFilter = document.getElementById('statusFilter');
+            if (statusFilter) {
+                statusFilter.value = '';
+                const event = new Event('change');
+                statusFilter.dispatchEvent(event);
+            }
         }
     </script>
 

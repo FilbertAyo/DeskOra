@@ -1,87 +1,105 @@
 <x-app-layout>
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs border-0" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab"
-                        aria-controls="home" aria-selected="true">
-                        <i class="ti ti-edit me-1"></i> Edit Action Log
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="col-auto">
-            <a href="{{ route('action-logs.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" class="btn btn-sm btn-info text-white me-1">
-                <i class="ti ti-eye me-1"></i> View Action Log
-            </a>
-            <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-light">
-                <i class="ti ti-arrow-left me-1"></i> Back to Action Logs
-            </a>
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10"><i class="ti ti-edit me-2"></i>Edit Action Log</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('action-logs.index') }}">Action Logs</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Edit</li>
+                            </ul>
+                        </div>
+
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <a href="{{ route('action-logs.show', $document->id) }}" class="btn btn-sm btn-info text-white">
+                                <i class="ti ti-eye me-1"></i> View Action Log
+                            </a>
+                          
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
+ 
 
-    @if($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>
-            <strong>Please fix the following errors:</strong>
-            <ul class="mb-0 mt-2">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
+    @php
+        $content = is_array($document->content) ? $document->content : [];
+        $taskRows = old('content.tasks', $content['tasks'] ?? []);
+        if (! is_array($taskRows) || empty($taskRows)) {
+            $taskRows = [[
+                'task_uid' => 'task_'.uniqid(),
+                'task_no' => 1,
+                'task' => '',
+                'responsible_user_ids' => [],
+                'progress' => 'Not Started',
+                'due_date' => '',
+                'compilation_date' => '',
+                'notes_progress' => '',
+                'status_reason' => '',
+            ]];
+        }
+        $tasksForJson = [];
+        foreach ($taskRows as $i => $row) {
+            $row = is_array($row) ? $row : [];
+            $selectedIds = old("content.tasks.$i.responsible_user_ids", $row['responsible_user_ids'] ?? []);
+            if (! is_array($selectedIds)) {
+                $selectedIds = [];
+            }
+            $isAssigned = in_array((string) auth()->id(), array_map('strval', $selectedIds), true);
+            $canEditRow = $isManager || $isAssigned;
+            $tasksForJson[] = [
+                'task_uid' => (string) ($row['task_uid'] ?? ''),
+                'task' => (string) ($row['task'] ?? ''),
+                'responsible_user_ids' => array_values(array_map('strval', $selectedIds)),
+                'progress' => (string) ($row['progress'] ?? 'Not Started'),
+                'due_date' => $row['due_date'] ? (string) $row['due_date'] : '',
+                'compilation_date' => $row['compilation_date'] ? (string) $row['compilation_date'] : '',
+                'notes_progress' => (string) ($row['notes_progress'] ?? ''),
+                'status_reason' => (string) ($row['status_reason'] ?? ''),
+                'can_edit' => $canEditRow,
+            ];
+        }
+    @endphp
+
+    <script type="application/json" id="action-log-initial-tasks">{!! json_encode($tasksForJson, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) !!}</script>
 
     <div class="row">
         <div class="col-md-12">
-            <form method="POST" action="{{ route('action-logs.update', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" id="editActionLogForm">
+            <form method="POST" action="{{ route('action-logs.update', $document->id) }}" id="editActionLogForm">
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="action" id="hiddenAction" value="draft">
                 <div class="card shadow-none border">
                     <div class="card-header bg-white border-bottom">
                         <h5 class="mb-0">
-                            <i class="ti ti-clipboard me-2"></i>Edit Action Log
-                            <span class="badge bg-info ml-2">Action Log</span>
+                            Edit Action Log
                         </h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <div class="form-group">
                                     <label class="form-label">State</label>
                                     <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-info"></i>
-                                        </span>
+                                       
                                         <input type="text"
                                             class="form-control"
                                             value="{{ $document->state_name }}"
                                             disabled>
                                     </div>
-                                    <small class="form-text text-muted">Current document state</small>
-                                </div>
+                               </div>
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <div class="form-group">
                                     <label class="form-label">Created</label>
                                     <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-clock"></i>
-                                        </span>
+                                      
                                         <input type="text"
                                             class="form-control"
                                             value="{{ $document->created_at->format('M d, Y h:i A') }}"
@@ -90,26 +108,24 @@
                                 </div>
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <div class="form-group">
                                     <label for="period_id" class="form-label">
                                         Work Period <span class="text-danger">*</span>
                                     </label>
                                     <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-calendar"></i>
-                                        </span>
+                                       
                                         <select class="form-control @error('period_id') is-invalid @enderror"
                                             name="period_id"
                                             id="period_id"
                                             {{ $isManager ? '' : 'disabled' }}
-                                            required>
+                                            required disabled>
                                             <option value="">-- Select Work Period --</option>
                                             @foreach($workPeriods as $workPeriod)
-                                                <option value="{{ $workPeriod->id }}" 
+                                                <option value="{{ $workPeriod->id }}"
                                                     {{ old('period_id', $document->period_id ?? '') == $workPeriod->id ? 'selected' : '' }}>
-                                                    Week {{ $workPeriod->week_number }} of {{ $workPeriod->year }} 
-                                                    ({{ \Carbon\Carbon::parse($workPeriod->week_start_date)->format('M d') }} - 
+                                                    Week {{ $workPeriod->week_number }} of {{ $workPeriod->year }}
+                                                    ({{ \Carbon\Carbon::parse($workPeriod->week_start_date)->format('M d') }} -
                                                      {{ \Carbon\Carbon::parse($workPeriod->week_end_date)->format('M d, Y') }})
                                                 </option>
                                             @endforeach
@@ -121,170 +137,37 @@
                                     @error('period_id')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
-                                    <small class="form-text text-muted">Action log week period.</small>
-                                </div>
+                              </div>
                             </div>
-
-                            <div class="col-md-6 mb-3">
-                                <div class="form-group">
-                                    <label for="title" class="form-label">
-                                        Title
-                                    </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-type"></i>
-                                        </span>
-                                        <input type="text"
-                                            class="form-control @error('title') is-invalid @enderror"
-                                            name="title"
-                                            id="title"
-                                            placeholder="Enter action-logs title"
-                                            {{ $isManager ? '' : 'readonly' }}
-                                            value="{{ old('title', $document->title ?? '') }}">
-                                    </div>
-                                    @error('title')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-
                         </div>
 
-                        @php
-                            $content = is_array($document->content) ? $document->content : [];
-                            $taskRows = old('content.tasks', $content['tasks'] ?? []);
-                            if (!is_array($taskRows) || empty($taskRows)) {
-                                $taskRows = [[
-                                    'task_uid' => 'task_' . uniqid(),
-                                    'task_no' => 1,
-                                    'task' => '',
-                                    'responsible_user_ids' => [],
-                                    'progress' => 'Not Started',
-                                    'due_date' => '',
-                                    'compilation_date' => '',
-                                    'notes_progress' => '',
-                                ]];
-                            }
-                        @endphp
-
                         <div class="card shadow-none border mt-2">
-                            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><i class="ti ti-list-check me-2"></i>Action Log Tasks</h6>
+                            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h6 class="mb-0"><i class="ti ti-list-check me-2"></i>Action Log Tasks</h6>
+                               </div>
                                 @if($isManager)
-                                    <button type="button" class="btn btn-sm btn-outline-primary" id="addTaskRowBtn">
-                                        <i class="ti ti-plus me-1"></i> Add Task
+                                    <button type="button" class="btn btn-sm btn-primary" id="addTaskRowBtn" data-bs-toggle="modal" data-bs-target="#actionLogTaskModal">
+                                        <i class="ti ti-plus me-1"></i> Add task
                                     </button>
                                 @endif
                             </div>
                             <div class="card-body">
                                 @if(!$isManager)
                                     <div class="alert alert-info mb-3 py-2">
-                                        You can update only your assigned task fields: <strong>Progress</strong>, <strong>Due Date</strong>, <strong>Compilation Date</strong>, and <strong>Notes/Progress</strong>.
+                                        You can update only <strong>your assigned</strong> tasks. Open a task with <strong>Edit</strong> to change progress, dates, and notes.
                                     </div>
                                 @endif
-                                <div class="table-responsive">
-                                    <table class="table table-bordered table-hover align-middle">
-                                        <thead class="thead-light">
-                                            <tr>
-                                                <th style="width: 70px;">No</th>
-                                                <th>Task</th>
-                                                <th style="width: 240px;">Responsible Person</th>
-                                                <th style="width: 160px;">Progress</th>
-                                                <th style="width: 150px;">Due Date</th>
-                                                <th style="width: 170px;">Compilation Date</th>
-                                                <th>Notes/Progress</th>
-                                                @if($isManager)
-                                                    <th style="width: 60px;"></th>
-                                                @endif
-                                            </tr>
-                                        </thead>
-                                        <tbody id="taskRowsBody">
-                                            @foreach($taskRows as $i => $row)
-                                                @php
-                                                    $row = is_array($row) ? $row : [];
-                                                    $selectedIds = old("content.tasks.$i.responsible_user_ids", $row['responsible_user_ids'] ?? []);
-                                                    if (!is_array($selectedIds)) $selectedIds = [];
-                                                    $isAssigned = in_array((string) auth()->id(), array_map('strval', $selectedIds), true);
-                                                    $canEditRow = $isManager || $isAssigned;
-                                                @endphp
-                                                <tr>
-                                                    <td class="text-center align-middle js-task-row-no">{{ $i + 1 }}</td>
-                                                    <td>
-                                                        <input type="hidden" name="content[tasks][{{ $i }}][task_uid]" value="{{ old("content.tasks.$i.task_uid", $row['task_uid'] ?? ('task_' . uniqid())) }}">
-                                                        <textarea class="form-control @error("content.tasks.$i.task") is-invalid @enderror"
-                                                            name="content[tasks][{{ $i }}][task]"
-                                                            rows="2"
-                                                            {{ $isManager ? '' : 'readonly' }}
-                                                            placeholder="Task description">{{ old("content.tasks.$i.task", $row['task'] ?? '') }}</textarea>
-                                                    </td>
-                                                    <td>
-                                                        <select class="form-control"
-                                                            multiple
-                                                            name="content[tasks][{{ $i }}][responsible_user_ids][]"
-                                                            {{ $isManager ? '' : 'disabled' }}>
-                                                            @foreach(($teamUsers ?? collect()) as $teamUser)
-                                                                <option value="{{ $teamUser->id }}" {{ in_array((string) $teamUser->id, array_map('strval', $selectedIds), true) ? 'selected' : '' }}>
-                                                                    {{ $teamUser->name }}
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                        @if(!$isManager)
-                                                            @foreach($selectedIds as $selectedId)
-                                                                <input type="hidden" name="content[tasks][{{ $i }}][responsible_user_ids][]" value="{{ $selectedId }}">
-                                                            @endforeach
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        <select class="form-control" name="content[tasks][{{ $i }}][progress]" {{ $canEditRow ? '' : 'disabled' }}>
-                                                            @php $currentProgress = old("content.tasks.$i.progress", $row['progress'] ?? 'Not Started'); @endphp
-                                                            @foreach(['Not Started', 'In Progress', 'Done'] as $progressOption)
-                                                                <option value="{{ $progressOption }}" {{ $currentProgress === $progressOption ? 'selected' : '' }}>
-                                                                    {{ $progressOption }}
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                        @if(!$canEditRow)
-                                                            <input type="hidden" name="content[tasks][{{ $i }}][progress]" value="{{ $currentProgress }}">
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        <input type="date"
-                                                            class="form-control"
-                                                            name="content[tasks][{{ $i }}][due_date]"
-                                                            {{ $canEditRow ? '' : 'readonly' }}
-                                                            value="{{ old("content.tasks.$i.due_date", $row['due_date'] ?? '') }}">
-                                                    </td>
-                                                    <td>
-                                                        <input type="date"
-                                                            class="form-control"
-                                                            name="content[tasks][{{ $i }}][compilation_date]"
-                                                            {{ $canEditRow ? '' : 'readonly' }}
-                                                            value="{{ old("content.tasks.$i.compilation_date", $row['compilation_date'] ?? '') }}">
-                                                    </td>
-                                                    <td>
-                                                        <textarea class="form-control"
-                                                            rows="2"
-                                                            name="content[tasks][{{ $i }}][notes_progress]"
-                                                            {{ $canEditRow ? '' : 'readonly' }}
-                                                            placeholder="Notes and progress update">{{ old("content.tasks.$i.notes_progress", $row['notes_progress'] ?? '') }}</textarea>
-                                                    </td>
-                                                    @if($isManager)
-                                                        <td class="text-center align-middle">
-                                                            <button type="button" class="btn btn-sm btn-outline-danger remove-task-row">&times;</button>
-                                                        </td>
-                                                    @endif
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <div id="taskListDisplay" class="list-group list-group-flush border rounded"></div>
+                                <p id="taskListEmpty" class="text-muted mb-0 d-none">No tasks on this log.</p>
+                                <div id="taskRowsBody" class="d-none" aria-hidden="true"></div>
                             </div>
                         </div>
                     </div>
 
                     <div class="card-footer bg-light">
                         <div class="d-flex justify-content-between align-items-center">
-                            <a href="{{ route('action-logs.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" class="btn btn-secondary">
+                            <a href="{{ route('action-logs.show', $document->id) }}" class="btn btn-secondary">
                                 <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div class="btn-group">
@@ -304,80 +187,430 @@
         </div>
     </div>
 
+    <select id="actionLogUserOptionsSource" class="d-none" aria-hidden="true" tabindex="-1">
+        @foreach(($teamUsers ?? collect()) as $teamUser)
+            <option value="{{ $teamUser->id }}">{{ $teamUser->name }}</option>
+        @endforeach
+    </select>
+
+    <div class="modal fade" id="actionLogTaskModal" tabindex="-1" role="dialog" aria-labelledby="actionLogTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="actionLogTaskModalLabel">Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="actionLogModalTaskUid" value="">
+                    <div class="mb-3 action-log-modal-field-task">
+                        <label for="actionLogModalTask" class="form-label">What needs to be done? <span class="text-danger">*</span></label>
+                        <textarea class="form-control action-log-textarea-lg" id="actionLogModalTask" rows="6" placeholder="Describe the action clearly (who, what, expected outcome)"></textarea>
+                    </div>
+                    <div class="mb-3 action-log-modal-manager-only">
+                        <label for="actionLogModalResponsible" class="form-label">Responsible people</label>
+                        <small class="d-block text-muted mb-1">Hold Ctrl/Cmd (Windows/Mac) to select more than one.</small>
+                        <select class="form-control action-log-select-multi" id="actionLogModalResponsible" multiple size="8"></select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="actionLogModalProgress" class="form-label">Progress</label>
+                            <select class="form-control" id="actionLogModalProgress"></select>
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label for="actionLogModalDueDate" class="form-label">Due date</label>
+                            <input type="date" class="form-control" id="actionLogModalDueDate">
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label for="actionLogModalCompilationDate" class="form-label">Compilation date</label>
+                            <input type="date" class="form-control" id="actionLogModalCompilationDate">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="actionLogModalNotes" class="form-label">Notes / progress update</label>
+                        <textarea class="form-control action-log-textarea-md" id="actionLogModalNotes" rows="4" placeholder="Weekly updates, blockers, or context"></textarea>
+                    </div>
+                    <div class="mb-0 action-log-modal-manager-only">
+                        <label for="actionLogModalStatusReason" class="form-label">Cancellation reason</label>
+                        <small class="d-block text-muted mb-1">Required only if progress is <strong>Cancelled</strong>.</small>
+                        <textarea class="form-control action-log-textarea-sm" id="actionLogModalStatusReason" rows="3" placeholder="Why was this task cancelled?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="actionLogTaskModalSave">
+                        <i class="ti ti-check me-1"></i> Save task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const isManager = @json($isManager);
             const form = document.getElementById('editActionLogForm');
             const submitBtn = document.getElementById('submitBtn');
             const saveDraftBtn = document.getElementById('saveDraftBtn');
             const hiddenActionInput = document.getElementById('hiddenAction');
             const taskRowsBody = document.getElementById('taskRowsBody');
+            const taskListDisplay = document.getElementById('taskListDisplay');
+            const taskListEmpty = document.getElementById('taskListEmpty');
             const addTaskRowBtn = document.getElementById('addTaskRowBtn');
-            let taskIndex = taskRowsBody ? taskRowsBody.querySelectorAll('tr').length : 0;
+            const modalEl = document.getElementById('actionLogTaskModal');
+            const modalTitle = document.getElementById('actionLogTaskModalLabel');
+            const modalSaveBtn = document.getElementById('actionLogTaskModalSave');
+            const userOptionsSource = document.getElementById('actionLogUserOptionsSource');
+            const modalResponsible = document.getElementById('actionLogModalResponsible');
 
-            function updateTaskRowNumbers() {
-                if (!taskRowsBody) return;
-                taskRowsBody.querySelectorAll('.js-task-row-no').forEach((cell, idx) => {
-                    cell.textContent = String(idx + 1);
+            const progressOptionsManager = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
+            const progressOptionsStaff = ['Not Started', 'In Progress', 'Done'];
+
+            let tasks = [];
+            let editingIndex = null;
+
+            function genUid() {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    return 'task_' + window.crypto.randomUUID();
+                }
+                return 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+            }
+
+            function defaultTask() {
+                return {
+                    task_uid: genUid(),
+                    task: '',
+                    responsible_user_ids: [],
+                    progress: 'Not Started',
+                    due_date: '',
+                    compilation_date: '',
+                    notes_progress: '',
+                    status_reason: '',
+                    can_edit: isManager,
+                };
+            }
+
+            function loadInitialTasks() {
+                const el = document.getElementById('action-log-initial-tasks');
+                if (!el) {
+                    tasks = [defaultTask()];
+                    return;
+                }
+                try {
+                    const parsed = JSON.parse(el.textContent);
+                    tasks = Array.isArray(parsed) && parsed.length ? parsed.map(normalizeTask) : [defaultTask()];
+                } catch (e) {
+                    tasks = [defaultTask()];
+                }
+            }
+
+            function normalizeTask(t) {
+                return {
+                    task_uid: String(t.task_uid || ''),
+                    task: String(t.task || ''),
+                    responsible_user_ids: Array.isArray(t.responsible_user_ids) ? t.responsible_user_ids.map(String) : [],
+                    progress: String(t.progress || 'Not Started'),
+                    due_date: t.due_date ? String(t.due_date) : '',
+                    compilation_date: t.compilation_date ? String(t.compilation_date) : '',
+                    notes_progress: String(t.notes_progress || ''),
+                    status_reason: String(t.status_reason || ''),
+                    can_edit: t.can_edit === true,
+                };
+            }
+
+            function fillProgressSelect(selected) {
+                const sel = document.getElementById('actionLogModalProgress');
+                const opts = isManager ? progressOptionsManager : progressOptionsStaff;
+                sel.innerHTML = '';
+                if (!isManager && selected && opts.indexOf(selected) === -1) {
+                    const o = document.createElement('option');
+                    o.value = selected;
+                    o.textContent = selected + ' (current)';
+                    o.disabled = true;
+                    o.selected = true;
+                    sel.appendChild(o);
+                }
+                opts.forEach(function(label) {
+                    const o = document.createElement('option');
+                    o.value = label;
+                    o.textContent = label;
+                    if (label === selected) {
+                        o.selected = true;
+                    }
+                    sel.appendChild(o);
                 });
             }
 
-            if (taskRowsBody) {
-                const firstUserSelect = taskRowsBody.querySelector('select[name$="[responsible_user_ids][]"]');
-                window.__actionLogUserOptions = firstUserSelect ? firstUserSelect.innerHTML : '';
+            function cloneUserOptionsIntoModal(selectedIds) {
+                modalResponsible.innerHTML = userOptionsSource.innerHTML;
+                const set = new Set((selectedIds || []).map(String));
+                Array.from(modalResponsible.options).forEach(function(opt) {
+                    opt.selected = set.has(String(opt.value));
+                });
             }
 
-            if (addTaskRowBtn && taskRowsBody) {
+            function setManagerOnlyVisible(show) {
+                document.querySelectorAll('.action-log-modal-manager-only').forEach(function(el) {
+                    el.classList.toggle('d-none', !show);
+                });
+                const taskField = document.querySelector('.action-log-modal-field-task');
+                const ta = document.getElementById('actionLogModalTask');
+                const labelHtml = 'What needs to be done? <span class="text-danger">*</span>';
+                if (taskField) {
+                    const lbl = taskField.querySelector('.form-label');
+                    if (!show) {
+                        ta.readOnly = true;
+                        lbl.textContent = 'Task (read only)';
+                    } else {
+                        ta.readOnly = false;
+                        lbl.innerHTML = labelHtml;
+                    }
+                }
+            }
+
+            function clearModal() {
+                document.getElementById('actionLogModalTaskUid').value = '';
+                document.getElementById('actionLogModalTask').value = '';
+                document.getElementById('actionLogModalDueDate').value = '';
+                document.getElementById('actionLogModalCompilationDate').value = '';
+                document.getElementById('actionLogModalNotes').value = '';
+                document.getElementById('actionLogModalStatusReason').value = '';
+                fillProgressSelect('Not Started');
+                cloneUserOptionsIntoModal([]);
+            }
+
+            function readModalManager() {
+                return {
+                    task_uid: document.getElementById('actionLogModalTaskUid').value || genUid(),
+                    task: document.getElementById('actionLogModalTask').value,
+                    responsible_user_ids: Array.from(modalResponsible.selectedOptions).map(function(o) { return o.value; }),
+                    progress: document.getElementById('actionLogModalProgress').value,
+                    due_date: document.getElementById('actionLogModalDueDate').value,
+                    compilation_date: document.getElementById('actionLogModalCompilationDate').value,
+                    notes_progress: document.getElementById('actionLogModalNotes').value,
+                    status_reason: document.getElementById('actionLogModalStatusReason').value,
+                };
+            }
+
+            function readModalStaffMerge(prev) {
+                const next = Object.assign({}, prev);
+                next.progress = document.getElementById('actionLogModalProgress').value;
+                next.due_date = document.getElementById('actionLogModalDueDate').value;
+                next.compilation_date = document.getElementById('actionLogModalCompilationDate').value;
+                next.notes_progress = document.getElementById('actionLogModalNotes').value;
+                return next;
+            }
+
+            function fillModal(task) {
+                document.getElementById('actionLogModalTaskUid').value = task.task_uid || '';
+                document.getElementById('actionLogModalTask').value = task.task || '';
+                document.getElementById('actionLogModalDueDate').value = task.due_date || '';
+                document.getElementById('actionLogModalCompilationDate').value = task.compilation_date || '';
+                document.getElementById('actionLogModalNotes').value = task.notes_progress || '';
+                document.getElementById('actionLogModalStatusReason').value = task.status_reason || '';
+                fillProgressSelect(task.progress || 'Not Started');
+                cloneUserOptionsIntoModal(task.responsible_user_ids || []);
+            }
+
+            function showModal() {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            }
+
+            function hideModal() {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                }
+            }
+
+            function syncPayload() {
+                taskRowsBody.innerHTML = '';
+                tasks.forEach(function(task, i) {
+                    if (!task.task_uid) {
+                        task.task_uid = genUid();
+                    }
+                    const uid = document.createElement('input');
+                    uid.type = 'hidden';
+                    uid.name = 'content[tasks][' + i + '][task_uid]';
+                    uid.value = task.task_uid;
+                    taskRowsBody.appendChild(uid);
+
+                    const ta = document.createElement('textarea');
+                    ta.name = 'content[tasks][' + i + '][task]';
+                    ta.className = 'd-none';
+                    ta.textContent = task.task || '';
+                    taskRowsBody.appendChild(ta);
+
+                    (task.responsible_user_ids || []).forEach(function(rid) {
+                        const hi = document.createElement('input');
+                        hi.type = 'hidden';
+                        hi.name = 'content[tasks][' + i + '][responsible_user_ids][]';
+                        hi.value = rid;
+                        taskRowsBody.appendChild(hi);
+                    });
+
+                    ['progress', 'due_date', 'compilation_date', 'notes_progress', 'status_reason'].forEach(function(key) {
+                        const inp = document.createElement('input');
+                        inp.type = 'hidden';
+                        inp.name = 'content[tasks][' + i + '][' + key + ']';
+                        inp.value = task[key] != null ? String(task[key]) : '';
+                        taskRowsBody.appendChild(inp);
+                    });
+                });
+            }
+
+            function taskPreviewText(task) {
+                const t = (task.task || '').trim();
+                if (!t) {
+                    return '(No description yet)';
+                }
+                return t.length > 140 ? t.slice(0, 137) + '…' : t;
+            }
+
+            function renderTaskList() {
+                taskListDisplay.innerHTML = '';
+                if (tasks.length === 0) {
+                    taskListEmpty.classList.remove('d-none');
+                    syncPayload();
+                    return;
+                }
+                taskListEmpty.classList.add('d-none');
+                tasks.forEach(function(task, index) {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item list-group-item-action flex-column align-items-stretch py-3';
+                    const header = document.createElement('div');
+                    header.className = 'd-flex w-100 justify-content-between align-items-start gap-2';
+                    const left = document.createElement('div');
+                    left.className = 'flex-grow-1 min-w-0';
+                    const title = document.createElement('div');
+                    title.className = 'font-weight-bold text-primary mb-1';
+                    title.textContent = 'Task ' + (index + 1);
+                    const preview = document.createElement('div');
+                    preview.className = 'text-muted small text-break';
+                    preview.textContent = taskPreviewText(task);
+                    const meta = document.createElement('div');
+                    meta.className = 'mt-2';
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-secondary';
+                    badge.textContent = task.progress || 'Not Started';
+                    meta.appendChild(badge);
+                    if (!task.can_edit) {
+                        const lock = document.createElement('span');
+                        lock.className = 'badge bg-light text-dark border ml-1';
+                        lock.textContent = 'View only';
+                        meta.appendChild(lock);
+                    }
+                    left.appendChild(title);
+                    left.appendChild(preview);
+                    left.appendChild(meta);
+                    const actions = document.createElement('div');
+                    actions.className = 'btn-group btn-group-sm flex-shrink-0';
+                    if (task.can_edit) {
+                        const editBtn = document.createElement('button');
+                        editBtn.type = 'button';
+                        editBtn.className = 'btn btn-outline-primary js-edit-task';
+                        editBtn.setAttribute('data-index', String(index));
+                        editBtn.innerHTML = '<i class="ti ti-edit"></i> Edit';
+                        actions.appendChild(editBtn);
+                    }
+                    if (isManager) {
+                        const delBtn = document.createElement('button');
+                        delBtn.type = 'button';
+                        delBtn.className = 'btn btn-outline-danger js-remove-task';
+                        delBtn.setAttribute('data-index', String(index));
+                        delBtn.innerHTML = '<i class="ti ti-trash"></i>';
+                        actions.appendChild(delBtn);
+                    }
+                    header.appendChild(left);
+                    header.appendChild(actions);
+                    item.appendChild(header);
+                    taskListDisplay.appendChild(item);
+                });
+                syncPayload();
+            }
+
+            modalEl.addEventListener('show.bs.modal', function(ev) {
+                const trigger = ev.relatedTarget;
+                if (trigger && trigger.id === 'addTaskRowBtn') {
+                    editingIndex = null;
+                    modalTitle.textContent = 'Add task';
+                    setManagerOnlyVisible(true);
+                    clearModal();
+                }
+            });
+
+            if (addTaskRowBtn) {
                 addTaskRowBtn.addEventListener('click', function() {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="text-center align-middle js-task-row-no"></td>
-                        <td>
-                            <input type="hidden" name="content[tasks][${taskIndex}][task_uid]" value="task_${Date.now()}_${taskIndex}">
-                            <textarea class="form-control" name="content[tasks][${taskIndex}][task]" rows="2" placeholder="Task description"></textarea>
-                        </td>
-                        <td>
-                            <select class="form-control" multiple name="content[tasks][${taskIndex}][responsible_user_ids][]">
-                                ${(window.__actionLogUserOptions || '')}
-                            </select>
-                        </td>
-                        <td>
-                            <select class="form-control" name="content[tasks][${taskIndex}][progress]">
-                                <option value="Not Started">Not Started</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Done">Done</option>
-                            </select>
-                        </td>
-                        <td><input type="date" class="form-control" name="content[tasks][${taskIndex}][due_date]"></td>
-                        <td><input type="date" class="form-control" name="content[tasks][${taskIndex}][compilation_date]"></td>
-                        <td><textarea class="form-control" rows="2" name="content[tasks][${taskIndex}][notes_progress]" placeholder="Notes and progress update"></textarea></td>
-                        <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-task-row">&times;</button></td>
-                    `;
-                    taskRowsBody.appendChild(row);
-                    taskIndex++;
-                    updateTaskRowNumbers();
+                    editingIndex = null;
+                    modalTitle.textContent = 'Add task';
+                    setManagerOnlyVisible(true);
+                    clearModal();
                 });
             }
 
-            if (taskRowsBody) {
-                taskRowsBody.addEventListener('click', function(event) {
-                    const removeBtn = event.target.closest('.remove-task-row');
-                    if (!removeBtn) return;
-                    const rows = taskRowsBody.querySelectorAll('tr');
-                    if (rows.length <= 1) return;
-                    removeBtn.closest('tr')?.remove();
-                    updateTaskRowNumbers();
-                });
-            }
+            taskListDisplay.addEventListener('click', function(ev) {
+                const editBtn = ev.target.closest('.js-edit-task');
+                const delBtn = ev.target.closest('.js-remove-task');
+                if (editBtn) {
+                    const idx = parseInt(editBtn.getAttribute('data-index'), 10);
+                    if (Number.isNaN(idx) || !tasks[idx]) {
+                        return;
+                    }
+                    editingIndex = idx;
+                    modalTitle.textContent = 'Edit task ' + (idx + 1);
+                    const staffEditing = !isManager && tasks[idx].can_edit;
+                    setManagerOnlyVisible(!staffEditing);
+                    fillModal(tasks[idx]);
+                    showModal();
+                    return;
+                }
+                if (delBtn) {
+                    const idx = parseInt(delBtn.getAttribute('data-index'), 10);
+                    if (Number.isNaN(idx)) {
+                        return;
+                    }
+                    if (tasks.length <= 1) {
+                        alert('You need at least one task on the action log.');
+                        return;
+                    }
+                    if (!confirm('Remove this task from the list?')) {
+                        return;
+                    }
+                    tasks.splice(idx, 1);
+                    renderTaskList();
+                }
+            });
 
-            updateTaskRowNumbers();
-            
-            // Ensure action is set when buttons are clicked
+            modalSaveBtn.addEventListener('click', function() {
+                if (editingIndex === null) {
+                    if (!isManager) {
+                        return;
+                    }
+                    const t = normalizeTask(readModalManager());
+                    t.can_edit = true;
+                    tasks.push(t);
+                } else {
+                    const prev = tasks[editingIndex];
+                    if (isManager) {
+                        const t = normalizeTask(readModalManager());
+                        t.can_edit = prev.can_edit;
+                        tasks[editingIndex] = t;
+                    } else {
+                        tasks[editingIndex] = normalizeTask(readModalStaffMerge(prev));
+                    }
+                }
+                renderTaskList();
+                hideModal();
+            });
+
+            loadInitialTasks();
+            renderTaskList();
+
             if (saveDraftBtn && hiddenActionInput) {
                 saveDraftBtn.addEventListener('click', function() {
                     hiddenActionInput.value = 'draft';
                 });
             }
-            
             if (submitBtn && hiddenActionInput) {
                 submitBtn.addEventListener('click', function() {
                     hiddenActionInput.value = 'submit';
@@ -385,23 +618,19 @@
             }
 
             form.addEventListener('submit', function(e) {
+                syncPayload();
                 const clickedButton = e.submitter;
-                const action = clickedButton?.value || hiddenActionInput?.value || 'draft';
-                
-                // Ensure the hidden action field is set to the correct value
+                const action = clickedButton && clickedButton.value ? clickedButton.value : (hiddenActionInput ? hiddenActionInput.value : 'draft');
                 if (hiddenActionInput) {
                     hiddenActionInput.value = action;
                 }
-                
                 if (action === 'submit' && submitBtn) {
-                    if (!confirm('Are you sure you want to submit this action log? Once submitted, it cannot be edited.')) {
+                    if (!confirm('Are you sure you want to submit this action log?')) {
                         e.preventDefault();
                         return false;
                     }
-                    if (submitBtn) {
-                        submitBtn.disabled = true;
-                        submitBtn.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Submitting...';
-                    }
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Submitting...';
                 } else {
                     if (saveDraftBtn) {
                         saveDraftBtn.disabled = true;
@@ -413,13 +642,25 @@
     </script>
 
     <style>
-        .spinning {
-            animation: spin 1s linear infinite;
-        }
+        .spinning { animation: spin 1s linear infinite; }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .action-log-textarea-lg {
+            min-height: 9rem;
+            font-size: 1rem;
+            line-height: 1.55;
+        }
+        .action-log-textarea-md {
+            min-height: 5.5rem;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+        .action-log-textarea-sm {
+            min-height: 3.75rem;
+            font-size: 0.95rem;
+        }
+        .action-log-select-multi { font-size: 0.95rem; }
     </style>
 </x-app-layout>
-

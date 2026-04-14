@@ -2,32 +2,54 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Carbon\Carbon;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class WorkPeriod extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUlids, LogsActivity, SoftDeletes;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('work_periods')
+            ->logOnly([
+                'year',
+                'week_number',
+                'week_start_date',
+                'week_end_date',
+                'plan_deadline',
+                'report_deadline',
+                'status',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     /**
      * Status Constants
      */
     public const STATUS_OPEN = 'open';
+
     public const STATUS_CLOSED = 'closed';
+
     public const STATUS_ARCHIVED = 'archived';
 
     /**
      * IMPORTANT: Submission Logic
-     * 
+     *
      * During the CURRENT week:
      * - Plan deadline (Friday): Submit plan FOR the NEXT week
      * - Report deadline (Saturday): Submit report FOR the CURRENT week
-     * 
+     *
      * Example:
-     * - Week 1 (Jan 1-7): 
+     * - Week 1 (Jan 1-7):
      *   - Plan for Week 2 due Friday Jan 5
      *   - Report for Week 1 due Saturday Jan 6
      * - Week 2 (Jan 8-14):
@@ -72,8 +94,6 @@ class WorkPeriod extends Model
 
     /**
      * Relationship: WorkPeriod has many Documents
-     *
-     * @return HasMany
      */
     public function documents(): HasMany
     {
@@ -82,8 +102,6 @@ class WorkPeriod extends Model
 
     /**
      * Get weekly plans for this period
-     *
-     * @return HasMany
      */
     public function weeklyPlans(): HasMany
     {
@@ -92,8 +110,6 @@ class WorkPeriod extends Model
 
     /**
      * Get weekly reports for this period
-     *
-     * @return HasMany
      */
     public function weeklyReports(): HasMany
     {
@@ -102,8 +118,6 @@ class WorkPeriod extends Model
 
     /**
      * Get monthly reports for this period
-     *
-     * @return HasMany
      */
     public function monthlyReports(): HasMany
     {
@@ -113,12 +127,13 @@ class WorkPeriod extends Model
     /**
      * Scope: Get current open period
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeCurrent($query)
     {
         $today = Carbon::today();
+
         return $query->where('status', self::STATUS_OPEN)
             ->where('week_start_date', '<=', $today)
             ->where('week_end_date', '>=', $today)
@@ -128,12 +143,13 @@ class WorkPeriod extends Model
     /**
      * Scope: Get upcoming periods
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeUpcoming($query)
     {
         $today = Carbon::today();
+
         return $query->where('status', self::STATUS_OPEN)
             ->where('week_start_date', '>', $today)
             ->orderBy('week_start_date', 'asc');
@@ -142,12 +158,13 @@ class WorkPeriod extends Model
     /**
      * Scope: Get past periods
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopePast($query)
     {
         $today = Carbon::today();
+
         return $query->where('week_end_date', '<', $today)
             ->orderBy('week_end_date', 'desc');
     }
@@ -155,19 +172,18 @@ class WorkPeriod extends Model
     /**
      * Scope: Get periods by year
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param int $year
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeByYear($query, int $year)
     {
-        return $query->where('year', $year)->orderBy('week_number', 'asc');
+        return $query->where('year', $year);
     }
 
     /**
      * Scope: Get open periods
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeOpen($query)
@@ -178,7 +194,7 @@ class WorkPeriod extends Model
     /**
      * Scope: Get closed periods
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeClosed($query)
@@ -188,8 +204,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if period is open
-     *
-     * @return bool
      */
     public function isOpen(): bool
     {
@@ -198,8 +212,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if period is closed
-     *
-     * @return bool
      */
     public function isClosed(): bool
     {
@@ -208,8 +220,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if period is archived
-     *
-     * @return bool
      */
     public function isArchived(): bool
     {
@@ -218,8 +228,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if plan deadline is today
-     *
-     * @return bool
      */
     public function isPlanDeadlineToday(): bool
     {
@@ -228,8 +236,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if report deadline is today
-     *
-     * @return bool
      */
     public function isReportDeadlineToday(): bool
     {
@@ -238,8 +244,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if plan deadline has passed
-     *
-     * @return bool
      */
     public function isPlanDeadlinePassed(): bool
     {
@@ -248,8 +252,6 @@ class WorkPeriod extends Model
 
     /**
      * Check if report deadline has passed
-     *
-     * @return bool
      */
     public function isReportDeadlinePassed(): bool
     {
@@ -258,42 +260,36 @@ class WorkPeriod extends Model
 
     /**
      * Get days until plan deadline
-     *
-     * @return int
      */
     public function getDaysUntilPlanDeadline(): int
     {
         $deadline = Carbon::parse($this->plan_deadline);
         $today = Carbon::today();
-        
+
         if ($deadline->isPast()) {
             return 0;
         }
-        
+
         return $today->diffInDays($deadline, false);
     }
 
     /**
      * Get days until report deadline
-     *
-     * @return int
      */
     public function getDaysUntilReportDeadline(): int
     {
         $deadline = Carbon::parse($this->report_deadline);
         $today = Carbon::today();
-        
+
         if ($deadline->isPast()) {
             return 0;
         }
-        
+
         return $today->diffInDays($deadline, false);
     }
 
     /**
      * Get period display name
-     *
-     * @return string
      */
     public function getDisplayNameAttribute(): string
     {
@@ -302,20 +298,17 @@ class WorkPeriod extends Model
 
     /**
      * Get period date range display
-     *
-     * @return string
      */
     public function getDateRangeAttribute(): string
     {
         $start = Carbon::parse($this->week_start_date)->format('M d');
         $end = Carbon::parse($this->week_end_date)->format('M d, Y');
+
         return "{$start} - {$end}";
     }
 
     /**
      * Close the period
-     *
-     * @return bool
      */
     public function close(): bool
     {
@@ -324,8 +317,6 @@ class WorkPeriod extends Model
 
     /**
      * Archive the period
-     *
-     * @return bool
      */
     public function archive(): bool
     {
@@ -334,8 +325,6 @@ class WorkPeriod extends Model
 
     /**
      * Get current period (static helper)
-     *
-     * @return WorkPeriod|null
      */
     public static function getCurrent(): ?WorkPeriod
     {
@@ -345,15 +334,14 @@ class WorkPeriod extends Model
     /**
      * Get period by date
      *
-     * @param Carbon|string $date
-     * @return WorkPeriod|null
+     * @param  Carbon|string  $date
      */
     public static function getPeriodByDate($date): ?WorkPeriod
     {
         if (is_string($date)) {
             $date = Carbon::parse($date);
         }
-        
+
         return self::where('week_start_date', '<=', $date)
             ->where('week_end_date', '>=', $date)
             ->first();
@@ -362,8 +350,6 @@ class WorkPeriod extends Model
     /**
      * Get next period (for plan submission)
      * Plans are submitted FOR the next week, during the current week
-     *
-     * @return WorkPeriod|null
      */
     public function getNextPeriod(): ?WorkPeriod
     {
@@ -379,6 +365,7 @@ class WorkPeriod extends Model
 
         // If next week is in the next year (Week 1 of next year)
         $nextYear = $this->year + 1;
+
         return self::where('year', $nextYear)
             ->where('week_number', 1)
             ->first();
@@ -387,8 +374,6 @@ class WorkPeriod extends Model
     /**
      * Get previous period (for report submission context)
      * Reports are submitted FOR the current week, during the current week
-     *
-     * @return WorkPeriod|null
      */
     public function getPreviousPeriod(): ?WorkPeriod
     {
@@ -402,6 +387,7 @@ class WorkPeriod extends Model
 
         // If previous week is in the previous year (last week of previous year)
         $prevYear = $this->year - 1;
+
         return self::where('year', $prevYear)
             ->orderBy('week_number', 'desc')
             ->first();
@@ -411,16 +397,14 @@ class WorkPeriod extends Model
      * Get period for plan submission
      * Plans are created FOR the next week, but submitted during current week
      * This returns the period that the plan is FOR (next week)
-     *
-     * @return WorkPeriod|null
      */
     public static function getPeriodForPlanSubmission(): ?WorkPeriod
     {
         $current = self::getCurrent();
-        if (!$current) {
+        if (! $current) {
             return null;
         }
-        
+
         return $current->getNextPeriod();
     }
 
@@ -428,8 +412,6 @@ class WorkPeriod extends Model
      * Get period for report submission
      * Reports are created FOR the current week, submitted during current week
      * This returns the period that the report is FOR (current week)
-     *
-     * @return WorkPeriod|null
      */
     public static function getPeriodForReportSubmission(): ?WorkPeriod
     {
@@ -437,69 +419,60 @@ class WorkPeriod extends Model
     }
 
     /**
-     * Check if plan deadline is for submitting plan FOR next week
-     * Plan deadline is Friday of current week, to submit plan for next week
-     *
-     * @return bool
+     * Whether an open plan for the next work period can still be submitted (next period's plan_deadline not passed).
      */
     public function canSubmitPlanForNextWeek(): bool
     {
-        if (!$this->isOpen()) {
+        if (! $this->isOpen()) {
             return false;
         }
 
-        // Check if plan deadline hasn't passed
-        if ($this->isPlanDeadlinePassed()) {
+        $next = $this->getNextPeriod();
+        if (! $next || ! $next->isOpen()) {
             return false;
         }
 
-        // Check if next period exists
-        return $this->getNextPeriod() !== null;
+        // Plan for the next week is due on that period's plan_deadline (Saturday before that week).
+        return ! $next->isPlanDeadlinePassed();
     }
 
     /**
      * Check if report deadline is for submitting report FOR this week
      * Report deadline is Saturday of current week, to submit report for current week
-     *
-     * @return bool
      */
     public function canSubmitReportForThisWeek(): bool
     {
-        if (!$this->isOpen()) {
+        if (! $this->isOpen()) {
             return false;
         }
 
         // Check if report deadline hasn't passed
-        return !$this->isReportDeadlinePassed();
+        return ! $this->isReportDeadlinePassed();
     }
 
     /**
      * Check if plan deadline is approaching (within 2 days)
-     *
-     * @return bool
      */
     public function isPlanDeadlineApproaching(): bool
     {
         $daysUntil = $this->getDaysUntilPlanDeadline();
+
         return $daysUntil > 0 && $daysUntil <= 2;
     }
 
     /**
      * Check if report deadline is approaching (within 2 days)
-     *
-     * @return bool
      */
     public function isReportDeadlineApproaching(): bool
     {
         $daysUntil = $this->getDaysUntilReportDeadline();
+
         return $daysUntil > 0 && $daysUntil <= 2;
     }
 
     /**
      * Get deadline status for plan
      * Returns: 'overdue', 'today', 'approaching', 'upcoming', 'passed'
-     *
-     * @return string
      */
     public function getPlanDeadlineStatus(): string
     {
@@ -526,8 +499,6 @@ class WorkPeriod extends Model
     /**
      * Get deadline status for report
      * Returns: 'overdue', 'today', 'approaching', 'upcoming', 'passed'
-     *
-     * @return string
      */
     public function getReportDeadlineStatus(): string
     {
@@ -553,12 +524,10 @@ class WorkPeriod extends Model
 
     /**
      * Get badge color class for plan deadline status
-     *
-     * @return string
      */
     public function getPlanDeadlineBadgeClass(): string
     {
-        return match($this->getPlanDeadlineStatus()) {
+        return match ($this->getPlanDeadlineStatus()) {
             'overdue' => 'badge-danger',
             'today' => 'badge-warning',
             'approaching' => 'badge-warning',
@@ -569,12 +538,10 @@ class WorkPeriod extends Model
 
     /**
      * Get badge color class for report deadline status
-     *
-     * @return string
      */
     public function getReportDeadlineBadgeClass(): string
     {
-        return match($this->getReportDeadlineStatus()) {
+        return match ($this->getReportDeadlineStatus()) {
             'overdue' => 'badge-danger',
             'today' => 'badge-warning',
             'approaching' => 'badge-warning',
@@ -586,15 +553,14 @@ class WorkPeriod extends Model
     /**
      * Get human-readable deadline status text
      *
-     * @param string $type 'plan' or 'report'
-     * @return string
+     * @param  string  $type  'plan' or 'report'
      */
     public function getDeadlineStatusText(string $type = 'plan'): string
     {
         $status = $type === 'plan' ? $this->getPlanDeadlineStatus() : $this->getReportDeadlineStatus();
         $daysUntil = $type === 'plan' ? $this->getDaysUntilPlanDeadline() : $this->getDaysUntilReportDeadline();
 
-        return match($status) {
+        return match ($status) {
             'overdue' => 'Overdue',
             'today' => 'Due Today',
             'approaching' => "Due in {$daysUntil} day(s)",

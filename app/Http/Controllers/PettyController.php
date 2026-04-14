@@ -9,54 +9,49 @@ use App\Mail\RejectMail;
 use App\Mail\ResubmitMail;
 use App\Mail\SuccessPayment;
 use App\Models\ApprovalLog;
+use App\Models\Department;
 use App\Models\Deposit;
 use App\Models\Petty;
 use App\Models\PettyAttachment;
-use App\Models\PettyList;
-use App\Models\StartPoint;
 use App\Models\Stop;
-use App\Models\TransMode;
 use App\Models\Trip;
 use App\Models\User;
-use Illuminate\Support\Str;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
-use NumberToWords\NumberToWords;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Vinkla\Hashids\Facades\Hashids;
-use Illuminate\Support\Facades\Auth;
-use App\Services\NotificationService;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use NumberToWords\NumberToWords;
 
 class PettyController extends Controller
 {
     /**
-     * Helper: Encode an integer ID using Hashids
-     */
-    private function encodeHashId(int $id): string
-    {
-        return Hashids::encode($id);
-    }
-
-    /**
-     * Helper: Build common petty mail arguments [requesterName, reason, encodedId]
+     * Helper: Build common petty mail arguments [requesterName, reason, publicId]
      */
     private function buildPettyMailArgs(Petty $petty): array
     {
         $requester = User::find($petty->user_id);
         $name = $requester?->name ?? 'User';
         $reason = $petty->request_for;
-        $encodedId = $this->encodeHashId($petty->id);
-        return [$name, $reason, $encodedId];
+        $publicId = (string) $petty->id;
+
+        return [$name, $reason, $publicId];
     }
 
     /**
      * Helper: Get emails of users in a department who have a specific permission
      */
-    private function collectDepartmentEmails(string $permission, int $departmentId): array
+    private function collectDepartmentEmails(string $permission, ?string $departmentId): array
     {
+        $scopeIds = $this->resolveDepartmentScopeIds($departmentId);
+        if ($scopeIds === []) {
+            return [];
+        }
+
         return User::permission($permission)
-            ->where('department_id', $departmentId)
+            ->whereIn('department_id', $scopeIds)
             ->pluck('email')
             ->filter()
             ->unique()
@@ -66,10 +61,15 @@ class PettyController extends Controller
     /**
      * Helper: Notify approvers by permission within a department via email and/or SMS based on their preferences
      */
-    private function notifyApprovers(string $permission, int $departmentId, object $mailable, string $smsMessage): void
+    private function notifyApprovers(string $permission, ?string $departmentId, object $mailable, string $smsMessage): void
     {
+        $scopeIds = $this->resolveDepartmentScopeIds($departmentId);
+        if ($scopeIds === []) {
+            return;
+        }
+
         $users = User::permission($permission)
-            ->where('department_id', $departmentId)
+            ->whereIn('department_id', $scopeIds)
             ->get(['id', 'email', 'phone', 'notification_channel']);
 
         if ($users->isEmpty()) {
@@ -81,10 +81,10 @@ class PettyController extends Controller
 
         foreach ($users as $user) {
             $channel = $user->notification_channel ?: 'sms';
-            if (in_array($channel, ['email', 'both']) && !empty($user->email)) {
+            if (in_array($channel, ['email', 'both']) && ! empty($user->email)) {
                 $emails[] = $user->email;
             }
-            if (in_array($channel, ['sms', 'both']) && !empty($user->phone)) {
+            if (in_array($channel, ['sms', 'both']) && ! empty($user->phone)) {
                 try {
                     $notifier->sendSms($user->phone, $smsMessage);
                 } catch (\Throwable $e) {
@@ -94,7 +94,7 @@ class PettyController extends Controller
         }
 
         $emails = array_values(array_unique(array_filter($emails)));
-        if (!empty($emails)) {
+        if (! empty($emails)) {
             $this->trySendMail($emails, $mailable);
         }
     }
@@ -109,6 +109,7 @@ class PettyController extends Controller
         }
         try {
             Mail::to($recipients)->send($mailable);
+
             return true;
         } catch (\Throwable $e) {
             Log::error('PettyController: Failed to send email', [
@@ -116,6 +117,7 @@ class PettyController extends Controller
                 'mailable' => get_class($mailable),
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -126,8 +128,9 @@ class PettyController extends Controller
     private function generateUniquePettyCode()
     {
         do {
-            $code = strtoupper(Str::random(2)) . rand(100, 999);
+            $code = strtoupper(Str::random(2)).rand(100, 999);
         } while (Petty::where('code', $code)->exists());
+
         return $code;
     }
 
@@ -140,10 +143,11 @@ class PettyController extends Controller
         foreach ($attachments as $attachment) {
             $rawProducts = $attachment->product_name ?? '';
             $products = collect(explode(',', $rawProducts))
-                ->map(fn($item) => trim($item))
+                ->map(fn ($item) => trim($item))
                 ->filter()
                 ->map(function ($item) {
                     $parts = explode('-', $item, 2);
+
                     return [
                         'name' => trim($parts[0] ?? ''),
                         'qty' => trim($parts[1] ?? ''),
@@ -152,12 +156,13 @@ class PettyController extends Controller
                 ->toArray();
 
             // Return as object to maintain consistency with blade template expectations
-            $parsed[] = (object)[
+            $parsed[] = (object) [
                 'name' => $attachment->name,
                 'products' => $products ?: [['name' => '', 'qty' => '']],
-                'attachment' => $attachment->attachment ?? null
+                'attachment' => $attachment->attachment ?? null,
             ];
         }
+
         return $parsed;
     }
 
@@ -208,18 +213,18 @@ class PettyController extends Controller
         foreach ($attachments as $index => $attachment) {
             $productLines = [];
             foreach ($attachment['products'] as $product) {
-                $productLines[] = $product['name'] . ' - ' . $product['qty'];
+                $productLines[] = $product['name'].' - '.$product['qty'];
             }
 
             $filePath = null;
 
             // Check if new file uploaded
-            if (!empty($attachment['file']) && is_object($attachment['file'])) {
+            if (! empty($attachment['file']) && is_object($attachment['file'])) {
                 $filePath = $attachment['file']->store('attachments', 'public');
-                $filePath = 'storage/' . $filePath;
+                $filePath = 'storage/'.$filePath;
             }
             // Preserve existing file if provided in hidden field (edit mode)
-            elseif (isset($attachment['existing_file']) && !empty($attachment['existing_file'])) {
+            elseif (isset($attachment['existing_file']) && ! empty($attachment['existing_file'])) {
                 $filePath = $attachment['existing_file'];
             }
 
@@ -278,8 +283,8 @@ class PettyController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'user_id' => 'required|integer',
-            'department_id' => 'required|integer',
+            'user_id' => ['required', 'string', 'ulid', 'exists:users,id'],
+            'department_id' => ['required', 'string', 'ulid', 'exists:departments,id'],
             'request_for' => 'required|string|in:Sales Delivery,Transport,Office Supplies',
             'amount' => 'required|numeric|min:0',
             'reason' => 'required|string|max:1000',
@@ -322,22 +327,19 @@ class PettyController extends Controller
     // OTHER EXISTING METHODS (UNCHANGED)
     // =============================================================================
 
-    public function show($hashid)
+    public function show(Petty $petty)
     {
-        $id = Hashids::decode($hashid);
+        $request = $petty->load(['attachments', 'lists', 'trips.startPoint', 'trips.stops', 'transMode', 'user', 'department']);
+        $approval_logs = ApprovalLog::where('petty_id', $petty->id)->get();
 
-        $request = Petty::with(['attachments', 'lists', 'trips.startPoint', 'trips.stops', 'transMode', 'user', 'department'])
-            ->findOrFail($id[0]);
-        $approval_logs = ApprovalLog::where('petty_id', $id[0])->get();
-
-        $numberToWords = new NumberToWords();
+        $numberToWords = new NumberToWords;
         $numberTransformer = $numberToWords->getNumberTransformer('en');
         $amountWords = $numberTransformer->toWords($request->amount);
         $amountWords = ucwords($amountWords);
-        $amountInWords = 'TZS ' . $amountWords;
+        $amountInWords = 'TZS '.$amountWords;
 
-        $verifiedBy = ApprovalLog::where('petty_id', $id[0])->where('action', 'approved')->first();
-        $approvedBy = ApprovalLog::where('petty_id', $id[0])->where('action', 'approved')->skip(1)->take(1)->first();
+        $verifiedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->first();
+        $approvedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->skip(1)->take(1)->first();
         $gm = User::where('email', 'gm@marstanzania.com')->first();
 
         return view('pettycash.view', compact('request', 'amountInWords', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
@@ -345,8 +347,11 @@ class PettyController extends Controller
 
     public function requests_list()
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $scopeIds = $user->departmentScopeIds();
         $requests = Petty::orderBy('created_at', 'desc')
-            ->where('department_id', Auth::user()->department_id)
+            ->whereIn('department_id', $scopeIds)
             ->get();
 
         return view('pettycash.approval.index', compact('requests'));
@@ -354,8 +359,11 @@ class PettyController extends Controller
 
     public function requestsCashier()
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $scopeIds = $user->departmentScopeIds();
         $requests = Petty::orderBy('created_at', 'desc')
-            ->where('department_id', Auth::user()->department_id)
+            ->whereIn('department_id', $scopeIds)
             ->whereIn('status', ['approved', 'paid'])
             ->get();
 
@@ -369,38 +377,35 @@ class PettyController extends Controller
         return view('pettycash.approval.index', compact('requests'));
     }
 
-    public function request_show($hashid)
+    public function request_show(Petty $petty)
     {
-        $id = Hashids::decode($hashid);
-
-        $request = Petty::with(['attachments', 'lists', 'trips.startPoint', 'trips.stops', 'transMode', 'user', 'department'])
-            ->findOrFail($id[0]);
-        $latest = ApprovalLog::where('petty_id', $id[0])->where('user_id', Auth::user()->id)->latest()->first();
-        $approval_logs = ApprovalLog::where('petty_id', $id[0])->get();
+        $request = $petty->load(['attachments', 'lists', 'trips.startPoint', 'trips.stops', 'transMode', 'user', 'department']);
+        $latest = ApprovalLog::where('petty_id', $petty->id)->where('user_id', Auth::user()->id)->latest()->first();
+        $approval_logs = ApprovalLog::where('petty_id', $petty->id)->get();
         $approval = optional($latest)->action;
 
-        $verifiedBy = ApprovalLog::where('petty_id', $id[0])->where('action', 'approved')->first();
-        $approvedBy = ApprovalLog::where('petty_id', $id[0])->where('action', 'approved')->skip(1)->take(1)->first();
+        $verifiedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->first();
+        $approvedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->skip(1)->take(1)->first();
         $gm = User::where('email', 'gm@marstanzania.com')->first();
 
-        $numberToWords = new NumberToWords();
+        $numberToWords = new NumberToWords;
         $numberTransformer = $numberToWords->getNumberTransformer('en');
         $amountWords = $numberTransformer->toWords($request->amount);
         $amountWords = ucwords($amountWords);
-        $amountInWords = 'TZS ' . $amountWords;
+        $amountInWords = 'TZS '.$amountWords;
 
         return view('pettycash.approval.details', compact('request', 'amountInWords', 'approval', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
     }
 
-    public function f_approve($id)
+    public function f_approve(Petty $petty)
     {
         ApprovalLog::create([
-            'petty_id' => $id,
+            'petty_id' => $petty->id,
             'user_id' => Auth::user()->id,
             'action' => 'approved',
         ]);
 
-        $request = Petty::findOrFail($id);
+        $request = $petty;
         $request->status = 'processing';
         $request->save();
 
@@ -411,15 +416,15 @@ class PettyController extends Controller
         return redirect()->back()->with('success', 'Request approved and status updated');
     }
 
-    public function l_approve($id)
+    public function l_approve(Petty $petty)
     {
         ApprovalLog::create([
-            'petty_id' => $id,
+            'petty_id' => $petty->id,
             'user_id' => Auth::user()->id,
             'action' => 'approved',
         ]);
 
-        $request = Petty::findOrFail($id);
+        $request = $petty;
         $request->status = 'approved';
         $request->save();
 
@@ -430,12 +435,12 @@ class PettyController extends Controller
         return redirect()->back()->with('success', 'Request approved and status updated');
     }
 
-    public function c_approve($id)
+    public function c_approve(Petty $petty)
     {
-        $request = Petty::findOrFail($id);
+        $request = $petty;
 
         // Check if already paid
-        $alreadyPaid = ApprovalLog::where('petty_id', $id)
+        $alreadyPaid = ApprovalLog::where('petty_id', $petty->id)
             ->where('action', 'paid')
             ->exists();
 
@@ -445,7 +450,7 @@ class PettyController extends Controller
 
         $latestDeposit = Deposit::latest()->first();
 
-        if (!$latestDeposit) {
+        if (! $latestDeposit) {
             return redirect()->back()->with('error', 'No deposit available.');
         }
 
@@ -454,7 +459,7 @@ class PettyController extends Controller
         $latestDeposit->save();
 
         $log = ApprovalLog::create([
-            'petty_id' => $id,
+            'petty_id' => $petty->id,
             'user_id' => Auth::user()->id,
             'action' => 'paid',
         ]);
@@ -483,71 +488,81 @@ class PettyController extends Controller
         return redirect()->back()->with('success', 'Payment done successfully, and the amount has been deducted from your deposit.');
     }
 
-    public function reject(Request $request, $id)
+    public function reject(Request $request, Petty $petty)
     {
         $request->validate([
             'comment' => 'required|string',
-            'action' => 'required|string'
+            'action' => 'required|string',
         ]);
 
         ApprovalLog::create([
-            'petty_id' => $id,
+            'petty_id' => $petty->id,
             'user_id' => Auth::user()->id,
             'action' => $request->action,
             'comment' => $request->comment,
         ]);
 
-        $petty = Petty::find($id);
+        $petty->status = $request->action;
+        $petty->save();
 
-        if ($petty) {
-            $petty->status = $request->action;
-            $petty->save();
-
-            [$name, $reason, $encodedId] = $this->buildPettyMailArgs($petty);
-            $requester = User::find($petty->user_id);
-            if ($requester) {
-                $channel = $requester->notification_channel ?? 'sms';
-                if ($request->action === 'rejected') {
-                    if (in_array($channel, ['email', 'both']) && $requester->email) {
-                        $this->trySendMail($requester->email, new RejectMail($name, $reason, $encodedId));
-                    }
-                    if (in_array($channel, ['sms', 'both']) && $requester->phone) {
-                        app(NotificationService::class)->sendSms($requester->phone, "Your petty cash {$encodedId} was rejected.");
-                    }
-                    return redirect()->back()->with('success', 'This request was rejected and feedback sent successfully.');
-                } else {
-                    if (in_array($channel, ['email', 'both']) && $requester->email) {
-                        $this->trySendMail($requester->email, new ResubmitMail($name, $reason, $encodedId));
-                    }
-                    if (in_array($channel, ['sms', 'both']) && $requester->phone) {
-                        app(NotificationService::class)->sendSms($requester->phone, "Your petty cash {$encodedId} requires resubmission.");
-                    }
-                    return redirect()->back()->with('success', 'You recommended resubmission for this petty cash request and feedback was sent successfully.');
+        [$name, $reason, $publicId] = $this->buildPettyMailArgs($petty);
+        $requester = User::find($petty->user_id);
+        if ($requester) {
+            $channel = $requester->notification_channel ?? 'sms';
+            if ($request->action === 'rejected') {
+                if (in_array($channel, ['email', 'both']) && $requester->email) {
+                    $this->trySendMail($requester->email, new RejectMail($name, $reason, $publicId));
                 }
+                if (in_array($channel, ['sms', 'both']) && $requester->phone) {
+                    app(NotificationService::class)->sendSms($requester->phone, "Your petty cash {$publicId} was rejected.");
+                }
+
+                return redirect()->back()->with('success', 'This request was rejected and feedback sent successfully.');
             }
+            if (in_array($channel, ['email', 'both']) && $requester->email) {
+                $this->trySendMail($requester->email, new ResubmitMail($name, $reason, $publicId));
+            }
+            if (in_array($channel, ['sms', 'both']) && $requester->phone) {
+                app(NotificationService::class)->sendSms($requester->phone, "Your petty cash {$publicId} requires resubmission.");
+            }
+
+            return redirect()->back()->with('success', 'You recommended resubmission for this petty cash request and feedback was sent successfully.');
         }
 
         return redirect()->back()->with('error', 'Request not found.');
     }
 
-    public function updateAttachment(Request $request, $id)
+    public function updateAttachment(Request $request, Petty $petty)
     {
         $request->validate([
             'attachment' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls|max:2048',
         ]);
 
-        $petty = Petty::findOrFail($id);
-
         if ($request->hasFile('attachment')) {
             $attachment = $request->file('attachment');
-            $attachmentName = time() . '_' . $attachment->getClientOriginalName();
+            $attachmentName = time().'_'.$attachment->getClientOriginalName();
             $attachment->storeAs('public/attachments', $attachmentName);
-            $petty->attachment = 'storage/attachments/' . $attachmentName;
+            $petty->attachment = 'storage/attachments/'.$attachmentName;
             $petty->save();
 
             return redirect()->back()->with('success', 'Attachment updated successfully.');
         }
 
         return redirect()->back()->with('error', 'No file uploaded.');
+    }
+
+    private function resolveDepartmentScopeIds(?string $departmentId): array
+    {
+        if ($departmentId === null || $departmentId === '') {
+            return [];
+        }
+
+        $department = Department::find($departmentId);
+
+        if (! $department) {
+            return [$departmentId];
+        }
+
+        return $department->selfAndDescendantIds();
     }
 }

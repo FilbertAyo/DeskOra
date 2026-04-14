@@ -69,7 +69,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.show', \Vinkla\Hashids\Facades\Hashids::encode($item->id)) }}"
+                                                <a href="{{ route('petty.show', $item->id) }}"
                                                     class="btn btn-sm btn-secondary text-white">
                                                     <i class="ti ti-eye"></i></a>
                                             </td>
@@ -99,7 +99,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.show', \Vinkla\Hashids\Facades\Hashids::encode($item->id)) }}"
+                                                <a href="{{ route('petty.show', $item->id) }}"
                                                     class="btn btn-sm btn-secondary text-white">
                                                     <i class="ti ti-eye"></i></a>
                                             </td>

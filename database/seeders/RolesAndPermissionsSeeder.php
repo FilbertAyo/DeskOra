@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 
@@ -33,6 +33,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'users management settings',
             'update other settings',
             'approve final item purchase',
+            'manage year plans',
+            'manage anonymous feedback',
+            'view activity log',
         ];
 
         // ============================================
@@ -73,5 +76,20 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach ($allPermissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
+
+        $yearPlanPerm = Permission::findByName('manage year plans');
+        User::query()
+            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
+            ->each(fn (User $user) => $user->givePermissionTo($yearPlanPerm));
+
+        $anonymousFeedbackPerm = Permission::findByName('manage anonymous feedback');
+        User::query()
+            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
+            ->each(fn (User $user) => $user->givePermissionTo($anonymousFeedbackPerm));
+
+        $activityLogPerm = Permission::findByName('view activity log');
+        User::query()
+            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
+            ->each(fn (User $user) => $user->givePermissionTo($activityLogPerm));
     }
 }

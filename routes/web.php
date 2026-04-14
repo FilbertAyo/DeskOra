@@ -1,20 +1,31 @@
 <?php
 
+use App\Http\Controllers\ActionLogController;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DepositController;
 use App\Http\Controllers\DocumentController;
-use App\Http\Controllers\ActionLogController;
+use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PettyController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\WorkPeriodController;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\YearPlanController;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('feedback/{token}')
+    ->middleware(['feedback.token'])
+    ->group(function () {
+        Route::get('/', [PublicAnonymousFeedbackController::class, 'create'])->name('anonymous-feedback.form');
+        Route::post('/', [PublicAnonymousFeedbackController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('anonymous-feedback.store');
+    });
 
 Route::get('/', [DashboardController::class, 'redirect'])->middleware(['auth', 'verified']);
 
@@ -40,12 +51,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/plan-target', [DocumentController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentController::class, 'create'])->name('create');
         Route::post('/', [DocumentController::class, 'store'])->name('store');
-        Route::get('/{id}', [DocumentController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [DocumentController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [DocumentController::class, 'update'])->name('update');
-        Route::delete('/{id}', [DocumentController::class, 'destroy'])->name('destroy');
-        Route::post('/{id}/submit', [DocumentController::class, 'submit'])->name('submit');
-        Route::post('/{id}/reject', [DocumentController::class, 'reject'])->name('reject');
+        Route::get('/{document}', [DocumentController::class, 'show'])->name('show');
+        Route::get('/{document}/edit', [DocumentController::class, 'edit'])->name('edit');
+        Route::put('/{document}', [DocumentController::class, 'update'])->name('update');
+        Route::delete('/{document}', [DocumentController::class, 'destroy'])->name('destroy');
+        Route::post('/{document}/submit', [DocumentController::class, 'submit'])->name('submit');
+        Route::post('/{document}/reject', [DocumentController::class, 'reject'])->name('reject');
 
         // Reviewer dashboard
         Route::get('/reviewer/dashboard', [DocumentController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
@@ -56,35 +67,36 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [ActionLogController::class, 'index'])->name('index');
         Route::get('/create', [ActionLogController::class, 'create'])->name('create');
         Route::post('/', [ActionLogController::class, 'store'])->name('store');
-        Route::get('/{id}', [ActionLogController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [ActionLogController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [ActionLogController::class, 'update'])->name('update');
-        Route::delete('/{id}', [ActionLogController::class, 'destroy'])->name('destroy');
+        Route::get('/{document}', [ActionLogController::class, 'show'])->name('show');
+        Route::get('/{document}/edit', [ActionLogController::class, 'edit'])->name('edit');
+        Route::put('/{document}', [ActionLogController::class, 'update'])->name('update');
+        Route::delete('/{document}', [ActionLogController::class, 'destroy'])->name('destroy');
     });
 
-    // Comments routes
-    Route::prefix('comments')->name('comments.')->group(function () {
-        Route::post('/document/{id}', [CommentController::class, 'store'])->name('store');
-        Route::put('/{id}', [CommentController::class, 'update'])->name('update');
-        Route::delete('/{id}', [CommentController::class, 'destroy'])->name('destroy');
+    Route::middleware('permission:manage year plans')->prefix('year-plans')->name('year-plan.')->group(function () {
+        Route::get('/', [YearPlanController::class, 'index'])->name('index');
+        Route::post('/', [YearPlanController::class, 'store'])->name('store');
+        Route::get('/{year}', [YearPlanController::class, 'show'])->name('show');
+        Route::post('/{year}/activities', [YearPlanController::class, 'storeActivity'])->name('activities.store');
+        Route::put('/{year}/activities/{activity}', [YearPlanController::class, 'updateActivity'])->name('activities.update');
+        Route::delete('/{year}/activities/{activity}', [YearPlanController::class, 'destroyActivity'])->name('activities.destroy');
     });
 
-    //departments
+    // departments
     Route::get('/departments', [DepartmentController::class, 'index'])->name('departments');          // list
     Route::post('/department', [DepartmentController::class, 'store'])->name('department.store');    // create
-    Route::put('/department/{hashid}', [DepartmentController::class, 'update'])->name('department.update'); // update
-    Route::delete('/department/{hashid}', [DepartmentController::class, 'destroy'])->name('department.destroy'); // delete
-    Route::get('/department/{hashid}', [DepartmentController::class, 'show'])->name('department.show');       // show
+    Route::put('/department/{department}', [DepartmentController::class, 'update'])->name('department.update'); // update
+    Route::delete('/department/{department}', [DepartmentController::class, 'destroy'])->name('department.destroy'); // delete
+    Route::get('/department/{department}', [DepartmentController::class, 'show'])->name('department.show');       // show
 
     // admin
     Route::resource('admin', AdminController::class);
-    Route::post('/activate/{id}', [AdminController::class, 'activate'])->name('admin.activate');
-    Route::post('/users/{id}/assign-permissions', [AdminController::class, 'assignPermissions'])->name('assign.permissions');
+    Route::post('/activate/{user}', [AdminController::class, 'activate'])->name('admin.activate');
+    Route::post('/users/{user}/assign-permissions', [AdminController::class, 'assignPermissions'])->name('assign.permissions');
 
-    Route::post('/petty/{id}/upload-attachment', [PettyController::class, 'updateAttachment'])->name('petty.updateAttachment');
+    Route::post('/petty/{petty}/upload-attachment', [PettyController::class, 'updateAttachment'])->name('petty.updateAttachment');
 
 });
-
 
 Route::middleware(['auth', 'permission:request pettycash'])->group(function () {
     Route::middleware(['auth'])->prefix('petty')->name('petty.')->group(function () {
@@ -96,8 +108,8 @@ Route::middleware(['auth', 'permission:request pettycash'])->group(function () {
         Route::post('/store', [PettyController::class, 'store'])->name('store');
 
         // Other routes
-        Route::get('/show/{id}', [PettyController::class, 'show'])->name('show');
-        Route::delete('/delete/{id}', [PettyController::class, 'destroy'])->name('destroy');
+        Route::get('/show/{petty}', [PettyController::class, 'show'])->name('show');
+        Route::delete('/delete/{petty}', [PettyController::class, 'destroy'])->name('destroy');
     });
 
     // Autocomplete route for destinations
@@ -106,17 +118,17 @@ Route::middleware(['auth', 'permission:request pettycash'])->group(function () {
 
 Route::middleware(['auth', 'permission:view requested pettycash'])->group(function () {
     Route::get('pettycash/requests/list', [PettyController::class, 'requests_list'])->name('petty.list');
-    Route::get('/pettycash/request/{hashid}/details', [PettyController::class, 'request_show'])->name('petty.details');
-    Route::post('f_approve/{id}', [PettyController::class, 'f_approve'])->name('f_approve.approve');
-    Route::post('l_approve/{id}', [PettyController::class, 'l_approve'])->name('l_approve.approve');
-    Route::get('c_approve/{id}', [PettyController::class, 'c_approve'])->name('c_approve.approve');
-    Route::post('/petty/reject/{id}', [PettyController::class, 'reject'])->name('petty.reject');
+    Route::get('/pettycash/request/{petty}/details', [PettyController::class, 'request_show'])->name('petty.details');
+    Route::post('f_approve/{petty}', [PettyController::class, 'f_approve'])->name('f_approve.approve');
+    Route::post('l_approve/{petty}', [PettyController::class, 'l_approve'])->name('l_approve.approve');
+    Route::get('c_approve/{petty}', [PettyController::class, 'c_approve'])->name('c_approve.approve');
+    Route::post('/petty/reject/{petty}', [PettyController::class, 'reject'])->name('petty.reject');
 
     Route::resource('replenishment', ReplenishmentController::class);
-    Route::post('/replenishment/initial/approve/{id}', [ReplenishmentController::class, 'firstApprove'])->name('initial.approve');
-    Route::post('/replenishment/last/approve/{id}', [ReplenishmentController::class, 'lastApprove'])->name('last.approve');
+    Route::post('/replenishment/initial/approve/{replenishment}', [ReplenishmentController::class, 'firstApprove'])->name('initial.approve');
+    Route::post('/replenishment/last/approve/{replenishment}', [ReplenishmentController::class, 'lastApprove'])->name('last.approve');
     Route::get('/replenishment/petty/cash/list', [ReplenishmentController::class, 'pettycash'])->name('replenishment.pettycash');
-    Route::get('/replenishment/{id}/download', [ReplenishmentController::class, 'downloadPDF'])->name('replenishment.download');
+    Route::get('/replenishment/{replenishment}/download', [ReplenishmentController::class, 'downloadPDF'])->name('replenishment.download');
 });
 
 Route::middleware(['auth', 'permission:last pettycash approval'])->group(function () {
@@ -129,7 +141,6 @@ Route::middleware(['auth', 'permission:view cashflow movements'])->group(functio
     Route::get('/cashflow/download', [DepositController::class, 'download'])->name('cashflow.download');
     Route::get('pettycash/requests/payments/list', [PettyController::class, 'requestsCashier'])->name('petty.cashier');
 });
-
 
 Route::middleware(['auth', 'permission:view reports'])->group(function () {
     Route::get('reports/list', [ReportController::class, 'index'])->name('reports');
@@ -147,6 +158,17 @@ Route::middleware(['auth', 'permission:view settings'])->group(function () {
     Route::get('/settings/notifications', [NotificationController::class, 'index'])->name('notification.index');
 });
 
+Route::middleware(['auth', 'permission:manage anonymous feedback'])->group(function () {
+    Route::get('/settings/anonymous-feedback', [ManageAnonymousFeedbackController::class, 'index'])->name('anonymous-feedback.index');
+    Route::get('/settings/anonymous-feedback/qr.png', [ManageAnonymousFeedbackController::class, 'downloadQr'])->name('anonymous-feedback.qr-download');
+    Route::patch('/settings/anonymous-feedback/{anonymous_feedback}', [ManageAnonymousFeedbackController::class, 'update'])->name('anonymous-feedback.update');
+});
+
+Route::middleware(['auth', 'permission:view activity log'])->group(function () {
+    Route::get('/settings/activity-log', [ActivityLogController::class, 'index'])->name('activity-log.index');
+    Route::get('/settings/activity-log/{activity}', [ActivityLogController::class, 'show'])->name('activity-log.show');
+});
+
 // Work Periods Management (Admin only - checked in controller)
 Route::middleware('auth')->group(function () {
     Route::resource('work-periods', WorkPeriodController::class)->names([
@@ -160,11 +182,10 @@ Route::middleware('auth')->group(function () {
     ]);
 
     // Additional routes for work periods
-    Route::post('/work-periods/{id}/close', [WorkPeriodController::class, 'close'])->name('work-periods.close');
-    Route::post('/work-periods/{id}/archive', [WorkPeriodController::class, 'archive'])->name('work-periods.archive');
+    Route::post('/work-periods/{work_period}/close', [WorkPeriodController::class, 'close'])->name('work-periods.close');
+    Route::post('/work-periods/{work_period}/archive', [WorkPeriodController::class, 'archive'])->name('work-periods.archive');
 });
-
 
 // Bonus Petty Cash Routes - View Permission
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

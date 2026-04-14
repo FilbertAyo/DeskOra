@@ -28,31 +28,30 @@
         <!-- Document Info Card -->
         <div class="col-md-6">
             <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom">
+                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">
-                        <i class="ti ti-info me-2"></i>Document Information &amp; Actions
+                        Document Information &amp; Actions
                     </h6>
-                </div>
-                <div class="card-body py-2">
-                    <div class="d-flex align-items-center flex-wrap mb-2">
-                        <span class="badge bg-info mr-2 mb-1">
-                            <i class="ti ti-file me-1"></i>{{ $document->type_name }}
-                        </span>
+                    <div class="d-flex align-items-center flex-wrap gap-1">
+                     
                         @if($document->state === 'draft')
-                            <span class="badge bg-warning mr-2 mb-1">
-                                <i class="ti ti-edit me-1"></i>Draft
+                            <span class="badge bg-warning">
+                                Draft
                             </span>
                         @else
-                            <span class="badge bg-success mr-2 mb-1">
-                                <i class="ti ti-check-circle me-1"></i>Submitted
+                            <span class="badge bg-success">
+                                Submitted
                             </span>
                         @endif
                         @if($document->isReturnedForRevision())
-                            <span class="badge bg-danger mr-2 mb-1">
-                                <i class="ti ti-arrow-back-up me-1"></i>Returned for Revision
+                            <span class="badge bg-danger">
+                                Returned for Revision
                             </span>
                         @endif
                     </div>
+                </div>
+                <div class="card-body py-2">
+                   
                     <div class="small text-muted mb-1">
                         <span>Created by: <strong>{{ $document->user->name }}</strong></span>
                         @if($document->period)
@@ -60,21 +59,26 @@
                             <span>
                                 Week <strong>{{ $document->period->week_number }}</strong> of <strong>{{ $document->period->year }}</strong>
                             </span>
+                        @elseif($document->type === \App\Models\Document::TYPE_MONTHLY_REPORT && $document->month && $document->year)
+                            <span class="mx-2">|</span>
+                            <span>
+                                <strong>{{ \Carbon\Carbon::create((int) $document->year, (int) $document->month, 1)->format('F Y') }}</strong>
+                            </span>
                         @endif
                     </div>
-                    <div class="btn-group mt-2" role="group">
+                    <div class="btn-group mt-2 gap-1" role="group">
                         @if($document->canBeEdited())
-                            <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" class="btn btn-primary btn-sm">
-                                <i class="ti ti-edit me-1"></i> Edit
+                            <a href="{{ route('documents.edit', $document->id) }}" class="btn btn-primary btn-sm">
+                                Edit
                             </a>
                         @endif
 
                         @if($document->canBeDeleted())
-                            <form action="{{ route('documents.destroy', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this document? This action cannot be undone.');">
+                            <form action="{{ route('documents.destroy', $document->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this document? This action cannot be undone.');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm">
-                                    <i class="ti ti-trash-2 me-1"></i> Delete
+                                    Delete
                                 </button>
                             </form>
                         @endif
@@ -130,11 +134,11 @@
                                     </small>
                                 </div>
                                 <div class="btn-group">
-                                    <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($relatedDocument->id)) }}" class="btn btn-info btn-sm text-white">
+                                    <a href="{{ route('documents.show', $relatedDocument->id) }}" class="btn btn-info btn-sm text-white">
                                         <i class="ti ti-eye me-1"></i> View
                                     </a>
                                     @if($relatedDocument->canBeEdited())
-                                        <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($relatedDocument->id)) }}" class="btn btn-primary btn-sm">
+                                        <a href="{{ route('documents.edit', $relatedDocument->id) }}" class="btn btn-primary btn-sm">
                                             <i class="ti ti-edit me-1"></i> Edit
                                         </a>
                                     @endif
@@ -142,9 +146,8 @@
                             </div>
                         @elseif($relatedAction)
                             <div class="d-flex justify-content-between align-items-center flex-wrap">
-                                <div class="mb-2">
-                                    <p class="text-muted mb-1">No related document found.</p>
-                                    <h6 class="mb-0">{{ $relatedAction['label'] }}</h6>
+                                <div>
+                                   <h6 class="mb-0">{{ $relatedAction['label'] }}</h6>
                                     <small class="text-muted">{{ $relatedAction['description'] ?? '' }}</small>
                                 </div>
                                 <a href="{{ $relatedAction['route'] }}" class="btn btn-outline-primary btn-sm">
@@ -265,7 +268,135 @@
                             $content = is_array($document->content) ? $document->content : [];
                         @endphp
 
-                        @if(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]) && !empty($content))
+                        @if($document->type === \App\Models\Document::TYPE_MONTHLY_REPORT)
+                            @php
+                                $mplanned = is_array($content['planned'] ?? null) ? $content['planned'] : [];
+                                $moff = is_array($content['off_plan'] ?? null) ? $content['off_plan'] : [];
+                                $msum = trim((string) ($content['month_summary'] ?? ''));
+                                $ypIds = collect($mplanned)->pluck('year_plan_activity_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
+                                $ypActivities = $ypIds === []
+                                    ? collect()
+                                    : \App\Models\YearPlanActivity::with(['department.parent'])->whereIn('id', $ypIds)->get()->keyBy('id');
+                                $monthTitle = \Carbon\Carbon::create((int) $document->year, (int) $document->month, 1)->format('F Y');
+                            @endphp
+                            <div class="p-4">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <h5 class="mb-0">Monthly report — {{ $monthTitle }}</h5>
+                                        <small class="text-muted">Year plan alignment and other work</small>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{{ route('year-plan.show', $document->year) }}" class="btn btn-sm btn-outline-primary">Year plan {{ $document->year }}</a>
+                                        <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="btn btn-sm btn-light">Monthly archive</a>
+                                    </div>
+                                </div>
+
+                                @if($msum !== '')
+                                    <div class="card shadow-none border mb-4">
+                                        <div class="card-header bg-white border-bottom">
+                                            <h6 class="mb-0"><i class="ti ti-notes me-2"></i>Month summary</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-0" style="white-space: pre-wrap;">{{ $msum }}</div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if(count($mplanned) > 0)
+                                    <div class="card shadow-none border mb-4">
+                                        <div class="card-header bg-white border-bottom">
+                                            <h6 class="mb-0"><i class="ti ti-chart-line me-2"></i>Year plan activities (this month)</h6>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered mb-0 align-middle">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Code</th>
+                                                            <th>Activity</th>
+                                                            <th>Status</th>
+                                                            <th>Achievements</th>
+                                                            <th>Challenges</th>
+                                                            <th>Next steps</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($mplanned as $row)
+                                                            @php $row = is_array($row) ? $row : []; @endphp
+                                                            @php $act = $ypActivities->get((int) ($row['year_plan_activity_id'] ?? 0)); @endphp
+                                                            <tr>
+                                                                <td class="fw-semibold">{{ $act ? $act->displayCode() : '—' }}</td>
+                                                                <td>
+                                                                    @if($act)
+                                                                        @if($act->department?->parent)
+                                                                            <span class="text-muted small">{{ $act->department->parent->name }}</span><br>
+                                                                        @endif
+                                                                        <span class="fw-medium">{{ $act->department?->name ?? '—' }}</span>
+                                                                        <p class="small text-muted mb-0 mt-1">{{ $act->description }}</p>
+                                                                    @else
+                                                                        <span class="text-muted">Activity #{{ $row['year_plan_activity_id'] ?? '—' }}</span>
+                                                                    @endif
+                                                                </td>
+                                                                <td>{{ $row['implementation_status'] ?? '—' }}</td>
+                                                                <td>{!! nl2br(e($row['achievements'] ?? '')) !!}</td>
+                                                                <td>{!! nl2br(e($row['challenges'] ?? '')) !!}</td>
+                                                                <td>{!! nl2br(e($row['next_steps'] ?? '')) !!}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if(count($moff) > 0)
+                                    <div class="card shadow-none border mb-4">
+                                        <div class="card-header bg-white border-bottom">
+                                            <h6 class="mb-0"><i class="ti ti-plus me-2"></i>Work outside the year plan</h6>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Title</th>
+                                                            <th>Description</th>
+                                                            <th>Status</th>
+                                                            <th>Notes</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($moff as $row)
+                                                            @php $row = is_array($row) ? $row : []; @endphp
+                                                            <tr>
+                                                                <td>{{ $row['title'] ?? '' }}</td>
+                                                                <td>{!! nl2br(e($row['description'] ?? '')) !!}</td>
+                                                                <td>{{ $row['status'] ?? '' }}</td>
+                                                                <td>{!! nl2br(e($row['notes'] ?? '')) !!}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if($msum === '' && count($mplanned) === 0 && count($moff) === 0)
+                                    <div class="alert alert-light border">
+                                        Structured report fields are empty. @if($document->file_path)Use the PDF tab above if this was filed as a document upload.@endif
+                                    </div>
+                                @endif
+
+                                @if($document->attachment)
+                                    <p class="small text-muted mb-0">
+                                        <i class="ti ti-paperclip me-1"></i>
+                                        <a href="{{ asset('storage/' . $document->attachment) }}" target="_blank">Supporting attachment</a>
+                                    </p>
+                                @endif
+                            </div>
+                        @elseif(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]) && !empty($content))
                             @if($document->type === \App\Models\Document::TYPE_WEEKLY_PLAN)
                                 @php
                                     $objective = $content['objective'] ?? [];
@@ -639,7 +770,7 @@
                                 <i class="ti ti-alert-triangle me-2"></i>
                                 <strong>No document content available.</strong>
                                 @if($document->canBeEdited())
-                                    Please <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}">complete the online form</a> to view the document.
+                                    Please <a href="{{ route('documents.edit', $document->id) }}">complete the online form</a> to view the document.
                                 @else
                                     The filled content for this document is not available.
                                 @endif
@@ -651,174 +782,11 @@
         </div>
     </div>
 
-    <!-- Comments Section -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">
-                        <i class="ti ti-message-circle me-2"></i>
-                        Comments
-                        <span class="badge bg-primary rounded-pill ml-2">{{ $document->comments->count() }}</span>
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <!-- Comment Form (Only for Reviewers) -->
-                    @can('create', \App\Models\Comment::class)
-                        <div class="mb-4">
-                            <form action="{{ route('comments.store', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}" method="POST" id="commentForm">
-                                @csrf
-                                <div class="form-group">
-                                    <label for="comment" class="form-label">
-                                        <i class="ti ti-edit me-1"></i> Add Comment
-                                    </label>
-                                    <textarea 
-                                        class="form-control @error('comment') is-invalid @enderror" 
-                                        name="comment" 
-                                        id="comment" 
-                                        rows="3" 
-                                        placeholder="Enter your comment here..."
-                                        required>{{ old('comment') }}</textarea>
-                                    @error('comment')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="ti ti-send me-1"></i> Post Comment
-                                </button>
-                            </form>
-                        </div>
-                        <hr>
-                    @endcan
-
-                    <!-- Comments List -->
-                    @if($document->comments->count() > 0)
-                        <div class="comments-list">
-                            @foreach($document->comments as $comment)
-                                <div class="comment-item mb-3 pb-3 border-bottom">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mr-2" style="width: 32px; height: 32px;">
-                                                {{ strtoupper(substr($comment->user->name, 0, 1)) }}
-                                            </div>
-                                            <div>
-                                                <strong class="d-block">{{ $comment->user->name }}</strong>
-                                                <small class="text-muted">
-                                                    <i class="ti ti-clock me-1"></i>
-                                                    {{ $comment->created_at->diffForHumans() }}
-                                                    @if($comment->updated_at != $comment->created_at)
-                                                        <span class="text-muted">(edited)</span>
-                                                    @endif
-                                                </small>
-                                            </div>
-                                        </div>
-                                        @can('update', $comment)
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" 
-                                                    class="btn btn-sm btn-light edit-comment-btn" 
-                                                    data-comment-id="{{ $comment->id }}"
-                                                    data-comment-text="{{ htmlspecialchars($comment->comment, ENT_QUOTES, 'UTF-8') }}"
-                                                    title="Edit">
-                                                    <i class="ti ti-edit"></i>
-                                                </button>
-                                                <form action="{{ route('comments.destroy', \Vinkla\Hashids\Facades\Hashids::encode($comment->id)) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this comment?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-light text-danger" title="Delete">
-                                                        <i class="ti ti-trash-2"></i>
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        @endcan
-                                    </div>
-                                    <div class="comment-content">
-                                        @php
-                                            $isRejectComment = \Illuminate\Support\Str::startsWith(
-                                                $comment->comment,
-                                                \App\Models\Document::REVIEW_REJECTION_PREFIX
-                                            );
-                                            $displayComment = $isRejectComment
-                                                ? trim(\Illuminate\Support\Str::after($comment->comment, \App\Models\Document::REVIEW_REJECTION_PREFIX))
-                                                : $comment->comment;
-                                        @endphp
-                                        @if($isRejectComment)
-                                            <div class="mb-1">
-                                                <span class="badge bg-warning text-dark">
-                                                    <i class="ti ti-arrow-back-up me-1"></i>Returned to Draft
-                                                </span>
-                                            </div>
-                                        @endif
-                                        <p class="mb-0" id="comment-text-{{ $comment->id }}">{{ $displayComment }}</p>
-                                        
-                                        <!-- Edit Form (Hidden by default) -->
-                                        <div id="edit-form-{{ $comment->id }}" style="display: none;" class="mt-2">
-                                            <form action="{{ route('comments.update', \Vinkla\Hashids\Facades\Hashids::encode($comment->id)) }}" method="POST">
-                                                @csrf
-                                                @method('PUT')
-                                                <textarea class="form-control mb-2" name="comment" rows="3" required>{{ $comment->comment }}</textarea>
-                                                <div class="btn-group btn-group-sm">
-                                                    <button type="submit" class="btn btn-primary btn-sm">
-                                                        <i class="ti ti-check me-1"></i> Save
-                                                    </button>
-                                                    <button type="button" 
-                                                        class="btn btn-secondary btn-sm cancel-edit-btn" 
-                                                        data-comment-id="{{ $comment->id }}"
-                                                        data-comment-text="{{ htmlspecialchars($comment->comment, ENT_QUOTES, 'UTF-8') }}">
-                                                        <i class="ti ti-x me-1"></i> Cancel
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="text-center py-4">
-                            <i class="ti ti-message-circle fs-1 text-muted"></i>
-                            <p class="text-muted mb-0 mt-2">No comments yet</p>
-                            @can('create', \App\Models\Comment::class)
-                                <small class="text-muted">Be the first to comment!</small>
-                            @endcan
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Handle edit comment button clicks
-            document.querySelectorAll('.edit-comment-btn').forEach(function(button) {
-                button.addEventListener('click', function() {
-                    const commentId = this.getAttribute('data-comment-id');
-                    document.getElementById('comment-text-' + commentId).style.display = 'none';
-                    document.getElementById('edit-form-' + commentId).style.display = 'block';
-                });
-            });
-
-            // Handle cancel edit button clicks
-            document.querySelectorAll('.cancel-edit-btn').forEach(function(button) {
-                button.addEventListener('click', function() {
-                    const commentId = this.getAttribute('data-comment-id');
-                    const originalText = this.getAttribute('data-comment-text');
-                    document.getElementById('comment-text-' + commentId).style.display = 'block';
-                    document.getElementById('edit-form-' + commentId).style.display = 'none';
-                    const textarea = document.querySelector('#edit-form-' + commentId + ' textarea');
-                    if (textarea) {
-                        textarea.value = originalText;
-                    }
-                });
-            });
-        });
-    </script>
-
     @can('reject', $document)
         <div class="modal fade" id="rejectDocumentModal" tabindex="-1" aria-labelledby="rejectDocumentModalLabel" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
-                    <form method="POST" action="{{ route('documents.reject', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}">
+                    <form method="POST" action="{{ route('documents.reject', $document->id) }}">
                         @csrf
                         <div class="modal-header">
                             <h5 class="modal-title" id="rejectDocumentModalLabel">

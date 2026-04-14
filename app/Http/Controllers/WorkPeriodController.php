@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\WorkPeriod;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
-use Vinkla\Hashids\Facades\Hashids;
 
 class WorkPeriodController extends Controller
 {
@@ -15,7 +14,7 @@ class WorkPeriodController extends Controller
      */
     private function checkAdmin()
     {
-        if (!Auth::user()->hasPermissionTo('approve documents')) {
+        if (! Auth::user()->hasPermissionTo('approve documents')) {
             abort(403, 'Unauthorized access. Only users with approve permissions can manage work periods.');
         }
     }
@@ -26,7 +25,7 @@ class WorkPeriodController extends Controller
      */
     public function index(Request $request)
     {
-        if (!$request->user()->hasPermissionTo('approve documents')) {
+        if (! $request->user()->hasPermissionTo('approve documents')) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -45,8 +44,7 @@ class WorkPeriodController extends Controller
             $query->where('status', $request->status);
         }
 
-        $periods = $query->orderBy('year', 'desc')
-            ->orderBy('week_number', 'desc')
+        $periods = $query->orderByDesc('week_start_date')
             ->paginate(20)
             ->withQueryString();
 
@@ -85,7 +83,7 @@ class WorkPeriodController extends Controller
     public function create()
     {
         $this->checkAdmin();
-        
+
         // Get the last period to suggest next week
         $lastPeriod = WorkPeriod::orderBy('year', 'desc')
             ->orderBy('week_number', 'desc')
@@ -105,7 +103,7 @@ class WorkPeriodController extends Controller
     public function store(Request $request)
     {
         $this->checkAdmin();
-        
+
         abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
         $request->validate([
@@ -123,7 +121,7 @@ class WorkPeriodController extends Controller
         if (
             (int) $request->year !== $expectedYear ||
             (int) $request->week_number !== $expectedWeekNumber ||
-            !$submittedStartDate->isSameDay($expectedStartDate)
+            ! $submittedStartDate->isSameDay($expectedStartDate)
         ) {
             return redirect()->route('work-periods.index')
                 ->withInput()
@@ -149,28 +147,11 @@ class WorkPeriodController extends Controller
         $startDate = Carbon::parse($request->week_start_date);
         $endDate = $startDate->copy()->addDays(6);
 
-        // Calculate deadlines
-        // Plan deadline: Friday of the week (5 days after start, or 4th day if start is Monday)
-        // Report deadline: Saturday of the week (6 days after start)
-        $planDeadline = $startDate->copy()->addDays(4); // Friday
-        $reportDeadline = $startDate->copy()->addDays(5); // Saturday
-
-        // Ensure deadlines are within the week
-        if ($planDeadline->dayOfWeek !== Carbon::FRIDAY) {
-            // Adjust to nearest Friday
-            $planDeadline = $startDate->copy()->next(Carbon::FRIDAY);
-            if ($planDeadline->gt($endDate)) {
-                $planDeadline = $startDate->copy()->previous(Carbon::FRIDAY);
-            }
-        }
-
-        if ($reportDeadline->dayOfWeek !== Carbon::SATURDAY) {
-            // Adjust to nearest Saturday
-            $reportDeadline = $startDate->copy()->next(Carbon::SATURDAY);
-            if ($reportDeadline->gt($endDate)) {
-                $reportDeadline = $startDate->copy()->previous(Carbon::SATURDAY);
-            }
-        }
+        // Calculate deadlines based on business rule:
+        // - Plan deadline for Week N is Saturday of Week N-1
+        // - Report deadline for Week N is Saturday of Week N
+        $planDeadline = $startDate->copy()->subDays(2); // previous Saturday
+        $reportDeadline = $startDate->copy()->addDays(5); // current Saturday
 
         $period = WorkPeriod::create([
             'year' => $request->year,
@@ -190,13 +171,11 @@ class WorkPeriodController extends Controller
      * Display the specified resource.
      * Anyone can view work periods
      */
-    public function show(string $id)
+    public function show(WorkPeriod $work_period)
     {
         abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
-        $decodedId = Hashids::decode($id);
-        $period = WorkPeriod::with(['documents.user', 'weeklyPlans.user', 'weeklyReports.user'])
-            ->findOrFail($decodedId[0] ?? null);
+        $period = $work_period->load(['documents.user', 'weeklyPlans.user', 'weeklyReports.user']);
 
         // Get statistics
         $stats = [
@@ -213,14 +192,13 @@ class WorkPeriodController extends Controller
      * Show the form for editing the specified resource.
      * Only admin can edit work periods
      */
-    public function edit(string $id)
+    public function edit(WorkPeriod $work_period)
     {
         $this->checkAdmin();
-        
+
         abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
-        $decodedId = Hashids::decode($id);
-        $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
+        $period = $work_period;
 
         return view('settings.work-periods.edit', compact('period'));
     }
@@ -229,14 +207,13 @@ class WorkPeriodController extends Controller
      * Update the specified resource in storage.
      * Only admin can update work periods
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, WorkPeriod $work_period)
     {
         $this->checkAdmin();
-        
+
         abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
-        $decodedId = Hashids::decode($id);
-        $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
+        $period = $work_period;
 
         $request->validate([
             'week_start_date' => ['required', 'date'],
@@ -258,21 +235,20 @@ class WorkPeriodController extends Controller
         ]);
 
         return redirect()->route('work-periods.index')
-            ->with('success', "Work period updated successfully.");
+            ->with('success', 'Work period updated successfully.');
     }
 
     /**
      * Remove the specified resource from storage.
      * Only admin can delete work periods
      */
-    public function destroy(string $id)
+    public function destroy(WorkPeriod $work_period)
     {
         $this->checkAdmin();
-        
+
         abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
 
-        $decodedId = Hashids::decode($id);
-        $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
+        $period = $work_period;
 
         // Check if period has documents
         if ($period->documents()->count() > 0) {
@@ -290,14 +266,11 @@ class WorkPeriodController extends Controller
      * Close a work period
      * Only admin can close work periods
      */
-    public function close(string $id)
+    public function close(WorkPeriod $work_period)
     {
         $this->checkAdmin();
-        
-        $decodedId = Hashids::decode($id);
-        $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
 
-        $period->close();
+        $work_period->close();
 
         return redirect()->back()
             ->with('success', 'Work period closed successfully.');
@@ -307,14 +280,11 @@ class WorkPeriodController extends Controller
      * Archive a work period
      * Only admin can archive work periods
      */
-    public function archive(string $id)
+    public function archive(WorkPeriod $work_period)
     {
         $this->checkAdmin();
-        
-        $decodedId = Hashids::decode($id);
-        $period = WorkPeriod::findOrFail($decodedId[0] ?? null);
 
-        $period->archive();
+        $work_period->archive();
 
         return redirect()->back()
             ->with('success', 'Work period archived successfully.');

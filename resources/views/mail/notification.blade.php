@@ -9,7 +9,11 @@
 
         <ul>
             <li><strong>Email:</strong> {{ $email }}</li>
-            <li><strong>Password:</strong> {{ $password }}</li>
+            @if (! empty($password))
+                <li><strong>Password:</strong> {{ $password }}</li>
+            @else
+                <li><strong>Password:</strong> Use the initial password your administrator set for you. You can change it anytime under Profile after you sign in.</li>
+            @endif
         </ul>
         <p>You can now log in to your account using the link below:</p>
         <p>

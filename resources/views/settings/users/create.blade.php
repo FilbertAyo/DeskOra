@@ -15,7 +15,7 @@
                         </div>
                         <div class="col-auto d-flex align-items-center gap-2">
                             <a href="{{ route('admin.index') }}" class="btn btn-sm btn-light">
-                                <i class="ti ti-arrow-left me-1"></i> Back to Users
+                                <i class="ti ti-arrow-left me-1"></i> Back
                             </a>
                         </div>
                     </div>
@@ -87,7 +87,52 @@
                                     @error('email')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
-                                    <small class="form-text text-muted">Login credentials will be sent to this email</small>
+                                    <small class="form-text text-muted">A welcome message will be sent to this address</small>
+                                </div>
+                            </div>
+
+                            <!-- Password -->
+                            <div class="col-md-6 col-lg-6 mb-3">
+                                <div class="form-group">
+                                    <label for="password" class="form-label">
+                                        Password <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="ti ti-lock"></i>
+                                        </span>
+                                        <input type="password"
+                                            class="form-control @error('password') is-invalid @enderror"
+                                            name="password"
+                                            id="password"
+                                            autocomplete="new-password"
+                                            required>
+                                    </div>
+                                    @error('password')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-6 mb-3">
+                                <div class="form-group">
+                                    <label for="password_confirmation" class="form-label">
+                                        Confirm Password <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="ti ti-lock-check"></i>
+                                        </span>
+                                        <input type="password"
+                                            class="form-control @error('password_confirmation') is-invalid @enderror"
+                                            name="password_confirmation"
+                                            id="password_confirmation"
+                                            autocomplete="new-password"
+                                            required>
+                                    </div>
+                                    @error('password_confirmation')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
@@ -121,7 +166,7 @@
                             <div class="col-md-6 col-lg-6 mb-3">
                                 <div class="form-group">
                                     <label for="department_id" class="form-label">
-                                        Department <span class="text-danger">*</span>
+                                        Department
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
@@ -129,12 +174,11 @@
                                         </span>
                                         <select class="form-control @error('department_id') is-invalid @enderror"
                                             name="department_id"
-                                            id="department_id"
-                                            required>
-                                            <option value="" disabled {{ old('department_id') ? '' : 'selected' }}>
-                                                -- Select Department --
+                                            id="department_id">
+                                            <option value="" {{ old('department_id') ? '' : 'selected' }}>
+                                                -- No Department/Sub-Department (Global user) --
                                             </option>
-                                            @foreach($departments as $department)
+                                            @foreach($topDepartments as $department)
                                                 <option value="{{ $department->id }}" {{ old('department_id') == $department->id ? 'selected' : '' }}>
                                                     {{ $department->name }}
                                                 </option>
@@ -144,7 +188,50 @@
                                     @error('department_id')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
-                                    <small class="form-text text-muted">Select the user's department</small>
+                                    <small class="form-text text-muted">Select parent department first, then sub-departments.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-6 mb-3">
+                                <div class="form-group">
+                                    <label for="sub_department_ids" class="form-label">Sub-Departments</label>
+                                    <select class="form-control @error('sub_department_ids') is-invalid @enderror @error('sub_department_ids.*') is-invalid @enderror"
+                                        name="sub_department_ids[]"
+                                        id="sub_department_ids"
+                                        multiple
+                                        size="6">
+                                        @foreach($topDepartments as $department)
+                                            @foreach($department->children as $subDepartment)
+                                                <option value="{{ $subDepartment->id }}"
+                                                    data-parent-id="{{ $department->id }}"
+                                                    {{ collect(old('sub_department_ids', []))->contains($subDepartment->id) ? 'selected' : '' }}>
+                                                    {{ $subDepartment->name }}
+                                                </option>
+                                            @endforeach
+                                        @endforeach
+                                    </select>
+                                    @error('sub_department_ids')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                    @error('sub_department_ids.*')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                    <small class="form-text text-muted">You can select multiple sub-departments under one department.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-6 mb-3">
+                                <div class="form-group">
+                                    <label class="form-label d-block">Department Leadership</label>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" value="1" id="is_department_head" name="is_department_head" {{ old('is_department_head') ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="is_department_head">
+                                            Set this user as Head of selected department
+                                        </label>
+                                    </div>
+                                    @error('is_department_head')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
@@ -186,7 +273,7 @@
                                     <i class="ti ti-info me-2"></i>
                                     <div>
                                         <strong>Note:</strong> The user will be created with <strong>Active</strong> status
-                                        and will receive an email with auto-generated login credentials.
+                                        and will receive a welcome email (the password is not included in the email for security—share it with the user separately if needed).
                                     </div>
                                 </div>
                             </div>
@@ -232,6 +319,20 @@
             const form = document.getElementById('createUserForm');
             const submitBtn = document.getElementById('submitBtn');
             const phoneInput = document.getElementById('phone');
+            const departmentSelect = document.getElementById('department_id');
+            const subDepartmentSelect = document.getElementById('sub_department_ids');
+
+            function filterSubDepartmentsByDepartment() {
+                if (!departmentSelect || !subDepartmentSelect) return;
+                const selectedDepartmentId = departmentSelect.value;
+                const options = Array.from(subDepartmentSelect.options);
+
+                options.forEach(option => {
+                    const shouldShow = selectedDepartmentId && option.dataset.parentId === selectedDepartmentId;
+                    option.hidden = !shouldShow;
+                    if (!shouldShow) option.selected = false;
+                });
+            }
 
             // Phone number validation
             phoneInput.addEventListener('input', function(e) {
@@ -264,6 +365,11 @@
                     }
                 }
             });
+
+            if (departmentSelect) {
+                departmentSelect.addEventListener('change', filterSubDepartmentsByDepartment);
+                filterSubDepartmentsByDepartment();
+            }
         });
     </script>
 

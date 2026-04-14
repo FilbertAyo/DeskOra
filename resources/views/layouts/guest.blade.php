@@ -6,20 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Adilisha Portal') }} - Authentication</title>
+    <title>{{ config('app.name', 'Adilisha Portal') }} — {{ config('branding.product_name') }}</title>
 
      <!-- [Favicon] icon -->
-<link rel="icon" href="{{ asset('assets/images/favicon.svg') }}" type="image/x-icon"> <!-- [Google Font] Family -->
+<link rel="icon" href="{{ asset('assets/images/logo-icon.png') }}" type="image/png">
+<link rel="apple-touch-icon" href="{{ asset('assets/images/logo-icon.png') }}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" id="main-font-link">
-<!-- [Tabler Icons] https://tablericons.com -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/tabler-icons.min.css') }}" >
-<!-- [Feather Icons] https://feathericons.com -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/feather.css') }}" >
-<!-- [Font Awesome Icons] https://fontawesome.com/icons -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/fontawesome.css') }}" >
-<!-- [Material Icons] https://fonts.google.com/icons -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/material.css') }}" >
-<!-- [Template CSS Files] -->
 <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}" id="main-style-link" >
 <link rel="stylesheet" href="{{ asset('assets/css/style-preset.css') }}" >
 </head>
@@ -28,7 +24,43 @@
     <div class="wrapper vh-100">
         <div class="row align-items-center h-100">
 
+            <!-- [ Pre-loader ] start -->
+    <div class="loader-bg">
+        <div class="loader-track">
+            <div class="loader-fill"></div>
+        </div>
+    </div>
+    <!-- [ Pre-loader ] End -->
+
+    <div class="auth-main">
+        <div class="auth-wrapper v3">
+            <div class="auth-form">
+                <div class="auth-header text-center">
+                    <a href="#">
+                        <img src="{{ asset('assets/images/logo.png') }}" alt="{{ config('app.name', 'Logo') }}" style="width: 100px; height: auto;">
+                    </a>
+                    <div class="mt-3 d-flex justify-content-center">
+                        <x-deskora-credit />
+                    </div>
+                </div>
             {{ $slot }}
+
+            <div class="auth-footer row">
+                    <div class="col my-1">
+                        <p class="m-0">
+                            Developed by <a href="#">DeskOra</a>
+                        </p>
+                    </div>
+                    <div class="col-auto">
+                        <ul class="list-inline footer-link mb-0">
+                            <li class="list-inline-item"><a href="https://adilisha.or.tz" target="_blank">Our website</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
         </div>
     </div>

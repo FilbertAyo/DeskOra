@@ -3,7 +3,6 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -14,18 +13,18 @@ class NotificationMail extends Mailable
     use Queueable, SerializesModels;
 
     public $name;
+
     public $email;
-    public $password;
 
     /**
-     * Create a new message instance.
+     * @param  ?string  $password  Optional plain password for legacy templates (avoid sending when set by admin).
      */
-    public function __construct($name, $email, $password)
+    public function __construct($name, $email, public ?string $password = null)
     {
         $this->name = $name;
         $this->email = $email;
-        $this->password = $password;
     }
+
     /**
      * Get the message envelope.
      */

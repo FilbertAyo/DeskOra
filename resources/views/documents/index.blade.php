@@ -15,15 +15,7 @@
                             <button type="button" class="btn btn-sm btn-light" onclick="window.location.reload()" title="Refresh">
                                 <i class="ti ti-refresh"></i>
                             </button>
-                            @if(request('type') === 'monthly_report')
-                                <a href="{{ route('documents.create', ['type' => 'monthly_report']) }}" class="btn btn-primary btn-sm">
-                                    <i class="ti ti-plus-circle me-1"></i> New Monthly Report
-                                </a>
-                            @else
-                                <a href="{{ route('documents.create') }}" class="btn btn-primary btn-sm">
-                                    <i class="ti ti-plus-circle me-1"></i> New Document
-                                </a>
-                            @endif
+                          
                         </div>
                     </div>
                 </div>
@@ -41,7 +33,10 @@
                         </div>
                         <div class="col-md-6">
                             <form method="GET" action="{{ route('documents.index') }}" class="row">
-                              
+                                @if(request()->filled('type'))
+                                    <input type="hidden" name="type" value="{{ request('type') }}">
+                                @endif
+                                @if(request('type') !== 'monthly_report')
                                 <div class="col-md-3 mb-2">
                                     <select name="period_id" class="form-control">
                                         <option value="" {{ request('period_id') ? '' : 'selected' }}>All Weeks</option>
@@ -52,7 +47,21 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-md-3  mb-2">
+                                @else
+                                <div class="col-md-4 mb-2">
+                                    <select name="month" class="form-control">
+                                        <option value="" {{ ! request()->filled('month') ? 'selected' : '' }}>All months</option>
+                                        @foreach([
+                                            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+                                            5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+                                            9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
+                                        ] as $num => $label)
+                                            <option value="{{ $num }}" {{ (string) request('month') === (string) $num ? 'selected' : '' }}>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                @endif
+                                <div class="col-md-4 mb-2">
                                     <select name="year" class="form-control">
                                         <option value="" {{ request('year') ? '' : 'selected' }}>All Years</option>
                                         @foreach($years as $year)
@@ -62,20 +71,18 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-md-3 mb-2">
-                                    <select name="review_status" class="form-control">
-                                        <option value="">All Review Statuses</option>
-                                        <option value="returned" {{ request('review_status') === 'returned' ? 'selected' : '' }}>
-                                            Returned for Revision
-                                        </option>
-                                    </select>
-                                </div>
+                              
                                 <div class="col-md-3 d-flex justify-content-end gap-2">
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="ti ti-filter me-1"></i>Apply
                                     </button>
-                                    @if(request()->hasAny(['period_id', 'year', 'review_status']))
-                                        <a href="{{ route('documents.index') }}" class="btn btn-light btn-sm">
+                                    @php
+                                        $resetMonthly = request('type') === 'monthly_report'
+                                            ? route('documents.index', ['type' => 'monthly_report'])
+                                            : route('documents.index');
+                                    @endphp
+                                    @if(request()->hasAny(['period_id', 'year', 'review_status', 'month']))
+                                        <a href="{{ $resetMonthly }}" class="btn btn-light btn-sm">
                                             <i class="ti ti-x me-1"></i>Reset
                                         </a>
                                     @endif
@@ -85,64 +92,19 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    @if(request('type') !== 'monthly_report')
-                        <div class="row mb-4">
-                            <div class="col-md-4 mb-3">
-                                <div class="border rounded p-3 h-100">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <p class="text-muted mb-1"><i class="ti ti-target me-1 text-info"></i>Plan Deadline</p>
-                                            @if($deadlineStatuses)
-                                                <h5 class="mb-1">{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y') }}</h5>
-                                                <span class="badge {{ $deadlineStatuses['plan_badge'] }}">{{ $deadlineStatuses['plan_text'] }}</span>
-                                            @else
-                                                <span class="text-muted">No current period</span>
-                                            @endif
-                                        </div>
-                                        <a href="{{ route('documents.index', ['type' => 'weekly_plan']) }}" class="btn btn-outline-info btn-sm">
-                                            View Plans
-                                        </a>
-                                    </div>
-                                </div>
+                    @if(request('type') === 'monthly_report')
+                        <div class="alert alert-light border mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div class="flex-grow-1">
+                                <strong>Monthly reports</strong> pull planned activities from the
+                                <a href="{{ route('year-plan.index') }}">year plan</a>
+                                for your sub-departments and the month you select. Report progress on those lines and add anything done outside the plan.
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <div class="border rounded p-3 h-100">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <p class="text-muted mb-1"><i class="ti ti-activity me-1 text-primary"></i>Report Deadline</p>
-                                            @if($deadlineStatuses)
-                                                <h5 class="mb-1">{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y') }}</h5>
-                                                <span class="badge {{ $deadlineStatuses['report_badge'] }}">{{ $deadlineStatuses['report_text'] }}</span>
-                                            @else
-                                                <span class="text-muted">No current period</span>
-                                            @endif
-                                        </div>
-                                        <a href="{{ route('documents.index', ['type' => 'weekly_report']) }}" class="btn btn-outline-primary btn-sm">
-                                            View Reports
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <div class="border rounded p-3 h-100">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <p class="text-muted mb-1"><i class="ti ti-calendar me-1 text-secondary"></i>Quick Period</p>
-                                            @if($currentPeriod)
-                                                <h5 class="mb-1">Week {{ $currentPeriod->week_number }}</h5>
-                                                <small class="text-muted">{{ $currentPeriod->date_range }}</small>
-                                            @else
-                                                <span class="text-muted">No period</span>
-                                            @endif
-                                        </div>
-                                        <a href="{{ route('work-periods.index') }}" class="btn btn-outline-secondary btn-sm">
-                                            Work Periods
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
+                            <a href="{{ route('documents.create', ['type' => 'monthly_report']) }}" class="btn btn-primary btn-sm text-nowrap">
+                                <i class="ti ti-plus-circle me-1"></i> New monthly report
+                            </a>
                         </div>
                     @endif
+              
 
                     @if($documents->count() > 0)
                         @php
@@ -241,13 +203,13 @@
                                                 <td class="text-center">
                                                     <div class="d-flex flex-wrap gap-1 justify-content-center">
                                                         @if($planDoc)
-                                                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($planDoc->id)) }}"
+                                                            <a href="{{ route('documents.show', $planDoc->id) }}"
                                                                 class="btn btn-info text-white btn-sm" title="View Plan">
                                                                 <i class="ti ti-eye"></i> Plan
                                                             </a>
                                                         @endif
                                                         @if($reportDoc)
-                                                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($reportDoc->id)) }}"
+                                                            <a href="{{ route('documents.show', $reportDoc->id) }}"
                                                                 class="btn btn-primary text-white btn-sm" title="View Report">
                                                                 <i class="ti ti-eye"></i> Report
                                                             </a>
@@ -302,7 +264,7 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-center">
-                                                    <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                    <a href="{{ route('documents.show', $document->id) }}"
                                                         class="btn btn-info text-white btn-sm" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
@@ -321,10 +283,7 @@
                         <div class="text-center py-5">
                             <i class="ti ti-file-text fs-1 text-muted"></i>
                             <p class="text-muted mb-3 mt-3">No documents found</p>
-                            <p class="text-muted small">Try adjusting your filters or create a new document.</p>
-                            <a href="{{ route('documents.create') }}" class="btn btn-primary">
-                                <i class="ti ti-plus-circle me-1"></i>Create New Document
-                            </a>
+                         
                         </div>
                     @endif
                 </div>

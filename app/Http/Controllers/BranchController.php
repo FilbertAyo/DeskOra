@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use Illuminate\Http\Request;
-use Vinkla\Hashids\Facades\Hashids;
 
 class BranchController extends Controller
 {
@@ -13,7 +12,7 @@ class BranchController extends Controller
      */
     public function index()
     {
-        $branches = Branch::withCount('users')->get();
+        $branches = Branch::withCount('users')->latest()->get();
 
         return view('settings.branches.index', compact('branches'));
     }
@@ -28,7 +27,7 @@ class BranchController extends Controller
 
     public function store(Request $request)
     {
-        $id = $request->branch_id ? Hashids::decode($request->branch_id)[0] : null;
+        $branchId = $request->filled('branch_id') ? $request->branch_id : null;
 
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
@@ -37,8 +36,8 @@ class BranchController extends Controller
             'status' => 'required|in:active,inactive',
         ]);
 
-        if ($id) {
-            $branch = Branch::findOrFail($id);
+        if ($branchId) {
+            $branch = Branch::findOrFail($branchId);
             $branch->update($validatedData);
             $message = 'Branch updated successfully';
         } else {
@@ -49,24 +48,18 @@ class BranchController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
-
     /**
      * Display the specified resource.
      */
-    public function show($hashid)
+    public function show(Branch $branch)
     {
-        $id = Hashids::decode($hashid);
-
-        $branch = Branch::withCount('users')->findOrFail($id[0]);
+        $branch->loadCount('users');
 
         return view('settings.branches.view', compact('branch'));
     }
 
-    public function update(Request $request, $hashid)
+    public function update(Request $request, Branch $branch)
     {
-        $id = Hashids::decode($hashid)[0] ?? null;
-        $branch = Branch::findOrFail($id);
-
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'region' => 'required|string|max:255',
@@ -79,19 +72,10 @@ class BranchController extends Controller
         return redirect()->back()->with('success', 'Branch updated successfully');
     }
 
-    public function destroy($hashid)
+    public function destroy(Branch $branch)
     {
-        $id = Hashids::decode($hashid);
+        $branch->delete();
 
-        $branch = Branch::find($id[0]);
-
-        if ($branch) {
-            $branch->delete();
-
-            return redirect()->back()->with('success', 'Branch deleted successfully');
-        } else {
-            // Redirect back with error message if branch not found
-            return redirect()->back()->with('error', 'Branch not found');
-        }
+        return redirect()->back()->with('success', 'Branch deleted successfully');
     }
 }

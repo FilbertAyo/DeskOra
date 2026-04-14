@@ -28,7 +28,7 @@
 
     <div class="row">
         <div class="col-md-12">
-            <div class="card tbl-card mb-4">
+            <div class="card tbl-card mb-2">
                 <div class="card-header bg-white border-bottom">
                     <div class="row align-items-center">
                         <div class="col-md-6 mb-2 mb-md-0">
@@ -70,14 +70,7 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-md-12 mb-2">
-                                    <select name="review_status" class="form-control" onchange="document.getElementById('filterForm').submit();">
-                                        <option value="">All Review Statuses</option>
-                                        <option value="returned" {{ request('review_status') === 'returned' ? 'selected' : '' }}>
-                                            Returned for Revision
-                                        </option>
-                                    </select>
-                                </div>
+                       
                             </form>
                         </div>
                     </div>
@@ -180,12 +173,12 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                    <a href="{{ route('documents.show', $document->id) }}"
                                                         class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
                                                     @if($document->canBeEdited())
-                                                        <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                        <a href="{{ route('documents.edit', $document->id) }}"
                                                             class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
                                                         </a>
@@ -198,7 +191,7 @@
                                                                 ->first();
                                                         @endphp
                                                         @if($relatedPlan)
-                                                            <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($relatedPlan->id)) }}"
+                                                            <a href="{{ route('documents.show', $relatedPlan->id) }}"
                                                                 class="btn btn-outline-primary" title="View Related Plan">
                                                                 <i class="ti ti-target"></i>
                                                             </a>
@@ -219,18 +212,7 @@
                         <div class="text-center py-5">
                             <i class="ti ti-activity fs-1 text-muted"></i>
                             <p class="text-muted mb-3 mt-3">No weekly reports found</p>
-                            <p class="text-muted small">
-                                @if(request('period_id'))
-                                    No reports found for the selected week period. Try selecting a different week or create a new report.
-                                @else
-                                    Try adjusting your filters or create a new weekly report.
-                                @endif
-                            </p>
-                            @if(isset($availableTypes['weekly_report']))
-                                <a href="{{ route('documents.create') }}?type=weekly_report" class="btn btn-primary">
-                                    <i class="ti ti-circle-plus me-1"></i>Create New Weekly Report
-                                </a>
-                            @endif
+                          
                         </div>
                     @endif
                 </div>

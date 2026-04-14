@@ -5,16 +5,16 @@
             <div class="card shadow-none border">
                 <div class="card-body text-center p-4">
                     <div class="profile-picture mb-3">
-                        <a type="button" class="avatar avatar-xxl" data-toggle="modal" data-target="#exampleModal"
+                        <button type="button" class="avatar avatar-xxl bg-transparent border-0 p-0" data-bs-toggle="modal" data-bs-target="#exampleModal"
                            style="margin: 0; cursor: pointer; position: relative; display: inline-block;">
-                            <img src="{{ asset(Auth::user()->file ?? 'image/prof.jpeg') }}" alt="Profile Picture"
+                            <img src="{{ asset(Auth::user()->file ?? 'assets/images/profile.png') }}" alt="Profile Picture"
                                 class="avatar-img rounded-circle shadow-sm" style="width: 150px; height: 150px; object-fit: cover;" />
                             <div class="avatar-overlay">
                                 <i class="ti ti-camera"></i>
                             </div>
-                        </a>
+                        </button>
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#exampleModal">
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#exampleModal">
                         <i class="ti ti-edit-2 mr-1"></i>Change Photo
                     </button>
                     <p class="text-muted small mt-2 mb-0">JPG, PNG or JPEG. Max 2MB</p>
@@ -131,9 +131,7 @@
                     <h5 class="modal-title" id="exampleModalLabel">
                         <i class="ti ti-image mr-2"></i>Upload Profile Image
                     </h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <form action="{{ route('profile.image') }}" method="POST" enctype="multipart/form-data">
@@ -150,7 +148,7 @@
                             </small>
                         </div>
                         <div class="text-right mt-4">
-                            <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-secondary mr-2" data-bs-dismiss="modal">Cancel</button>
                             <x-primary-button label="Upload Image" />
                         </div>
                     </form>

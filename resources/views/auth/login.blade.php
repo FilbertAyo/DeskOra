@@ -1,20 +1,5 @@
 <x-guest-layout>
-    <!-- [ Pre-loader ] start -->
-    <div class="loader-bg">
-        <div class="loader-track">
-            <div class="loader-fill"></div>
-        </div>
-    </div>
-    <!-- [ Pre-loader ] End -->
 
-    <div class="auth-main">
-        <div class="auth-wrapper v3">
-            <div class="auth-form">
-                <div class="auth-header">
-                    <a href="#">
-                        <img src="{{ asset('assets/images/logo-dark.svg') }}" alt="img">
-                    </a>
-                </div>
 
                 <div class="card my-5">
                     <div class="card-body">
@@ -99,7 +84,7 @@
                         </form>
                         <div class="auth-bottom">
                             <div class="text-center mt-4 font-weight-light">
-                                Don't have an account?
+                                Facing issues?
                                 <a href="https://wa.me/255741400900" target="_blank" class="text-primary">
                                     Contact Admin
                                 </a>
@@ -108,21 +93,8 @@
                     </div>
                 </div>
 
-                <div class="auth-footer row">
-                    <div class="col my-1">
-                        <p class="m-0">
-                            Copyright &copy; <a href="#">Filbert Ayo</a>
-                        </p>
-                    </div>
-                    <div class="col-auto my-1">
-                        <ul class="list-inline footer-link mb-0">
-                            <li class="list-inline-item"><a href="#">Home</a></li>
-                            <li class="list-inline-item"><a href="#">Privacy Policy</a></li>
-                            <li class="list-inline-item"><a href="#">Contact us</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
+
+
+                
 </x-guest-layout>

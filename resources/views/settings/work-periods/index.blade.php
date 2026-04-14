@@ -1,38 +1,6 @@
 <x-app-layout>
 
-    <!-- Success/Error Messages -->
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>
-            <strong>Please fix the following errors:</strong>
-            <ul class="mb-0 mt-2">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
+  
 
     <div class="page-header">
         <div class="page-block">
@@ -65,7 +33,7 @@
 
     <!-- Current Period Info -->
     @if($currentPeriod)
-    <div class="row mb-3">
+    <div class="row">
         <div class="col-md-12">
             <div class="card border-primary shadow-none">
                 <div class="card-body">
@@ -80,7 +48,7 @@
                                 Status: <span class="badge badge-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }}">{{ ucfirst($currentPeriod->status) }}</span>
                             </p>
                         </div>
-                        <div class="text-right">
+                        <div class="text-right d-flex gap-2">
                             <div class="mb-1">
                                 <small class="text-muted">Plan Deadline:</small>
                                 <strong class="d-block">{{ \Carbon\Carbon::parse($currentPeriod->plan_deadline)->format('M d, Y') }}</strong>
@@ -98,7 +66,7 @@
     @endif
 
     <!-- Filters -->
-    <div class="row mb-3">
+    <div class="row">
         <div class="col-md-12">
             <div class="card shadow-none border">
                 <div class="card-body">
@@ -210,17 +178,17 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('work-periods.show', Hashids::encode($period->id)) }}"
+                                                    <a href="{{ route('work-periods.show', $period->id) }}"
                                                        class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
                                                     @if(Auth::user()->hasPermissionTo('approve documents'))
-                                                        <a href="{{ route('work-periods.edit', Hashids::encode($period->id)) }}"
+                                                        <a href="{{ route('work-periods.edit', $period->id) }}"
                                                            class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
                                                         </a>
                                                         @if($period->status === 'open')
-                                                            <form action="{{ route('work-periods.close', Hashids::encode($period->id)) }}"
+                                                            <form action="{{ route('work-periods.close', $period->id) }}"
                                                                   method="POST" class="d-inline"
                                                                   onsubmit="return confirm('Are you sure you want to close this period?');">
                                                                 @csrf
@@ -277,7 +245,7 @@
                             <strong>Important:</strong>
                             <ul class="mb-0 mt-2">
                                 <li>Week will run from Monday to Sunday</li>
-                                <li>Plan deadline: Friday (to submit plan for the NEXT week)</li>
+                                <li>Plan deadline: Saturday of the current week (to submit plan for the NEXT week)</li>
                                 <li>Report deadline: Saturday (to submit report for THIS week)</li>
                                 <li>Next week is auto-created every Thursday (one week ahead only)</li>
                             </ul>

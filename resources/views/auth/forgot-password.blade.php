@@ -1,11 +1,9 @@
 <x-guest-layout>
     <!-- Session Status -->
 
-
-    <div class="container-fluid vh-100">
-        <div class="row h-100">
-            <div class="col-md-12 d-flex justify-content-center align-items-center">
-                <div class="card p-5 w-100 " style="max-width: 500px;">
+    <div class="card my-5">
+    <div class="card-body">
+ 
                     <div class="text-center mb-4">
                         <h3 class="fw-bold text-dark">Forgot Password</h3>
                         <p class="text-muted">
@@ -37,11 +35,8 @@
                          <x-primary-button label="Send" class="w-100"/>
 
                     </form>
-                </div>
-            </div>
 
-
-
-        </div>
-    </div>
+                    </div>
+                    </div>
+         
 </x-guest-layout>

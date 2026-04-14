@@ -8,10 +8,29 @@ use Carbon\Carbon;
 class WorkPeriodService
 {
     /**
+     * Resolve period that weekly plans should target (next week).
+     */
+    public function periodForWeeklyPlanSubmission(): ?WorkPeriod
+    {
+        $current = $this->getCurrentPeriod();
+        if (! $current) {
+            return null;
+        }
+
+        return $current->getNextPeriod();
+    }
+
+    /**
+     * Resolve period that weekly reports should target (current week).
+     */
+    public function periodForWeeklyReportSubmission(): ?WorkPeriod
+    {
+        return $this->getCurrentPeriod();
+    }
+
+    /**
      * Create the next work period automatically
      * This creates only the immediate next week from "now"
-     *
-     * @return WorkPeriod|null
      */
     public function createNextWeek(): ?WorkPeriod
     {
@@ -35,26 +54,11 @@ class WorkPeriodService
                 ->first();
         }
 
-        // Calculate deadlines
-        // Plan deadline: Friday of the week (4 days after Monday = Friday)
-        // Report deadline: Saturday of the week (5 days after Monday = Saturday)
-        $planDeadline = $nextWeekStart->copy()->addDays(4); // Friday
-        $reportDeadline = $nextWeekStart->copy()->addDays(5); // Saturday
-
-        // Ensure deadlines are correct days of week
-        if ($planDeadline->dayOfWeek !== Carbon::FRIDAY) {
-            $planDeadline = $nextWeekStart->copy()->next(Carbon::FRIDAY);
-            if ($planDeadline->gt($nextWeekEnd)) {
-                $planDeadline = $nextWeekStart->copy()->previous(Carbon::FRIDAY);
-            }
-        }
-
-        if ($reportDeadline->dayOfWeek !== Carbon::SATURDAY) {
-            $reportDeadline = $nextWeekStart->copy()->next(Carbon::SATURDAY);
-            if ($reportDeadline->gt($nextWeekEnd)) {
-                $reportDeadline = $nextWeekStart->copy()->previous(Carbon::SATURDAY);
-            }
-        }
+        // Calculate deadlines based on business rule:
+        // - Plan deadline for Week N is Saturday of Week N-1
+        // - Report deadline for Week N is Saturday of Week N
+        $planDeadline = $nextWeekStart->copy()->subDays(2); // previous Saturday
+        $reportDeadline = $nextWeekStart->copy()->addDays(5); // current Saturday
 
         // Create the new period
         $period = WorkPeriod::create([
@@ -73,16 +77,12 @@ class WorkPeriodService
     /**
      * Close the current week period
      * This is called on Sunday to close the week that just ended
-     *
-     * @return bool
      */
     public function closeCurrentWeek(): bool
     {
-        // Get the period that ended yesterday (Saturday)
-        $yesterday = Carbon::yesterday();
-        
-        $period = WorkPeriod::where('week_end_date', $yesterday->format('Y-m-d'))
+        $period = WorkPeriod::where('week_end_date', '<', Carbon::today()->format('Y-m-d'))
             ->where('status', WorkPeriod::STATUS_OPEN)
+            ->orderBy('week_end_date', 'desc')
             ->first();
 
         if ($period) {
@@ -93,9 +93,32 @@ class WorkPeriodService
     }
 
     /**
-     * Get current period
+     * Close all open periods that have already ended before today.
      *
-     * @return WorkPeriod|null
+     * @return array{count:int, periods:\Illuminate\Support\Collection<int,WorkPeriod>}
+     */
+    public function closeEndedWeeks(): array
+    {
+        $periods = WorkPeriod::where('status', WorkPeriod::STATUS_OPEN)
+            ->where('week_end_date', '<', Carbon::today()->format('Y-m-d'))
+            ->orderBy('week_end_date', 'asc')
+            ->get();
+
+        $closed = 0;
+        foreach ($periods as $period) {
+            if ($period->close()) {
+                $closed++;
+            }
+        }
+
+        return [
+            'count' => $closed,
+            'periods' => $periods,
+        ];
+    }
+
+    /**
+     * Get current period
      */
     public function getCurrentPeriod(): ?WorkPeriod
     {
@@ -103,10 +126,35 @@ class WorkPeriodService
     }
 
     /**
+     * Badge/text/deadline dates for UI: plan targets next week; report targets current week.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function deadlineStatusesForUi(?WorkPeriod $current, ?WorkPeriod $next): ?array
+    {
+        if (! $current && ! $next) {
+            return null;
+        }
+
+        $row = [];
+        if ($next) {
+            $row['plan_badge'] = $next->getPlanDeadlineBadgeClass();
+            $row['plan_text'] = $next->getDeadlineStatusText('plan');
+            $row['plan_due'] = $next->plan_deadline;
+        }
+        if ($current) {
+            $row['report_badge'] = $current->getReportDeadlineBadgeClass();
+            $row['report_text'] = $current->getDeadlineStatusText('report');
+            $row['report_due'] = $current->report_deadline;
+        }
+
+        return $row;
+    }
+
+    /**
      * Get period by date
      *
-     * @param Carbon|string $date
-     * @return WorkPeriod|null
+     * @param  Carbon|string  $date
      */
     public function getPeriodByDate($date): ?WorkPeriod
     {
@@ -117,8 +165,6 @@ class WorkPeriodService
      * Process weekly automation
      * This method handles both closing the current week and creating the next week
      * Called by scheduler (creation should run every Thursday)
-     *
-     * @return array
      */
     public function processWeeklyAutomation(): array
     {
@@ -130,14 +176,12 @@ class WorkPeriodService
             'messages' => [],
         ];
 
-        // Close the week that just ended (Saturday)
-        $closed = $this->closeCurrentWeek();
-        if ($closed) {
+        // Close all ended weeks
+        $closedResult = $this->closeEndedWeeks();
+        if ($closedResult['count'] > 0) {
             $results['closed'] = true;
-            $results['closed_period'] = WorkPeriod::where('week_end_date', Carbon::yesterday()->format('Y-m-d'))
-                ->where('status', WorkPeriod::STATUS_CLOSED)
-                ->first();
-            $results['messages'][] = "Closed week: " . ($results['closed_period'] ? $results['closed_period']->display_name : 'Unknown');
+            $results['closed_period'] = $closedResult['periods']->last();
+            $results['messages'][] = "Closed {$closedResult['count']} ended week(s).";
         }
 
         // Create the next week
@@ -145,12 +189,11 @@ class WorkPeriodService
         if ($newPeriod) {
             $results['created'] = true;
             $results['created_period'] = $newPeriod;
-            $results['messages'][] = "Created new week: " . $newPeriod->display_name;
+            $results['messages'][] = 'Created new week: '.$newPeriod->display_name;
         } else {
-            $results['messages'][] = "Could not create next week. No previous period found or period already exists.";
+            $results['messages'][] = 'Could not create next week. No previous period found or period already exists.';
         }
 
         return $results;
     }
 }
-

@@ -16,6 +16,9 @@
         $currentPeriod = $periodInfo['current'] ?? null;
         $nextPeriod = $periodInfo['next'] ?? null;
         $returnedForRevisionCount = $pendingDocuments->filter(fn ($document) => $document->isReturnedForRevision())->count();
+        $wr = $weeklySubmissionReminder ?? null;
+        $empWeeklyPlanCta = isset($availableTypes['weekly_plan']) && ($nextPeriod ?? null) && $wr && $wr->plan && $wr->plan->showCta;
+        $empWeeklyReportCta = isset($availableTypes['weekly_report']) && ($currentPeriod ?? null) && $wr && $wr->report && $wr->report->showCta;
     @endphp
 
     <div class="row mb-3">
@@ -75,40 +78,54 @@
                                 {{ ucfirst($currentPeriod->status) }}
                             </span>
                         </div>
+                        @if($weeklySubmissionReminder && count($weeklySubmissionReminder->missedMessages) > 0)
+                            <div class="alert alert-danger mt-3 mb-0">
+                                <p class="mb-1 fw-semibold small"><i class="ti ti-alert-circle me-1"></i>Missed submission window</p>
+                                <ul class="mb-0 ps-3 small">
+                                    @foreach($weeklySubmissionReminder->missedMessages as $line)
+                                        <li>{{ $line }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
                         @if($deadlineStatuses)
                             <div class="row mt-4">
-                                <div class="col-md-6 mb-3 mb-md-0">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <p class="text-muted mb-1">
-                                                    <i class="ti ti-target text-info me-1"></i>Plan Deadline
-                                                </p>
-                                                <h5 class="mb-1">{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y') }}</h5>
-                                                <small class="text-muted">Submit plan for next week</small>
+                                @isset($deadlineStatuses['plan_due'])
+                                    <div class="col-md-6 mb-3 mb-md-0">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <p class="text-muted mb-1">
+                                                        <i class="ti ti-target text-info me-1"></i>Plan deadline (next week)
+                                                    </p>
+                                                    <h5 class="mb-1">{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y') }}</h5>
+                                                    <small class="text-muted">Submit plan for next week</small>
+                                                </div>
+                                                <span class="badge {{ $deadlineStatuses['plan_badge'] }}">
+                                                    {{ $deadlineStatuses['plan_text'] }}
+                                                </span>
                                             </div>
-                                            <span class="badge {{ $deadlineStatuses['plan_badge'] }}">
-                                                {{ $deadlineStatuses['plan_text'] }}
-                                            </span>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <p class="text-muted mb-1">
-                                                    <i class="ti ti-activity text-primary me-1"></i>Report Deadline
-                                                </p>
-                                                <h5 class="mb-1">{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y') }}</h5>
-                                                <small class="text-muted">Submit report for this week</small>
+                                @endisset
+                                @isset($deadlineStatuses['report_due'])
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <p class="text-muted mb-1">
+                                                        <i class="ti ti-activity text-primary me-1"></i>Report deadline (this week)
+                                                    </p>
+                                                    <h5 class="mb-1">{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y') }}</h5>
+                                                    <small class="text-muted">Submit report for this week</small>
+                                                </div>
+                                                <span class="badge {{ $deadlineStatuses['report_badge'] }}">
+                                                    {{ $deadlineStatuses['report_text'] }}
+                                                </span>
                                             </div>
-                                            <span class="badge {{ $deadlineStatuses['report_badge'] }}">
-                                                {{ $deadlineStatuses['report_text'] }}
-                                            </span>
                                         </div>
                                     </div>
-                                </div>
+                                @endisset
                             </div>
                         @else
                             <div class="alert alert-warning mt-3 mb-0">
@@ -125,20 +142,28 @@
                         <h6 class="mb-0"><i class="ti ti-zap me-1 text-primary"></i>Quick Actions</h6>
                     </div>
                     <div class="card-body">
-                        @if(isset($availableTypes['weekly_plan']))
-                            <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-outline-info btn-block mb-2">
+                        @if($empWeeklyPlanCta)
+                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_plan', 'period_id' => $nextPeriod->id ?? null])) }}" class="btn btn-outline-info btn-block mb-2">
                                 <i class="ti ti-calendar me-1"></i> New Weekly Plan
                             </a>
+                        @elseif(isset($availableTypes['weekly_plan']))
+                            <button class="btn btn-outline-info btn-block mb-2" disabled title="Plan deadline has passed or plan already submitted">
+                                <i class="ti ti-calendar-off me-1"></i> Plan unavailable
+                            </button>
                         @else
                             <button class="btn btn-outline-info btn-block mb-2" disabled>
                                 <i class="ti ti-calendar-off me-1"></i> Plan Unavailable
                             </button>
                         @endif
 
-                        @if(isset($availableTypes['weekly_report']))
-                            <a href="{{ route('documents.create') }}?type=weekly_report" class="btn btn-outline-primary btn-block mb-2">
+                        @if($empWeeklyReportCta)
+                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_report', 'period_id' => $currentPeriod->id ?? null])) }}" class="btn btn-outline-primary btn-block mb-2">
                                 <i class="ti ti-file-text me-1"></i> New Weekly Report
                             </a>
+                        @elseif(isset($availableTypes['weekly_report']))
+                            <button class="btn btn-outline-primary btn-block mb-2" disabled title="Report deadline has passed or report already submitted">
+                                <i class="ti ti-file-minus me-1"></i> Report unavailable
+                            </button>
                         @else
                             <button class="btn btn-outline-primary btn-block mb-2" disabled>
                                 <i class="ti ti-file-minus me-1"></i> Report Unavailable
@@ -200,11 +225,11 @@
                         <div class="flex-grow-1">
                             <span class="text-muted d-block">Weekly Plans Pending</span>
                             <h3 class="mb-0 text-info">{{ $stats['weekly_plan_pending'] }}</h3>
-                            @if($deadlineStatuses)
+                            @isset($deadlineStatuses['plan_badge'])
                                 <span class="badge {{ $deadlineStatuses['plan_badge'] }}">
                                     {{ $deadlineStatuses['plan_text'] }}
                                 </span>
-                            @endif
+                            @endisset
                         </div>
                         <div class="text-info">
                             <i class="ti ti-calendar fs-1"></i>
@@ -299,11 +324,11 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                    <a href="{{ route('documents.show', $document->id) }}"
                                                         class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
-                                                    <a href="{{ route('documents.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                    <a href="{{ route('documents.edit', $document->id) }}"
                                                         class="btn btn-primary text-white" title="Edit">
                                                         <i class="ti ti-edit"></i>
                                                     </a>
@@ -352,7 +377,6 @@
                                         <th>Created</th>
                                         <th>Submitted</th>
                                         <th class="text-center" style="width: 120px;">Status</th>
-                                        <th class="text-center" style="width: 100px;">Comments</th>
                                         <th class="text-center" style="width: 100px;">Actions</th>
                                     </tr>
                                 </thead>
@@ -402,12 +426,7 @@
                                                 @endif
                                             </td>
                                             <td class="text-center">
-                                                <span class="badge bg-primary rounded-pill">
-                                                    {{ $document->comments->count() }}
-                                                </span>
-                                            </td>
-                                            <td class="text-center">
-                                                <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                <a href="{{ route('documents.show', $document->id) }}"
                                                     class="btn btn-info btn-sm text-white" title="View">
                                                     <i class="ti ti-eye"></i>
                                                 </a>
@@ -474,7 +493,7 @@
                                                         <span class="badge bg-danger ml-1">Returned</span>
                                                     @endif
                                                     @if($entry['plan'])
-                                                        <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($entry['plan']->id)) }}" class="btn btn-link btn-sm p-0 ml-2">View</a>
+                                                        <a href="{{ route('documents.show', $entry['plan']->id) }}" class="btn btn-link btn-sm p-0 ml-2">View</a>
                                                     @endif
                                                 @endif
                                             </div>
@@ -490,7 +509,7 @@
                                                         <span class="badge bg-danger ml-1">Returned</span>
                                                     @endif
                                                     @if($entry['report'])
-                                                        <a href="{{ route('documents.show', \Vinkla\Hashids\Facades\Hashids::encode($entry['report']->id)) }}" class="btn btn-link btn-sm p-0 ml-2">View</a>
+                                                        <a href="{{ route('documents.show', $entry['report']->id) }}" class="btn btn-link btn-sm p-0 ml-2">View</a>
                                                     @endif
                                                 @endif
                                             </div>

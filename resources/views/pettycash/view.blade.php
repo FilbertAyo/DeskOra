@@ -102,7 +102,7 @@
                                 </button>
                             @endif
                             @if ($request->status == 'pending' || $request->status == 'resubmission')
-                                <a href="{{ route('petty.edit.step1', \Vinkla\Hashids\Facades\Hashids::encode($request->id)) }}" class="btn btn-outline-warning d-flex align-items-center">
+                                <a href="{{ route('petty.edit.step1', $request->id) }}" class="btn btn-outline-warning d-flex align-items-center">
                                     <i class="ti ti-edit me-2"></i>Edit Request
                                 </a>
                             @endif
@@ -150,7 +150,7 @@
                                     $statusInfo = $statusMap[$request->status] ?? ['class' => 'secondary', 'icon' => 'fe-info', 'text' => ucfirst($request->status)];
                                 @endphp
                                 @if ($request->status == 'resubmission')
-                                    <a href="{{ route('petty.edit.step1', \Vinkla\Hashids\Facades\Hashids::encode($request->id)) }}" class="btn btn-{{ $statusInfo['class'] }} text-white d-inline-flex align-items-center px-3 py-2">
+                                    <a href="{{ route('petty.edit.step1', $request->id) }}" class="btn btn-{{ $statusInfo['class'] }} text-white d-inline-flex align-items-center px-3 py-2">
                                         <i class="ti ti-edit me-2"></i>
                                         Edit & Resubmit
                                     </a>

@@ -1,13 +1,25 @@
 <x-app-layout>
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <h5 class="mb-2"><i class="ti ti-clipboard-list me-2"></i>Action Logs</h5>
-            <p class="text-muted mb-2">Weekly shared action tracker with task progress and ownership.</p>
-        </div>
-        <div class="col-auto">
-            <a href="{{ route('action-logs.create') }}" class="btn mb-2 btn-primary btn-sm">
-                <i class="ti ti-plus-circle me-1"></i> Open Current Week Log
-            </a>
+    <div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Action Logs</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Action Logs</li>
+                            </ul>
+                      </div>
+
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <a href="{{ route('action-logs.create') }}" class="btn btn-primary btn-sm">
+                                <i class="ti ti-plus-circle me-1"></i> Open Current Week Log
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -116,6 +128,8 @@
                                             $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
                                             $taskTotal = count($tasks);
                                             $doneTasks = collect($tasks)->filter(fn($row) => is_array($row) && (($row['progress'] ?? '') === 'Done'))->count();
+                                            $cancelledTasks = collect($tasks)->filter(fn($row) => is_array($row) && (($row['progress'] ?? '') === 'Cancelled'))->count();
+                                            $activeTasks = max(0, $taskTotal - $doneTasks - $cancelledTasks);
                                         @endphp
                                         <tr>
                                             <td class="text-center">{{ ($documents->currentPage() - 1) * $documents->perPage() + $loop->iteration }}</td>
@@ -142,7 +156,10 @@
                                             <td>
                                                 @if($taskTotal > 0)
                                                     <span class="badge bg-success">{{ $doneTasks }} Done</span>
-                                                    <span class="badge bg-secondary">{{ $taskTotal - $doneTasks }} Active</span>
+                                                    <span class="badge bg-secondary">{{ $activeTasks }} Active</span>
+                                                    @if($cancelledTasks > 0)
+                                                        <span class="badge bg-danger">{{ $cancelledTasks }} Cancelled</span>
+                                                    @endif
                                                 @else
                                                     <span class="text-muted">No tasks</span>
                                                 @endif
@@ -166,12 +183,12 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('action-logs.show', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                    <a href="{{ route('action-logs.show', $document->id) }}"
                                                         class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
                                                     @can('update', $document)
-                                                        <a href="{{ route('action-logs.edit', \Vinkla\Hashids\Facades\Hashids::encode($document->id)) }}"
+                                                        <a href="{{ route('action-logs.edit', $document->id) }}"
                                                             class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
                                                         </a>
@@ -191,9 +208,7 @@
                         <div class="text-center py-5">
                             <i class="ti ti-clipboard fs-1 text-muted"></i>
                             <p class="text-muted mb-3 mt-3">No action logs found</p>
-                            <a href="{{ route('action-logs.create') }}" class="btn btn-primary">
-                                <i class="ti ti-plus-circle me-1"></i>Create Your First Action Log
-                            </a>
+                       
                         </div>
                     @endif
                 </div>

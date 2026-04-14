@@ -6,14 +6,12 @@ use App\Models\ApprovalLog;
 use App\Models\Petty;
 use App\Models\Replenishment;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Vinkla\Hashids\Facades\Hashids;
 use NumberToWords\NumberToWords;
-use Illuminate\Support\Facades\Auth;
-
 
 class ReplenishmentController extends Controller
 {
@@ -27,6 +25,7 @@ class ReplenishmentController extends Controller
 
         return view('pettycash.replenishments.index', compact('replenishments'));
     }
+
     public function pettycash(Request $request)
     {
         // Start with a base query for paid status
@@ -51,7 +50,7 @@ class ReplenishmentController extends Controller
         $to = $request->to;
 
         // Check overlap with existing replenishments
-        $overlap =  Replenishment::where('status', '!=', 'rejected')->where(function ($query) use ($from, $to) {
+        $overlap = Replenishment::where('status', '!=', 'rejected')->where(function ($query) use ($from, $to) {
             $query->whereBetween('from', [$from, $to])
                 ->orWhereBetween('to', [$from, $to])
                 ->orWhere(function ($q) use ($from, $to) {
@@ -72,10 +71,8 @@ class ReplenishmentController extends Controller
             ->whereNull('replenishment_id')
             ->sum('amount');
 
-
         return view('pettycash.replenishments.create', compact('from', 'to', 'totalAmount'));
     }
-
 
     /**
      * Store a newly created resource in storage.
@@ -178,8 +175,8 @@ class ReplenishmentController extends Controller
                 ->with('replenishment_id', $replenishment ? $replenishment->id : null);
 
         } catch (\Exception $e) {
-            Log::error('Replenishment creation failed: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('Replenishment creation failed: '.$e->getMessage());
+            Log::error('Stack trace: '.$e->getTraceAsString());
 
             return redirect()->back()
                 ->withInput()
@@ -190,11 +187,8 @@ class ReplenishmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show($hashid)
+    public function show(Replenishment $replenishment)
     {
-        $id = Hashids::decode($hashid)[0] ?? null;
-
-        $replenishment = Replenishment::findOrFail($id);
 
         if ($replenishment->status === 'rejected') {
             $petties = Petty::whereDate('paid_date', '>=', $replenishment->from)
@@ -204,11 +198,11 @@ class ReplenishmentController extends Controller
             $petties = Petty::where('replenishment_id', $replenishment->id)->get();
         }
 
-        $numberToWords = new NumberToWords();
+        $numberToWords = new NumberToWords;
         $numberTransformer = $numberToWords->getNumberTransformer('en');
         $amountWords = $numberTransformer->toWords($replenishment->total_amount);
         $amountWords = ucwords($amountWords);
-        $amountInWords = 'TZS ' . $amountWords;
+        $amountInWords = 'TZS '.$amountWords;
 
         // Get the initiator (created action)
         $initiator = ApprovalLog::where('replenishment_id', $replenishment->id)
@@ -245,14 +239,13 @@ class ReplenishmentController extends Controller
         //
     }
 
-    public function firstApprove($id)
+    public function firstApprove(Replenishment $replenishment)
     {
-        $replenishment = Replenishment::findOrFail($id);
         $replenishment->status = 'processing';
         $replenishment->save();
 
         ApprovalLog::create([
-            'replenishment_id' => $id,
+            'replenishment_id' => $replenishment->id,
             'user_id' => Auth::id(), // cleaner
             'action' => 'approved',
         ]);
@@ -260,21 +253,19 @@ class ReplenishmentController extends Controller
         return redirect()->back()->with('success', 'Replenishment first approved successfully.');
     }
 
-    public function lastApprove($id)
+    public function lastApprove(Replenishment $replenishment)
     {
-        $replenishment = Replenishment::findOrFail($id);
         $replenishment->status = 'approved';
         $replenishment->save();
 
         ApprovalLog::create([
-            'replenishment_id' => $id,
+            'replenishment_id' => $replenishment->id,
             'user_id' => Auth::id(),
             'action' => 'approved',
         ]);
 
         return redirect()->back()->with('success', 'Replenishment approved successfully.');
     }
-
 
     public function destroy(Replenishment $replenishment)
     {
@@ -295,11 +286,8 @@ class ReplenishmentController extends Controller
         return redirect()->back()->with('success', 'Replenishment rejected and unlinked from all petty cash records.');
     }
 
-
-    public function downloadPDF($id)
+    public function downloadPDF(Replenishment $replenishment)
     {
-
-        $replenishment = Replenishment::findOrFail($id);
 
         if ($replenishment->status === 'rejected') {
             $petties = Petty::whereDate('paid_date', '>=', $replenishment->from)
@@ -309,11 +297,11 @@ class ReplenishmentController extends Controller
             $petties = Petty::where('replenishment_id', $replenishment->id)->get();
         }
 
-        $numberToWords = new NumberToWords();
+        $numberToWords = new NumberToWords;
         $numberTransformer = $numberToWords->getNumberTransformer('en');
         $amountWords = $numberTransformer->toWords($replenishment->total_amount);
         $amountWords = ucwords($amountWords);
-        $amountInWords = 'TZS ' . $amountWords;
+        $amountInWords = 'TZS '.$amountWords;
 
         $approvalLogs = ApprovalLog::where('replenishment_id', $replenishment->id)
             ->where('action', 'approved')
@@ -333,6 +321,6 @@ class ReplenishmentController extends Controller
             'approver'
         ));
 
-        return $pdf->download('replenishment_' . $replenishment->id . '.pdf');
+        return $pdf->download('replenishment_'.$replenishment->id.'.pdf');
     }
 }

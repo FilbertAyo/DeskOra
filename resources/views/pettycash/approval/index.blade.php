@@ -63,7 +63,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.details', Hashids::encode($item->id)) }}"
+                                                <a href="{{ route('petty.details', $item->id) }}"
                                                     class="btn btn-sm btn-secondary text-white">
                                                     <i class="ti ti-eye"></i></a>
                                             </td>
@@ -96,7 +96,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.details', Hashids::encode($item->id)) }}"
+                                                <a href="{{ route('petty.details', $item->id) }}"
                                                     class="btn btn-sm btn-secondary text-white">
                                                     <i class="ti ti-eye"></i></a>
                                             </td>

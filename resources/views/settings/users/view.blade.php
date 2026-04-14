@@ -15,12 +15,12 @@
                         </div>
                         <div class="col-auto d-flex align-items-center gap-2">
                             @can('users management settings')
-                                <a href="{{ route('admin.edit', Hashids::encode($user->id)) }}" class="btn btn-sm btn-primary">
+                                <a href="{{ route('admin.edit', $user->id) }}" class="btn btn-sm btn-primary">
                                     <i class="ti ti-edit me-1"></i> Edit User
                                 </a>
                             @endcan
                             <a href="{{ route('admin.index') }}" class="btn btn-sm btn-light">
-                                <i class="ti ti-arrow-left me-1"></i> Back to Users
+                                <i class="ti ti-arrow-left me-1"></i> Back
                             </a>
                         </div>
                     </div>
@@ -148,36 +148,40 @@
                                 <div class="col-md-6 mb-3">
                                     <label class="text-muted small mb-1">Full Name</label>
                                     <div class="d-flex align-items-center">
-                                        <i class="ti ti-user me-2 text-primary"></i>
                                         <strong>{{ $user->name }}</strong>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="text-muted small mb-1">Email Address</label>
                                     <div class="d-flex align-items-center">
-                                        <i class="ti ti-mail me-2 text-primary"></i>
                                         <strong>{{ $user->email }}</strong>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="text-muted small mb-1">Phone Number</label>
                                     <div class="d-flex align-items-center">
-                                        <i class="ti ti-phone me-2 text-primary"></i>
                                         <strong>{{ $user->phone }}</strong>
                                     </div>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="text-muted small mb-1">Branch</label>
-                                    <div class="d-flex align-items-center">
-                                        <i class="ti ti-git-branch me-2 text-primary"></i>
-                                        <strong>{{ $user->branch?->name ?? 'No Branch' }}</strong>
-                                    </div>
-                                </div>
+                            
                                 <div class="col-md-6 mb-3">
                                     <label class="text-muted small mb-1">Department</label>
                                     <div class="d-flex align-items-center">
-                                        <i class="ti ti-briefcase me-2 text-primary"></i>
                                         <strong>{{ $user->department?->name ?? 'No Department' }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="text-muted small mb-1">Sub-Departments</label>
+                                    <div class="d-flex align-items-center flex-wrap gap-1">
+                                        @if ($user->subDepartments->isNotEmpty())
+                                            @foreach ($user->subDepartments as $subDepartment)
+                                                <span class="badge bg-light-secondary border">{{ $subDepartment->name }}</span>
+                                            @endforeach
+                                        @else
+                                            <span class="text-muted">
+                                                <i class="ti ti-building-community me-1"></i>None assigned
+                                            </span>
+                                        @endif
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">

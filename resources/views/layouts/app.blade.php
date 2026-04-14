@@ -6,10 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Adilisha Portal') }}</title>
+    <title>{{ config('app.name', 'Adilisha Portal') }} — {{ config('branding.product_name') }}</title>
 
   <!-- [Favicon] icon -->
-  <link rel="icon" href="{{ asset('assets/images/favicon.svg') }}" type="image/x-icon"> <!-- [Google Font] Family -->
+  <link rel="icon" href="{{ asset('assets/images/logo-icon.png') }}" type="image/png">
+  <link rel="apple-touch-icon" href="{{ asset('assets/images/logo-icon.png') }}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" id="main-font-link">
 <!-- [Tabler Icons] https://tablericons.com -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/tabler-icons.min.css') }}" >
