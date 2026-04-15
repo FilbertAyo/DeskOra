@@ -1039,6 +1039,7 @@
                 if (weeklyTypes.includes(selectedTypeValue)) {
                     workPeriodContainer.style.display = '';
                     periodSelect.required = true;
+                    periodSelect.disabled = false;
                     
                     // Hide month/year fields
                     if (monthYearContainer) monthYearContainer.style.display = 'none';
@@ -1064,6 +1065,7 @@
                     // Hide work period, show month/year
                     workPeriodContainer.style.display = 'none';
                     periodSelect.required = false;
+                    periodSelect.disabled = true;
                     periodSelect.value = '';
                     
                     // Show month/year fields
@@ -1079,6 +1081,7 @@
                     // Hide both
                     workPeriodContainer.style.display = 'none';
                     periodSelect.required = false;
+                    periodSelect.disabled = true;
                     periodSelect.value = '';
                     
                     if (monthYearContainer) monthYearContainer.style.display = 'none';
