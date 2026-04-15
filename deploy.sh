@@ -40,7 +40,7 @@ echo "==> Running database migrations..."
 "$PHP_BIN" artisan migrate --force
 
 echo "==> Running database seeders..."
-"$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder
+"$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder --force --no-interaction
 
 
 echo "==> Clearing old caches..."
@@ -57,5 +57,18 @@ echo "==> Rebuilding caches..."
 "$PHP_BIN" artisan view:cache
 "$PHP_BIN" artisan event:cache || true
 "$PHP_BIN" artisan optimize
+
+echo "==> Validating anonymous feedback token config..."
+AF_TOKEN="$("$PHP_BIN" artisan tinker --execute="echo (string) config('anonymous_feedback.public_token');" | tr -d '\r')"
+if [ -z "$AF_TOKEN" ]; then
+  echo "ERROR: ANONYMOUS_FEEDBACK_PUBLIC_TOKEN is empty in runtime config."
+  exit 1
+fi
+if printf '%s' "$AF_TOKEN" | /usr/bin/env grep -q '[[:space:]]'; then
+  echo "ERROR: ANONYMOUS_FEEDBACK_PUBLIC_TOKEN contains whitespace. Remove spaces/newlines from .env."
+  exit 1
+fi
+echo "==> Anonymous feedback URL:"
+echo "    $(/usr/bin/env sed -n 's|^APP_URL=||p' .env | head -n 1)/feedback/$AF_TOKEN"
 
 echo "==> Deployment completed successfully."

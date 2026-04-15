@@ -69,13 +69,6 @@
                     </div>
                 </div>
 
-                <div class="auth-footer row">
-                    <div class="col my-1">
-                        <p class="m-0">
-                            &copy; {{ date('Y') }} {{ config('app.name') }}
-                        </p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

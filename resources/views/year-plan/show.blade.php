@@ -131,7 +131,7 @@
                                         <button type="button" class="btn btn-sm btn-light btn-edit-activity" title="Edit"
                                             data-activity-b64="{{ base64_encode(json_encode([
                                                 'id' => $activity->id,
-                                                'department_id' => (int) $activity->department_id,
+                                                'department_id' => (string) $activity->department_id,
                                                 'sort_order' => (int) $activity->sort_order,
                                                 'description' => (string) $activity->description,
                                                 'frequency' => (string) $activity->frequency,
