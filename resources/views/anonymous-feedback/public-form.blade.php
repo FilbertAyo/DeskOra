@@ -18,13 +18,13 @@
                                 Your message is anonymous. Do not include your name or other identifying details if you want to stay anonymous.
                             </p>
 
-                            @if (session('status'))
+                            @if (session('status') || session('success'))
                                 <div class="alert alert-success mb-4" role="alert">
-                                    {{ session('status') }}
+                                    {{ session('success') ?? session('status') }}
                                 </div>
                             @endif
 
-                            <form method="POST" action="{{ route('anonymous-feedback.store', ['token' => config('anonymous_feedback.public_token')]) }}" class="pt-1">
+                            <form method="POST" action="{{ route('anonymous-feedback.store', ['token' => request()->route('token')]) }}" class="pt-1">
                                 @csrf
 
                                 <div class="mb-3" style="position: absolute; left: -9999px;" aria-hidden="true">

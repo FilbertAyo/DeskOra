@@ -31,6 +31,7 @@ class PublicAnonymousFeedbackController extends Controller
 
         return redirect()
             ->route('anonymous-feedback.form', ['token' => config('anonymous_feedback.public_token')])
-            ->with('status', 'Thank you. Your message has been submitted anonymously.');
+            ->with('status', 'Thank you. Your message has been submitted anonymously.')
+            ->with('success', 'Thank you. Your message has been submitted anonymously.');
     }
 }

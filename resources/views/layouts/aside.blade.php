@@ -206,6 +206,13 @@
                                     <span class="pc-mtext">Notifications</span>
                                 </a>
                             </li>
+                            @can('manage anonymous feedback')
+                                <li class="pc-item {{ Request::routeIs('anonymous-feedback.*') ? 'active' : '' }}">
+                                    <a href="{{ route('anonymous-feedback.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Anonymous Feedback</span>
+                                    </a>
+                                </li>
+                            @endcan
                             @can('view activity log')
                                 <li class="pc-item {{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
                                     <a href="{{ route('activity-log.index') }}" class="pc-link">
