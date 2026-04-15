@@ -92,7 +92,6 @@
                                     <div class="input-group">
                                       
                                         <select class="form-control @error('period_id') is-invalid @enderror"
-                                            name="period_id"
                                             id="period_id" disabled>
                                             <option value="">-- Select Work Period --</option>
                                             @foreach($workPeriods as $workPeriod)
@@ -104,6 +103,8 @@
                                                 </option>
                                             @endforeach
                                         </select>
+                                        <input type="hidden" name="period_id" id="period_id_hidden"
+                                            value="{{ old('period_id', $defaultPeriodId ?? '') }}">
                                     </div>
                                     @error('period_id')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -1018,6 +1019,7 @@
             const monthYearContainer = document.getElementById('monthYearContainer');
             const yearContainer = document.getElementById('yearContainer');
             const periodSelect = document.getElementById('period_id');
+            const periodHiddenInput = document.getElementById('period_id_hidden');
             const monthSelect = document.getElementById('month');
             const yearSelect = document.getElementById('year');
             const monthlyAttachmentContainer = document.getElementById('monthlyAttachmentContainer');
@@ -1035,11 +1037,17 @@
             function toggleWorkPeriod() {
                 const selectedTypeValue = typeSelect.value || selectedType;
                 const weeklyTypes = ['weekly_plan', 'weekly_report'];
+
+                const syncPeriodId = () => {
+                    if (periodHiddenInput) {
+                        periodHiddenInput.value = periodSelect.value || '';
+                    }
+                };
                 
                 if (weeklyTypes.includes(selectedTypeValue)) {
                     workPeriodContainer.style.display = '';
-                    periodSelect.required = true;
-                    periodSelect.disabled = false;
+                    periodSelect.required = false;
+                    periodSelect.disabled = true;
                     
                     // Hide month/year fields
                     if (monthYearContainer) monthYearContainer.style.display = 'none';
@@ -1061,12 +1069,14 @@
                             periodSelect.value = defaultPeriodId;
                         }
                     }
+                    syncPeriodId();
                 } else if (selectedTypeValue === 'monthly_report') {
                     // Hide work period, show month/year
                     workPeriodContainer.style.display = 'none';
                     periodSelect.required = false;
                     periodSelect.disabled = true;
                     periodSelect.value = '';
+                    syncPeriodId();
                     
                     // Show month/year fields
                     if (monthYearContainer) monthYearContainer.style.display = '';
@@ -1083,6 +1093,7 @@
                     periodSelect.required = false;
                     periodSelect.disabled = true;
                     periodSelect.value = '';
+                    syncPeriodId();
                     
                     if (monthYearContainer) monthYearContainer.style.display = 'none';
                     if (yearContainer) yearContainer.style.display = 'none';
@@ -1501,6 +1512,9 @@
 
                 periodSelect.addEventListener('change', function() {
                     const periodId = this.value;
+                    if (periodHiddenInput) {
+                        periodHiddenInput.value = periodId;
+                    }
                     if (periodId) {
                         loadPlanData(periodId);
                     }
@@ -1536,7 +1550,7 @@
                 // If type is pre-selected and disabled, ensure correct fields are shown
                 if (['weekly_plan', 'weekly_report'].includes(selectedType)) {
                     workPeriodContainer.style.display = '';
-                    periodSelect.required = true;
+                    periodSelect.required = false;
                 } else if (selectedType === 'monthly_report') {
                     if (monthYearContainer) monthYearContainer.style.display = '';
                     if (yearContainer) yearContainer.style.display = '';
