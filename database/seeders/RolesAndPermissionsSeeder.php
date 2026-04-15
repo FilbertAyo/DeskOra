@@ -58,6 +58,8 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // Approval Permissions (removed verify, only approve)
             'approve documents',
+            'view weekly budgets',
+            'process weekly budgets',
 
             // Action logs permissions
             'view action logs',

@@ -48,9 +48,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [DocumentController::class, 'index'])->name('index');
         Route::get('/weekly-plans', [DocumentController::class, 'weeklyPlans'])->name('weekly-plans');
         Route::get('/weekly-reports', [DocumentController::class, 'weeklyReports'])->name('weekly-reports');
+        Route::get('/weekly-budget-review', [DocumentController::class, 'weeklyBudgetReviewPanel'])->name('weekly-budget-review');
         Route::get('/plan-target', [DocumentController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentController::class, 'create'])->name('create');
         Route::post('/', [DocumentController::class, 'store'])->name('store');
+        Route::post('/{document}/weekly-budget-review', [DocumentController::class, 'processWeeklyBudgetReview'])->name('process-weekly-budget-review');
         Route::get('/{document}', [DocumentController::class, 'show'])->name('show');
         Route::get('/{document}/edit', [DocumentController::class, 'edit'])->name('edit');
         Route::put('/{document}', [DocumentController::class, 'update'])->name('update');

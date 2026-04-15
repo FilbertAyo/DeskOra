@@ -529,6 +529,9 @@ class DocumentController extends Controller
                 $updateData['content'] = $monthlyContent;
             } elseif ($templateContent !== null) {
                 $updateData['content'] = $templateContent;
+                if ($request->type === Document::TYPE_WEEKLY_PLAN) {
+                    $updateData = array_merge($updateData, $this->budgetReviewDefaultsForWeeklyPlan($templateContent));
+                }
             }
 
             // Add attachment for monthly reports
@@ -607,6 +610,9 @@ class DocumentController extends Controller
             $documentData['content'] = $monthlyContent;
         } elseif ($templateContent !== null) {
             $documentData['content'] = $templateContent;
+            if ($request->type === Document::TYPE_WEEKLY_PLAN) {
+                $documentData = array_merge($documentData, $this->budgetReviewDefaultsForWeeklyPlan($templateContent));
+            }
         }
 
         $document = Document::create($documentData);
@@ -881,6 +887,9 @@ class DocumentController extends Controller
             $updateData['content'] = $monthlyContent;
         } elseif ($templateContent !== null) {
             $updateData['content'] = $templateContent;
+            if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+                $updateData = array_merge($updateData, $this->budgetReviewDefaultsForWeeklyPlan($templateContent));
+            }
         }
 
         // Update state if submitting
@@ -1395,6 +1404,142 @@ class DocumentController extends Controller
     }
 
     /**
+     * Weekly budget review panel.
+     */
+    public function weeklyBudgetReviewPanel(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (! $user->hasPermissionTo('view weekly budgets')) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $query = Document::query()
+            ->with(['user', 'period', 'budgetReviewedBy'])
+            ->weeklyPlans()
+            ->where(function ($budgetQuery) {
+                $budgetQuery
+                    ->whereNotNull('budget_review_status')
+                    ->orWhere('content', 'like', '%"budget"%');
+            });
+
+        if ($request->filled('user_id')) {
+            $query->forUser($request->string('user_id')->toString());
+        }
+
+        if ($request->filled('period_id')) {
+            $query->forPeriod($request->string('period_id')->toString());
+        }
+
+        if ($request->filled('year')) {
+            $year = (int) $request->input('year');
+            $query->whereHas('period', function ($periodQuery) use ($year) {
+                $periodQuery->where('year', $year);
+            });
+        }
+
+        $statusFilter = $request->input('status');
+        if ($statusFilter === Document::BUDGET_REVIEW_PENDING) {
+            $query->where(function ($statusQuery) {
+                $statusQuery
+                    ->whereNull('budget_review_status')
+                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
+            });
+        } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED], true)) {
+            $query->where('budget_review_status', $statusFilter);
+        }
+
+        $documents = $query->latest()->paginate(15)->withQueryString();
+        $documents->setCollection(
+            $documents->getCollection()->filter(fn (Document $document) => $document->hasBudgetItems())->values()
+        );
+
+        $statsDocuments = (clone $query)
+            ->get()
+            ->filter(fn (Document $document) => $document->hasBudgetItems());
+
+        $stats = [
+            'total' => $statsDocuments->count(),
+            'pending' => $statsDocuments->filter(fn (Document $document) => in_array($document->budget_review_status, [null, Document::BUDGET_REVIEW_PENDING], true))->count(),
+            'approved' => $statsDocuments->where('budget_review_status', Document::BUDGET_REVIEW_APPROVED)->count(),
+            'rejected' => $statsDocuments->where('budget_review_status', Document::BUDGET_REVIEW_REJECTED)->count(),
+            'requested_total' => $statsDocuments->sum(fn (Document $document) => $this->requestedBudgetTotal($document)),
+            'provided_total' => $statsDocuments->sum(fn (Document $document) => (float) ($document->budget_provided_amount ?? 0)),
+        ];
+
+        $usersWithBudgets = User::query()
+            ->whereHas('documents', function ($documentsQuery) {
+                $documentsQuery
+                    ->weeklyPlans()
+                    ->where(function ($budgetQuery) {
+                        $budgetQuery
+                            ->whereNotNull('budget_review_status')
+                            ->orWhere('content', 'like', '%"budget"%');
+                    });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $periodOptions = WorkPeriod::orderBy('year', 'desc')
+            ->orderBy('week_number', 'desc')
+            ->take(52)
+            ->get();
+
+        $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
+
+        return view('documents.weekly-budget-review', compact(
+            'documents',
+            'stats',
+            'usersWithBudgets',
+            'periodOptions',
+            'years',
+            'statusFilter'
+        ));
+    }
+
+    /**
+     * Approve or reject weekly plan budget.
+     */
+    public function processWeeklyBudgetReview(Request $request, Document $document)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (! $user->hasPermissionTo('process weekly budgets')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if ($document->type !== Document::TYPE_WEEKLY_PLAN || ! $document->hasBudgetItems()) {
+            return redirect()
+                ->back()
+                ->with('error', 'Only weekly plans with budget rows can be processed.');
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', 'in:approved,rejected'],
+            'provided_amount' => ['nullable', 'numeric', 'min:0', 'required_if:decision,approved'],
+            'note' => ['nullable', 'string', 'max:2000', 'required_if:decision,rejected'],
+        ]);
+
+        $decision = $validated['decision'];
+        $providedAmount = $decision === Document::BUDGET_REVIEW_APPROVED
+            ? (float) $validated['provided_amount']
+            : 0.0;
+        $note = isset($validated['note']) && trim($validated['note']) !== '' ? trim($validated['note']) : null;
+
+        $document->update([
+            'budget_review_status' => $decision,
+            'budget_reviewed_by' => $user->id,
+            'budget_reviewed_at' => now(),
+            'budget_provided_amount' => $providedAmount,
+            'budget_review_note' => $note,
+        ]);
+
+        return redirect()
+            ->back()
+            ->with('success', 'Weekly plan budget has been reviewed successfully.');
+    }
+
+    /**
      * Build document_id => latest rejection reason map for visible documents.
      */
     private function getReturnedDocumentMapForIds(array $documentIds): array
@@ -1412,6 +1557,27 @@ class DocumentController extends Controller
                 return [(string) $doc->id => trim((string) $doc->review_rejection_reason)];
             })
             ->all();
+    }
+
+    private function budgetReviewDefaultsForWeeklyPlan(?array $content): array
+    {
+        if (! $this->templateHasBudgetRows($content)) {
+            return [
+                'budget_review_status' => null,
+                'budget_reviewed_by' => null,
+                'budget_reviewed_at' => null,
+                'budget_provided_amount' => null,
+                'budget_review_note' => null,
+            ];
+        }
+
+        return [
+            'budget_review_status' => Document::BUDGET_REVIEW_PENDING,
+            'budget_reviewed_by' => null,
+            'budget_reviewed_at' => null,
+            'budget_provided_amount' => null,
+            'budget_review_note' => null,
+        ];
     }
 
     private const MONTHLY_IMPLEMENTATION_STATUSES = [
@@ -1612,5 +1778,65 @@ class DocumentController extends Controller
 
             return false;
         }));
+    }
+
+    private function templateHasBudgetRows(?array $content): bool
+    {
+        if (! is_array($content)) {
+            return false;
+        }
+
+        $budgetRows = $content['budget'] ?? [];
+        if (! is_array($budgetRows)) {
+            return false;
+        }
+
+        foreach ($budgetRows as $budgetRow) {
+            if (! is_array($budgetRow)) {
+                continue;
+            }
+
+            $item = trim((string) ($budgetRow['item'] ?? ''));
+            $description = trim((string) ($budgetRow['description_purpose'] ?? ''));
+            $amount = trim((string) ($budgetRow['amount'] ?? ''));
+            if ($item !== '' || $description !== '' || $amount !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function requestedBudgetTotal(Document $document): float
+    {
+        if (! is_array($document->content)) {
+            return 0.0;
+        }
+
+        $budgetRows = $document->content['budget'] ?? [];
+        if (! is_array($budgetRows)) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+        foreach ($budgetRows as $budgetRow) {
+            if (! is_array($budgetRow)) {
+                continue;
+            }
+
+            $rawAmount = trim((string) ($budgetRow['amount'] ?? ''));
+            if ($rawAmount === '') {
+                continue;
+            }
+
+            $normalizedAmount = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rawAmount));
+            if ($normalizedAmount === null || $normalizedAmount === '' || ! is_numeric($normalizedAmount)) {
+                continue;
+            }
+
+            $total += (float) $normalizedAmount;
+        }
+
+        return $total;
     }
 }

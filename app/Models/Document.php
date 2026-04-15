@@ -55,6 +55,15 @@ class Document extends Model
     public const STATE_SUBMITTED = 'submitted';
 
     /**
+     * Weekly budget review statuses
+     */
+    public const BUDGET_REVIEW_PENDING = 'pending';
+
+    public const BUDGET_REVIEW_APPROVED = 'approved';
+
+    public const BUDGET_REVIEW_REJECTED = 'rejected';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -76,6 +85,11 @@ class Document extends Model
         'target_explanation',
         'state',
         'review_rejection_reason',
+        'budget_review_status',
+        'budget_reviewed_by',
+        'budget_reviewed_at',
+        'budget_provided_amount',
+        'budget_review_note',
     ];
 
     /**
@@ -89,6 +103,8 @@ class Document extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
+            'budget_reviewed_at' => 'datetime',
+            'budget_provided_amount' => 'decimal:2',
             // Used for template-based weekly_plan/weekly_report forms.
             'content' => 'array',
         ];
@@ -252,6 +268,11 @@ class Document extends Model
         return $this->belongsTo(WorkPeriod::class);
     }
 
+    public function budgetReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'budget_reviewed_by');
+    }
+
     /**
      * Scope: Filter by type
      *
@@ -327,6 +348,32 @@ class Document extends Model
     public function scopeWeeklyReports($query)
     {
         return $query->where('type', self::TYPE_WEEKLY_REPORT);
+    }
+
+    public function scopeWeeklyPlansWithBudget($query)
+    {
+        return $query
+            ->weeklyPlans()
+            ->where(function ($budgetQuery) {
+                $budgetQuery
+                    ->whereNotNull('budget_review_status')
+                    ->orWhereRaw("JSON_LENGTH(JSON_EXTRACT(content, '$.budget')) > 0");
+            });
+    }
+
+    public function scopeBudgetPending($query)
+    {
+        return $query->where('budget_review_status', self::BUDGET_REVIEW_PENDING);
+    }
+
+    public function scopeBudgetApproved($query)
+    {
+        return $query->where('budget_review_status', self::BUDGET_REVIEW_APPROVED);
+    }
+
+    public function scopeBudgetRejected($query)
+    {
+        return $query->where('budget_review_status', self::BUDGET_REVIEW_REJECTED);
     }
 
     /**
@@ -503,5 +550,47 @@ class Document extends Model
     public function isReturnedForRevision(): bool
     {
         return $this->isDraft() && $this->latestRejectionReason() !== null;
+    }
+
+    public function hasBudgetItems(): bool
+    {
+        if (! is_array($this->content)) {
+            return false;
+        }
+
+        $budgetRows = $this->content['budget'] ?? [];
+        if (! is_array($budgetRows)) {
+            return false;
+        }
+
+        foreach ($budgetRows as $budgetRow) {
+            if (! is_array($budgetRow)) {
+                continue;
+            }
+
+            $item = trim((string) ($budgetRow['item'] ?? ''));
+            $description = trim((string) ($budgetRow['description_purpose'] ?? ''));
+            $amount = trim((string) ($budgetRow['amount'] ?? ''));
+
+            if ($item !== '' || $description !== '' || $amount !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getBudgetReviewStatusLabelAttribute(): ?string
+    {
+        if ($this->budget_review_status === null) {
+            return $this->hasBudgetItems() ? 'Pending' : null;
+        }
+
+        return match ($this->budget_review_status) {
+            self::BUDGET_REVIEW_PENDING => 'Pending',
+            self::BUDGET_REVIEW_APPROVED => 'Approved',
+            self::BUDGET_REVIEW_REJECTED => 'Rejected',
+            default => ucfirst((string) $this->budget_review_status),
+        };
     }
 }
