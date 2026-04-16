@@ -462,7 +462,6 @@
                                                     <thead class="thead-light">
                                                         <tr>
                                                             <th>Main Target</th>
-                                                            <th>Description</th>
                                                             <th style="width: 150px;">Status</th>
                                                             <th>Reflection / Progress</th>
                                                         </tr>
@@ -470,7 +469,6 @@
                                                     <tbody>
                                                         <tr>
                                                             <td>{{ $document->main_target ?: '-' }}</td>
-                                                            <td>{{ $objective['description'] ?? '-' }}</td>
                                                             <td>{{ $objective['status'] ?? '-' }}</td>
                                                             <td>{{ $objective['reflection_progress'] ?? '-' }}</td>
                                                         </tr>

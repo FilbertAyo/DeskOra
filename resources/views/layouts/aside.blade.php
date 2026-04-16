@@ -66,6 +66,12 @@
                                     @php
                                         $pendingWeeklyBudgetCount = \App\Models\Document::query()
                                             ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
+                                            ->where('state', \App\Models\Document::STATE_SUBMITTED)
+                                            ->where(function ($budgetQuery) {
+                                                $budgetQuery
+                                                    ->whereNotNull('budget_review_status')
+                                                    ->orWhere('content', 'like', '%"budget"%');
+                                            })
                                             ->where(function ($query) {
                                                 $query->whereNull('budget_review_status')
                                                     ->orWhere('budget_review_status', \App\Models\Document::BUDGET_REVIEW_PENDING);

@@ -1443,6 +1443,7 @@ class DocumentController extends Controller
         $query = Document::query()
             ->with(['user.department', 'period', 'budgetReviewedBy'])
             ->weeklyPlans()
+            ->submitted()
             ->where(function ($budgetQuery) {
                 $budgetQuery
                     ->whereNotNull('budget_review_status')
@@ -1493,6 +1494,7 @@ class DocumentController extends Controller
             ->whereHas('documents', function ($documentsQuery) {
                 $documentsQuery
                     ->weeklyPlans()
+                    ->submitted()
                     ->where(function ($budgetQuery) {
                         $budgetQuery
                             ->whereNotNull('budget_review_status')

@@ -288,7 +288,7 @@
                                                                     <input class="form-control"
                                                                         name="content[key_meetings][{{ $i }}][meeting]"
                                                                         value="{{ old("content.key_meetings.$i.meeting", $row['meeting'] ?? '') }}"
-                                                                        placeholder="e.g., MIT Engagement - Dr. Nibu">
+                                                                        placeholder="e.g., MIT Engagement ...">
                                                                 </td>
                                                                 <td>
                                                                     <input class="form-control"

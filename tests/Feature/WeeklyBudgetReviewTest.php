@@ -172,6 +172,47 @@ class WeeklyBudgetReviewTest extends TestCase
         $response->assertSee('Desk');
     }
 
+    public function test_budget_review_excludes_draft_weekly_plans_even_with_budget(): void
+    {
+        [, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        // Submitted plan should appear
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Submitted Item', 'description_purpose' => 'Visible', 'amount' => '100'],
+        ]);
+
+        // Draft plan with budget should NOT appear
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $next->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Draft plan with budget',
+            'state' => Document::STATE_DRAFT,
+            'main_target' => 'Draft target',
+            'content' => [
+                'objective' => ['description' => 'Draft objective'],
+                'planned_activities' => [],
+                'key_meetings' => [],
+                'budget' => [
+                    [
+                        'budget_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'item' => 'Draft Item',
+                        'description_purpose' => 'Should be hidden',
+                        'amount' => '200',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review'));
+        $response->assertOk();
+        $response->assertSee('Submitted Item');
+        $response->assertDontSee('Draft Item');
+    }
+
     // ------------------------------------------------------------------
     // 2. Grouped by department -> staff -> items
     // ------------------------------------------------------------------
