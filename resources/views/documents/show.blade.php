@@ -724,35 +724,59 @@
                                             <h6 class="mb-0"><i class="ti ti-dollar-sign me-2"></i>Budget Status (from weekly plan)</h6>
                                         </div>
                                         <div class="card-body">
-                                            @if(!empty($planBudget))
+                                            @php
+                                                $planBudgetFiltered = is_array($planBudget) ? array_values(array_filter($planBudget, function ($row) {
+                                                    if (!is_array($row)) return false;
+                                                    return trim((string)($row['item'] ?? '')) !== '' || trim((string)($row['amount'] ?? '')) !== '';
+                                                })) : [];
+                                                $reviewsByUid = $relatedPlan ? $relatedPlan->budgetReviewItemsByUid() : [];
+                                                // Index budget_statuses by budget_uid
+                                                $statusByUid = [];
+                                                foreach ($budgetStatuses as $sIdx => $s) {
+                                                    $sUid = is_array($s) ? trim((string)($s['budget_uid'] ?? '')) : '';
+                                                    if ($sUid !== '') $statusByUid[$sUid] = $s;
+                                                }
+                                            @endphp
+                                            @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
                                                     <table class="table table-bordered">
                                                         <thead class="thead-light">
                                                             <tr>
                                                                 <th>Budget Item</th>
-                                                                <th style="width: 180px;">Amount</th>
-                                                                <th style="width: 220px;">Status</th>
+                                                                <th style="width: 150px;">Amount</th>
+                                                                <th style="width: 130px;">Review</th>
+                                                                <th style="width: 160px;">Staff Status</th>
                                                                 <th>Notes</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            @php
-                                                                $max = max(count($planBudget), count($budgetStatuses));
-                                                            @endphp
-                                                            @for($i=0;$i<$max;$i++)
+                                                            @foreach($planBudgetFiltered as $i => $planRow)
                                                                 @php
-                                                                    $planRow = $planBudget[$i] ?? [];
-                                                                    $statusRow = $budgetStatuses[$i] ?? [];
                                                                     $planRow = is_array($planRow) ? $planRow : [];
+                                                                    $uid = trim((string)($planRow['budget_uid'] ?? ''));
+                                                                    $review = ($uid !== '' && isset($reviewsByUid[$uid])) ? $reviewsByUid[$uid] : null;
+                                                                    $reviewDecision = is_array($review) ? ($review['decision'] ?? null) : null;
+                                                                    $statusRow = ($uid !== '' && isset($statusByUid[$uid])) ? $statusByUid[$uid] : ($budgetStatuses[$i] ?? []);
                                                                     $statusRow = is_array($statusRow) ? $statusRow : [];
                                                                 @endphp
                                                                 <tr>
                                                                     <td>{{ $planRow['item'] ?? '' }}</td>
                                                                     <td>{{ $planRow['amount'] ?? '' }}</td>
+                                                                    <td class="text-center">
+                                                                        @if($reviewDecision === 'approved')
+                                                                            <span class="badge bg-success">Approved</span>
+                                                                        @elseif($reviewDecision === 'rejected')
+                                                                            <span class="badge bg-danger">Rejected</span>
+                                                                        @elseif($reviewDecision === 'pending')
+                                                                            <span class="badge bg-warning">Pending</span>
+                                                                        @else
+                                                                            <span class="text-muted">-</span>
+                                                                        @endif
+                                                                    </td>
                                                                     <td>{{ $statusRow['status'] ?? '' }}</td>
                                                                     <td>{{ $statusRow['notes'] ?? '' }}</td>
                                                                 </tr>
-                                                            @endfor
+                                                            @endforeach
                                                         </tbody>
                                                     </table>
                                                 </div>

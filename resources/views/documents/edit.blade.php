@@ -876,49 +876,95 @@
                                         </div>
                                         <div class="card-body">
                                             @php
-                                                $budgetCount = 2;
+                                                // Use plan budget items and match by budget_uid where possible
+                                                $planBudgetFiltered = is_array($planBudget) ? array_values(array_filter($planBudget, function ($row) {
+                                                    if (!is_array($row)) return false;
+                                                    return trim((string)($row['item'] ?? '')) !== '' || trim((string)($row['amount'] ?? '')) !== '';
+                                                })) : [];
+                                                $relatedPlanReviewsByUid = [];
+                                                if ($relatedPlan) {
+                                                    $relatedPlanReviewsByUid = $relatedPlan->budgetReviewItemsByUid();
+                                                }
+                                                // Index existing budget_statuses by budget_uid if available, else by position
+                                                $statusByUid = [];
+                                                foreach ($budgetStatuses as $sIdx => $s) {
+                                                    $sUid = is_array($s) ? trim((string)($s['budget_uid'] ?? '')) : '';
+                                                    if ($sUid !== '') {
+                                                        $statusByUid[$sUid] = $s;
+                                                    }
+                                                }
                                             @endphp
-                                            <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
-                                                    <thead class="thead-light">
-                                                        <tr>
-                                                            <th>Budget Item / Activity</th>
-                                                            <th style="width: 200px;">Amount (TZS)</th>
-                                                            <th style="width: 240px;">Status</th>
-                                                            <th>Notes</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @for($i=0;$i<$budgetCount;$i++)
-                                                            @php $planRow = $planBudget[$i] ?? []; @endphp
-                                                            @php $statusRow = $budgetStatuses[$i] ?? []; @endphp
+
+                                            @if(count($planBudgetFiltered) > 0)
+                                                <div class="table-responsive">
+                                                    <table class="table table-bordered align-middle mb-0">
+                                                        <thead class="thead-light">
                                                             <tr>
-                                                                <td>
-                                                                    <input class="form-control" type="text" value="{{ $planRow['item'] ?? '' }}" disabled>
-                                                                </td>
-                                                                <td>
-                                                                    <input class="form-control" type="text" value="{{ $planRow['amount'] ?? '' }}" disabled>
-                                                                </td>
-                                                                <td>
-                                                                    <select class="form-select"
-                                                                        name="content[budget_statuses][{{ $i }}][status]">
-                                                                        @foreach(['Not started','Pending','Received','Paid'] as $opt)
-                                                                            @php $curStatus = old("content.budget_statuses.$i.status", $statusRow['status'] ?? ''); @endphp
-                                                                            <option value="{{ $opt }}" {{ $curStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
-                                                                        @endforeach
-                                                                    </select>
-                                                                </td>
-                                                                <td>
-                                                                    <textarea class="form-control" rows="2"
-                                                                        name="content[budget_statuses][{{ $i }}][notes]">{{ old("content.budget_statuses.$i.notes", $statusRow['notes'] ?? '') }}</textarea>
-                                                                </td>
+                                                                <th>Budget Item / Activity</th>
+                                                                <th style="width: 200px;">Amount</th>
+                                                                <th style="width: 140px;">Review</th>
+                                                                <th style="width: 240px;">Your Status</th>
+                                                                <th>Notes</th>
                                                             </tr>
-                                                        @endfor
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach($planBudgetFiltered as $i => $planRow)
+                                                                @php
+                                                                    $planRow = is_array($planRow) ? $planRow : [];
+                                                                    $uid = trim((string)($planRow['budget_uid'] ?? ''));
+                                                                    $review = $uid !== '' ? ($relatedPlanReviewsByUid[$uid] ?? null) : null;
+                                                                    $reviewDecision = is_array($review) ? ($review['decision'] ?? null) : null;
+
+                                                                    // Try to find existing status by uid first, then by index
+                                                                    $statusRow = ($uid !== '' && isset($statusByUid[$uid])) ? $statusByUid[$uid] : ($budgetStatuses[$i] ?? []);
+                                                                    $statusRow = is_array($statusRow) ? $statusRow : [];
+
+                                                                    // Auto-prefill from review if staff hasn't set a status yet
+                                                                    $currentStatus = old("content.budget_statuses.$i.status", $statusRow['status'] ?? '');
+                                                                    if ($currentStatus === '' && $reviewDecision === 'approved') $currentStatus = 'Received';
+                                                                    elseif ($currentStatus === '' && $reviewDecision === 'pending') $currentStatus = 'Pending';
+                                                                @endphp
+                                                                <tr>
+                                                                    <td>
+                                                                        <input class="form-control" type="text" value="{{ $planRow['item'] ?? '' }}" disabled>
+                                                                        <input type="hidden" name="content[budget_statuses][{{ $i }}][budget_uid]" value="{{ $uid }}">
+                                                                    </td>
+                                                                    <td>
+                                                                        <input class="form-control" type="text" value="{{ $planRow['amount'] ?? '' }}" disabled>
+                                                                    </td>
+                                                                    <td class="text-center">
+                                                                        @if($reviewDecision === 'approved')
+                                                                            <span class="badge bg-success">Approved</span>
+                                                                        @elseif($reviewDecision === 'rejected')
+                                                                            <span class="badge bg-danger">Rejected</span>
+                                                                        @elseif($reviewDecision === 'pending')
+                                                                            <span class="badge bg-warning">Pending</span>
+                                                                        @else
+                                                                            <span class="text-muted">-</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td>
+                                                                        <select class="form-select"
+                                                                            name="content[budget_statuses][{{ $i }}][status]">
+                                                                            @foreach(['Not started','Pending','Received','Paid'] as $opt)
+                                                                                <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </td>
+                                                                    <td>
+                                                                        <textarea class="form-control" rows="2"
+                                                                            name="content[budget_statuses][{{ $i }}][notes]">{{ old("content.budget_statuses.$i.notes", $statusRow['notes'] ?? '') }}</textarea>
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            @else
+                                                <div class="alert alert-info mb-0">No budget items found in the related weekly plan.</div>
+                                            @endif
                                             <small class="form-text text-muted mt-2">
-                                                Budget statuses reflect outcomes for the budget items defined in your weekly plan.
+                                                Budget statuses reflect outcomes for the budget items defined in your weekly plan. Review decisions are auto-prefilled but you can adjust.
                                             </small>
                                         </div>
                                     </div>

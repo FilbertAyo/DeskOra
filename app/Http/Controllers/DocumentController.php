@@ -10,7 +10,9 @@ use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class DocumentController extends Controller
@@ -530,7 +532,10 @@ class DocumentController extends Controller
             } elseif ($templateContent !== null) {
                 $updateData['content'] = $templateContent;
                 if ($request->type === Document::TYPE_WEEKLY_PLAN) {
-                    $updateData = array_merge($updateData, $this->budgetReviewDefaultsForWeeklyPlan($templateContent));
+                    $updateData = array_merge(
+                        $updateData,
+                        $this->budgetReviewDefaultsForWeeklyPlan($templateContent, $existingDocument->budget_review_items)
+                    );
                 }
             }
 
@@ -611,7 +616,10 @@ class DocumentController extends Controller
         } elseif ($templateContent !== null) {
             $documentData['content'] = $templateContent;
             if ($request->type === Document::TYPE_WEEKLY_PLAN) {
-                $documentData = array_merge($documentData, $this->budgetReviewDefaultsForWeeklyPlan($templateContent));
+                $documentData = array_merge(
+                    $documentData,
+                    $this->budgetReviewDefaultsForWeeklyPlan($templateContent)
+                );
             }
         }
 
@@ -888,7 +896,10 @@ class DocumentController extends Controller
         } elseif ($templateContent !== null) {
             $updateData['content'] = $templateContent;
             if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-                $updateData = array_merge($updateData, $this->budgetReviewDefaultsForWeeklyPlan($templateContent));
+                $updateData = array_merge(
+                    $updateData,
+                    $this->budgetReviewDefaultsForWeeklyPlan($templateContent, $document->budget_review_items)
+                );
             }
         }
 
@@ -1281,17 +1292,25 @@ class DocumentController extends Controller
 
         if ($plan) {
             $budgetItems = [];
+            $reviewsByUid = $plan->budgetReviewItemsByUid();
             if (is_array($plan->content) && ! empty($plan->content['budget']) && is_array($plan->content['budget'])) {
-                // Normalize into a simple array for the UI.
-                $budgetItems = array_values(array_map(function ($row) {
+                // Normalize into a simple array for the UI, including review metadata.
+                $budgetItems = array_values(array_map(function ($row) use ($reviewsByUid) {
                     if (! is_array($row)) {
                         return null;
                     }
+
+                    $uid = trim((string) ($row['budget_uid'] ?? ''));
+                    $review = $uid !== '' ? ($reviewsByUid[$uid] ?? null) : null;
 
                     return [
                         'item' => $row['item'] ?? null,
                         'description_purpose' => $row['description_purpose'] ?? null,
                         'amount' => $row['amount'] ?? null,
+                        'budget_uid' => $uid,
+                        'review_decision' => $review['decision'] ?? null,
+                        'review_provided_amount' => $review['provided_amount'] ?? null,
+                        'review_note' => $review['note'] ?? null,
                     ];
                 }, $plan->content['budget']));
                 // Remove empty rows (e.g., all fields blank)
@@ -1414,8 +1433,15 @@ class DocumentController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
+        // Default to next-week period (the period plans target) unless filters are explicitly provided
+        $defaultPeriod = null;
+        $hasExplicitFilter = $request->filled('period_id') || $request->filled('year') || $request->filled('user_id') || $request->filled('status');
+        if (! $hasExplicitFilter) {
+            $defaultPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
+        }
+
         $query = Document::query()
-            ->with(['user', 'period', 'budgetReviewedBy'])
+            ->with(['user.department', 'period', 'budgetReviewedBy'])
             ->weeklyPlans()
             ->where(function ($budgetQuery) {
                 $budgetQuery
@@ -1429,6 +1455,8 @@ class DocumentController extends Controller
 
         if ($request->filled('period_id')) {
             $query->forPeriod($request->string('period_id')->toString());
+        } elseif ($defaultPeriod) {
+            $query->forPeriod($defaultPeriod->id);
         }
 
         if ($request->filled('year')) {
@@ -1449,23 +1477,17 @@ class DocumentController extends Controller
             $query->where('budget_review_status', $statusFilter);
         }
 
-        $documents = $query->latest()->paginate(15)->withQueryString();
+        $documents = $query->latest()->paginate(100)->withQueryString();
         $documents->setCollection(
             $documents->getCollection()->filter(fn (Document $document) => $document->hasBudgetItems())->values()
         );
 
-        $statsDocuments = (clone $query)
-            ->get()
-            ->filter(fn (Document $document) => $document->hasBudgetItems());
+        // Build grouped data: department -> staff -> budget items
+        $grouped = $this->groupBudgetDocumentsByDepartment($documents->getCollection());
 
-        $stats = [
-            'total' => $statsDocuments->count(),
-            'pending' => $statsDocuments->filter(fn (Document $document) => in_array($document->budget_review_status, [null, Document::BUDGET_REVIEW_PENDING], true))->count(),
-            'approved' => $statsDocuments->where('budget_review_status', Document::BUDGET_REVIEW_APPROVED)->count(),
-            'rejected' => $statsDocuments->where('budget_review_status', Document::BUDGET_REVIEW_REJECTED)->count(),
-            'requested_total' => $statsDocuments->sum(fn (Document $document) => $this->requestedBudgetTotal($document)),
-            'provided_total' => $statsDocuments->sum(fn (Document $document) => (float) ($document->budget_provided_amount ?? 0)),
-        ];
+        // Stats from current result set
+        $statsDocuments = $documents->getCollection();
+        $aggregateStats = $this->computeBudgetStats($statsDocuments);
 
         $usersWithBudgets = User::query()
             ->whereHas('documents', function ($documentsQuery) {
@@ -1487,18 +1509,124 @@ class DocumentController extends Controller
 
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
-        return view('documents.weekly-budget-review', compact(
-            'documents',
-            'stats',
-            'usersWithBudgets',
-            'periodOptions',
-            'years',
-            'statusFilter'
-        ));
+        return view('documents.weekly-budget-review', [
+            'documents' => $documents,
+            'grouped' => $grouped,
+            'stats' => $aggregateStats,
+            'usersWithBudgets' => $usersWithBudgets,
+            'periodOptions' => $periodOptions,
+            'years' => $years,
+            'statusFilter' => $statusFilter,
+            'defaultPeriod' => $defaultPeriod,
+        ]);
     }
 
     /**
-     * Approve or reject weekly plan budget.
+     * Group budget documents by department -> staff -> budget items for the review UI.
+     *
+     * @return array<string, array{department_name: string, department_id: string|null, requested_total: float, provided_total: float, staff: array}>
+     */
+    private function groupBudgetDocumentsByDepartment(\Illuminate\Support\Collection $documents): array
+    {
+        $grouped = [];
+
+        foreach ($documents as $document) {
+            $departmentName = $document->user?->department?->name ?? 'No Department';
+            $departmentId = (string) ($document->user?->department_id ?? 'none');
+
+            if (! isset($grouped[$departmentId])) {
+                $grouped[$departmentId] = [
+                    'department_name' => $departmentName,
+                    'department_id' => $departmentId,
+                    'requested_total' => 0.0,
+                    'provided_total' => 0.0,
+                    'staff' => [],
+                ];
+            }
+
+            $userId = (string) $document->user_id;
+            if (! isset($grouped[$departmentId]['staff'][$userId])) {
+                $grouped[$departmentId]['staff'][$userId] = [
+                    'user' => $document->user,
+                    'document' => $document,
+                    'items' => [],
+                    'requested_total' => 0.0,
+                    'provided_total' => 0.0,
+                    'summary' => $document->budgetReviewSummary(),
+                ];
+            }
+
+            $budgetItems = $document->budgetItems();
+            $reviewsByUid = $document->budgetReviewItemsByUid();
+
+            foreach ($budgetItems as $item) {
+                $uid = $item['budget_uid'];
+                $review = $reviewsByUid[$uid] ?? null;
+                $amountNumeric = (float) ($item['amount_numeric'] ?? 0);
+                $providedAmount = (float) ($review['provided_amount'] ?? 0);
+
+                $grouped[$departmentId]['staff'][$userId]['items'][] = [
+                    'budget_uid' => $uid,
+                    'item' => $item['item'],
+                    'description_purpose' => $item['description_purpose'],
+                    'amount' => $item['amount'],
+                    'amount_numeric' => $amountNumeric,
+                    'decision' => $review['decision'] ?? Document::BUDGET_REVIEW_PENDING,
+                    'provided_amount' => $providedAmount,
+                    'note' => $review['note'] ?? null,
+                    'reviewed_by' => $review['reviewed_by'] ?? null,
+                    'reviewed_at' => $review['reviewed_at'] ?? null,
+                    'document_id' => $document->id,
+                ];
+
+                $grouped[$departmentId]['staff'][$userId]['requested_total'] += $amountNumeric;
+                $grouped[$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
+                $grouped[$departmentId]['requested_total'] += $amountNumeric;
+                $grouped[$departmentId]['provided_total'] += $providedAmount;
+            }
+        }
+
+        // Sort departments alphabetically
+        uasort($grouped, fn ($a, $b) => strcasecmp($a['department_name'], $b['department_name']));
+
+        return $grouped;
+    }
+
+    /**
+     * Compute aggregate stats across multiple budget documents.
+     */
+    private function computeBudgetStats(\Illuminate\Support\Collection $documents): array
+    {
+        $totalItems = 0;
+        $pendingItems = 0;
+        $approvedItems = 0;
+        $rejectedItems = 0;
+        $requestedTotal = 0.0;
+        $providedTotal = 0.0;
+
+        foreach ($documents as $document) {
+            $summary = $document->budgetReviewSummary();
+            $totalItems += $summary['items_total'];
+            $pendingItems += $summary['pending'];
+            $approvedItems += $summary['approved'];
+            $rejectedItems += $summary['rejected'];
+            $requestedTotal += $summary['requested_total'];
+            $providedTotal += $summary['provided_total'];
+        }
+
+        return [
+            'total' => $documents->count(),
+            'total_items' => $totalItems,
+            'pending' => $pendingItems,
+            'approved' => $approvedItems,
+            'rejected' => $rejectedItems,
+            'requested_total' => $requestedTotal,
+            'provided_total' => $providedTotal,
+        ];
+    }
+
+    /**
+     * Approve or reject a single weekly plan budget item.
      */
     public function processWeeklyBudgetReview(Request $request, Document $document)
     {
@@ -1515,28 +1643,81 @@ class DocumentController extends Controller
         }
 
         $validated = $request->validate([
+            'budget_uid' => ['required', 'string', 'max:255'],
             'decision' => ['required', 'in:approved,rejected'],
             'provided_amount' => ['nullable', 'numeric', 'min:0', 'required_if:decision,approved'],
             'note' => ['nullable', 'string', 'max:2000', 'required_if:decision,rejected'],
         ]);
 
+        $budgetUid = trim($validated['budget_uid']);
         $decision = $validated['decision'];
         $providedAmount = $decision === Document::BUDGET_REVIEW_APPROVED
             ? (float) $validated['provided_amount']
             : 0.0;
         $note = isset($validated['note']) && trim($validated['note']) !== '' ? trim($validated['note']) : null;
 
+        // Verify the UID exists in the plan's budget items
+        $budgetItems = $document->budgetItems();
+        $uidExists = collect($budgetItems)->contains(fn ($item) => $item['budget_uid'] === $budgetUid);
+        if (! $uidExists) {
+            return redirect()
+                ->back()
+                ->with('error', 'Budget item not found in this plan.');
+        }
+
+        // Update the specific item in budget_review_items
+        $existingReviews = is_array($document->budget_review_items) ? $document->budget_review_items : [];
+        $found = false;
+        foreach ($existingReviews as &$review) {
+            if (is_array($review) && ($review['budget_uid'] ?? '') === $budgetUid) {
+                $review['decision'] = $decision;
+                $review['provided_amount'] = $providedAmount;
+                $review['note'] = $note;
+                $review['reviewed_by'] = $user->id;
+                $review['reviewed_at'] = now()->toIso8601String();
+                $found = true;
+                break;
+            }
+        }
+        unset($review);
+
+        if (! $found) {
+            $existingReviews[] = [
+                'budget_uid' => $budgetUid,
+                'decision' => $decision,
+                'provided_amount' => $providedAmount,
+                'note' => $note,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => now()->toIso8601String(),
+            ];
+        }
+
+        // Recompute plan-level summary from all item decisions
+        $document->budget_review_items = $existingReviews;
+        $summary = $document->budgetReviewSummary();
+
+        $planStatus = Document::BUDGET_REVIEW_PENDING;
+        if ($summary['all_approved']) {
+            $planStatus = Document::BUDGET_REVIEW_APPROVED;
+        } elseif ($summary['all_rejected']) {
+            $planStatus = Document::BUDGET_REVIEW_REJECTED;
+        } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
+            // All items reviewed but mixed decisions
+            $planStatus = Document::BUDGET_REVIEW_APPROVED;
+        }
+
         $document->update([
-            'budget_review_status' => $decision,
+            'budget_review_items' => $existingReviews,
+            'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
             'budget_reviewed_at' => now(),
-            'budget_provided_amount' => $providedAmount,
-            'budget_review_note' => $note,
+            'budget_provided_amount' => $summary['provided_total'],
+            'budget_review_note' => null,
         ]);
 
         return redirect()
             ->back()
-            ->with('success', 'Weekly plan budget has been reviewed successfully.');
+            ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
     }
 
     /**
@@ -1559,7 +1740,7 @@ class DocumentController extends Controller
             ->all();
     }
 
-    private function budgetReviewDefaultsForWeeklyPlan(?array $content): array
+    private function budgetReviewDefaultsForWeeklyPlan(?array $content, ?array $existingReviewItems = null): array
     {
         if (! $this->templateHasBudgetRows($content)) {
             return [
@@ -1568,7 +1749,43 @@ class DocumentController extends Controller
                 'budget_reviewed_at' => null,
                 'budget_provided_amount' => null,
                 'budget_review_note' => null,
+                'budget_review_items' => null,
             ];
+        }
+
+        // Build initial per-item review entries, preserving existing decisions if UIDs match
+        $existingByUid = [];
+        if (is_array($existingReviewItems)) {
+            foreach ($existingReviewItems as $row) {
+                if (is_array($row) && ! empty($row['budget_uid'])) {
+                    $existingByUid[(string) $row['budget_uid']] = $row;
+                }
+            }
+        }
+
+        $budgetRows = $content['budget'] ?? [];
+        $itemReviews = [];
+        foreach ($budgetRows as $budgetRow) {
+            if (! is_array($budgetRow)) {
+                continue;
+            }
+            $uid = trim((string) ($budgetRow['budget_uid'] ?? ''));
+            if ($uid === '') {
+                continue;
+            }
+
+            if (isset($existingByUid[$uid])) {
+                $itemReviews[] = $existingByUid[$uid];
+            } else {
+                $itemReviews[] = [
+                    'budget_uid' => $uid,
+                    'decision' => Document::BUDGET_REVIEW_PENDING,
+                    'provided_amount' => 0,
+                    'note' => null,
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                ];
+            }
         }
 
         return [
@@ -1577,6 +1794,7 @@ class DocumentController extends Controller
             'budget_reviewed_at' => null,
             'budget_provided_amount' => null,
             'budget_review_note' => null,
+            'budget_review_items' => $itemReviews,
         ];
     }
 
@@ -1706,6 +1924,7 @@ class DocumentController extends Controller
                 $content['budget'] ?? [],
                 ['item', 'description_purpose', 'amount']
             );
+            $content['budget'] = $this->ensureBudgetRowUids($content['budget']);
         }
 
         if ($type === Document::TYPE_WEEKLY_REPORT) {
@@ -1805,6 +2024,25 @@ class DocumentController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Assign a stable unique identifier to each budget row that doesn't already have one.
+     */
+    private function ensureBudgetRowUids(array $budgetRows): array
+    {
+        foreach ($budgetRows as &$row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $uid = trim((string) ($row['budget_uid'] ?? ''));
+            if ($uid === '') {
+                $row['budget_uid'] = (string) Str::ulid();
+            }
+        }
+        unset($row);
+
+        return $budgetRows;
     }
 
     private function requestedBudgetTotal(Document $document): float

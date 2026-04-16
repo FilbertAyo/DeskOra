@@ -90,6 +90,7 @@ class Document extends Model
         'budget_reviewed_at',
         'budget_provided_amount',
         'budget_review_note',
+        'budget_review_items',
     ];
 
     /**
@@ -105,6 +106,7 @@ class Document extends Model
             'deleted_at' => 'datetime',
             'budget_reviewed_at' => 'datetime',
             'budget_provided_amount' => 'decimal:2',
+            'budget_review_items' => 'array',
             // Used for template-based weekly_plan/weekly_report forms.
             'content' => 'array',
         ];
@@ -554,34 +556,16 @@ class Document extends Model
 
     public function hasBudgetItems(): bool
     {
-        if (! is_array($this->content)) {
-            return false;
-        }
-
-        $budgetRows = $this->content['budget'] ?? [];
-        if (! is_array($budgetRows)) {
-            return false;
-        }
-
-        foreach ($budgetRows as $budgetRow) {
-            if (! is_array($budgetRow)) {
-                continue;
-            }
-
-            $item = trim((string) ($budgetRow['item'] ?? ''));
-            $description = trim((string) ($budgetRow['description_purpose'] ?? ''));
-            $amount = trim((string) ($budgetRow['amount'] ?? ''));
-
-            if ($item !== '' || $description !== '' || $amount !== '') {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->budgetItems() !== [];
     }
 
     public function getBudgetReviewStatusLabelAttribute(): ?string
     {
+        $summary = $this->budgetReviewSummary();
+        if ($summary['is_partial']) {
+            return 'Partial';
+        }
+
         if ($this->budget_review_status === null) {
             return $this->hasBudgetItems() ? 'Pending' : null;
         }
@@ -592,5 +576,145 @@ class Document extends Model
             self::BUDGET_REVIEW_REJECTED => 'Rejected',
             default => ucfirst((string) $this->budget_review_status),
         };
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function budgetItems(): array
+    {
+        if (! is_array($this->content)) {
+            return [];
+        }
+
+        $budgetRows = $this->content['budget'] ?? [];
+        if (! is_array($budgetRows)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($budgetRows as $index => $budgetRow) {
+            if (! is_array($budgetRow)) {
+                continue;
+            }
+
+            $item = trim((string) ($budgetRow['item'] ?? ''));
+            $description = trim((string) ($budgetRow['description_purpose'] ?? ''));
+            $amount = trim((string) ($budgetRow['amount'] ?? ''));
+            if ($item === '' && $description === '' && $amount === '') {
+                continue;
+            }
+
+            $uid = trim((string) ($budgetRow['budget_uid'] ?? ''));
+            if ($uid === '') {
+                $uid = 'legacy_'.$this->id.'_'.$index;
+            }
+
+            $items[] = [
+                'budget_uid' => $uid,
+                'item' => $item,
+                'description_purpose' => $description,
+                'amount' => $amount,
+                'amount_numeric' => self::parseBudgetAmount($amount),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function budgetReviewItemsByUid(): array
+    {
+        $rows = is_array($this->budget_review_items) ? $this->budget_review_items : [];
+        $mapped = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $uid = trim((string) ($row['budget_uid'] ?? ''));
+            if ($uid === '') {
+                continue;
+            }
+
+            $decision = trim((string) ($row['decision'] ?? ''));
+            if (! in_array($decision, [self::BUDGET_REVIEW_PENDING, self::BUDGET_REVIEW_APPROVED, self::BUDGET_REVIEW_REJECTED], true)) {
+                $decision = self::BUDGET_REVIEW_PENDING;
+            }
+
+            $mapped[$uid] = [
+                'budget_uid' => $uid,
+                'decision' => $decision,
+                'provided_amount' => (float) ($row['provided_amount'] ?? 0),
+                'note' => isset($row['note']) ? trim((string) $row['note']) : null,
+                'reviewed_by' => $row['reviewed_by'] ?? null,
+                'reviewed_at' => isset($row['reviewed_at']) && $row['reviewed_at'] !== '' ? (string) $row['reviewed_at'] : null,
+            ];
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function budgetReviewSummary(): array
+    {
+        $items = $this->budgetItems();
+        $reviewsByUid = $this->budgetReviewItemsByUid();
+
+        $pending = 0;
+        $approved = 0;
+        $rejected = 0;
+        $requestedTotal = 0.0;
+        $providedTotal = 0.0;
+
+        foreach ($items as $item) {
+            $uid = (string) $item['budget_uid'];
+            $requestedTotal += (float) ($item['amount_numeric'] ?? 0);
+            $review = $reviewsByUid[$uid] ?? null;
+            $decision = $review['decision'] ?? self::BUDGET_REVIEW_PENDING;
+            if ($decision === self::BUDGET_REVIEW_APPROVED) {
+                $approved++;
+                $providedTotal += (float) ($review['provided_amount'] ?? 0);
+            } elseif ($decision === self::BUDGET_REVIEW_REJECTED) {
+                $rejected++;
+            } else {
+                $pending++;
+            }
+        }
+
+        $hasApproved = $approved > 0;
+        $hasRejected = $rejected > 0;
+        $isPartial = $hasApproved && ($hasRejected || $pending > 0);
+
+        return [
+            'items_total' => count($items),
+            'pending' => $pending,
+            'approved' => $approved,
+            'rejected' => $rejected,
+            'requested_total' => $requestedTotal,
+            'provided_total' => $providedTotal,
+            'is_partial' => $isPartial,
+            'all_approved' => count($items) > 0 && $approved === count($items),
+            'all_rejected' => count($items) > 0 && $rejected === count($items),
+        ];
+    }
+
+    public static function parseBudgetAmount(string $rawAmount): float
+    {
+        $rawAmount = trim($rawAmount);
+        if ($rawAmount === '') {
+            return 0.0;
+        }
+
+        $normalizedAmount = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rawAmount));
+        if ($normalizedAmount === null || $normalizedAmount === '' || ! is_numeric($normalizedAmount)) {
+            return 0.0;
+        }
+
+        return (float) $normalizedAmount;
     }
 }

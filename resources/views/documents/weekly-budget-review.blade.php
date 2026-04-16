@@ -16,11 +16,12 @@
         </div>
     </div>
 
+    {{-- Summary stats cards --}}
     <div class="row mb-3">
         <div class="col-md-2 col-sm-6 mb-2">
             <div class="card border-start border h-100">
                 <div class="card-body py-3">
-                    <h6 class="mb-1 text-muted">Pending</h6>
+                    <h6 class="mb-1 text-muted">Pending Items</h6>
                     <h4 class="mb-0">{{ $stats['pending'] }}</h4>
                 </div>
             </div>
@@ -28,7 +29,7 @@
         <div class="col-md-2 col-sm-6 mb-2">
             <div class="card border-start border h-100">
                 <div class="card-body py-3">
-                    <h6 class="mb-1 text-muted">Approved</h6>
+                    <h6 class="mb-1 text-muted">Approved Items</h6>
                     <h4 class="mb-0">{{ $stats['approved'] }}</h4>
                 </div>
             </div>
@@ -36,7 +37,7 @@
         <div class="col-md-2 col-sm-6 mb-2">
             <div class="card border-start border h-100">
                 <div class="card-body py-3">
-                    <h6 class="mb-1 text-muted">Rejected</h6>
+                    <h6 class="mb-1 text-muted">Rejected Items</h6>
                     <h4 class="mb-0">{{ $stats['rejected'] }}</h4>
                 </div>
             </div>
@@ -64,6 +65,9 @@
             <div class="row align-items-center">
                 <div class="col-md-4">
                     <h5 class="mb-0"><i class="ti ti-wallet me-2 text-primary"></i>Weekly Budget Submissions</h5>
+                    @if(isset($defaultPeriod) && $defaultPeriod && !request()->filled('period_id'))
+                        <small class="text-muted">Showing next week: Week {{ $defaultPeriod->week_number }} &bull; {{ $defaultPeriod->year }}</small>
+                    @endif
                 </div>
                 <div class="col-md-8">
                     <form method="GET" action="{{ route('documents.weekly-budget-review') }}" id="budgetFilterForm" class="row g-2">
@@ -82,7 +86,7 @@
                                 <option value="">All Weeks</option>
                                 @foreach($periodOptions as $periodOption)
                                     <option value="{{ $periodOption->id }}" {{ request('period_id') == $periodOption->id ? 'selected' : '' }}>
-                                        Week {{ $periodOption->week_number }} • {{ $periodOption->year }}
+                                        Week {{ $periodOption->week_number }} &bull; {{ $periodOption->year }}
                                     </option>
                                 @endforeach
                             </select>
@@ -111,120 +115,188 @@
             </div>
         </div>
         <div class="card-body">
-            @if($documents->count() > 0)
-                <div class="table-responsive">
-                    <table class="table table-hover table-bordered">
-                        <thead class="thead-light">
-                            <tr>
-                                <th class="text-center" style="width: 55px;">No.</th>
-                                <th>Staff</th>
-                                <th>Week</th>
-                                <th class="text-end">Requested Amount</th>
-                                <th class="text-end">Provided Amount</th>
-                                <th>Status</th>
-                                <th>Reviewed By</th>
-                                <th>Reviewed At</th>
-                                <th class="text-center" style="width: 250px;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($documents as $document)
+            @if(count($grouped) > 0)
+                @foreach($grouped as $departmentId => $dept)
+                    {{-- Department header --}}
+                    <div class="card border mb-4">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
+                            </h6>
+                            <div class="text-end">
+                                <span class="badge bg-secondary me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
+                                <span class="badge bg-primary">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            @foreach($dept['staff'] as $userId => $staffData)
                                 @php
-                                    $status = $document->budget_review_status_label;
-                                    $isPending = $document->budget_review_status === null || $document->budget_review_status === \App\Models\Document::BUDGET_REVIEW_PENDING;
-                                    $requestedAmount = collect($document->content['budget'] ?? [])->sum(function ($row) {
-                                        if (! is_array($row)) {
-                                            return 0;
-                                        }
-                                        $normalized = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', (string) ($row['amount'] ?? '0')));
-                                        return is_numeric($normalized) ? (float) $normalized : 0;
-                                    });
+                                    $staffUser = $staffData['user'];
+                                    $staffDocument = $staffData['document'];
+                                    $staffItems = $staffData['items'];
+                                    $staffSummary = $staffData['summary'];
                                 @endphp
-                                <tr>
-                                    <td class="text-center">{{ ($documents->currentPage() - 1) * $documents->perPage() + $loop->iteration }}</td>
-                                    <td>{{ $document->user?->name ?? '-' }}</td>
-                                    <td>
-                                        @if($document->period)
-                                            Week {{ $document->period->week_number }} • {{ $document->period->date_range }}
-                                        @else
-                                            <span class="text-muted">-</span>
+                                {{-- Staff sub-header --}}
+                                <div class="border-bottom px-3 py-2 bg-white d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ $staffUser?->name ?? 'Unknown' }}</strong>
+                                        @if($staffDocument->period)
+                                            <small class="text-muted ms-2">
+                                                Week {{ $staffDocument->period->week_number }} &bull; {{ $staffDocument->period->date_range }}
+                                            </small>
                                         @endif
-                                    </td>
-                                    <td class="text-end">{{ number_format($requestedAmount, 2) }}</td>
-                                    <td class="text-end">{{ number_format((float) ($document->budget_provided_amount ?? 0), 2) }}</td>
-                                    <td>
-                                        @if($status === 'Approved')
-                                            <span class="badge bg-success">Approved</span>
-                                        @elseif($status === 'Rejected')
-                                            <span class="badge bg-danger">Rejected</span>
-                                        @else
-                                            <span class="badge bg-warning">Pending</span>
+                                        <a href="{{ route('documents.show', $staffDocument->id) }}" class="btn btn-sm btn-outline-info ms-2" title="View plan">
+                                            <i class="ti ti-eye"></i>
+                                        </a>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-muted me-2">{{ count($staffItems) }} item(s)</span>
+                                        <span class="badge bg-secondary me-1">Req: {{ number_format($staffData['requested_total'], 2) }}</span>
+                                        <span class="badge bg-primary me-1">Prov: {{ number_format($staffData['provided_total'], 2) }}</span>
+                                        @if($staffSummary['pending'] > 0)
+                                            <span class="badge bg-warning">{{ $staffSummary['pending'] }} pending</span>
                                         @endif
-                                    </td>
-                                    <td>{{ $document->budgetReviewedBy?->name ?? '-' }}</td>
-                                    <td>{{ $document->budget_reviewed_at?->format('M d, Y H:i') ?? '-' }}</td>
-                                    <td class="text-center">
-                                        <div class="d-flex justify-content-center gap-2">
-                                            <a href="{{ route('documents.show', $document->id) }}" class="btn btn-sm btn-info text-white">
-                                                <i class="ti ti-eye"></i>
-                                            </a>
-                                            @can('process weekly budgets')
-                                                <button
-                                                    type="button"
-                                                    class="btn btn-sm {{ $isPending ? 'btn-primary' : 'btn-outline-primary' }}"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#budgetReviewModal{{ $document->id }}">
-                                                    Process
-                                                </button>
-                                            @endcan
-                                        </div>
-                                        @can('process weekly budgets')
-                                            <div class="modal fade text-start" id="budgetReviewModal{{ $document->id }}" tabindex="-1" aria-hidden="true">
-                                                <div class="modal-dialog">
-                                                    <form method="POST" action="{{ route('documents.process-weekly-budget-review', $document->id) }}" class="modal-content">
-                                                        @csrf
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title">Process Weekly Budget</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        @if($staffSummary['approved'] > 0)
+                                            <span class="badge bg-success">{{ $staffSummary['approved'] }} approved</span>
+                                        @endif
+                                        @if($staffSummary['rejected'] > 0)
+                                            <span class="badge bg-danger">{{ $staffSummary['rejected'] }} rejected</span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Item rows --}}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th style="width: 50px;" class="text-center">#</th>
+                                                <th>Item</th>
+                                                <th>Description / Purpose</th>
+                                                <th class="text-end" style="width: 140px;">Requested</th>
+                                                <th class="text-end" style="width: 140px;">Provided</th>
+                                                <th style="width: 120px;">Status</th>
+                                                <th>Note</th>
+                                                <th class="text-center" style="width: 120px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($staffItems as $idx => $item)
+                                                @php
+                                                    $isPending = ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_PENDING;
+                                                    $isApproved = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
+                                                    $isRejected = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_REJECTED;
+                                                @endphp
+                                                <tr>
+                                                    <td class="text-center">{{ $idx + 1 }}</td>
+                                                    <td>{{ $item['item'] }}</td>
+                                                    <td>{{ $item['description_purpose'] }}</td>
+                                                    <td class="text-end">{{ $item['amount'] }}</td>
+                                                    <td class="text-end">
+                                                        @if($isApproved)
+                                                            {{ number_format($item['provided_amount'], 2) }}
+                                                        @else
+                                                            -
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($isApproved)
+                                                            <span class="badge bg-success">Approved</span>
+                                                        @elseif($isRejected)
+                                                            <span class="badge bg-danger">Rejected</span>
+                                                        @else
+                                                            <span class="badge bg-warning">Pending</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <small>{{ $item['note'] ?? '' }}</small>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        @can('process weekly budgets')
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm {{ $isPending ? 'btn-primary' : 'btn-outline-primary' }}"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
+                                                                {{ $isPending ? 'Process' : 'Edit' }}
+                                                            </button>
+                                                        @endcan
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="3" class="text-end">Staff Total</td>
+                                                <td class="text-end">{{ number_format($staffData['requested_total'], 2) }}</td>
+                                                <td class="text-end">{{ number_format($staffData['provided_total'], 2) }}</td>
+                                                <td colspan="3"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                {{-- Per-item review modals --}}
+                                @can('process weekly budgets')
+                                    @foreach($staffItems as $item)
+                                        <div class="modal fade" id="itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <form method="POST" action="{{ route('documents.process-weekly-budget-review', $item['document_id']) }}" class="modal-content">
+                                                    @csrf
+                                                    <input type="hidden" name="budget_uid" value="{{ $item['budget_uid'] }}">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Review Budget Item</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label text-muted">Item</label>
+                                                            <div class="fw-semibold">{{ $item['item'] }}</div>
+                                                            @if($item['description_purpose'])
+                                                                <small class="text-muted">{{ $item['description_purpose'] }}</small>
+                                                            @endif
+                                                            <div class="mt-1"><strong>Requested:</strong> {{ $item['amount'] }}</div>
                                                         </div>
-                                                        <div class="modal-body">
-                                                            <div class="mb-3">
-                                                                <label class="form-label">Decision</label>
-                                                                <select name="decision" class="form-control" required>
-                                                                    <option value="approved">Approve</option>
-                                                                    <option value="rejected">Reject</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label">Provided Amount</label>
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    name="provided_amount"
-                                                                    value="{{ $document->budget_provided_amount ?? number_format($requestedAmount, 2, '.', '') }}"
-                                                                    class="form-control"
-                                                                    required>
-                                                            </div>
-                                                            <div class="mb-0">
-                                                                <label class="form-label">Note</label>
-                                                                <textarea name="note" rows="3" class="form-control" placeholder="Reason (required on rejection)">{{ $document->budget_review_note }}</textarea>
-                                                            </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Decision</label>
+                                                            <select name="decision" class="form-control" required>
+                                                                <option value="approved" {{ ($item['decision'] ?? '') === 'approved' ? 'selected' : '' }}>Approve</option>
+                                                                <option value="rejected" {{ ($item['decision'] ?? '') === 'rejected' ? 'selected' : '' }}>Reject</option>
+                                                            </select>
                                                         </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                                            <button type="submit" class="btn btn-primary">Save Decision</button>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Provided Amount</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                name="provided_amount"
+                                                                value="{{ ($item['decision'] ?? '') === 'approved' ? number_format($item['provided_amount'], 2, '.', '') : number_format($item['amount_numeric'], 2, '.', '') }}"
+                                                                class="form-control">
                                                         </div>
-                                                    </form>
-                                                </div>
+                                                        <div class="mb-0">
+                                                            <label class="form-label">Note</label>
+                                                            <textarea name="note" rows="3" class="form-control" placeholder="Reason (required on rejection)">{{ $item['note'] ?? '' }}</textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                                                        <button type="submit" class="btn btn-primary">Save Decision</button>
+                                                    </div>
+                                                </form>
                                             </div>
-                                        @endcan
-                                    </td>
-                                </tr>
+                                        </div>
+                                    @endforeach
+                                @endcan
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        </div>
+                        {{-- Department total footer --}}
+                        <div class="card-footer bg-light d-flex justify-content-end">
+                            <strong class="me-3">Department Total Requested: {{ number_format($dept['requested_total'], 2) }}</strong>
+                            <strong>Department Total Provided: {{ number_format($dept['provided_total'], 2) }}</strong>
+                        </div>
+                    </div>
+                @endforeach
 
                 <div class="mt-3">
                     {{ $documents->links() }}

@@ -1452,11 +1452,33 @@
                                 budgetStatusContainer.innerHTML = budgetItems.map((item, idx) => {
                                     const amount = item.amount ?? '';
                                     const label = item.item ?? '';
+                                    const uid = item.budget_uid ?? '';
+                                    const reviewDecision = item.review_decision ?? null;
+                                    const reviewNote = item.review_note ?? '';
+
+                                    // Auto-prefill status from budget review decision
+                                    let defaultStatus = 'Not started';
+                                    if (reviewDecision === 'approved') defaultStatus = 'Received';
+                                    else if (reviewDecision === 'rejected') defaultStatus = 'Not started';
+                                    else if (reviewDecision === 'pending') defaultStatus = 'Pending';
+
+                                    // Review badge
+                                    let reviewBadge = '';
+                                    if (reviewDecision === 'approved') {
+                                        reviewBadge = '<span class="badge bg-success ms-1">Approved</span>';
+                                    } else if (reviewDecision === 'rejected') {
+                                        reviewBadge = '<span class="badge bg-danger ms-1">Rejected</span>';
+                                        if (reviewNote) reviewBadge += `<br><small class="text-danger">${reviewNote}</small>`;
+                                    } else if (reviewDecision === 'pending') {
+                                        reviewBadge = '<span class="badge bg-warning ms-1">Pending Review</span>';
+                                    }
+
                                     return `
                                         <div class="mb-3 border rounded p-2">
+                                            <input type="hidden" name="content[budget_statuses][${idx}][budget_uid]" value="${uid}">
                                             <div class="d-flex justify-content-between align-items-start flex-wrap">
                                                 <div class="me-3">
-                                                    <div class="fw-semibold">${label}</div>
+                                                    <div class="fw-semibold">${label} ${reviewBadge}</div>
                                                     <small class="text-muted">Amount: ${amount}</small>
                                                 </div>
                                                 <div class="flex-grow-1" style="min-width: 260px;">
@@ -1464,7 +1486,7 @@
                                                     <select class="form-select"
                                                         name="content[budget_statuses][${idx}][status]">
                                                         ${['Not started','Pending','Received','Paid'].map(opt => `
-                                                            <option value="${opt}">${opt}</option>
+                                                            <option value="${opt}" ${opt === defaultStatus ? 'selected' : ''}>${opt}</option>
                                                         `).join('')}
                                                     </select>
                                                     <textarea class="form-control mt-2"

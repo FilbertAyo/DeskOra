@@ -74,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
                         ->where('period_id', $currentPeriod->id)
                         ->whereNotNull('main_target')
                         ->where('main_target', '!=', '')
-                        ->with('user:id,name,sub_department')
+                        ->with('user:id,name,department_id')
                         ->latest('updated_at')
                         ->get(['user_id', 'main_target', 'updated_at'])
                         ->groupBy('user_id')
