@@ -290,11 +290,13 @@ class DashboardController extends Controller
     private function buildActionLogProgressForUser(User $user): array
     {
         $isActionLogManager = $user->hasAnyPermission(['create action logs', 'approve documents']);
-        $documents = Document::with('period')
+        $documentsQuery = Document::with('period')
             ->where('type', Document::TYPE_ACTION_LOG)
-            ->forUser($user->id)
-            ->whereNotNull('period_id')
-            ->get();
+            ->whereNotNull('period_id');
+
+        $documents = $isActionLogManager
+            ? $documentsQuery->forUser($user->id)->get()
+            : $documentsQuery->get()->filter(fn (Document $document) => $this->isUserAssignedToActionLog($user, $document))->values();
 
         if ($documents->isEmpty()) {
             return [
@@ -328,10 +330,6 @@ class DashboardController extends Controller
         $taskTimeline = [];
         foreach ($selectedByPeriod as $document) {
             if (! $document || ! $document->period) {
-                continue;
-            }
-            if (! $isActionLogManager && ! $document->isSubmitted()) {
-                // Staff should not see action-task notifications from draft logs.
                 continue;
             }
 
@@ -403,5 +401,29 @@ class DashboardController extends Controller
             'currentDraftId' => $isActionLogManager ? $currentDraftDoc?->id : null,
             'showNotifications' => ! empty($activeTasks),
         ];
+    }
+
+    private function isUserAssignedToActionLog(User $user, Document $document): bool
+    {
+        $content = is_array($document->content) ? $document->content : [];
+        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+
+        foreach ($tasks as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+
+            $responsibleIds = $task['responsible_user_ids'] ?? [];
+            if (! is_array($responsibleIds)) {
+                continue;
+            }
+
+            $ids = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
+            if (in_array((string) $user->id, $ids, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
