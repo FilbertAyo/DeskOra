@@ -193,8 +193,8 @@
                                                 @if(!empty($history))
                                                     <button type="button"
                                                         class="btn btn-sm btn-outline-primary"
-                                                        data-toggle="collapse"
-                                                        data-target="#{{ $timelineModalId }}"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#{{ $timelineModalId }}"
                                                         aria-expanded="false"
                                                         aria-controls="{{ $timelineModalId }}">
                                                         View Timeline

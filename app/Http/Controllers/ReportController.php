@@ -17,12 +17,24 @@ class ReportController extends Controller
 {
     public function index()
     {
+        $search = trim((string) request('search', ''));
+
         $organizationReports = OrganizationReport::query()
             ->with('uploader:id,name')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($innerQuery) use ($search) {
+                    $innerQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('stored_name', 'like', "%{$search}%")
+                        ->orWhereHas('uploader', function ($uploaderQuery) use ($search) {
+                            $uploaderQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->latest()
-            ->paginate(10);
+            ->paginate(12)
+            ->withQueryString();
 
-        return view('reports.index', compact('organizationReports'));
+        return view('reports.index', compact('organizationReports', 'search'));
     }
 
     public function storeOrganizationDocument(Request $request)

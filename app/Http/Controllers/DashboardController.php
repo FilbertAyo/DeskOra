@@ -289,6 +289,7 @@ class DashboardController extends Controller
 
     private function buildActionLogProgressForUser(User $user): array
     {
+        $isActionLogManager = $user->hasAnyPermission(['create action logs', 'approve documents']);
         $documents = Document::with('period')
             ->where('type', Document::TYPE_ACTION_LOG)
             ->forUser($user->id)
@@ -299,6 +300,7 @@ class DashboardController extends Controller
             return [
                 'activeTasks' => [],
                 'currentDraftId' => null,
+                'showNotifications' => false,
             ];
         }
 
@@ -326,6 +328,10 @@ class DashboardController extends Controller
         $taskTimeline = [];
         foreach ($selectedByPeriod as $document) {
             if (! $document || ! $document->period) {
+                continue;
+            }
+            if (! $isActionLogManager && ! $document->isSubmitted()) {
+                // Staff should not see action-task notifications from draft logs.
                 continue;
             }
 
@@ -394,7 +400,8 @@ class DashboardController extends Controller
 
         return [
             'activeTasks' => $activeTasks,
-            'currentDraftId' => $currentDraftDoc?->id,
+            'currentDraftId' => $isActionLogManager ? $currentDraftDoc?->id : null,
+            'showNotifications' => ! empty($activeTasks),
         ];
     }
 }

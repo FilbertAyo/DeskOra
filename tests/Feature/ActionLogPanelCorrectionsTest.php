@@ -227,6 +227,43 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('Week 14 progress update', $latest['notes_progress'] ?? null);
     }
 
+    public function test_manager_update_uses_existing_period_when_period_id_not_submitted(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Existing task'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('action-logs.update', $document), [
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Updated task text'),
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('action-logs.show', $document));
+        $response->assertSessionHas('success');
+
+        $document->refresh();
+        $this->assertSame($period->id, $document->period_id);
+        $this->assertSame('Updated task text', $document->content['tasks'][0]['task'] ?? null);
+    }
+
     private function taskRow(
         string $uid,
         string $task,

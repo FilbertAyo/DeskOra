@@ -326,6 +326,11 @@ class ActionLogController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
+        // Keep period stable when the UI shows a disabled work-period selector.
+        if (! $request->filled('period_id') && ! empty($document->period_id)) {
+            $request->merge(['period_id' => (string) $document->period_id]);
+        }
+
         $request->validate([
             'period_id' => ['required', 'string', 'ulid', 'exists:work_periods,id'],
             'content' => ['nullable', 'array'],

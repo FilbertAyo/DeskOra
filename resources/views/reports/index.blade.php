@@ -36,6 +36,25 @@
    
 
     <div class="row">
+        <div class="col-12 mb-3">
+            <form action="{{ route('reports') }}" method="GET" class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label for="search-reports" class="form-label mb-1">Search Organization Documents</label>
+                    <input type="text" id="search-reports" name="search" value="{{ $search ?? '' }}"
+                        class="form-control" placeholder="Search by name, file name, or uploader">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-search me-1"></i>Search
+                    </button>
+                </div>
+                @if(!empty($search))
+                    <div class="col-auto">
+                        <a href="{{ route('reports') }}" class="btn btn-light">Clear</a>
+                    </div>
+                @endif
+            </form>
+        </div>
 
     @forelse($organizationReports as $organizationReport)
                             @php
@@ -88,6 +107,14 @@
                                 </div>
                             </div>
                         @endforelse
+
+                    @if(!empty($search))
+                        <div class="col-12 mb-2">
+                            <small class="text-muted">
+                                Showing {{ $organizationReports->total() }} result(s) for "{{ $search }}"
+                            </small>
+                        </div>
+                    @endif
 
                          
                     @if ($organizationReports->hasPages())

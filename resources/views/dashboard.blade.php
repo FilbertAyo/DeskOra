@@ -18,7 +18,7 @@
         $activeActionTaskCount = is_array($activeActionTasks) ? count($activeActionTasks) : 0;
         $currentActionLogDraftId = $actionLogProgress['currentDraftId'] ?? null;
         $hasCurrentActionDraft = !empty($currentActionLogDraftId);
-        $shouldShowActionToast = $activeActionTaskCount > 0;
+        $shouldShowActionToast = (bool) ($actionLogProgress['showNotifications'] ?? ($activeActionTaskCount > 0));
         $pendingDraftsTotal =
             (int) ($dashboardPendingDocs['weekly_plan'] ?? 0)
             + (int) ($dashboardPendingDocs['weekly_report'] ?? 0)
