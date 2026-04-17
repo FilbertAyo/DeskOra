@@ -154,15 +154,12 @@ Route::middleware(['auth', 'permission:view reports'])->group(function () {
         ->name('reports.organization-documents.preview');
     Route::get('reports/organization-documents/{organizationReport}/download', [ReportController::class, 'downloadOrganizationDocument'])
         ->name('reports.organization-documents.download');
+    Route::put('reports/organization-documents/{organizationReport}', [ReportController::class, 'updateOrganizationDocument'])
+        ->name('reports.organization-documents.update');
     Route::delete('reports/organization-documents/{organizationReport}', [ReportController::class, 'destroyOrganizationDocument'])
         ->name('reports.organization-documents.destroy');
     Route::get('reports/users', [ReportController::class, 'usersReport'])->name('reports.users');
     Route::get('/reports/users/download/{type}', [ReportController::class, 'downloadUsers'])->name('reports.users.download');
-    Route::get('reports/petty/cash', [ReportController::class, 'pettyReport'])->name('reports.petties');
-    Route::get('/reports/petty/cash/download/{type}', [ReportController::class, 'downloadPetty'])->name('reports.petties.download');
-    Route::get('reports/petty/cash/transactions', [ReportController::class, 'transactionReport'])->name('reports.transaction');
-    Route::get('/reports/petty/cash/transaction/download/{type}', [ReportController::class, 'downloadTransaction'])->name('reports.transaction.download');
-
     Route::get('/reports/routes/download', [ReportController::class, 'downloadRouteReport'])->name('reports.route.download');
 });
 

@@ -5,7 +5,7 @@
                 <div class="col-md-12">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="page-header-title">
-                            <h5 class="m-b-10">Organization Reports</h5>
+                            <h5 class="m-b-10">Organization Reports/Documents</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item"><a href="javascript: void(0)">Reports</a></li>
@@ -37,23 +37,27 @@
 
     <div class="row">
         <div class="col-12 mb-3">
-            <form action="{{ route('reports') }}" method="GET" class="row g-2 align-items-end">
-                <div class="col-md-6">
-                    <label for="search-reports" class="form-label mb-1">Search Organization Documents</label>
-                    <input type="text" id="search-reports" name="search" value="{{ $search ?? '' }}"
-                        class="form-control" placeholder="Search by name, file name, or uploader">
+            <div class="card card-stats card-light card-round shadow-none border">
+                <div class="card-body">
+                    <form action="{{ route('reports') }}" method="GET" class="row g-2 align-items-end">
+                        <div class="col-md-6">
+                            <label for="search-reports" class="form-label mb-1">Search Organization Documents</label>
+                            <input type="text" id="search-reports" name="search" value="{{ $search ?? '' }}"
+                                class="form-control" placeholder="Search by name, file name, or uploader">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-search me-1"></i>Search
+                            </button>
+                        </div>
+                        @if(!empty($search))
+                            <div class="col-auto">
+                                <a href="{{ route('reports') }}" class="btn btn-light">Clear</a>
+                            </div>
+                        @endif
+                    </form>
                 </div>
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-search me-1"></i>Search
-                    </button>
-                </div>
-                @if(!empty($search))
-                    <div class="col-auto">
-                        <a href="{{ route('reports') }}" class="btn btn-light">Clear</a>
-                    </div>
-                @endif
-            </form>
+            </div>
         </div>
 
     @forelse($organizationReports as $organizationReport)
@@ -87,6 +91,19 @@
                                                 <i class="ti ti-download"></i>
                                             </a>
                                             @can('upload organization reports')
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-warning btn-sm text-white"
+                                                    title="Edit"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#editOrganizationDocumentModal"
+                                                    data-update-url="{{ route('reports.organization-documents.update', $organizationReport) }}"
+                                                    data-document-id="{{ $organizationReport->id }}"
+                                                    data-document-name="{{ $organizationReport->name }}"
+                                                    data-document-file="{{ $organizationReport->stored_name }}"
+                                                >
+                                                    <i class="ti ti-pencil"></i>
+                                                </button>
                                                 <form action="{{ route('reports.organization-documents.destroy', $organizationReport) }}"
                                                     method="POST" onsubmit="return confirm('Delete this document?');">
                                                     @csrf
@@ -124,24 +141,6 @@
                     @endif
 
 
-        @can('view cashflow movements')
-            <div class="col-sm-6 col-md-3">
-                <a href="{{ route('reports.petties') }}" class="text-decoration-none">
-                    <div class="card card-stats card-light card-round shadow-none border">
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-12 col-stats">
-                                    <div class="numbers">
-                                        <div class="h5">Petty Cash</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-        @endcan
-
         <div class="col-sm-6 col-md-3">
             <a href="{{ route('reports.users') }}" class="text-decoration-none">
                 <div class="card card-stats card-light card-round shadow-none border">
@@ -159,22 +158,6 @@
             </a>
         </div>
 
-        <div class="col-sm-6 col-md-3">
-            <a href="{{ route('reports.transaction') }}" class="text-decoration-none">
-                <div class="card card-stats card-light card-round shadow-none border">
-                    <div class="card-body">
-                        <div class="row">
-
-                            <div class="col-12 col-stats">
-                                <div class="numbers">
-                                    <div class="h5">Transactions</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </a>
-        </div>
     </div>
 
 
@@ -195,20 +178,20 @@
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label for="organization-document-name" class="form-label">Document Name</label>
-                                <input type="text" class="form-control @error('name') is-invalid @enderror"
+                                <input type="text" class="form-control @if($errors->uploadOrganizationDocument->has('name')) is-invalid @endif"
                                     id="organization-document-name" name="name" value="{{ old('name') }}" required>
-                                @error('name')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
+                                @if($errors->uploadOrganizationDocument->has('name'))
+                                    <div class="invalid-feedback">{{ $errors->uploadOrganizationDocument->first('name') }}</div>
+                                @endif
                             </div>
                             <div class="mb-3">
                                 <label for="organization-document-file" class="form-label">File</label>
-                                <input type="file" class="form-control @error('file') is-invalid @enderror"
+                                <input type="file" class="form-control @if($errors->uploadOrganizationDocument->has('file')) is-invalid @endif"
                                     id="organization-document-file" name="file"
                                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" required>
-                                @error('file')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
+                                @if($errors->uploadOrganizationDocument->has('file'))
+                                    <div class="invalid-feedback">{{ $errors->uploadOrganizationDocument->first('file') }}</div>
+                                @endif
                                 <small class="text-muted">Accepted: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (Max 20MB)</small>
                             </div>
                         </div>
@@ -224,15 +207,127 @@
         </div>
     @endcan
 
-    @if ($errors->has('name') || $errors->has('file'))
+    @can('upload organization reports')
+        <div class="modal fade" id="editOrganizationDocumentModal" tabindex="-1"
+            aria-labelledby="editOrganizationDocumentModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form
+                        method="POST"
+                        id="editOrganizationDocumentForm"
+                        data-route-template="{{ route('reports.organization-documents.update', ['organizationReport' => '__ORG_REPORT_ID__']) }}"
+                        action="#"
+                        enctype="multipart/form-data"
+                    >
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="edit_document_id" id="edit-organization-document-id" value="{{ old('edit_document_id') }}">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editOrganizationDocumentModalLabel">Edit Organization Document</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="edit-organization-document-name" class="form-label">Document Name</label>
+                                <input
+                                    type="text"
+                                    class="form-control @if($errors->editOrganizationDocument->has('name')) is-invalid @endif"
+                                    id="edit-organization-document-name"
+                                    name="name"
+                                    value="{{ old('name') }}"
+                                    required
+                                >
+                                @if($errors->editOrganizationDocument->has('name'))
+                                    <div class="invalid-feedback">{{ $errors->editOrganizationDocument->first('name') }}</div>
+                                @endif
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">
+                                    Current file: <span id="edit-organization-document-current-file">-</span>
+                                </small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit-organization-document-file" class="form-label">Replace File (optional)</label>
+                                <input
+                                    type="file"
+                                    class="form-control @if($errors->editOrganizationDocument->has('file')) is-invalid @endif"
+                                    id="edit-organization-document-file"
+                                    name="file"
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                                >
+                                @if($errors->editOrganizationDocument->has('file'))
+                                    <div class="invalid-feedback">{{ $errors->editOrganizationDocument->first('file') }}</div>
+                                @endif
+                                <small class="text-muted">Accepted: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (Max 20MB)</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-device-floppy me-1"></i>Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endcan
+
+    @can('upload organization reports')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 const uploadModalElement = document.getElementById('uploadOrganizationDocumentModal');
-                if (uploadModalElement) {
+                const shouldOpenUploadModal = uploadModalElement
+                    && uploadModalElement.querySelector('.is-invalid') !== null;
+                if (shouldOpenUploadModal) {
                     const uploadModal = new bootstrap.Modal(uploadModalElement);
                     uploadModal.show();
                 }
+
+                const editModalElement = document.getElementById('editOrganizationDocumentModal');
+                const editForm = document.getElementById('editOrganizationDocumentForm');
+                const editNameInput = document.getElementById('edit-organization-document-name');
+                const editCurrentFile = document.getElementById('edit-organization-document-current-file');
+                const editDocumentIdInput = document.getElementById('edit-organization-document-id');
+
+                if (editModalElement && editForm) {
+                    editModalElement.addEventListener('show.bs.modal', function(event) {
+                        const triggerButton = event.relatedTarget;
+                        if (!triggerButton) {
+                            return;
+                        }
+
+                        const updateUrl = triggerButton.getAttribute('data-update-url');
+                        const documentId = triggerButton.getAttribute('data-document-id') || '';
+                        const documentName = triggerButton.getAttribute('data-document-name') || '';
+                        const documentFile = triggerButton.getAttribute('data-document-file') || '';
+
+                        editForm.setAttribute('action', updateUrl || '#');
+                        editDocumentIdInput.value = documentId;
+                        editNameInput.value = documentName;
+                        editCurrentFile.textContent = documentFile || '-';
+                    });
+
+                    const shouldOpenEditModal = editForm.querySelector('.is-invalid') !== null;
+                    if (shouldOpenEditModal) {
+                        const editDocumentId = editDocumentIdInput.value;
+                        const routeTemplate = editForm.getAttribute('data-route-template');
+                        if (editDocumentId && routeTemplate) {
+                            editForm.setAttribute('action', routeTemplate.replace('__ORG_REPORT_ID__', editDocumentId));
+                        }
+
+                        if (editCurrentFile && editCurrentFile.textContent.trim() === '-') {
+                            const selectedButton = document.querySelector('[data-document-id="' + editDocumentId + '"]');
+                            if (selectedButton) {
+                                editCurrentFile.textContent = selectedButton.getAttribute('data-document-file') || '-';
+                            }
+                        }
+
+                        const editModal = new bootstrap.Modal(editModalElement);
+                        editModal.show();
+                    }
+                }
             });
         </script>
-    @endif
+    @endcan
 </x-app-layout>
