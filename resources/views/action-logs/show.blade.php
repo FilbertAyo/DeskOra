@@ -24,7 +24,7 @@
         <div class="col-12 mb-3">
             <div class="row g-3">
                 <!-- Compact Info Card -->
-                <div class="col-12 col-lg-10">
+                <div class="col-12 col-lg-9">
                     <div class="card shadow-none border h-100">
                         <div class="card-header bg-white border-bottom py-2">
                             <h6 class="mb-0">Action Log Information</h6>
@@ -79,7 +79,7 @@
                 </div>
 
                 <!-- Compact Actions Card -->
-                <div class="col-12 col-lg-2">
+                <div class="col-6 col-lg-3">
                     <div class="card shadow-none border h-100">
                         <div class="card-header bg-white border-bottom py-2">
                             <h6 class="mb-0"><i class="ti ti-activity me-2"></i>Actions</h6>
@@ -89,22 +89,25 @@
                                 @can('update', $document)
                                     <div class="col-12 col-md-6">
                                         <a href="{{ route('action-logs.edit', $document->id) }}" class="btn btn-primary btn-sm w-100">
-                                            <i class="ti ti-edit me-1"></i> Edit 
+                                            <i class="ti ti-edit me-1"></i> Update
                                         </a>
                                     </div>
                                 @endcan
 
-                                @if($document->canBeDeleted())
-                                    <div class="col-12 col-md-6">
-                                        <form action="{{ route('action-logs.destroy', $document->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this action log? This action cannot be undone.');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-danger btn-sm w-100">
-                                                <i class="ti ti-trash-2 me-1"></i> Delete 
-                                            </button>
-                                        </form>
-                                    </div>
-                                @endif
+                                @can('manage action logs', $document)
+                                    @if($document->canBeDeleted())
+                                        <div class="col-12 col-md-6">
+                                            <form action="{{ route('action-logs.destroy', $document->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this action log? This action cannot be undone.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                    <i class="ti ti-trash me-1"></i> Delete 
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @endif
+                                @endcan
+                           
                             </div>
                         </div>
                     </div>
