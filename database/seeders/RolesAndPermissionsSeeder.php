@@ -29,6 +29,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'request item purchase',
             'approve item purchase',
             'view reports',
+            'upload organization reports',
             'view settings',
             'users management settings',
             'update other settings',

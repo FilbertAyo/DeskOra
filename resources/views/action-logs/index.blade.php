@@ -202,8 +202,9 @@
                         </div>
 
                         <div class="mt-3">
-                            {{ $documents->links() }}
+                            {{ $documents->links('pagination::bootstrap-5') }}
                         </div>
+                   
                     @else
                         <div class="text-center py-5">
                             <i class="ti ti-clipboard fs-1 text-muted"></i>

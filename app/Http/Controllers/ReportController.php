@@ -4,18 +4,89 @@ namespace App\Http\Controllers;
 
 use App\Exports\PettyExport;
 use App\Exports\UserExport;
+use App\Models\OrganizationReport;
 use App\Models\Petty;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
     public function index()
     {
-        return view('reports.index');
+        $organizationReports = OrganizationReport::query()
+            ->with('uploader:id,name')
+            ->latest()
+            ->paginate(10);
+
+        return view('reports.index', compact('organizationReports'));
+    }
+
+    public function storeOrganizationDocument(Request $request)
+    {
+        abort_unless($request->user()->can('upload organization reports'), 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'file' => ['required', 'file', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx', 'max:20480'],
+        ]);
+
+        $file = $validated['file'];
+        $path = $file->store('organization-reports', 'public');
+
+        OrganizationReport::create([
+            'name' => $validated['name'],
+            'stored_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime_type' => $file->getMimeType(),
+            'size' => $file->getSize(),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Document uploaded successfully.');
+    }
+
+    public function showOrganizationDocument(OrganizationReport $organizationReport)
+    {
+        if (! Storage::disk('public')->exists($organizationReport->path)) {
+            return back()->with('error', 'Document file was not found in storage.');
+        }
+
+        return response()->file(
+            Storage::disk('public')->path($organizationReport->path),
+            [
+                'Content-Type' => $organizationReport->mime_type ?: 'application/octet-stream',
+                'Content-Disposition' => 'inline; filename="'.$organizationReport->stored_name.'"',
+            ]
+        );
+    }
+
+    public function downloadOrganizationDocument(OrganizationReport $organizationReport)
+    {
+        if (! Storage::disk('public')->exists($organizationReport->path)) {
+            return back()->with('error', 'Document file was not found in storage.');
+        }
+
+        return response()->download(
+            Storage::disk('public')->path($organizationReport->path),
+            $organizationReport->stored_name
+        );
+    }
+
+    public function destroyOrganizationDocument(Request $request, OrganizationReport $organizationReport)
+    {
+        abort_unless($request->user()->can('upload organization reports'), 403);
+
+        if (Storage::disk('public')->exists($organizationReport->path)) {
+            Storage::disk('public')->delete($organizationReport->path);
+        }
+
+        $organizationReport->delete();
+
+        return back()->with('success', 'Document deleted successfully.');
     }
 
     public function usersReport(Request $request)

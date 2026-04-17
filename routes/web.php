@@ -146,6 +146,14 @@ Route::middleware(['auth', 'permission:view cashflow movements'])->group(functio
 
 Route::middleware(['auth', 'permission:view reports'])->group(function () {
     Route::get('reports/list', [ReportController::class, 'index'])->name('reports');
+    Route::post('reports/organization-documents', [ReportController::class, 'storeOrganizationDocument'])
+        ->name('reports.organization-documents.store');
+    Route::get('reports/organization-documents/{organizationReport}/view', [ReportController::class, 'showOrganizationDocument'])
+        ->name('reports.organization-documents.view');
+    Route::get('reports/organization-documents/{organizationReport}/download', [ReportController::class, 'downloadOrganizationDocument'])
+        ->name('reports.organization-documents.download');
+    Route::delete('reports/organization-documents/{organizationReport}', [ReportController::class, 'destroyOrganizationDocument'])
+        ->name('reports.organization-documents.destroy');
     Route::get('reports/users', [ReportController::class, 'usersReport'])->name('reports.users');
     Route::get('/reports/users/download/{type}', [ReportController::class, 'downloadUsers'])->name('reports.users.download');
     Route::get('reports/petty/cash', [ReportController::class, 'pettyReport'])->name('reports.petties');
