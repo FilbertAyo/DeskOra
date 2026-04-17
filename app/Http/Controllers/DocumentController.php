@@ -10,7 +10,6 @@ use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -691,6 +690,32 @@ class DocumentController extends Controller
     }
 
     /**
+     * Reviewer-facing document view: same UI as {@see self::show} without related plan/report chrome.
+     */
+    public function reviewerShow(Document $document)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (! $user->hasPermissionTo('view all documents')) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            abort(403, 'This view is only available for weekly plans and weekly reports.');
+        }
+
+        $this->authorize('view', $document);
+
+        $document->load(['user', 'period']);
+
+        $relatedDocument = null;
+        $relatedAction = null;
+        $reviewerPresentation = true;
+
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation'));
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Document $document)
@@ -1075,7 +1100,7 @@ class DocumentController extends Controller
 
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
-        return view('documents.reviewer-dashboard', compact(
+        return view('documents.reviewer.dashboard', compact(
             'mergedWeeklyRows',
             'groupedDocuments',
             'stats',
@@ -1262,7 +1287,7 @@ class DocumentController extends Controller
 
         $availableTypes = Document::getAvailableTypesForUser($user);
 
-        return view('documents.weekly-plans', [
+        return view('documents.weekly.plans', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
             'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
@@ -1413,7 +1438,7 @@ class DocumentController extends Controller
 
         $availableTypes = Document::getAvailableTypesForUser($user);
 
-        return view('documents.weekly-reports', [
+        return view('documents.weekly.reports', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
             'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
@@ -1514,7 +1539,7 @@ class DocumentController extends Controller
 
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
-        return view('documents.weekly-budget-review', [
+        return view('documents.reviewer.budget-weekly', [
             'documents' => $documents,
             'grouped' => $grouped,
             'stats' => $aggregateStats,

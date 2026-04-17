@@ -8,7 +8,7 @@
                             <h5 class="m-b-10">Weekly Plans</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                                <li class="breadcrumb-item"><a href="javascript: void(0)">Documents</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('documents.index') }}">Documents</a></li>
                                 <li class="breadcrumb-item" aria-current="page">Weekly Plans</li>
                             </ul>
                         </div>

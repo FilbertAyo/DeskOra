@@ -213,6 +213,39 @@ class WeeklyBudgetReviewTest extends TestCase
         $response->assertDontSee('Draft Item');
     }
 
+    public function test_pending_budget_review_sidebar_count_excludes_plans_with_only_empty_budget_rows(): void
+    {
+        [, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $next->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Plan with placeholder budget row',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Target',
+            'content' => [
+                'objective' => [],
+                'planned_activities' => [],
+                'key_meetings' => [],
+                'budget' => [
+                    ['item' => '', 'description_purpose' => '', 'amount' => ''],
+                ],
+            ],
+            'budget_review_status' => null,
+        ]);
+
+        $this->assertSame(0, Document::countPendingWeeklyBudgetReviewForPeriod($next->id));
+
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Real line', 'description_purpose' => 'Yes', 'amount' => '1000'],
+        ]);
+
+        $this->assertSame(1, Document::countPendingWeeklyBudgetReviewForPeriod($next->id));
+    }
+
     // ------------------------------------------------------------------
     // 2. Grouped by department -> staff -> items
     // ------------------------------------------------------------------

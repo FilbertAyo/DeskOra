@@ -53,15 +53,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [DocumentController::class, 'create'])->name('create');
         Route::post('/', [DocumentController::class, 'store'])->name('store');
         Route::post('/{document}/weekly-budget-review', [DocumentController::class, 'processWeeklyBudgetReview'])->name('process-weekly-budget-review');
+
+        // Reviewer routes (must be registered before /{document} so "reviewer" is not captured as a document id)
+        Route::get('/reviewer/dashboard', [DocumentController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
+        Route::get('/reviewer/{document}', [DocumentController::class, 'reviewerShow'])->name('reviewer-show');
+
         Route::get('/{document}', [DocumentController::class, 'show'])->name('show');
         Route::get('/{document}/edit', [DocumentController::class, 'edit'])->name('edit');
         Route::put('/{document}', [DocumentController::class, 'update'])->name('update');
         Route::delete('/{document}', [DocumentController::class, 'destroy'])->name('destroy');
         Route::post('/{document}/submit', [DocumentController::class, 'submit'])->name('submit');
         Route::post('/{document}/reject', [DocumentController::class, 'reject'])->name('reject');
-
-        // Reviewer dashboard
-        Route::get('/reviewer/dashboard', [DocumentController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
     });
 
     // Action Logs routes (restricted to minutes_preparer and admin - authorization handled in controller)

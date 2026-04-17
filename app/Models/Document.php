@@ -559,6 +559,37 @@ class Document extends Model
         return $this->budgetItems() !== [];
     }
 
+    /**
+     * Count submitted weekly plans that appear on the Weekly Budget Review panel:
+     * same candidate query as {@see \App\Http\Controllers\DocumentController::weeklyBudgetReviewPanel},
+     * then restricted to plans that actually have non-empty budget rows ({@see self::hasBudgetItems()}).
+     *
+     * @param  string|null  $periodId  When set, only plans for this work period (e.g. next plan week).
+     */
+    public static function countPendingWeeklyBudgetReviewForPeriod(?string $periodId = null): int
+    {
+        $query = static::query()
+            ->select(['id', 'content', 'budget_review_status', 'type', 'state', 'period_id'])
+            ->weeklyPlans()
+            ->submitted()
+            ->where(function ($budgetQuery) {
+                $budgetQuery
+                    ->whereNotNull('budget_review_status')
+                    ->orWhere('content', 'like', '%"budget"%');
+            })
+            ->where(function ($statusQuery) {
+                $statusQuery
+                    ->whereNull('budget_review_status')
+                    ->orWhere('budget_review_status', self::BUDGET_REVIEW_PENDING);
+            });
+
+        if ($periodId !== null && $periodId !== '') {
+            $query->forPeriod($periodId);
+        }
+
+        return $query->get()->filter(fn (Document $document) => $document->hasBudgetItems())->count();
+    }
+
     public function getBudgetReviewStatusLabelAttribute(): ?string
     {
         $summary = $this->budgetReviewSummary();

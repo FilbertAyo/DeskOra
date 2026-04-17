@@ -29,7 +29,7 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans') || Request::routeIs('documents.weekly-reports') || Request::routeIs('documents.reviewer-dashboard') || Request::routeIs('documents.weekly-budget-review') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans') || Request::routeIs('documents.weekly-reports') || Request::routeIs('documents.reviewer-dashboard') || Request::routeIs('documents.reviewer-show') || Request::routeIs('documents.weekly-budget-review') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Weekly Activities</span>
@@ -47,7 +47,7 @@
                             </a>
                         </li>
                         @if(Auth::user()->hasPermissionTo('view all documents') || Auth::user()->hasPermissionTo('approve documents'))
-                            <li class="{{ Request::routeIs('documents.reviewer-dashboard') ? 'active' : '' }}">
+                            <li class="{{ Request::routeIs('documents.reviewer-dashboard') || Request::routeIs('documents.reviewer-show') ? 'active' : '' }}">
                                 <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
                                    <span class="pc-mtext">Review Submissions</span>
                                     @php
@@ -64,19 +64,10 @@
                                 <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
                                     <span class="pc-mtext">Weekly Budget Review</span>
                                     @php
-                                        $pendingWeeklyBudgetCount = \App\Models\Document::query()
-                                            ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
-                                            ->where('state', \App\Models\Document::STATE_SUBMITTED)
-                                            ->where(function ($budgetQuery) {
-                                                $budgetQuery
-                                                    ->whereNotNull('budget_review_status')
-                                                    ->orWhere('content', 'like', '%"budget"%');
-                                            })
-                                            ->where(function ($query) {
-                                                $query->whereNull('budget_review_status')
-                                                    ->orWhere('budget_review_status', \App\Models\Document::BUDGET_REVIEW_PENDING);
-                                            })
-                                            ->count();
+                                        $defaultBudgetReviewPeriod = app(\App\Services\WorkPeriodService::class)->periodForWeeklyPlanSubmission();
+                                        $pendingWeeklyBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
+                                            $defaultBudgetReviewPeriod?->id
+                                        );
                                     @endphp
                                     @if($pendingWeeklyBudgetCount > 0)
                                         <span class="badge bg-warning ml-2">{{ $pendingWeeklyBudgetCount }}</span>

@@ -254,13 +254,13 @@
                                             <td class="text-center">
                                                 <div class="d-flex flex-wrap gap-1 justify-content-center">
                                                     @if($planDoc)
-                                                        <a href="{{ route('documents.show', $planDoc->id) }}"
+                                                        <a href="{{ route('documents.reviewer-show', $planDoc->id) }}"
                                                             class="btn btn-info btn-sm text-white" title="View Plan">
                                                             <i class="ti ti-eye"></i> Plan
                                                         </a>
                                                     @endif
                                                     @if($reportDoc)
-                                                        <a href="{{ route('documents.show', $reportDoc->id) }}"
+                                                        <a href="{{ route('documents.reviewer-show', $reportDoc->id) }}"
                                                             class="btn btn-primary btn-sm text-white" title="View Report">
                                                             <i class="ti ti-eye"></i> Report
                                                         </a>
