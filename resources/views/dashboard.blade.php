@@ -18,7 +18,6 @@
         $activeActionTaskCount = is_array($activeActionTasks) ? count($activeActionTasks) : 0;
         $currentActionLogDraftId = $actionLogProgress['currentDraftId'] ?? null;
         $hasCurrentActionDraft = !empty($currentActionLogDraftId);
-        $shouldShowActionToast = (bool) ($actionLogProgress['showNotifications'] ?? ($activeActionTaskCount > 0));
         $pendingDraftsTotal =
             (int) ($dashboardPendingDocs['weekly_plan'] ?? 0)
             + (int) ($dashboardPendingDocs['weekly_report'] ?? 0)
@@ -34,40 +33,26 @@
             && ($currentPeriod ?? null)
             && $wr
             && ($wr->report !== null && $wr->report->showCta);
+        $focusTaskShowRoute = function ($doc) {
+            if (($doc->type ?? null) === \App\Models\Document::TYPE_ACTION_LOG) {
+                return route('action-logs.show', $doc->id);
+            }
+
+            return route('documents.show', $doc->id);
+        };
+        $focusTaskEditRoute = function ($doc) {
+            if (($doc->type ?? null) === \App\Models\Document::TYPE_ACTION_LOG) {
+                return route('action-logs.edit', $doc->id);
+            }
+
+            return route('documents.edit', $doc->id);
+        };
     @endphp
 
-    @if($showWeeklyToast || $shouldShowActionToast)
+    @if($showWeeklyToast)
         <div class="position-fixed bottom-0 end-0 p-2 p-sm-3 d-flex flex-column gap-2 align-items-stretch dashboard-toast-stack"
              style="z-index: 1080; width: 100%; max-width: min(22rem, calc(100vw - 1rem)); box-sizing: border-box; pointer-events: none;">
-            @if($showWeeklyToast)
-                @include('components.weekly-submission-reminder-toast', ['fixedWrapper' => false, 'withScript' => false])
-            @endif
-            @if($shouldShowActionToast)
-                <div id="actionLogDashboardToast" class="toast hide border-0 shadow-sm action-toast w-100" role="alert" aria-live="assertive" aria-atomic="true" style="max-width: 100%; pointer-events: auto;">
-                    <div class="toast-header py-2">
-                        <i class="ti ti-bell-ringing text-primary me-2"></i>
-                        <strong class="me-auto">Action Log</strong>
-                        <small class="text-muted">{{ $activeActionTaskCount }} open</small>
-                        <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
-                    </div>
-                    <div class="toast-body py-2">
-                        <p class="mb-2 small">
-                            {{ $activeActionTaskCount }} task{{ $activeActionTaskCount === 1 ? '' : 's' }} need update.
-                        </p>
-                        <div class="d-flex justify-content-end">
-                            @if($currentActionLogDraftId)
-                                <a href="{{ route('action-logs.edit', $currentActionLogDraftId) }}" class="btn btn-primary btn-sm">
-                                    <i class="ti ti-edit me-1"></i>Update
-                                </a>
-                            @else
-                                <a href="{{ route('action-logs.index') }}" class="btn btn-primary btn-sm">
-                                    <i class="ti ti-eye me-1"></i>View Action Logs
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            @endif
+            @include('components.weekly-submission-reminder-toast', ['fixedWrapper' => false, 'withScript' => false])
         </div>
     @endif
 
@@ -93,7 +78,7 @@
             <div class="card">
                 <div class="card-body">
                     <h6 class="mb-2 f-w-400 text-muted">Departments</h6>
-                    <h4 class="mb-3">
+                    <h4>
                         {{ number_format($departmentNo ?? 0) }}
                         <span class="badge bg-light border border-secondary text-muted">
                             <i class="ti ti-building"></i>
@@ -107,7 +92,7 @@
             <div class="card">
                 <div class="card-body">
                     <h6 class="mb-2 f-w-400 text-muted">Total Users</h6>
-                    <h4 class="mb-3">
+                    <h4>
                         {{ number_format($userNo ?? 0) }}
                         <span class="badge bg-light-primary border border-primary text-primary">
                             <i class="ti ti-users"></i>
@@ -121,7 +106,7 @@
             <div class="card">
                 <div class="card-body">
                     <h6 class="mb-2 f-w-400 text-muted">Your document drafts</h6>
-                    <h4 class="mb-3">
+                    <h4>
                         {{ number_format($pendingDraftsTotal) }}
                         <span class="badge bg-light-warning border border-warning text-warning">
                             <i class="ti ti-pencil"></i>
@@ -135,7 +120,7 @@
             <div class="card">
                 <div class="card-body">
                     <h6 class="mb-2 f-w-400 text-muted">Active work period</h6>
-                    <h4 class="mb-3">
+                    <h4>
                         @if ($currentPeriod)
                             <span class="fs-5">Week {{ $currentPeriod->week_number }}, {{ $currentPeriod->year }}</span>
                             <span class="badge bg-light-success border border-success text-success">
@@ -153,7 +138,141 @@
             </div>
         </div>
 
-        <div class="col-12">
+    
+
+        <div class="col-xl-8 col-md-6 col-12 mb-3">
+            <div class="card shadow-none border h-100">
+                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Focus Tasks</h5>
+                    <small class="text-muted">What to do next</small>
+                </div>
+                <div class="card-body">
+                    @if($activeActionTaskCount > 0)
+                        <div class="mb-3">
+                            <h6 class="text-primary mb-2"><i class="ti ti-clipboard-list me-1"></i>Action Log Tasks</h6>
+                            <div class="border rounded p-3 bg-light-subtle">
+                                <p class="mb-2 text-muted">
+                                    {{ $activeActionTaskCount }} task{{ $activeActionTaskCount === 1 ? '' : 's' }} need update.
+                                </p>
+                                <div class="d-flex justify-content-end">
+                                    @if($currentActionLogDraftId)
+                                        <a href="{{ route('action-logs.edit', $currentActionLogDraftId) }}" class="btn btn-sm btn-primary">
+                                            <i class="ti ti-edit me-1"></i>Update
+                                        </a>
+                                    @else
+                                        <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-primary">
+                                            <i class="ti ti-eye me-1"></i>View Action Logs
+                                        </a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($returnedDocs->count() > 0)
+                        <div class="mb-3">
+                            <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>
+                            @foreach($returnedDocs->take(3) as $doc)
+                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
+                                    <div>
+                                        <strong>{{ $doc->display_title }}</strong>
+                                        <div class="small text-muted">
+                                            {{ $doc->type_name }} • Updated {{ $doc->updated_at?->diffForHumans() }}
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <a href="{{ $focusTaskShowRoute($doc) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                                        <a href="{{ $focusTaskEditRoute($doc) }}" class="btn btn-sm btn-danger">Revise</a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($plainDraftDocs->count() > 0)
+                        <div class="mb-3">
+                            <h6 class="text-warning mb-2"><i class="ti ti-file-edit me-1"></i>Drafts To Finalize</h6>
+                            @foreach($plainDraftDocs->take(3) as $doc)
+                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
+                                    <div>
+                                        <strong>{{ $doc->display_title }}</strong>
+                                        <div class="small text-muted">{{ $doc->type_name }} • Created {{ $doc->created_at?->format('M d, Y') }}</div>
+                                    </div>
+                                    <a href="{{ $focusTaskEditRoute($doc) }}" class="btn btn-sm btn-warning text-dark">Continue</a>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($recentReviewerReturns->count() > 0)
+                        <div>
+                            <h6 class="text-primary mb-2"><i class="ti ti-arrow-back-up me-1"></i>Latest return reasons</h6>
+                            @foreach($recentReviewerReturns as $doc)
+                                <div class="border-start border-3 border-primary ps-3 mb-2">
+                                    <div class="small fw-semibold">{{ $doc->display_title }}</div>
+                                    <div class="small text-muted">
+                                        {{ $doc->latestRejectionReason() }}
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($activeActionTaskCount === 0 && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
+                        <div class="text-center py-4">
+                            <i class="ti ti-mood-smile fs-1 text-success"></i>
+                            <p class="text-muted mt-2 mb-0">Great flow. No pending revisions or drafts right now.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-xl-4 col-md-6 col-12">
+            <div class="card shadow-none border h-100">
+                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="ti ti-bolt me-2"></i>Quick Shortcuts</h5>
+                    <small class="text-muted">Personalized actions</small>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ route('documents.index') }}" class="btn btn-light text-start">
+                            <i class="ti ti-folders me-2 text-primary"></i>My Documents Hub
+                        </a>
+                        @if($showWeeklyPlanShortcut)
+                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_plan', 'period_id' => $nextPeriod->id ?? null])) }}" class="btn btn-light text-start">
+                                <i class="ti ti-calendar-plus me-2 text-info"></i>Create Weekly Plan
+                            </a>
+                        @elseif(isset($availableTypes['weekly_plan']) && ($nextPeriod ?? null))
+                            <button type="button" class="btn btn-light text-start" disabled title="Plan deadline has passed">
+                                <i class="ti ti-calendar-off me-2 text-muted"></i>Weekly plan closed for this window
+                            </button>
+                        @endif
+                        @if($showWeeklyReportShortcut)
+                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_report', 'period_id' => $currentPeriod->id ?? null])) }}" class="btn btn-light text-start">
+                                <i class="ti ti-file-analytics me-2 text-success"></i>Create Weekly Report
+                            </a>
+                        @elseif(isset($availableTypes['weekly_report']) && ($currentPeriod ?? null))
+                            <button type="button" class="btn btn-light text-start" disabled title="Report deadline has passed">
+                                <i class="ti ti-file-minus me-2 text-muted"></i>Weekly report closed for this window
+                            </button>
+                        @endif
+                    
+                        <a href="{{ route('profile.edit') }}" class="btn btn-light text-start">
+                            <i class="ti ti-user me-2 text-secondary"></i>My Profile Settings
+                        </a>
+                        @if($hasReviewerAccess)
+                            <a href="{{ route('documents.reviewer-dashboard') }}" class="btn btn-light text-start">
+                                <i class="ti ti-eye-check me-2 text-danger"></i>Reviewer Dashboard
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-6 col-xl-6 mb-3">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
@@ -208,121 +327,10 @@
             </div>
         </div>
 
-        <div class="col-xl-5 col-12">
-            <div class="card shadow-none border h-100">
-                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-bolt me-2"></i>Quick Shortcuts</h5>
-                    <small class="text-muted">Personalized actions</small>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{{ route('documents.index') }}" class="btn btn-light text-start">
-                            <i class="ti ti-folders me-2 text-primary"></i>My Documents Hub
-                        </a>
-                        @if($showWeeklyPlanShortcut)
-                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_plan', 'period_id' => $nextPeriod->id ?? null])) }}" class="btn btn-light text-start">
-                                <i class="ti ti-calendar-plus me-2 text-info"></i>Create Weekly Plan
-                            </a>
-                        @elseif(isset($availableTypes['weekly_plan']) && ($nextPeriod ?? null))
-                            <button type="button" class="btn btn-light text-start" disabled title="Plan deadline has passed">
-                                <i class="ti ti-calendar-off me-2 text-muted"></i>Weekly plan closed for this window
-                            </button>
-                        @endif
-                        @if($showWeeklyReportShortcut)
-                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_report', 'period_id' => $currentPeriod->id ?? null])) }}" class="btn btn-light text-start">
-                                <i class="ti ti-file-analytics me-2 text-success"></i>Create Weekly Report
-                            </a>
-                        @elseif(isset($availableTypes['weekly_report']) && ($currentPeriod ?? null))
-                            <button type="button" class="btn btn-light text-start" disabled title="Report deadline has passed">
-                                <i class="ti ti-file-minus me-2 text-muted"></i>Weekly report closed for this window
-                            </button>
-                        @endif
-                        <a href="{{ route('action-logs.index') }}" class="btn btn-light text-start">
-                            <i class="ti ti-list-details me-2 text-warning"></i>Action Logs
-                        </a>
-                        <a href="{{ route('profile.edit') }}" class="btn btn-light text-start">
-                            <i class="ti ti-user-cog me-2 text-secondary"></i>My Profile Settings
-                        </a>
-                        @if($hasReviewerAccess)
-                            <a href="{{ route('documents.reviewer-dashboard') }}" class="btn btn-light text-start">
-                                <i class="ti ti-eye-check me-2 text-danger"></i>Reviewer Dashboard
-                            </a>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-7 col-12">
-            <div class="card shadow-none border h-100">
-                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Focus Tasks</h5>
-                    <small class="text-muted">What to do next</small>
-                </div>
-                <div class="card-body">
-                    @if($returnedDocs->count() > 0)
-                        <div class="mb-3">
-                            <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>
-                            @foreach($returnedDocs->take(3) as $doc)
-                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
-                                    <div>
-                                        <strong>{{ $doc->display_title }}</strong>
-                                        <div class="small text-muted">
-                                            {{ $doc->type_name }} • Updated {{ $doc->updated_at?->diffForHumans() }}
-                                        </div>
-                                    </div>
-                                    <div class="d-flex gap-2">
-                                        <a href="{{ route('documents.show', $doc->id) }}" class="btn btn-sm btn-outline-secondary">View</a>
-                                        <a href="{{ route('documents.edit', $doc->id) }}" class="btn btn-sm btn-danger">Revise</a>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @if($plainDraftDocs->count() > 0)
-                        <div class="mb-3">
-                            <h6 class="text-warning mb-2"><i class="ti ti-file-edit me-1"></i>Drafts To Finalize</h6>
-                            @foreach($plainDraftDocs->take(3) as $doc)
-                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
-                                    <div>
-                                        <strong>{{ $doc->display_title }}</strong>
-                                        <div class="small text-muted">{{ $doc->type_name }} • Created {{ $doc->created_at?->format('M d, Y') }}</div>
-                                    </div>
-                                    <a href="{{ route('documents.edit', $doc->id) }}" class="btn btn-sm btn-warning text-dark">Continue</a>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @if($recentReviewerReturns->count() > 0)
-                        <div>
-                            <h6 class="text-primary mb-2"><i class="ti ti-arrow-back-up me-1"></i>Latest return reasons</h6>
-                            @foreach($recentReviewerReturns as $doc)
-                                <div class="border-start border-3 border-primary ps-3 mb-2">
-                                    <div class="small fw-semibold">{{ $doc->display_title }}</div>
-                                    <div class="small text-muted">
-                                        {{ $doc->latestRejectionReason() }}
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @if($returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
-                        <div class="text-center py-4">
-                            <i class="ti ti-mood-smile fs-1 text-success"></i>
-                            <p class="text-muted mt-2 mb-0">Great flow. No pending revisions or drafts right now.</p>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
        
     </div>
 
-    @if($showWeeklyToast || $shouldShowActionToast)
+    @if($showWeeklyToast)
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 if (typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
@@ -330,11 +338,6 @@
                 var weeklyEl = document.getElementById('weeklySubmissionReminderToast');
                 if (weeklyEl) {
                     new bootstrap.Toast(weeklyEl, { autohide: false }).show();
-                }
-
-                var actionEl = document.getElementById('actionLogDashboardToast');
-                if (actionEl) {
-                    new bootstrap.Toast(actionEl, { autohide: false }).show();
                 }
             });
         </script>
