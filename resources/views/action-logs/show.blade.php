@@ -171,7 +171,7 @@
                                         @endphp
                                         <tr>
                                             <td class="text-center">{{ $row['task_no'] ?? $loop->iteration }}</td>
-                                            <td class="text-wrap small">{{ $row['task'] ?? '' }}</td>
+                                            <td class="text-wrap">{{ $row['task'] ?? '' }}</td>
                                             <td class="text-muted small">{{ !empty($names) ? implode(', ', $names) : '-' }}</td>
                                             <td>
                                                 @php $progress = $row['progress'] ?? 'Not Started'; @endphp
