@@ -89,6 +89,58 @@ class ReportController extends Controller
         return back()->with('success', 'Document deleted successfully.');
     }
 
+    public function previewOrganizationDocument(OrganizationReport $organizationReport)
+    {
+        if (! Storage::disk('public')->exists($organizationReport->path)) {
+            return $this->previewPlaceholderResponse('Missing file');
+        }
+
+        $filePath = Storage::disk('public')->path($organizationReport->path);
+        $extension = strtolower(pathinfo($organizationReport->stored_name, PATHINFO_EXTENSION));
+
+        $imagickClass = 'Imagick';
+
+        if ($extension === 'pdf' && class_exists($imagickClass)) {
+            try {
+                $imagick = new $imagickClass();
+                $imagick->setResolution(150, 150);
+                $imagick->readImage($filePath.'[0]');
+                $imagick->setImageFormat('png');
+                $imagick->thumbnailImage(600, 0, true);
+                $content = $imagick->getImageBlob();
+                $imagick->clear();
+                $imagick->destroy();
+
+                return response($content, 200, [
+                    'Content-Type' => 'image/png',
+                    'Cache-Control' => 'public, max-age=600',
+                ]);
+            } catch (\Throwable $exception) {
+                return $this->previewPlaceholderResponse(strtoupper($extension).' preview unavailable');
+            }
+        }
+
+        return $this->previewPlaceholderResponse(strtoupper($extension).' preview unavailable');
+    }
+
+    private function previewPlaceholderResponse(string $label)
+    {
+        $safeLabel = e($label);
+        $svg = <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420">
+    <rect width="600" height="420" fill="#f8f9fa"/>
+    <rect x="35" y="35" width="530" height="350" rx="12" fill="#ffffff" stroke="#dee2e6" stroke-width="2"/>
+    <text x="300" y="190" font-size="44" font-family="Arial, sans-serif" text-anchor="middle" fill="#495057">Document</text>
+    <text x="300" y="235" font-size="20" font-family="Arial, sans-serif" text-anchor="middle" fill="#6c757d">{$safeLabel}</text>
+</svg>
+SVG;
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
+
     public function usersReport(Request $request)
     {
         $query = User::where('status', 'active');

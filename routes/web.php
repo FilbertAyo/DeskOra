@@ -150,6 +150,8 @@ Route::middleware(['auth', 'permission:view reports'])->group(function () {
         ->name('reports.organization-documents.store');
     Route::get('reports/organization-documents/{organizationReport}/view', [ReportController::class, 'showOrganizationDocument'])
         ->name('reports.organization-documents.view');
+    Route::get('reports/organization-documents/{organizationReport}/preview', [ReportController::class, 'previewOrganizationDocument'])
+        ->name('reports.organization-documents.preview');
     Route::get('reports/organization-documents/{organizationReport}/download', [ReportController::class, 'downloadOrganizationDocument'])
         ->name('reports.organization-documents.download');
     Route::delete('reports/organization-documents/{organizationReport}', [ReportController::class, 'destroyOrganizationDocument'])
