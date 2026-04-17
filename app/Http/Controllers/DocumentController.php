@@ -74,6 +74,9 @@ class DocumentController extends Controller
                 ->where('state', Document::STATE_DRAFT)
                 ->whereNotNull('review_rejection_reason')
                 ->where('review_rejection_reason', '!=', '');
+        } else {
+            // Default documents list to submitted items only.
+            $query->submitted();
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
