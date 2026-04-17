@@ -103,7 +103,7 @@
                 </li>
 
                 <!-- Action Log -->
-                @if(Auth::user()->hasAnyPermission(['create action logs', 'approve documents']))
+                @if(Auth::user()->hasAnyPermission(['view action logs', 'approve documents', 'create action logs']))
                     <li class="pc-item {{ Request::routeIs('action-logs.index') ? 'active' : '' }}">
                         <a href="{{ route('action-logs.index') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-clipboard"></i></span>
