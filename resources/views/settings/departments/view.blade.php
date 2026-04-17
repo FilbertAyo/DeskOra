@@ -60,7 +60,6 @@
                                     <th>Name</th>
                                     <th class="text-center">Code</th>
                                     <th class="text-center">Users</th>
-                                    <th class="text-center">Children</th>
                                     <th class="text-center">Status</th>
                                     <th class="text-center">Action</th>
                                 </tr>
@@ -71,7 +70,6 @@
                                         <td>{{ $child->name }}</td>
                                         <td class="text-center text-muted">{{ $child->plan_section_number ?? '—' }}</td>
                                         <td class="text-center">{{ $child->users_count }}</td>
-                                        <td class="text-center">{{ $child->children_count }}</td>
                                         <td class="text-center">
                                             <span class="badge {{ $child->status === 'active' ? 'bg-success' : 'bg-secondary' }}">
                                                 {{ ucfirst($child->status) }}

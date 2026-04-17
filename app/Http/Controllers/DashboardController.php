@@ -39,7 +39,10 @@ class DashboardController extends Controller
         $paidAmount = Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->sum('amount');
         $myExpense = Petty::where('user_id', Auth::user()->id)->where('status', 'paid')->sum('amount');
 
-        $departmentNo = Department::count();
+        $departmentNo = Department::query()
+            ->where('status', 'active')
+            ->whereNull('parent_id')
+            ->count();
 
         // Status breakdown for pie chart
         $statusTotals = Petty::query()
