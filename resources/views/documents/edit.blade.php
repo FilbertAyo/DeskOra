@@ -121,25 +121,24 @@
                                         <div class="card-body">
                                             <div class="mb-3">
                                     <label for="main_target" class="form-label">
-                                                    Objective / Main Target <span class="text-danger">*</span>
+                                                    Objective (s) / Main Target (s) <span class="text-danger">*</span>
                                     </label>
                                     <textarea class="form-control @error('main_target') is-invalid @enderror"
                                         name="main_target"
                                         id="main_target"
-                                                    rows="3"
-                                                    required>{{ old('main_target', $document->main_target) }}</textarea>
+                                                    rows="5"
+                                                    required
+                                                    placeholder="Enter the main objective for this week">{{ old('main_target', $document->main_target) }}</textarea>
                                     @error('main_target')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
+                                                <small class="form-text text-muted">
+                                                    This becomes the "Main Target(s)" used by weekly reports.
+                                                </small>
                                             </div>
 
                                             <div class="row">
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Description</label>
-                                                    <textarea class="form-control" name="content[objective][description]" rows="3"
-                                                        placeholder="Short description of the objective">{{ old('content.objective.description', $objective['description'] ?? '') }}</textarea>
-                                                </div>
-                                                <div class="col-md-6 mb-3">
+                                                <div class="col-md-4 mb-3">
                                                     <label class="form-label">Status</label>
                                                     <select class="form-select" name="content[objective][status]">
                                                         <option value="" {{ old('content.objective.status', $objective['status'] ?? '') ? '' : 'selected' }}>-- Select Status --</option>
@@ -148,9 +147,9 @@
                                                         @endforeach
                                                     </select>
                                                 </div>
-                                                <div class="col-md-12 mb-3">
+                                                <div class="col-md-8 mb-3">
                                                     <label class="form-label">Reflection / Progress</label>
-                                                    <textarea class="form-control" name="content[objective][reflection_progress]" rows="3"
+                                                    <textarea class="form-control" name="content[objective][reflection_progress]" rows="5"
                                                         placeholder="What progress/reflection did you have?">{{ old('content.objective.reflection_progress', $objective['reflection_progress'] ?? '') }}</textarea>
                                                 </div>
                                             </div>
@@ -173,12 +172,12 @@
                                                 <table class="table table-bordered align-middle mb-0">
                                                     <thead class="thead-light">
                                                         <tr>
-                                                            <th style="width: 130px;">Day</th>
+                                                            <th style="width: 100px;">Day</th>
                                                             <th>Activity</th>
                                                             <th style="width: 130px;">Location</th>
                                                             <th style="width: 220px;">Staff/Team</th>
-                                                            <th>Notes / Inclusion</th>
-                                                            <th style="width: 60px;"></th>
+                                                            <th style="width: 250px;">Notes / Inclusion</th>
+                                                            <th style="width: 30px;"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="plannedActivitiesBody">
@@ -201,7 +200,7 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][activity]"
                                                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $row['activity'] ?? '') }}</textarea>
                                                                 </td>
@@ -230,7 +229,7 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][notes_inclusion]"
                                                                         placeholder="Notes / inclusion">{{ old("content.planned_activities.$i.notes_inclusion", $row['notes_inclusion'] ?? '') }}</textarea>
                                                                 </td>
@@ -261,12 +260,12 @@
                                                 <table class="table table-bordered align-middle mb-0">
                                                     <thead class="thead-light">
                                                         <tr>
-                                                            <th style="width: 140px;">Date</th>
+                                                            <th style="width: 150px;">Date</th>
                                                             <th>Meeting / Engagement</th>
                                                             <th style="width: 200px;">Participant(s)</th>
                                                             <th style="width: 180px;">Location</th>
                                                             <th>Reactions / Notes</th>
-                                                            <th style="width: 60px;"></th>
+                                                            <th style="width: 30px;"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="keyMeetingsBody">
@@ -307,7 +306,7 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[key_meetings][{{ $i }}][reactions_notes]"
                                                                         placeholder="Notes">{{ old("content.key_meetings.$i.reactions_notes", $row['reactions_notes'] ?? '') }}</textarea>
                                                                 </td>
@@ -339,9 +338,9 @@
                                                     <thead class="thead-light">
                                                         <tr>
                                                             <th>Budget Item / Activity</th>
-                                                            <th style="width: 300px;">Description / Purpose</th>
+                                                            <th style="width: 600px;">Description / Purpose</th>
                                                             <th style="width: 180px;">Amount (TZS)</th>
-                                                            <th style="width: 60px;"></th>
+                                                            <th style="width: 30px;"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="budgetBody">
@@ -358,18 +357,21 @@
                                                                     <input class="form-control"
                                                                         name="content[budget][{{ $i }}][item]"
                                                                         value="{{ old("content.budget.$i.item", $row['item'] ?? '') }}"
-                                                                        placeholder="Budget item">
+                                                                        placeholder="e.g., Printing books ..">
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[budget][{{ $i }}][description_purpose]"
                                                                         placeholder="Purpose">{{ old("content.budget.$i.description_purpose", $row['description_purpose'] ?? '') }}</textarea>
                                                                 </td>
                                                                 <td>
                                                                     <input class="form-control"
                                                                         name="content[budget][{{ $i }}][amount]"
+                                                                        inputmode="numeric"
+                                                                        pattern="^[0-9,]+(\.[0-9]{1,2})?$"
+                                                                        title="Enter amount like 100,000"
                                                                         value="{{ old("content.budget.$i.amount", $row['amount'] ?? '') }}"
-                                                                        placeholder="Amount">
+                                                                        placeholder="e.g., 100,000">
                                                                 </td>
                                                                 <td class="text-center align-middle">
                                                                     <button type="button" class="btn btn-sm btn-outline-danger remove-budget-row">&times;</button>
@@ -631,11 +633,12 @@
 
                                         <div class="mb-3">
                                             <label for="target_accomplished" class="form-label">
-                                                Was the target accomplished?
+                                                Was the target accomplished? <span class="text-danger">*</span>
                                             </label>
                                             <select class="form-control @error('target_accomplished') is-invalid @enderror"
                                                 name="target_accomplished"
-                                                id="target_accomplished">
+                                                id="target_accomplished"
+                                                required>
                                                 <option value="">-- Select Status --</option>
                                                 <option value="1" {{ old('target_accomplished', $document->target_accomplished) === true || old('target_accomplished') === '1' ? 'selected' : '' }}>Yes, Completed</option>
                                                 <option value="0" {{ old('target_accomplished', $document->target_accomplished) === false || (old('target_accomplished') === '0' && $document->target_accomplished !== null) ? 'selected' : '' }}>No, Not Completed</option>
@@ -655,7 +658,7 @@
                                             <textarea class="form-control @error('target_explanation') is-invalid @enderror"
                                                 name="target_explanation"
                                                 id="target_explanation"
-                                                rows="3"
+                                                rows="5"
                                                 placeholder="Please explain why the target was not accomplished...">{{ old('target_explanation', $document->target_explanation) }}</textarea>
                                             @error('target_explanation')
                                                 <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -677,8 +680,8 @@
                                         <div class="card-body">
                                             <textarea class="form-control"
                                                 name="content[summary]"
-                                                rows="4"
-                                                placeholder="Describe what this week focused on">{{ old('content.summary', $objectiveSummary) }}</textarea>
+                                                rows="5"
+                                                placeholder="Describe what this week focused on (and the overall progress)">{{ old('content.summary', $objectiveSummary) }}</textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -745,12 +748,12 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[activity_progress][{{ $i }}][remarks_challenges]"
                                                                         placeholder="Remarks/Challenges">{{ old("content.activity_progress.$i.remarks_challenges", $row['remarks_challenges'] ?? '') }}</textarea>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[activity_progress][{{ $i }}][next_step]"
                                                                         placeholder="Next step">{{ old("content.activity_progress.$i.next_step", $row['next_step'] ?? '') }}</textarea>
                                                                 </td>
@@ -800,7 +803,7 @@
                                                                 <td>
                                                                     <textarea class="form-control @error("content.key_achievements.$i") is-invalid @enderror"
                                                                         name="content[key_achievements][{{ $i }}]"
-                                                                        rows="2"
+                                                                        rows="5"
                                                                         placeholder="Achievement">{{ old("content.key_achievements.$i", is_string($achievement) ? $achievement : '') }}</textarea>
                                                                 </td>
                                                                 <td class="text-center align-middle">
@@ -847,12 +850,12 @@
                                                             @php $chRow = is_array($chRow) ? $chRow : []; @endphp
                                                             <tr>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[challenges_mitigation][{{ $i }}][challenge]"
                                                                         placeholder="Challenge">{{ old("content.challenges_mitigation.$i.challenge", $chRow['challenge'] ?? '') }}</textarea>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="2"
+                                                                    <textarea class="form-control" rows="5"
                                                                         name="content[challenges_mitigation][{{ $i }}][action_taken_planned]"
                                                                         placeholder="Action taken/planned">{{ old("content.challenges_mitigation.$i.action_taken_planned", $chRow['action_taken_planned'] ?? '') }}</textarea>
                                                                 </td>
@@ -1121,7 +1124,7 @@
                                 <option value="Saturday">Saturday</option>
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="2" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
                         <td>
                             <select class="form-select" name="content[planned_activities][${activityIndex}][location]">
                                 <option value="">-- Select --</option>
@@ -1136,7 +1139,7 @@
                                 ${(window.__teamUsersOptionsHtml || '')}
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="2" name="content[planned_activities][${activityIndex}][notes_inclusion]" placeholder="Notes / inclusion"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][notes_inclusion]" placeholder="Notes / inclusion"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-activity-row">&times;</button></td>
                     `;
                     plannedActivitiesBody.appendChild(row);
@@ -1161,7 +1164,7 @@
                     row.innerHTML = `
                         <td><input type="date" class="form-control" name="content[key_meetings][${meetingIndex}][date]"></td>
                         <td><input class="form-control" name="content[key_meetings][${meetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
-                        <td><input class="form-control" name="content[key_meetings][${meetingIndex}][participants]" placeholder="e.g., Dr. Theo / DUCE"></td>
+                        <td><input class="form-control" name="content[key_meetings][${meetingIndex}][participants]" placeholder="e.g., Dr. Theo / DUCE / Name of institution"></td>
                         <td>
                             <select class="form-select" name="content[key_meetings][${meetingIndex}][location]">
                                 <option value="">-- Select --</option>
@@ -1171,7 +1174,7 @@
                                 <option value="On site">On site</option>
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="2" name="content[key_meetings][${meetingIndex}][reactions_notes]" placeholder="What happened?"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[key_meetings][${meetingIndex}][reactions_notes]" placeholder="What happened?"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-meeting-row">&times;</button></td>
                     `;
                     keyMeetingsBody.appendChild(row);
@@ -1194,9 +1197,9 @@
                 addBudgetRowBtn.addEventListener('click', function() {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td><input class="form-control" name="content[budget][${budgetIndex}][item]" placeholder="Budget item / activity"></td>
-                        <td><textarea class="form-control" rows="2" name="content[budget][${budgetIndex}][description_purpose]" placeholder="Description / purpose"></textarea></td>
-                        <td><input class="form-control" name="content[budget][${budgetIndex}][amount]" placeholder="Amount"></td>
+                        <td><input class="form-control" name="content[budget][${budgetIndex}][item]" placeholder="e.g., Printing books .."></td>
+                        <td><textarea class="form-control" rows="5" name="content[budget][${budgetIndex}][description_purpose]" placeholder="Description / purpose"></textarea></td>
+                        <td><input class="form-control" inputmode="numeric" pattern="^[0-9,]+(\.[0-9]{1,2})?$" title="Enter amount like 100,000" name="content[budget][${budgetIndex}][amount]" placeholder="e.g., 100,000"></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-budget-row">&times;</button></td>
                     `;
                     budgetBody.appendChild(row);
@@ -1234,8 +1237,8 @@
                                 <option value="Partially done">Partially done</option>
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="2" name="content[activity_progress][${reportActivityIndex}][remarks_challenges]" placeholder="Remarks/Challenges"></textarea></td>
-                        <td><textarea class="form-control" rows="2" name="content[activity_progress][${reportActivityIndex}][next_step]" placeholder="Next step"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][remarks_challenges]" placeholder="Remarks/Challenges"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][next_step]" placeholder="Next step"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-report-activity-row">&times;</button></td>
                     `;
                     reportActivityProgressBody.appendChild(row);
@@ -1261,7 +1264,7 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="text-center align-middle js-achievement-row-no"></td>
-                        <td><textarea class="form-control" name="content[key_achievements][${achievementIndex}]" rows="2" placeholder="Achievement"></textarea></td>
+                        <td><textarea class="form-control" name="content[key_achievements][${achievementIndex}]" rows="5" placeholder="Achievement"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-achievement-row">&times;</button></td>
                     `;
                     achievementsBody.appendChild(row);
@@ -1284,8 +1287,8 @@
                 addChallengeRowBtn.addEventListener('click', function() {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td><textarea class="form-control" rows="2" name="content[challenges_mitigation][${challengeIndex}][challenge]" placeholder="Challenge"></textarea></td>
-                        <td><textarea class="form-control" rows="2" name="content[challenges_mitigation][${challengeIndex}][action_taken_planned]" placeholder="Action taken/planned"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[challenges_mitigation][${challengeIndex}][challenge]" placeholder="Challenge"></textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[challenges_mitigation][${challengeIndex}][action_taken_planned]" placeholder="Action taken/planned"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-challenge-row">&times;</button></td>
                     `;
                     challengesMitigationBody.appendChild(row);

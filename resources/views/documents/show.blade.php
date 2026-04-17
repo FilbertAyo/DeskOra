@@ -449,6 +449,32 @@
                                                 })
                                                 ->toArray()
                                         );
+
+                                    $hasKeyMeetings = collect($keyMeetings ?: [])->contains(function ($row) {
+                                        if (! is_array($row)) {
+                                            return false;
+                                        }
+                                        foreach (['date', 'meeting', 'participants', 'location', 'reactions_notes'] as $k) {
+                                            if (trim((string) ($row[$k] ?? '')) !== '') {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    });
+
+                                    $hasBudgetRows = collect($budget ?: [])->contains(function ($row) {
+                                        if (! is_array($row)) {
+                                            return false;
+                                        }
+                                        foreach (['item', 'description_purpose', 'amount'] as $k) {
+                                            if (trim((string) ($row[$k] ?? '')) !== '') {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    });
                                 @endphp
 
                                 <div class="p-4">
@@ -524,7 +550,7 @@
                                                         @endforeach
                                                         @if(!$hasGroupedRows)
                                                             <tr>
-                                                                <td colspan="5" class="text-center text-muted">No planned activities provided.</td>
+                                                                <td colspan="5" class="text-center text-muted py-4">No planned activities for this week.</td>
                                                             </tr>
                                                         @endif
                                                     </tbody>
@@ -550,16 +576,33 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @foreach(($keyMeetings ?: []) as $row)
-                                                            @php $row = is_array($row) ? $row : []; @endphp
+                                                        @if($hasKeyMeetings)
+                                                            @foreach(($keyMeetings ?: []) as $row)
+                                                                @php $row = is_array($row) ? $row : []; @endphp
+                                                                @php
+                                                                    $kmEmpty = true;
+                                                                    foreach (['date', 'meeting', 'participants', 'location', 'reactions_notes'] as $kmk) {
+                                                                        if (trim((string) ($row[$kmk] ?? '')) !== '') {
+                                                                            $kmEmpty = false;
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                @endphp
+                                                                @if(!$kmEmpty)
+                                                                    <tr>
+                                                                        <td>{{ $row['date'] ?? '' }}</td>
+                                                                        <td>{{ $row['meeting'] ?? '' }}</td>
+                                                                        <td>{{ $row['participants'] ?? '' }}</td>
+                                                                        <td>{{ $row['location'] ?? '' }}</td>
+                                                                        <td>{{ $row['reactions_notes'] ?? '' }}</td>
+                                                                    </tr>
+                                                                @endif
+                                                            @endforeach
+                                                        @else
                                                             <tr>
-                                                                <td>{{ $row['date'] ?? '' }}</td>
-                                                                <td>{{ $row['meeting'] ?? '' }}</td>
-                                                                <td>{{ $row['participants'] ?? '' }}</td>
-                                                                <td>{{ $row['location'] ?? '' }}</td>
-                                                                <td>{{ $row['reactions_notes'] ?? '' }}</td>
+                                                                <td colspan="5" class="text-center text-muted py-4">No meetings or engagements planned for this week.</td>
                                                             </tr>
-                                                        @endforeach
+                                                        @endif
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -581,14 +624,31 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @foreach(($budget ?: []) as $row)
-                                                            @php $row = is_array($row) ? $row : []; @endphp
+                                                        @if($hasBudgetRows)
+                                                            @foreach(($budget ?: []) as $row)
+                                                                @php $row = is_array($row) ? $row : []; @endphp
+                                                                @php
+                                                                    $bEmpty = true;
+                                                                    foreach (['item', 'description_purpose', 'amount'] as $bk) {
+                                                                        if (trim((string) ($row[$bk] ?? '')) !== '') {
+                                                                            $bEmpty = false;
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                @endphp
+                                                                @if(!$bEmpty)
+                                                                    <tr>
+                                                                        <td>{{ $row['item'] ?? '' }}</td>
+                                                                        <td>{{ $row['description_purpose'] ?? '' }}</td>
+                                                                        <td>{{ $row['amount'] ?? '' }}</td>
+                                                                    </tr>
+                                                                @endif
+                                                            @endforeach
+                                                        @else
                                                             <tr>
-                                                                <td>{{ $row['item'] ?? '' }}</td>
-                                                                <td>{{ $row['description_purpose'] ?? '' }}</td>
-                                                                <td>{{ $row['amount'] ?? '' }}</td>
+                                                                <td colspan="3" class="text-center text-muted py-4">No budget items for this week.</td>
                                                             </tr>
-                                                        @endforeach
+                                                        @endif
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -608,6 +668,32 @@
                                         ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
                                         ->first();
                                     $planBudget = is_array($relatedPlan?->content ?? null) ? ($relatedPlan->content['budget'] ?? []) : [];
+
+                                    $hasActivityProgress = collect($activityProgress ?: [])->contains(function ($row) {
+                                        if (! is_array($row)) {
+                                            return false;
+                                        }
+                                        foreach (['activity_output', 'progress', 'remarks_challenges', 'next_step'] as $k) {
+                                            if (trim((string) ($row[$k] ?? '')) !== '') {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    });
+
+                                    $hasChallengesMitigation = collect($challengesMitigation ?: [])->contains(function ($row) {
+                                        if (! is_array($row)) {
+                                            return false;
+                                        }
+                                        foreach (['challenge', 'action_taken_planned'] as $k) {
+                                            if (trim((string) ($row[$k] ?? '')) !== '') {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    });
                                 @endphp
 
                                 <div class="p-4">
@@ -639,16 +725,35 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @foreach(($activityProgress ?: []) as $idx => $row)
-                                                            @php $row = is_array($row) ? $row : []; @endphp
+                                                        @if($hasActivityProgress)
+                                                            @php $apNum = 0; @endphp
+                                                            @foreach(($activityProgress ?: []) as $row)
+                                                                @php $row = is_array($row) ? $row : []; @endphp
+                                                                @php
+                                                                    $apEmpty = true;
+                                                                    foreach (['activity_output', 'progress', 'remarks_challenges', 'next_step'] as $apk) {
+                                                                        if (trim((string) ($row[$apk] ?? '')) !== '') {
+                                                                            $apEmpty = false;
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                @endphp
+                                                                @if(!$apEmpty)
+                                                                    @php $apNum++; @endphp
+                                                                    <tr>
+                                                                        <td class="text-center">{{ $apNum }}</td>
+                                                                        <td>{{ $row['activity_output'] ?? '' }}</td>
+                                                                        <td>{{ $row['progress'] ?? '' }}</td>
+                                                                        <td>{{ $row['remarks_challenges'] ?? '' }}</td>
+                                                                        <td>{{ $row['next_step'] ?? '' }}</td>
+                                                                    </tr>
+                                                                @endif
+                                                            @endforeach
+                                                        @else
                                                             <tr>
-                                                                <td class="text-center">{{ $idx + 1 }}</td>
-                                                                <td>{{ $row['activity_output'] ?? '' }}</td>
-                                                                <td>{{ $row['progress'] ?? '' }}</td>
-                                                                <td>{{ $row['remarks_challenges'] ?? '' }}</td>
-                                                                <td>{{ $row['next_step'] ?? '' }}</td>
+                                                                <td colspan="5" class="text-center text-muted py-4">No activity progress recorded for this week.</td>
                                                             </tr>
-                                                        @endforeach
+                                                        @endif
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -685,7 +790,7 @@
                                                     </table>
                                                 </div>
                                             @else
-                                                <div class="text-muted">No achievements provided.</div>
+                                                <div class="text-muted py-2">No key achievements recorded for this week.</div>
                                             @endif
                                         </div>
                                     </div>
@@ -704,13 +809,30 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @foreach(($challengesMitigation ?: []) as $row)
-                                                            @php $row = is_array($row) ? $row : []; @endphp
+                                                        @if($hasChallengesMitigation)
+                                                            @foreach(($challengesMitigation ?: []) as $row)
+                                                                @php $row = is_array($row) ? $row : []; @endphp
+                                                                @php
+                                                                    $cmEmpty = true;
+                                                                    foreach (['challenge', 'action_taken_planned'] as $cmk) {
+                                                                        if (trim((string) ($row[$cmk] ?? '')) !== '') {
+                                                                            $cmEmpty = false;
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                @endphp
+                                                                @if(!$cmEmpty)
+                                                                    <tr>
+                                                                        <td>{{ $row['challenge'] ?? '' }}</td>
+                                                                        <td>{{ $row['action_taken_planned'] ?? '' }}</td>
+                                                                    </tr>
+                                                                @endif
+                                                            @endforeach
+                                                        @else
                                                             <tr>
-                                                                <td>{{ $row['challenge'] ?? '' }}</td>
-                                                                <td>{{ $row['action_taken_planned'] ?? '' }}</td>
+                                                                <td colspan="2" class="text-center text-muted py-4">No challenges or mitigation notes for this week.</td>
                                                             </tr>
-                                                        @endforeach
+                                                        @endif
                                                     </tbody>
                                                 </table>
                                             </div>
