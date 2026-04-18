@@ -115,7 +115,7 @@
                                                         <tr>
                                                             <th style="width: 90px;">Day</th>
                                                             <th>Activity</th>
-                                                            <th style="width: 180px;">Location</th>
+                                                            <th style="width: 150px;">Location</th>
                                                             <th style="width: 180px;">Lead Staff/Team</th>
                                                             <th>Notes</th>
                                                         </tr>
