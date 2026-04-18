@@ -4,11 +4,11 @@
 ])
 
 @php
-    $defaultClasses = 'btn btn-primary';
+    $defaultClasses = 'btn btn-primary lh-1';
 @endphp
 
 <button type="submit" {{ $attributes->merge(['class' => $defaultClasses] + ($id ? ['id' => $id] : [])) }}>
-    <span class="spinner-border spinner-border-sm me-2 mr-1 d-none" role="status" aria-hidden="true"></span>
+    <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
     <span class="btn-label">{{ $label }}</span>
 </button>
 
