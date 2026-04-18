@@ -38,6 +38,13 @@
                             </span>
                         @endif
                     </div>
+                    @if(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true) && $document->sharedUsers->isNotEmpty())
+                        <div class="small text-muted mb-2">
+                            <i class="ti ti-users-group me-1"></i>
+                            <span class="fw-semibold text-body-secondary">Collaborators:</span>
+                            {{ $document->sharedUsers->pluck('name')->join(', ') }}
+                        </div>
+                    @endif
                     <div class="btn-group mt-2 gap-1" role="group">
                         @if($document->canBeEdited())
                             <a href="{{ route('documents.edit', $document->id) }}" class="btn btn-primary btn-sm">

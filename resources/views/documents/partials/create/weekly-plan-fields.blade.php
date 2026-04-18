@@ -1,4 +1,30 @@
 <div class="col-12 mb-3">
+    <div class="card border-primary-subtle">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="mb-0"><i class="ti ti-users-group me-2"></i>Collaboration (Optional)</h6>
+        </div>
+        <div class="card-body">
+            @php
+                $selectedSharedUsers = old('shared_user_ids', []);
+                if (!is_array($selectedSharedUsers)) $selectedSharedUsers = [];
+            @endphp
+            <label for="shared_user_ids" class="form-label">Share this weekly plan with staff in your department</label>
+            <select class="form-select @error('shared_user_ids') is-invalid @enderror" id="shared_user_ids" name="shared_user_ids[]" multiple>
+                @foreach(($shareableUsers ?? collect()) as $shareUser)
+                    <option value="{{ $shareUser->id }}" {{ in_array((string)$shareUser->id, array_map('strval', $selectedSharedUsers), true) ? 'selected' : '' }}>
+                        {{ $shareUser->name }}
+                    </option>
+                @endforeach
+            </select>
+            @error('shared_user_ids')
+                <div class="invalid-feedback d-block">{{ $message }}</div>
+            @enderror
+            <small class="form-text text-muted">Selected staff can view, edit, and submit this weekly plan while it remains draft.</small>
+        </div>
+    </div>
+</div>
+
+<div class="col-12 mb-3">
     <div class="card border-primary">
         <div class="card-header bg-white border-bottom">
             <h6 class="mb-0"><i class="ti ti-target me-2"></i>1. Key Objective for the Week</h6>
@@ -226,9 +252,9 @@
                 <table class="table table-bordered align-middle mb-0">
                     <thead class="thead-light">
                         <tr>
-                            <th>Budget Item / Activity</th>
-                            <th style="width: 600px;">Description / Purpose</th>
-                            <th style="width: 180px;">Amount (TZS)</th>
+                            <th style="width: 500px;">Budget Item / Activity</th>
+                            <th style="width: 500px;">Description / Purpose</th>
+                            <th style="width: 150px;">Amount (TZS)</th>
                             <th style="width: 30px;"></th>
                         </tr>
                     </thead>

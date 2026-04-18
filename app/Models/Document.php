@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -46,6 +47,10 @@ class Document extends Model
     public const TYPE_MONTHLY_REPORT = 'monthly_report';
 
     public const TYPE_ACTION_LOG = 'action_log';
+
+    public const SHARE_EVENT_ADDED = 'added';
+
+    public const SHARE_EVENT_REMOVED = 'removed';
 
     /**
      * Document State Constants
@@ -276,6 +281,64 @@ class Document extends Model
     }
 
     /**
+     * Weekly document collaborators explicitly added by the owner.
+     */
+    public function sharedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'document_user_shares', 'document_id', 'user_id')
+            ->withTimestamps();
+    }
+
+    public function isSharedWith(string $userId): bool
+    {
+        return $this->sharedUsers()
+            ->where('users.id', $userId)
+            ->exists();
+    }
+
+    public function allEditableUserIds(): array
+    {
+        $sharedIds = $this->sharedUsers()
+            ->pluck('users.id')
+            ->all();
+
+        return array_values(array_unique(array_merge([$this->user_id], $sharedIds)));
+    }
+
+    public static function supportsSharedEditing(?string $type): bool
+    {
+        return in_array($type, [self::TYPE_WEEKLY_PLAN, self::TYPE_WEEKLY_REPORT], true);
+    }
+
+    /**
+     * Weekly plan for the same period and owning user (submitted preferred).
+     */
+    public static function findWeeklyPlanForPeriodOwner(string $periodId, string $ownerUserId): ?Document
+    {
+        return static::query()
+            ->where('period_id', $periodId)
+            ->where('type', self::TYPE_WEEKLY_PLAN)
+            ->where('user_id', $ownerUserId)
+            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Weekly report for the same period and owning user (submitted preferred).
+     */
+    public static function findWeeklyReportForPeriodOwner(string $periodId, string $ownerUserId): ?Document
+    {
+        return static::query()
+            ->where('period_id', $periodId)
+            ->where('type', self::TYPE_WEEKLY_REPORT)
+            ->where('user_id', $ownerUserId)
+            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Scope: Filter by type
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
@@ -306,6 +369,16 @@ class Document extends Model
     public function scopeForUser($query, string $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    public function scopeForOwnerOrSharedUser($query, string $userId)
+    {
+        return $query->where(function ($nested) use ($userId) {
+            $nested->where('user_id', $userId)
+                ->orWhereHas('sharedUsers', function ($sharedUsers) use ($userId) {
+                    $sharedUsers->where('users.id', $userId);
+                });
+        });
     }
 
     /**

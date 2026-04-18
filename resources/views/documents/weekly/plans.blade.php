@@ -108,6 +108,7 @@
                                         <th>Title</th>
                                         <th>Week Period</th>
                                         <th>Author</th>
+                                        <th>Collaborators</th>
                                         <th>Created</th>
                                         <th>Last Updated</th>
                                         <th class="text-center" style="width: 120px;">Status</th>
@@ -120,6 +121,15 @@
                                             <td class="text-center">{{ ($documents->currentPage() - 1) * $documents->perPage() + $loop->iteration }}</td>
                                             <td>
                                                 <strong>{{ $document->display_title }}</strong>
+                                                @if($document->sharedUsers->isNotEmpty())
+                                                    <div class="mt-1">
+                                                        @if((string) auth()->id() === (string) $document->user_id)
+                                                            <span class="badge bg-light-primary text-primary">Owner (Shared)</span>
+                                                        @else
+                                                            <span class="badge bg-light-info text-info">Shared With You</span>
+                                                        @endif
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td>
                                                 @if($document->period)
@@ -139,6 +149,9 @@
                                                 @else
                                                     <span class="text-muted">-</span>
                                                 @endif
+                                            </td>
+                                            <td>
+                                                @include('documents.partials.weekly-shared-names-cell', ['document' => $document])
                                             </td>
                                             <td>
                                                 <small class="text-muted">
@@ -182,10 +195,10 @@
                                                     @endif
                                                     @if($document->period)
                                                         @php
-                                                            $relatedReport = \App\Models\Document::where('period_id', $document->period_id)
-                                                                ->where('type', \App\Models\Document::TYPE_WEEKLY_REPORT)
-                                                                ->forUser($document->user_id)
-                                                                ->first();
+                                                            $relatedReport = \App\Models\Document::findWeeklyReportForPeriodOwner(
+                                                                $document->period_id,
+                                                                (string) $document->user_id
+                                                            );
                                                         @endphp
                                                         @if($relatedReport)
                                                             <a href="{{ route('documents.show', $relatedReport->id) }}"

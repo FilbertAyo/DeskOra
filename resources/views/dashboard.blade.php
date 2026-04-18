@@ -16,6 +16,8 @@
 
         $activeActionTasks = $actionLogProgress['activeTasks'] ?? [];
         $activeActionTaskCount = is_array($activeActionTasks) ? count($activeActionTasks) : 0;
+        $sharedWithMeCount = (int) ($sharedWithMeCount ?? 0);
+        $collaborationEvents = collect($collaborationEvents ?? []);
         $currentActionLogDraftId = $actionLogProgress['currentDraftId'] ?? null;
         $hasCurrentActionDraft = !empty($currentActionLogDraftId);
         $pendingDraftsTotal =
@@ -277,12 +279,12 @@
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
                     <span class="badge bg-primary">
-                        {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount }}
+                        {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount }}
                     </span>
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned for revision
@@ -291,7 +293,7 @@
                                 <small class="text-muted">Update and re-submit these first.</small>
                             </div>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-file-edit text-warning me-1"></i>Drafts waiting submission
@@ -300,13 +302,36 @@
                                 <small class="text-muted">Ready to review and submit.</small>
                             </div>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-clipboard-list text-primary me-1"></i>Open action tasks
                                 </p>
                                 <h4 class="mb-1 text-primary">{{ $activeActionTaskCount }}</h4>
                                 <small class="text-muted">Track progress updates for your assigned tasks.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="p-3 border rounded h-100">
+                                <p class="mb-1 text-muted small">
+                                    <i class="ti ti-users-group text-info me-1"></i>Shared weekly docs
+                                </p>
+                                <h4 class="mb-1 text-info">{{ $sharedWithMeCount }}</h4>
+                                <small class="text-muted">Plans/reports where you are a collaborator.</small>
+                                @if($sharedWithMeCount > 0)
+                                    <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top small">
+                                        @if(isset($dashboardAvailableTypes['weekly_plan']))
+                                            <a href="{{ route('documents.weekly-plans') }}" class="text-decoration-none">
+                                                <i class="ti ti-target me-1"></i>Weekly plans
+                                            </a>
+                                        @endif
+                                        @if(isset($dashboardAvailableTypes['weekly_report']))
+                                            <a href="{{ route('documents.weekly-reports') }}" class="text-decoration-none">
+                                                <i class="ti ti-activity me-1"></i>Weekly reports
+                                            </a>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -320,6 +345,23 @@
                                     <li>{{ $line }}</li>
                                 @endforeach
                             </ul>
+                        </div>
+                    @endif
+
+                    @if($collaborationEvents->isNotEmpty())
+                        <div class="border rounded p-3">
+                            <p class="fw-semibold mb-2"><i class="ti ti-users-group me-1"></i>Recent collaboration updates</p>
+                            @foreach($collaborationEvents as $event)
+                                <div class="d-flex align-items-start gap-2 mb-2">
+                                    <span class="badge {{ $event['badge_class'] ?? 'bg-light' }} align-self-center">{{ $event['badge_label'] ?? '' }}</span>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
+                                            {{ $event['message'] }}
+                                        </a>
+                                    </div>
+                                    <small class="text-muted text-nowrap">{{ $event['created_at']->diffForHumans() }}</small>
+                                </div>
+                            @endforeach
                         </div>
                     @endif
 

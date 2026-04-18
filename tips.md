@@ -1,1 +1,7 @@
-This system is called DeskOra and its logo is public/assets/images/deskora-logo.svg so this is my sytem but now i create and i want to use to the organization i work now so i can test it and improve while is being used on the organization so i just use thhe logo of the organization so thhat they dont feel like they use something is now theirs so so far all logo with name 'logo' is the organization logo so now i want to put name of the system someplaces and logo but in few places so help me with that 
+Since this system is not well completed hence i will improve as many times until become strong and since now is already started to be used - hence this is still week version
+
+The big issue i discover is that
+- there are some staffs already created their plan and report so there is issue arise where it can happen that two staffs on the same department to have one plan hence one report (but they should be under one departmnent - it doesnt matter different sub departments) so what i want is to add feauture where more that one staff merge plan hence report if wanted and thhey can also be unmerged hence all staff of that plan can all edit it 
+
+please be very causions and ensure ui consistence and dont forget to show notification for those who shares plan and report on dashboard
+

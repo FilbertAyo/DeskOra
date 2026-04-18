@@ -10,6 +10,7 @@ use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -30,11 +31,11 @@ class DocumentController extends Controller
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $query = Document::with(['user', 'period']);
+        $query = Document::with(['user', 'period', 'sharedUsers:id,name']);
 
         // Users with 'view all documents' permission can see all documents, others see only their own
         if (! $user->hasPermissionTo('view all documents')) {
-            $query->forUser($user->id);
+            $query->forOwnerOrSharedUser($user->id);
         }
 
         // Get current period for defaults
@@ -78,7 +79,14 @@ class DocumentController extends Controller
             $query->submitted();
         }
 
-        $documents = $query->latest()->paginate(15)->withQueryString();
+        if (! $user->hasPermissionTo('view all documents')
+            && in_array($request->input('type'), [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            $this->applyWeeklyListSortForUser($query, $user);
+        } else {
+            $query->latest();
+        }
+
+        $documents = $query->paginate(15)->withQueryString();
         $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
             $documents->getCollection()->pluck('id')->all()
         );
@@ -182,6 +190,7 @@ class DocumentController extends Controller
             // Validate that user can create this type
             if (Document::canUserCreateType($user, $selectedType)) {
                 $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+                $shareableUsers = $this->shareableDepartmentUsersFor($user);
 
                 return view('documents.create', compact(
                     'availableTypes',
@@ -192,6 +201,7 @@ class DocumentController extends Controller
                     'nextPeriod',
                     'relatedPlan',
                     'teamUsers',
+                    'shareableUsers',
                     'monthlyYearPlan',
                     'monthlyPlannedActivities',
                     'monthlyDefaultMonth',
@@ -203,6 +213,7 @@ class DocumentController extends Controller
         }
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+        $shareableUsers = $this->shareableDepartmentUsersFor($user);
 
         return view('documents.create', compact(
             'availableTypes',
@@ -212,6 +223,7 @@ class DocumentController extends Controller
             'nextPeriod',
             'relatedPlan',
             'teamUsers',
+            'shareableUsers',
             'monthlyYearPlan',
             'monthlyPlannedActivities',
             'monthlyDefaultMonth',
@@ -241,6 +253,8 @@ class DocumentController extends Controller
         // Make period_id required for weekly plans and reports
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
             $validationRules['period_id'] = ['required', 'string', 'ulid', 'exists:work_periods,id'];
+            $validationRules['shared_user_ids'] = ['nullable', 'array'];
+            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
         } else {
             $validationRules['period_id'] = ['nullable', 'string', 'ulid', 'exists:work_periods,id'];
         }
@@ -319,6 +333,13 @@ class DocumentController extends Controller
 
         $action = $request->input('action', 'draft');
         $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+        $sharedUserIds = $this->extractRequestedSharedUserIds($request);
+
+        if (Document::supportsSharedEditing($request->type)) {
+            $sharedUserIds = $this->validateSharedMembersWithinDepartment($user, $sharedUserIds);
+        } else {
+            $sharedUserIds = [];
+        }
 
         // Normalize and trim template payload to avoid storing empty rows.
         $templateContent = null;
@@ -401,8 +422,9 @@ class DocumentController extends Controller
         // Check if document already exists for this user, period/month/year, and type
         $existingDocument = null;
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $period) {
-            // For weekly plans and reports - one per week period
-            $existingDocument = Document::where('user_id', $user->id)
+            // For weekly plans and reports, a user can own one or collaborate on one per period.
+            $existingDocument = Document::query()
+                ->forOwnerOrSharedUser($user->id)
                 ->where('period_id', $period->id)
                 ->where('type', $request->type)
                 ->first();
@@ -413,6 +435,21 @@ class DocumentController extends Controller
                 ->where('month', $request->month)
                 ->where('year', $request->year)
                 ->first();
+        }
+
+        if (Document::supportsSharedEditing($request->type) && $period) {
+            $conflictMessage = $this->firstCollaborationConflictMessage(
+                $period->id,
+                $request->type,
+                array_merge([$user->id], $sharedUserIds),
+                $existingDocument?->id
+            );
+
+            if ($conflictMessage !== null) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['shared_user_ids' => $conflictMessage]);
+            }
         }
 
         if ($period && in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
@@ -570,6 +607,9 @@ class DocumentController extends Controller
             }
 
             $existingDocument->update($updateData);
+            if (Document::supportsSharedEditing($existingDocument->type)) {
+                $this->syncDocumentShares($existingDocument, $sharedUserIds, $user);
+            }
 
             $message = ($action === 'submit')
                 ? 'Document updated and submitted successfully.'
@@ -626,6 +666,9 @@ class DocumentController extends Controller
         }
 
         $document = Document::create($documentData);
+        if (Document::supportsSharedEditing($document->type)) {
+            $this->syncDocumentShares($document, $sharedUserIds, $user);
+        }
 
         $message = ($action === 'submit')
             ? 'Document submitted successfully.'
@@ -640,7 +683,7 @@ class DocumentController extends Controller
      */
     public function show(Document $document)
     {
-        $document->load(['user', 'period']);
+        $document->load(['user', 'period', 'sharedUsers']);
 
         // Authorize view action
         $this->authorize('view', $document);
@@ -650,17 +693,15 @@ class DocumentController extends Controller
         $relatedAction = null;
         if ($document->period_id) {
             if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-                // Get the report for this period (same period)
-                $relatedDocument = Document::where('period_id', $document->period_id)
-                    ->where('type', Document::TYPE_WEEKLY_REPORT)
-                    ->where('user_id', $document->user_id)
-                    ->first();
+                $relatedDocument = Document::findWeeklyReportForPeriodOwner(
+                    $document->period_id,
+                    (string) $document->user_id
+                );
             } elseif ($document->type === Document::TYPE_WEEKLY_REPORT) {
-                // Get the plan for this period (same period)
-                $relatedDocument = Document::where('period_id', $document->period_id)
-                    ->where('type', Document::TYPE_WEEKLY_PLAN)
-                    ->where('user_id', $document->user_id)
-                    ->first();
+                $relatedDocument = Document::findWeeklyPlanForPeriodOwner(
+                    $document->period_id,
+                    (string) $document->user_id
+                );
             }
 
             if (! $relatedDocument) {
@@ -724,7 +765,7 @@ class DocumentController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
-        $document->loadMissing('user');
+        $document->loadMissing(['user', 'sharedUsers']);
         $monthlyYearPlan = null;
         $monthlyPlannedActivities = collect();
         $monthlyHasSubDepartments = false;
@@ -740,8 +781,9 @@ class DocumentController extends Controller
         }
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+        $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
 
-        return view('documents.edit', compact('document', 'teamUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments'));
+        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments'));
     }
 
     /**
@@ -749,6 +791,8 @@ class DocumentController extends Controller
      */
     public function update(Request $request, Document $document)
     {
+        /** @var \App\Models\User $actingUser */
+        $actingUser = Auth::user();
 
         // Authorize update action
         $this->authorize('update', $document);
@@ -794,6 +838,8 @@ class DocumentController extends Controller
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             $validationRules['target_accomplished'] = ['nullable', 'boolean'];
             $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['shared_user_ids'] = ['nullable', 'array'];
+            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
 
             $validationRules['content.summary'] = ['nullable', 'string', 'max:5000'];
 
@@ -822,10 +868,33 @@ class DocumentController extends Controller
             $validationRules['attachment'] = ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240'];
         }
 
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $validationRules['shared_user_ids'] = ['nullable', 'array'];
+            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+        }
+
         $request->validate($validationRules);
 
         $action = $request->input('action', 'draft');
         $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+        $sharedUserIds = $this->extractRequestedSharedUserIds($request);
+
+        if (Document::supportsSharedEditing($document->type)) {
+            $sharedUserIds = $this->validateSharedMembersWithinDepartment($document->user, $sharedUserIds);
+            $conflictMessage = $this->firstCollaborationConflictMessage(
+                $document->period_id,
+                $document->type,
+                array_merge([$document->user_id], $sharedUserIds),
+                $document->id
+            );
+            if ($conflictMessage !== null) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['shared_user_ids' => $conflictMessage]);
+            }
+        } else {
+            $sharedUserIds = [];
+        }
 
         if ($action === 'submit') {
             $this->authorize('submit', $document);
@@ -938,6 +1007,9 @@ class DocumentController extends Controller
         }
 
         $document->update($updateData);
+        if (Document::supportsSharedEditing($document->type)) {
+            $this->syncDocumentShares($document, $sharedUserIds, $actingUser);
+        }
 
         $message = ($action === 'submit')
             ? 'Document submitted successfully.'
@@ -1146,12 +1218,12 @@ class DocumentController extends Controller
 
         // Get pending submissions (draft documents)
         $pendingDocumentsQuery = Document::query()
-            ->forUser($user->id)
+            ->forOwnerOrSharedUser($user->id)
             ->drafts()
             ->latest();
 
         $allDocumentsQuery = Document::query()
-            ->forUser($user->id)
+            ->forOwnerOrSharedUser($user->id)
             ->latest();
 
         if ($periodFilterId) {
@@ -1190,14 +1262,20 @@ class DocumentController extends Controller
             ->take(6)
             ->get()
             ->map(function ($period) use ($user) {
-                $plan = Document::where('user_id', $user->id)
+                $plan = Document::query()
+                    ->forOwnerOrSharedUser($user->id)
                     ->where('period_id', $period->id)
                     ->where('type', Document::TYPE_WEEKLY_PLAN)
+                    ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [Document::STATE_SUBMITTED])
+                    ->latest('id')
                     ->first();
 
-                $report = Document::where('user_id', $user->id)
+                $report = Document::query()
+                    ->forOwnerOrSharedUser($user->id)
                     ->where('period_id', $period->id)
                     ->where('type', Document::TYPE_WEEKLY_REPORT)
+                    ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [Document::STATE_SUBMITTED])
+                    ->latest('id')
                     ->first();
 
                 return [
@@ -1237,12 +1315,12 @@ class DocumentController extends Controller
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $query = Document::with(['user', 'period'])
+        $query = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->ofType(Document::TYPE_WEEKLY_PLAN);
 
         // Users with 'view all documents' permission can see all documents, others see only their own
         if (! $user->hasPermissionTo('view all documents')) {
-            $query->forUser($user->id);
+            $query->forOwnerOrSharedUser($user->id);
         }
 
         // Get current period for defaults
@@ -1269,7 +1347,8 @@ class DocumentController extends Controller
                 ->where('review_rejection_reason', '!=', '');
         }
 
-        $documents = $query->latest()->paginate(15)->withQueryString();
+        $this->applyWeeklyListSortForUser($query, $user);
+        $documents = $query->paginate(15)->withQueryString();
         $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
             $documents->getCollection()->pluck('id')->all()
         );
@@ -1311,7 +1390,8 @@ class DocumentController extends Controller
             return response()->json(['error' => 'Period ID is required'], 400);
         }
 
-        $plan = Document::where('user_id', $user->id)
+        $plan = Document::query()
+            ->forOwnerOrSharedUser($user->id)
             ->where('period_id', $periodId)
             ->where('type', Document::TYPE_WEEKLY_PLAN)
             ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [Document::STATE_SUBMITTED])
@@ -1396,12 +1476,12 @@ class DocumentController extends Controller
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $query = Document::with(['user', 'period'])
+        $query = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->ofType(Document::TYPE_WEEKLY_REPORT);
 
         // Users with 'view all documents' permission can see all documents, others see only their own
         if (! $user->hasPermissionTo('view all documents')) {
-            $query->forUser($user->id);
+            $query->forOwnerOrSharedUser($user->id);
         }
 
         // Get current period for defaults
@@ -1428,7 +1508,8 @@ class DocumentController extends Controller
                 ->where('review_rejection_reason', '!=', '');
         }
 
-        $documents = $query->latest()->paginate(15)->withQueryString();
+        $this->applyWeeklyListSortForUser($query, $user);
+        $documents = $query->paginate(15)->withQueryString();
         $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
             $documents->getCollection()->pluck('id')->all()
         );
@@ -1835,6 +1916,184 @@ class DocumentController extends Controller
         'Deferred',
         'Not applicable',
     ];
+
+    private function shareableDepartmentUsersFor(User $owner)
+    {
+        if (! $owner->department_id) {
+            return collect();
+        }
+
+        return User::query()
+            ->select('id', 'name')
+            ->where('department_id', $owner->department_id)
+            ->where('id', '!=', $owner->id)
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extractRequestedSharedUserIds(Request $request): array
+    {
+        $rawIds = $request->input('shared_user_ids', []);
+        if (! is_array($rawIds)) {
+            return [];
+        }
+
+        $normalized = array_map(static fn ($id) => trim((string) $id), $rawIds);
+        $normalized = array_values(array_filter($normalized, static fn ($id) => $id !== ''));
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param  array<int, string>  $sharedUserIds
+     * @return array<int, string>
+     */
+    private function validateSharedMembersWithinDepartment(User $owner, array $sharedUserIds): array
+    {
+        if ($sharedUserIds === []) {
+            return [];
+        }
+
+        $sharedUserIds = array_values(array_filter(
+            $sharedUserIds,
+            static fn ($id) => $id !== '' && $id !== (string) $owner->id
+        ));
+
+        if ($sharedUserIds === []) {
+            return [];
+        }
+
+        if (! $owner->department_id) {
+            throw ValidationException::withMessages([
+                'shared_user_ids' => 'You can only share weekly documents after you are assigned to a department.',
+            ]);
+        }
+
+        $validIds = User::query()
+            ->whereIn('id', $sharedUserIds)
+            ->where('department_id', $owner->department_id)
+            ->pluck('id')
+            ->map(static fn ($id) => (string) $id)
+            ->all();
+
+        if (count($validIds) !== count($sharedUserIds)) {
+            throw ValidationException::withMessages([
+                'shared_user_ids' => 'Selected staff must belong to your department.',
+            ]);
+        }
+
+        return $validIds;
+    }
+
+    /**
+     * @param  array<int, string>  $memberIds
+     */
+    private function firstCollaborationConflictMessage(
+        ?string $periodId,
+        string $type,
+        array $memberIds,
+        ?string $excludeDocumentId = null
+    ): ?string {
+        if (! $periodId || ! Document::supportsSharedEditing($type) || $memberIds === []) {
+            return null;
+        }
+
+        $query = Document::query()
+            ->with(['user:id,name', 'sharedUsers:id,name'])
+            ->where('period_id', $periodId)
+            ->where('type', $type)
+            ->where(function ($nested) use ($memberIds) {
+                $nested->whereIn('user_id', $memberIds)
+                    ->orWhereHas('sharedUsers', function ($sharedUsers) use ($memberIds) {
+                        $sharedUsers->whereIn('users.id', $memberIds);
+                    });
+            });
+
+        if ($excludeDocumentId) {
+            $query->where('id', '!=', $excludeDocumentId);
+        }
+
+        /** @var Document|null $conflict */
+        $conflict = $query->first();
+        if (! $conflict) {
+            return null;
+        }
+
+        $ownerName = $conflict->user?->name ?? 'another staff member';
+        $typeLabel = $type === Document::TYPE_WEEKLY_PLAN ? 'weekly plan' : 'weekly report';
+
+        return "A {$typeLabel} collaboration already exists for this week with {$ownerName}. Open that document instead of creating a new group.";
+    }
+
+    /**
+     * @param  array<int, string>  $sharedUserIds
+     */
+    private function syncDocumentShares(Document $document, array $sharedUserIds, User $actor): void
+    {
+        $desiredIds = array_values(array_unique(array_filter(
+            array_map(static fn ($id) => trim((string) $id), $sharedUserIds),
+            static fn ($id) => $id !== '' && $id !== (string) $document->user_id
+        )));
+
+        $existingIds = $document->sharedUsers()
+            ->pluck('users.id')
+            ->map(static fn ($id) => (string) $id)
+            ->all();
+
+        $document->sharedUsers()->sync($desiredIds);
+
+        $addedIds = array_values(array_diff($desiredIds, $existingIds));
+        $removedIds = array_values(array_diff($existingIds, $desiredIds));
+        if ($addedIds === [] && $removedIds === []) {
+            return;
+        }
+
+        $now = now();
+        $events = [];
+        foreach ($addedIds as $targetUserId) {
+            $events[] = [
+                'document_id' => $document->id,
+                'actor_user_id' => $actor->id,
+                'target_user_id' => $targetUserId,
+                'event_type' => Document::SHARE_EVENT_ADDED,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        foreach ($removedIds as $targetUserId) {
+            $events[] = [
+                'document_id' => $document->id,
+                'actor_user_id' => $actor->id,
+                'target_user_id' => $targetUserId,
+                'event_type' => Document::SHARE_EVENT_REMOVED,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::table('document_share_events')->insert($events);
+    }
+
+    /**
+     * For staff lists: rows where you are a collaborator (not the author) appear first, then by last update.
+     * Reviewers keep a simple newest-first ordering by {@see Document::$updated_at}.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Document>  $query
+     */
+    private function applyWeeklyListSortForUser($query, User $user): void
+    {
+        if ($user->hasPermissionTo('view all documents')) {
+            $query->orderByDesc('documents.updated_at');
+
+            return;
+        }
+
+        $query->orderByRaw('CASE WHEN documents.user_id = ? THEN 1 ELSE 0 END', [$user->id])
+            ->orderByDesc('documents.updated_at');
+    }
 
     /**
      * @param  array<string, mixed>  $input

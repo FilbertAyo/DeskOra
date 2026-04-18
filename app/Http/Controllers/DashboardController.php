@@ -172,7 +172,7 @@ class DashboardController extends Controller
         $dashboardAvailableTypes = Document::getAvailableTypesForUser($user);
 
         // Get pending document counts by type
-        $pendingDocuments = Document::forUser($user->id)
+        $pendingDocuments = Document::forOwnerOrSharedUser($user->id)
             ->drafts()
             ->get();
 
@@ -201,7 +201,7 @@ class DashboardController extends Controller
                 ->get();
 
             $allDocuments = Document::query()
-                ->forUser($user->id)
+                ->forOwnerOrSharedUser($user->id)
                 ->latest()
                 ->get();
 
@@ -210,7 +210,7 @@ class DashboardController extends Controller
                 ->take(6)
                 ->get();
             $timelineDocs = Document::query()
-                ->forUser($user->id)
+                ->forOwnerOrSharedUser($user->id)
                 ->whereIn('period_id', $timelinePeriods->pluck('id'))
                 ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
                 ->get()
@@ -255,6 +255,47 @@ class DashboardController extends Controller
             ];
         }
 
+        $sharedWithMeCount = Document::query()
+            ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+            ->whereHas('sharedUsers', function ($sharedUsers) use ($user) {
+                $sharedUsers->where('users.id', $user->id);
+            })
+            ->count();
+
+        $collaborationEvents = DB::table('document_share_events as dse')
+            ->join('documents as d', 'd.id', '=', 'dse.document_id')
+            ->leftJoin('users as actor', 'actor.id', '=', 'dse.actor_user_id')
+            ->where('dse.target_user_id', $user->id)
+            ->whereIn('d.type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+            ->orderByDesc('dse.created_at')
+            ->limit(5)
+            ->get([
+                'dse.document_id',
+                'dse.event_type',
+                'dse.created_at',
+                'd.type as document_type',
+                'd.title as document_title',
+                'actor.name as actor_name',
+            ])
+            ->map(function ($event) {
+                $typeLabel = $event->document_type === Document::TYPE_WEEKLY_PLAN ? 'Weekly Plan' : 'Weekly Report';
+                $verb = $event->event_type === Document::SHARE_EVENT_REMOVED ? 'removed you from' : 'shared';
+                $actor = $event->actor_name ?: 'A teammate';
+                $title = $event->document_title ?: $typeLabel;
+
+                $isRemoved = $event->event_type === Document::SHARE_EVENT_REMOVED;
+
+                return [
+                    'document_id' => $event->document_id,
+                    'message' => "{$actor} {$verb} {$typeLabel}: {$title}",
+                    'event_type' => $event->event_type,
+                    'badge_label' => $isRemoved ? 'Removed' : 'Shared',
+                    'badge_class' => $isRemoved ? 'bg-secondary' : 'bg-success',
+                    'created_at' => Carbon::parse($event->created_at),
+                ];
+            })
+            ->values();
+
         $actionLogProgress = $this->buildActionLogProgressForUser($user);
 
         return view('dashboard', compact(
@@ -284,6 +325,8 @@ class DashboardController extends Controller
             'periodDeadlineStatuses',
             'dashboardAvailableTypes',
             'dashboardPendingDocs',
+            'sharedWithMeCount',
+            'collaborationEvents',
             'canSeeWeeklyDashboard',
             'weeklyDashboardData',
             'actionLogProgress'

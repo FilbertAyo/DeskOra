@@ -45,6 +45,10 @@ class DocumentPolicy
             return true;
         }
 
+        if ($this->isSharedWeeklyMember($user, $document)) {
+            return true;
+        }
+
         // Users with 'view all documents' permission can view all documents
         if ($user->hasPermissionTo('view all documents')) {
             return true;
@@ -140,6 +144,10 @@ class DocumentPolicy
             return true;
         }
 
+        if ($this->isSharedWeeklyMember($user, $document)) {
+            return true;
+        }
+
         if ($user->hasPermissionTo('approve documents')) {
             return true;
         }
@@ -223,6 +231,10 @@ class DocumentPolicy
         }
 
         if ($document->user_id === $user->id) {
+            return true;
+        }
+
+        if ($this->isSharedWeeklyMember($user, $document)) {
             return true;
         }
 
@@ -319,5 +331,14 @@ class DocumentPolicy
         }
 
         return false;
+    }
+
+    private function isSharedWeeklyMember(User $user, Document $document): bool
+    {
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return false;
+        }
+
+        return $document->isSharedWith($user->id);
     }
 }
