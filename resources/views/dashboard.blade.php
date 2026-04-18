@@ -274,7 +274,7 @@
             </div>
         </div>
 
-        <div class="col-6 col-md-6 col-xl-6 mb-3">
+        <div class="col-6 col-md-8 col-xl-8 mb-3">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
