@@ -20,7 +20,7 @@
 
     <!-- Statistics Cards -->
     <div class="row">
-        <div class="col-md-3 col-sm-6 mb-3">
+        <div class="col-md-3 col-sm-6">
             <div class="card border shadow-none">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -35,7 +35,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6 mb-3">
+        <div class="col-md-3 col-sm-6">
             <div class="card border shadow-none">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -50,7 +50,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6 mb-3">
+        <div class="col-md-3 col-sm-6">
             <div class="card border shadow-none">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -65,7 +65,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6 mb-3">
+        <div class="col-md-3 col-sm-6">
             <div class="card border shadow-none">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -86,13 +86,10 @@
     <div class="row">
         <div class="col-md-12">
             <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom">
-                    <h6 class="mb-0"><i class="ti ti-filter me-2"></i>Filters</h6>
-                </div>
                 <div class="card-body">
                     <form method="GET" action="{{ route('documents.reviewer-dashboard') }}" id="filterForm">
                         <div class="row">
-                            <div class="col-md-2 mb-2">
+                            <div class="col-md-2">
                                 <label class="form-label small text-muted">Document Type</label>
                                 <select class="form-control form-control-sm" name="type" id="typeFilter">
                                     <option value="">All Types</option>
@@ -101,7 +98,7 @@
                                     <option value="action_log" {{ request('type') == 'action_log' ? 'selected' : '' }}>Action Logs</option>
                                 </select>
                             </div>
-                            <div class="col-md-2 mb-2">
+                            <div class="col-md-2">
                                 <label class="form-label small text-muted">User</label>
                                 <select class="form-control form-control-sm" name="user_id" id="userFilter">
                                     <option value="">All Users</option>
@@ -112,7 +109,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-2 mb-2">
+                            <div class="col-md-2">
                                 <label class="form-label small text-muted">Period</label>
                                 <select class="form-control form-control-sm" name="period" id="periodFilter">
                                     <option value="">All Time</option>
@@ -122,7 +119,7 @@
                                     <option value="last_month" {{ request('period') == 'last_month' ? 'selected' : '' }}>Last Month</option>
                                 </select>
                             </div>
-                            <div class="col-md-2 mb-2">
+                            <div class="col-md-2">
                                 <label class="form-label small text-muted">Specific Week</label>
                                 <select class="form-control form-control-sm" name="work_period_id">
                                     <option value="">Any Week</option>
@@ -133,7 +130,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                                <div class="col-md-2 mb-2">
+                                <div class="col-md-2">
                                 <label class="form-label small text-muted">Year</label>
                                 <select class="form-control form-control-sm" name="year">
                                     <option value="">Any Year</option>
@@ -144,7 +141,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-2 mb-2 d-flex align-items-end">
+                            <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary btn-sm w-100">
                                     <i class="ti ti-filter me-1"></i> Apply Filters
                                 </button>
