@@ -130,7 +130,12 @@ class WeeklySubmissionReminderService
             return new WeeklyReminderSegment($next, $doc, false, true);
         }
 
-        $missedMessages[] = 'Weekly plan for Week '.$next->week_number.', '.$next->year.' was not submitted before the plan deadline.';
+        $missedMessages[] = sprintf(
+            'Weekly plan for Week %d, %d was not submitted before the plan deadline (%s).',
+            $next->week_number,
+            $next->year,
+            $next->getPlanDeadlineCutoff()->format('M d, Y \a\t H:i')
+        );
 
         return new WeeklyReminderSegment($next, $doc, true, false);
     }
@@ -155,7 +160,12 @@ class WeeklySubmissionReminderService
             return new WeeklyReminderSegment($current, $doc, false, true);
         }
 
-        $missedMessages[] = 'Weekly report for Week '.$current->week_number.', '.$current->year.' was not submitted before the report deadline.';
+        $missedMessages[] = sprintf(
+            'Weekly report for Week %d, %d was not submitted before the report deadline (%s).',
+            $current->week_number,
+            $current->year,
+            $current->getReportDeadlineCutoff()->format('M d, Y \a\t H:i')
+        );
 
         return new WeeklyReminderSegment($current, $doc, true, false);
     }

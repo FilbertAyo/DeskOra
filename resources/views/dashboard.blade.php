@@ -314,6 +314,7 @@
                     @if($weeklySubmissionReminder && count($weeklySubmissionReminder->missedMessages) > 0)
                         <div class="alert alert-danger border mb-3">
                             <p class="mb-1 fw-semibold"><i class="ti ti-alert-circle me-1"></i>Missed submission window</p>
+                            <p class="mb-2 small text-muted">Weekly plan and report cut-off is every Saturday at 23:59.</p>
                             <ul class="mb-0 ps-3 small">
                                 @foreach($weeklySubmissionReminder->missedMessages as $line)
                                     <li>{{ $line }}</li>

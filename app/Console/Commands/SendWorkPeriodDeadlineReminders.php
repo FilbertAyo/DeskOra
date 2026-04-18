@@ -47,8 +47,8 @@ class SendWorkPeriodDeadlineReminders extends Command
         }
 
         $today = Carbon::today();
-        $planDeadline = Carbon::parse($period->plan_deadline);
-        $reportDeadline = Carbon::parse($period->report_deadline);
+        $planDeadline = $period->getPlanDeadlineCutoff();
+        $reportDeadline = $period->getReportDeadlineCutoff();
 
         $planDiff = $today->diffInDays($planDeadline, false);
         $reportDiff = $today->diffInDays($reportDeadline, false);
@@ -83,7 +83,7 @@ class SendWorkPeriodDeadlineReminders extends Command
                     $nextPeriod->week_number,
                     $nextPeriod->date_range,
                     $when,
-                    $planDeadline->format('d M Y')
+                    $planDeadline->format('d M Y H:i')
                 );
             } else {
                 Log::warning('Plan reminder skipped: next period missing.', [
@@ -102,7 +102,7 @@ class SendWorkPeriodDeadlineReminders extends Command
                 $period->week_number,
                 $period->date_range,
                 $when,
-                $reportDeadline->format('d M Y')
+                $reportDeadline->format('d M Y H:i')
             );
         }
 

@@ -140,12 +140,12 @@ class WorkPeriodService
         if ($next) {
             $row['plan_badge'] = $next->getPlanDeadlineBadgeClass();
             $row['plan_text'] = $next->getDeadlineStatusText('plan');
-            $row['plan_due'] = $next->plan_deadline;
+            $row['plan_due'] = $next->getPlanDeadlineCutoff();
         }
         if ($current) {
             $row['report_badge'] = $current->getReportDeadlineBadgeClass();
             $row['report_text'] = $current->getDeadlineStatusText('report');
-            $row['report_due'] = $current->report_deadline;
+            $row['report_due'] = $current->getReportDeadlineCutoff();
         }
 
         return $row;

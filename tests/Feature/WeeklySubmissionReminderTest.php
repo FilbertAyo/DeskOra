@@ -57,6 +57,21 @@ class WeeklySubmissionReminderTest extends TestCase
         $this->assertFalse($r->showToast);
     }
 
+    public function test_plan_is_still_open_on_saturday_before_2359_cutoff(): void
+    {
+        Carbon::setTestNow(Carbon::create(2025, 4, 5, 12, 0, 0));
+        [, $next] = $this->createCurrentAndNextPeriods();
+        $user = $this->makeUserWithWeeklyPermissions();
+        $svc = app(WeeklySubmissionReminderService::class);
+
+        $r = $svc->forUser($user);
+
+        $this->assertNotNull($r->plan);
+        $this->assertTrue($r->plan->showCta);
+        $this->assertFalse($r->plan->isMissed);
+        $this->assertSame($next->id, $r->plan->period->id);
+    }
+
     public function test_submitted_plan_removes_plan_from_toast(): void
     {
         Carbon::setTestNow(Carbon::create(2025, 4, 2, 10, 0, 0));

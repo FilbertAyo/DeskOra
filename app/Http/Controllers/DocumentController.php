@@ -672,7 +672,7 @@ class DocumentController extends Controller
                         'type' => Document::TYPE_WEEKLY_REPORT,
                         'label' => 'Create Weekly Report for this Week',
                         'route' => route('documents.create', ['type' => Document::TYPE_WEEKLY_REPORT]),
-                        'description' => 'Weekly report is due on '.$document->period->report_deadline->format('M d, Y'),
+                        'description' => 'Weekly report is due on '.$document->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
                     ];
                 } elseif ($document->type === Document::TYPE_WEEKLY_REPORT &&
                     Document::canUserCreateType($user, Document::TYPE_WEEKLY_PLAN, $document->period)) {
@@ -1281,7 +1281,7 @@ class DocumentController extends Controller
             $deadlineStatuses = [
                 'plan_badge' => $nextPeriod->getPlanDeadlineBadgeClass(),
                 'plan_text' => $nextPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $nextPeriod->plan_deadline,
+                'plan_due' => $nextPeriod->getPlanDeadlineCutoff(),
             ];
         }
 

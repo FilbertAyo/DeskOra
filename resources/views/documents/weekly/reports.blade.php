@@ -85,7 +85,7 @@
                                       Weekly Report Deadline
                                     </h6>
                                     <p class="mb-0">
-                                        <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y') }}</strong>
+                                        <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}</strong>
                                         <span class="badge bg-danger {{ $deadlineStatuses['report_badge'] }} ml-2">
                                             {{ $deadlineStatuses['report_text'] }}
                                         </span>

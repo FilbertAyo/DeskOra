@@ -42,11 +42,11 @@
                         </div>
                         <div class="col-md-6 col-lg-3 mb-3">
                             <small class="text-muted d-block">Plan deadline</small>
-                            <strong>{{ \Carbon\Carbon::parse($period->plan_deadline)->format('M d, Y') }}</strong>
+                            <strong>{{ $period->getPlanDeadlineCutoff()->format('M d, Y H:i') }}</strong>
                         </div>
                         <div class="col-md-6 col-lg-3 mb-3">
                             <small class="text-muted d-block">Report deadline</small>
-                            <strong>{{ \Carbon\Carbon::parse($period->report_deadline)->format('M d, Y') }}</strong>
+                            <strong>{{ $period->getReportDeadlineCutoff()->format('M d, Y H:i') }}</strong>
                         </div>
                         <div class="col-md-6 col-lg-3 mb-3">
                             <small class="text-muted d-block">Status</small>

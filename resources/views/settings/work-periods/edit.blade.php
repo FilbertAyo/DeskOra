@@ -60,19 +60,21 @@
                         <div class="mb-3">
                             <label for="plan_deadline" class="form-label">Plan deadline <span class="text-danger">*</span></label>
                             <input type="date" name="plan_deadline" id="plan_deadline" class="form-control @error('plan_deadline') is-invalid @enderror"
-                                   value="{{ old('plan_deadline', $period->plan_deadline?->format('Y-m-d')) }}" required>
+                                   value="{{ old('plan_deadline', $period->plan_deadline?->format('Y-m-d')) }}" readonly required>
                             @error('plan_deadline')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                            <small class="text-muted">Auto-set to Saturday 23:59 before the selected week.</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="report_deadline" class="form-label">Report deadline <span class="text-danger">*</span></label>
                             <input type="date" name="report_deadline" id="report_deadline" class="form-control @error('report_deadline') is-invalid @enderror"
-                                   value="{{ old('report_deadline', $period->report_deadline?->format('Y-m-d')) }}" required>
+                                   value="{{ old('report_deadline', $period->report_deadline?->format('Y-m-d')) }}" readonly required>
                             @error('report_deadline')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                            <small class="text-muted">Auto-set to Saturday 23:59 of the selected week.</small>
                         </div>
 
                         <div class="mb-4">

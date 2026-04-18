@@ -45,16 +45,16 @@ class WorkPeriod extends Model
      * IMPORTANT: Submission Logic
      *
      * During the CURRENT week:
-     * - Plan deadline (Friday): Submit plan FOR the NEXT week
+     * - Plan deadline (Saturday 23:59): Submit plan FOR the NEXT week
      * - Report deadline (Saturday): Submit report FOR the CURRENT week
      *
      * Example:
      * - Week 1 (Jan 1-7):
-     *   - Plan for Week 2 due Friday Jan 5
-     *   - Report for Week 1 due Saturday Jan 6
+     *   - Plan for Week 2 due Saturday Jan 6 at 23:59
+     *   - Report for Week 1 due Saturday Jan 6 at 23:59
      * - Week 2 (Jan 8-14):
-     *   - Plan for Week 3 due Friday Jan 12
-     *   - Report for Week 2 due Saturday Jan 13
+     *   - Plan for Week 3 due Saturday Jan 13 at 23:59
+     *   - Report for Week 2 due Saturday Jan 13 at 23:59
      */
 
     /**
@@ -90,6 +90,38 @@ class WorkPeriod extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Canonical plan deadline date for this period (Saturday before week start).
+     */
+    private function canonicalPlanDeadlineDate(): Carbon
+    {
+        return Carbon::parse($this->week_start_date)->subDays(2)->startOfDay();
+    }
+
+    /**
+     * Canonical report deadline date for this period (Saturday of current week).
+     */
+    private function canonicalReportDeadlineDate(): Carbon
+    {
+        return Carbon::parse($this->week_start_date)->addDays(5)->startOfDay();
+    }
+
+    /**
+     * Plan deadline cutoff timestamp (Saturday 23:59 local time).
+     */
+    public function getPlanDeadlineCutoff(): Carbon
+    {
+        return $this->canonicalPlanDeadlineDate()->copy()->setTime(23, 59, 0);
+    }
+
+    /**
+     * Report deadline cutoff timestamp (Saturday 23:59 local time).
+     */
+    public function getReportDeadlineCutoff(): Carbon
+    {
+        return $this->canonicalReportDeadlineDate()->copy()->setTime(23, 59, 0);
     }
 
     /**
@@ -231,7 +263,7 @@ class WorkPeriod extends Model
      */
     public function isPlanDeadlineToday(): bool
     {
-        return Carbon::parse($this->plan_deadline)->isToday();
+        return $this->canonicalPlanDeadlineDate()->isToday();
     }
 
     /**
@@ -239,7 +271,7 @@ class WorkPeriod extends Model
      */
     public function isReportDeadlineToday(): bool
     {
-        return Carbon::parse($this->report_deadline)->isToday();
+        return $this->canonicalReportDeadlineDate()->isToday();
     }
 
     /**
@@ -247,7 +279,7 @@ class WorkPeriod extends Model
      */
     public function isPlanDeadlinePassed(): bool
     {
-        return Carbon::parse($this->plan_deadline)->isPast();
+        return Carbon::now()->greaterThan($this->getPlanDeadlineCutoff());
     }
 
     /**
@@ -255,7 +287,7 @@ class WorkPeriod extends Model
      */
     public function isReportDeadlinePassed(): bool
     {
-        return Carbon::parse($this->report_deadline)->isPast();
+        return Carbon::now()->greaterThan($this->getReportDeadlineCutoff());
     }
 
     /**
@@ -263,14 +295,14 @@ class WorkPeriod extends Model
      */
     public function getDaysUntilPlanDeadline(): int
     {
-        $deadline = Carbon::parse($this->plan_deadline);
-        $today = Carbon::today();
+        $cutoff = $this->getPlanDeadlineCutoff();
+        $now = Carbon::now();
 
-        if ($deadline->isPast()) {
+        if ($now->greaterThan($cutoff)) {
             return 0;
         }
 
-        return $today->diffInDays($deadline, false);
+        return $now->diffInDays($cutoff, false);
     }
 
     /**
@@ -278,14 +310,14 @@ class WorkPeriod extends Model
      */
     public function getDaysUntilReportDeadline(): int
     {
-        $deadline = Carbon::parse($this->report_deadline);
-        $today = Carbon::today();
+        $cutoff = $this->getReportDeadlineCutoff();
+        $now = Carbon::now();
 
-        if ($deadline->isPast()) {
+        if ($now->greaterThan($cutoff)) {
             return 0;
         }
 
-        return $today->diffInDays($deadline, false);
+        return $now->diffInDays($cutoff, false);
     }
 
     /**

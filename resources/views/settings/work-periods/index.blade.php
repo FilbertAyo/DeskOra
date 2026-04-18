@@ -51,11 +51,11 @@
                         <div class="text-right d-flex gap-2">
                             <div class="mb-1">
                                 <small class="text-muted">Plan Deadline:</small>
-                                <strong class="d-block">{{ \Carbon\Carbon::parse($currentPeriod->plan_deadline)->format('M d, Y') }}</strong>
+                                <strong class="d-block">{{ $currentPeriod->getPlanDeadlineCutoff()->format('M d, Y H:i') }}</strong>
                             </div>
                             <div>
                                 <small class="text-muted">Report Deadline:</small>
-                                <strong class="d-block">{{ \Carbon\Carbon::parse($currentPeriod->report_deadline)->format('M d, Y') }}</strong>
+                                <strong class="d-block">{{ $currentPeriod->getReportDeadlineCutoff()->format('M d, Y H:i') }}</strong>
                             </div>
                         </div>
                     </div>
@@ -139,7 +139,7 @@
                                                 <small>{{ $period->date_range }}</small>
                                             </td>
                                             <td>
-                                                <small>{{ \Carbon\Carbon::parse($period->plan_deadline)->format('M d, Y') }}</small>
+                                                <small>{{ $period->getPlanDeadlineCutoff()->format('M d, Y H:i') }}</small>
                                                 @if($period->isPlanDeadlineToday())
                                                     <span class="badge bg-warning ml-1">Today</span>
                                                 @elseif($period->isPlanDeadlinePassed())
@@ -149,7 +149,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <small>{{ \Carbon\Carbon::parse($period->report_deadline)->format('M d, Y') }}</small>
+                                                <small>{{ $period->getReportDeadlineCutoff()->format('M d, Y H:i') }}</small>
                                                 @if($period->isReportDeadlineToday())
                                                     <span class="badge bg-warning ml-1">Today</span>
                                                 @elseif($period->isReportDeadlinePassed())
@@ -245,8 +245,8 @@
                             <strong>Important:</strong>
                             <ul class="mb-0 mt-2">
                                 <li>Week will run from Monday to Sunday</li>
-                                <li>Plan deadline: Saturday of the current week (to submit plan for the NEXT week)</li>
-                                <li>Report deadline: Saturday (to submit report for THIS week)</li>
+                                <li>Plan deadline: Saturday 23:59 of the current week (for NEXT week plan)</li>
+                                <li>Report deadline: Saturday 23:59 (for THIS week report)</li>
                                 <li>Next week is auto-created every Thursday (one week ahead only)</li>
                             </ul>
                         </div>

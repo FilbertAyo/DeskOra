@@ -88,7 +88,7 @@
                                         @endisset
                                     </h6>
                                     <p class="mb-0">
-                                        <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y') }}</strong>
+                                        <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y H:i') }}</strong>
                                         <span class="badge bg-danger {{ $deadlineStatuses['plan_badge'] }} ml-2">
                                             {{ $deadlineStatuses['plan_text'] }}
                                         </span>
