@@ -7,7 +7,7 @@
                                         ->filter(fn($row) => is_array($row) && !empty($row['team_member_ids']) && is_array($row['team_member_ids']))
                                         ->flatMap(fn($row) => $row['team_member_ids'])
                                         ->filter()
-                                        ->map(fn($id) => (int)$id)
+                                        ->map(fn($id) => (string) $id)
                                         ->unique()
                                         ->values()
                                         ->all();
@@ -136,7 +136,7 @@
                                                                             @php
                                                                                 $rowTeamIds = (is_array($row['team_member_ids'] ?? null)) ? $row['team_member_ids'] : [];
                                                                                 $rowTeamNames = collect($rowTeamIds)
-                                                                                    ->map(fn($id) => $teamUserNames[(int)$id] ?? null)
+                                                                                    ->map(fn($id) => $teamUserNames[(string) $id] ?? null)
                                                                                     ->filter()
                                                                                     ->values()
                                                                                     ->all();
