@@ -29,7 +29,7 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans') || Request::routeIs('documents.weekly-reports') || Request::routeIs('documents.reviewer-dashboard') || Request::routeIs('documents.reviewer-show') || Request::routeIs('documents.weekly-budget-review') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'action-logs.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Weekly Activities</span>
@@ -38,7 +38,7 @@
                     <ul class="pc-submenu">
                         <li class="{{ Request::routeIs('documents.weekly-plans') ? 'active' : '' }}">
                             <a href="{{ route('documents.weekly-plans') }}" class="pc-link">
-                             <span class="pc-mtext">Weekly Plans</span>
+                                <span class="pc-mtext">Weekly Plans</span>
                             </a>
                         </li>
                         <li class="{{ Request::routeIs('documents.weekly-reports') ? 'active' : '' }}">
@@ -46,35 +46,13 @@
                                 <span class="pc-mtext">Weekly Reports</span>
                             </a>
                         </li>
-                        @if(Auth::user()->hasPermissionTo('view all documents') || Auth::user()->hasPermissionTo('approve documents'))
-                            <li class="{{ Request::routeIs('documents.reviewer-dashboard') || Request::routeIs('documents.reviewer-show') ? 'active' : '' }}">
-                                <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
-                                   <span class="pc-mtext">Review Submissions</span>
-                                    @php
-                                        $submittedCount = \App\Models\Document::submitted()->count();
-                                    @endphp
-                                    @if($submittedCount > 0)
-                                        <span class="badge bg-primary ml-2">{{ $submittedCount }}</span>
-                                    @endif
+                        @if(Auth::user()->hasAnyPermission(['view action logs', 'approve documents', 'create action logs']))
+                            <li class="{{ Request::routeIs('action-logs.*') ? 'active' : '' }}">
+                                <a href="{{ route('action-logs.index') }}" class="pc-link">
+                                    <span class="pc-mtext">Action Log</span>
                                 </a>
                             </li>
                         @endif
-                        @can('view weekly budgets')
-                            <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
-                                <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
-                                    <span class="pc-mtext">Weekly Budget Review</span>
-                                    @php
-                                        $defaultBudgetReviewPeriod = app(\App\Services\WorkPeriodService::class)->periodForWeeklyPlanSubmission();
-                                        $pendingWeeklyBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
-                                            $defaultBudgetReviewPeriod?->id
-                                        );
-                                    @endphp
-                                    @if($pendingWeeklyBudgetCount > 0)
-                                        <span class="badge bg-warning ml-2">{{ $pendingWeeklyBudgetCount }}</span>
-                                    @endif
-                                </a>
-                            </li>
-                        @endcan
                     </ul>
                 </li>
 
@@ -92,14 +70,49 @@
                         <span class="pc-mtext">All Documents</span>
                     </a>
                 </li>
-
-                <!-- Action Log -->
-                @if(Auth::user()->hasAnyPermission(['view action logs', 'approve documents', 'create action logs']))
-                    <li class="pc-item {{ Request::routeIs('action-logs.index') ? 'active' : '' }}">
-                        <a href="{{ route('action-logs.index') }}" class="pc-link">
-                            <span class="pc-micon"><i class="ti ti-clipboard"></i></span>
-                            <span class="pc-mtext">Action Log</span>
+                @php
+                    $canReviewSubmissions = Auth::user()->hasPermissionTo('view all documents') || Auth::user()->hasPermissionTo('approve documents');
+                    $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');
+                @endphp
+                @if($canReviewSubmissions || $canWeeklyBudgetReview)
+                    @php
+                        $reviewActivitiesSubmittedCount = $canReviewSubmissions ? \App\Models\Document::submitted()->count() : 0;
+                        $reviewActivitiesPendingBudgetCount = 0;
+                        if ($canWeeklyBudgetReview) {
+                            $reviewActivitiesBudgetPeriod = app(\App\Services\WorkPeriodService::class)->periodForWeeklyPlanSubmission();
+                            $reviewActivitiesPendingBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
+                                $reviewActivitiesBudgetPeriod?->id
+                            );
+                        }
+                    @endphp
+                    <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show', 'documents.weekly-budget-review') ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-eye-check"></i></span>
+                            <span class="pc-mtext">Review Activities</span>
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
+                        <ul class="pc-submenu">
+                            @if($canReviewSubmissions)
+                                <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">
+                                    <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
+                                        <span class="pc-mtext">Review Submissions</span>
+                                        @if($reviewActivitiesSubmittedCount > 0)
+                                            <span class="badge bg-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endif
+                            @can('view weekly budgets')
+                                <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
+                                    <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
+                                        <span class="pc-mtext">Weekly Budget Review</span>
+                                        @if($reviewActivitiesPendingBudgetCount > 0)
+                                            <span class="badge bg-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcan
+                        </ul>
                     </li>
                 @endif
 
