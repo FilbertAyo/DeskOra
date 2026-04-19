@@ -95,7 +95,7 @@
                             @if($canReviewSubmissions)
                                 <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">
                                     <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
-                                        <span class="pc-mtext">Review Submissions</span>
+                                        <span class="pc-mtext">Submissions</span>
                                         @if($reviewActivitiesSubmittedCount > 0)
                                             <span class="badge bg-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
                                         @endif
@@ -105,7 +105,7 @@
                             @can('view weekly budgets')
                                 <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
                                     <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
-                                        <span class="pc-mtext">Weekly Budget Review</span>
+                                        <span class="pc-mtext">Weekly Budget</span>
                                         @if($reviewActivitiesPendingBudgetCount > 0)
                                             <span class="badge bg-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
                                         @endif
