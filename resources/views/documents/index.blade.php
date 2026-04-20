@@ -283,7 +283,7 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-center">
-                                                    <a href="{{ route('documents.show', $document->id) }}"
+                                                    <a href="{{ $document->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $document->id) : route('documents.show', $document->id) }}"
                                                         class="btn btn-info text-white btn-sm" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>

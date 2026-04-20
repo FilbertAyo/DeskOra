@@ -687,6 +687,12 @@ class DocumentController extends Controller
      */
     public function show(Document $document)
     {
+        if ($document->type === Document::TYPE_ACTION_LOG) {
+            $this->authorize('view', $document);
+
+            return redirect()->route('action-logs.show', $document);
+        }
+
         $document->load(['user', 'period', 'sharedUsers']);
 
         // Authorize view action
@@ -765,6 +771,11 @@ class DocumentController extends Controller
      */
     public function edit(Document $document)
     {
+        if ($document->type === Document::TYPE_ACTION_LOG) {
+            $this->authorize('update', $document);
+
+            return redirect()->route('action-logs.edit', $document);
+        }
 
         // Authorize update action
         $this->authorize('update', $document);

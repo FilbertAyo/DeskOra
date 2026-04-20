@@ -134,7 +134,7 @@
                                                 @endif
                                             </td>
                                             <td class="text-center">
-                                                <a href="{{ route('documents.show', $doc) }}" class="btn btn-sm btn-outline-primary">
+                                                <a href="{{ $doc->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $doc) : route('documents.show', $doc) }}" class="btn btn-sm btn-outline-primary">
                                                     View
                                                 </a>
                                             </td>

@@ -91,6 +91,39 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
             ->assertOk();
     }
 
+    public function test_documents_show_redirects_action_logs_to_action_logs_show(): void
+    {
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-13',
+            'week_end_date' => '2026-04-19',
+            'plan_deadline' => '2026-04-17',
+            'report_deadline' => '2026-04-18',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'Programs', 'status' => 'active']);
+        $manager = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $manager->givePermissionTo(['create action logs']);
+
+        $log = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Week 16 actions',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => ['tasks' => []],
+        ]);
+
+        $viewer = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $viewer->givePermissionTo(['create weekly report']);
+
+        $this->actingAs($viewer)
+            ->get(route('documents.show', $log))
+            ->assertRedirect(route('action-logs.show', $log));
+    }
+
     public function test_staff_cannot_view_another_users_draft_weekly_plan(): void
     {
         $period = WorkPeriod::create([
