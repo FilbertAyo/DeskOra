@@ -173,11 +173,12 @@
                                                     @if($planDoc)
                                                         <div class="fw-semibold">{{ $planDoc->display_title }}</div>
                                                         @if($planDoc->sharedUsers->isNotEmpty())
-                                                            @if((string) auth()->id() === (string) $planDoc->user_id)
-                                                                <span class="badge bg-light-primary text-primary mt-1">Owner (Shared)</span>
-                                                            @else
-                                                                <span class="badge bg-light-info text-info mt-1">Shared With You</span>
-                                                            @endif
+                                                            @php
+                                                                $planSharedNames = $planDoc->sharedUsers->pluck('name')->filter()->values()->implode(', ');
+                                                            @endphp
+                                                            <span class="badge bg-light-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
+                                                                {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
+                                                            </span>
                                                         @endif
                                                         <span class="badge {{ $planDoc->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
                                                             {{ ucfirst($planDoc->state) }}
@@ -193,11 +194,12 @@
                                                     @if($reportDoc)
                                                         <div class="fw-semibold">{{ $reportDoc->display_title }}</div>
                                                         @if($reportDoc->sharedUsers->isNotEmpty())
-                                                            @if((string) auth()->id() === (string) $reportDoc->user_id)
-                                                                <span class="badge bg-light-primary text-primary mt-1">Owner (Shared)</span>
-                                                            @else
-                                                                <span class="badge bg-light-info text-info mt-1">Shared With You</span>
-                                                            @endif
+                                                            @php
+                                                                $reportSharedNames = $reportDoc->sharedUsers->pluck('name')->filter()->values()->implode(', ');
+                                                            @endphp
+                                                            <span class="badge bg-light-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
+                                                                {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
+                                                            </span>
                                                         @endif
                                                         <span class="badge {{ $reportDoc->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
                                                             {{ ucfirst($reportDoc->state) }}

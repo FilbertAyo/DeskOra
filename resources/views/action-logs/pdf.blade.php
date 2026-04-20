@@ -45,12 +45,12 @@
             background: #f5f5f5;
         }
         .col-no { width: 5%; }
-        .col-task { width: 28%; }
-        .col-responsible { width: 20%; }
+        .col-task { width: 21%; }
+        .col-responsible { width: 18%; }
         .col-progress { width: 10%; }
         .col-due { width: 11%; }
         .col-compilation { width: 11%; }
-        .col-notes { width: 15%; }
+        .col-notes { width: 24%; }
     </style>
 </head>
 <body>
