@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -270,6 +271,50 @@ class ActionLogController extends Controller
         $this->authorize('view', $document);
 
         return view('action-logs.show', compact('document'));
+    }
+
+    /**
+     * Download the specified action log as PDF.
+     */
+    public function downloadPdf(Document $document)
+    {
+        $document->load(['user', 'period']);
+
+        if ($document->type !== Document::TYPE_ACTION_LOG) {
+            abort(404, 'Document not found.');
+        }
+
+        $this->authorize('view', $document);
+
+        $content = is_array($document->content) ? $document->content : [];
+        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+
+        $responsibleIds = collect($tasks)
+            ->filter(fn ($row) => is_array($row) && is_array($row['responsible_user_ids'] ?? null))
+            ->flatMap(fn ($row) => $row['responsible_user_ids'])
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $responsibleNameMap = User::query()
+            ->whereIn('id', $responsibleIds)
+            ->pluck('name', 'id')
+            ->toArray();
+
+        $pdf = Pdf::loadView('action-logs.pdf', [
+            'document' => $document,
+            'tasks' => $tasks,
+            'responsibleNameMap' => $responsibleNameMap,
+        ]);
+
+        $weekLabel = $document->period
+            ? 'week_'.$document->period->week_number.'_'.$document->period->year
+            : 'no_period';
+        $filename = 'action_log_'.$weekLabel.'_'.$document->id.'.pdf';
+
+        return $pdf->download($filename);
     }
 
     /**
