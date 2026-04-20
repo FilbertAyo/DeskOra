@@ -59,7 +59,7 @@
         <thead>
             <tr>
                 <th style="width: 22%;">Staff</th>
-                <th style="width: 20%;">Sub department</th>
+                <th style="width: 20%;">Department</th>
                 <th style="width: 29%;">Main Objective</th>
                 <th style="width: 29%;">Progress / Reflection</th>
             </tr>

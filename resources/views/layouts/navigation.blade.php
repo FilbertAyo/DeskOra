@@ -202,7 +202,7 @@
                         <thead>
                             <tr>
                                 <th style="width: 240px;">Staff</th>
-                                <th style="width: 220px;">Sub department</th>
+                                <th style="width: 220px;">Department</th>
                                 <th>Main Objective</th>
                                 <th>Progress / Reflection</th>
                             </tr>
