@@ -29,6 +29,11 @@
             <div class="card shadow-none border">
               
                 <div class="card-body border-bottom">
+                    @php
+                        $selectedCauserId = request('causer_id');
+                        $staffIds = $staffUsers->pluck('id')->map(fn ($id) => (string) $id)->all();
+                        $selectedCauserMissing = filled($selectedCauserId) && ! in_array((string) $selectedCauserId, $staffIds, true);
+                    @endphp
                     <form method="GET" action="{{ route('activity-log.index') }}" class="row g-3 align-items-end">
                         <div class="col-md-3 col-lg-2">
                             <label class="form-label small mb-0" for="filter-from">From</label>
@@ -49,6 +54,11 @@
                                         {{ $u->name }}
                                     </option>
                                 @endforeach
+                                @if ($selectedCauserMissing)
+                                    <option value="{{ $selectedCauserId }}" selected>
+                                        Unknown / deleted staff (#{{ $selectedCauserId }})
+                                    </option>
+                                @endif
                             </select>
                         </div>
                         <div class="col-md-4 col-lg-2">
@@ -75,6 +85,9 @@
                             <a href="{{ route('activity-log.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
                         </div>
                     </form>
+                    <p class="text-muted small mt-2 mb-0">
+                        Entries from removed users are shown as <span class="fw-semibold">Unknown / deleted staff</span> with their ID.
+                    </p>
                 </div>
 
                 <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -99,6 +112,14 @@
                                 @forelse ($activities as $activity)
                                     @php
                                         $subjectLabel = '—';
+                                        $causerLabel = 'System';
+
+                                        if ($activity->causer?->name) {
+                                            $causerLabel = $activity->causer->name;
+                                        } elseif ($activity->causer_id) {
+                                            $causerLabel = 'Unknown / deleted staff (#'.$activity->causer_id.')';
+                                        }
+
                                         if ($activity->subject) {
                                             $subjectLabel = class_basename($activity->subject_type).' #'.$activity->subject_id;
                                         } elseif ($activity->subject_type) {
@@ -107,7 +128,7 @@
                                     @endphp
                                     <tr>
                                         <td class="text-nowrap small">{{ $activity->created_at->format('Y-m-d H:i') }}</td>
-                                        <td class="small">{{ $activity->causer?->name ?? '—' }}</td>
+                                        <td class="small">{{ $causerLabel }}</td>
                                         <td><code class="small">{{ $activity->event ?? '—' }}</code></td>
                                         <td class="small">{{ \Illuminate\Support\Str::limit($activity->description, 80) }}</td>
                                         <td><span class="badge bg-light text-dark">{{ $activity->log_name ?? 'default' }}</span></td>
@@ -128,7 +149,8 @@
                     </div>
                     @if ($activities->hasPages())
                         <div class="p-3 border-top">
-                            {{ $activities->links() }}
+                            
+                            {{ $activities->links('pagination::bootstrap-5') }}
                         </div>
                     @endif
                 </div>
@@ -136,15 +158,6 @@
         </div>
     </div>
 
-    <script>
-        function reloadPage() {
-            location.reload();
-        }
-    </script>
 
-    <style>
-        .table-hover tbody tr:hover {
-            background-color: rgba(0, 123, 255, 0.05);
-        }
-    </style>
+ 
 </x-app-layout>

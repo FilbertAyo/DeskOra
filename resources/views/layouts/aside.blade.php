@@ -211,11 +211,7 @@
                                     <span class="pc-mtext">Departments</span>
                                 </a>
                             </li>
-                            <li class="pc-item {{ Request::routeIs('notification.index') ? 'active' : '' }}">
-                                <a href="{{ route('notification.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Notifications</span>
-                                </a>
-                            </li>
+                           
                          
                             @can('view activity log')
                                 <li class="pc-item {{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
