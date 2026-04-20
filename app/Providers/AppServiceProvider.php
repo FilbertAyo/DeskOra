@@ -66,17 +66,29 @@ class AppServiceProvider extends ServiceProvider
             });
 
             $matrixRows = collect();
-            if ($currentPeriod) {
-                $matrixRows = Cache::remember('weekly-objective-matrix-'.$currentPeriod->id, now()->addMinutes(5), function () use ($currentPeriod) {
+            if ($currentPeriod && Auth::check()) {
+                /** @var \App\Models\User $user */
+                $user = Auth::user();
+                $departmentScopeIds = $user->departmentScopeIds();
+                $matrixCacheKey = sprintf(
+                    'weekly-objective-matrix-%s-%s',
+                    (string) $currentPeriod->id,
+                    (string) $user->id
+                );
+
+                $matrixRows = Cache::remember($matrixCacheKey, now()->addMinutes(5), function () use ($currentPeriod, $departmentScopeIds) {
                     return Document::query()
                         ->where('type', Document::TYPE_WEEKLY_PLAN)
                         ->where('state', Document::STATE_SUBMITTED)
                         ->where('period_id', $currentPeriod->id)
                         ->whereNotNull('main_target')
                         ->where('main_target', '!=', '')
-                        ->with('user:id,name,department_id')
+                        ->whereHas('user', function ($userQuery) use ($departmentScopeIds) {
+                            $userQuery->whereIn('department_id', $departmentScopeIds);
+                        })
+                        ->with(['user:id,name,department_id', 'user.department:id,name'])
                         ->latest('updated_at')
-                        ->get(['user_id', 'main_target', 'updated_at'])
+                        ->get(['user_id', 'main_target', 'content', 'updated_at'])
                         ->groupBy('user_id')
                         ->map(fn ($plans) => $plans->first())
                         ->values()

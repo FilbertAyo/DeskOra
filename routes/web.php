@@ -16,6 +16,7 @@ use App\Http\Controllers\ReplenishmentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
+use App\Http\Controllers\WeeklyObjectiveMatrixController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('feedback/{token}')
@@ -49,6 +50,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/weekly-plans', [DocumentController::class, 'weeklyPlans'])->name('weekly-plans');
         Route::get('/weekly-reports', [DocumentController::class, 'weeklyReports'])->name('weekly-reports');
         Route::get('/weekly-budget-review', [DocumentController::class, 'weeklyBudgetReviewPanel'])->name('weekly-budget-review');
+        Route::get('/weekly-objective-matrix/download', [WeeklyObjectiveMatrixController::class, 'download'])->name('weekly-objective-matrix.download');
         Route::get('/plan-target', [DocumentController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentController::class, 'create'])->name('create');
         Route::post('/', [DocumentController::class, 'store'])->name('store');

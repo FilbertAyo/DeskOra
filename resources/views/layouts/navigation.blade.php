@@ -189,6 +189,17 @@
                     No submitted weekly plans with a filled main objective found for this week.
                 </div>
             @else
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <a href="{{ route('documents.weekly-objective-matrix.download', ['orientation' => 'portrait']) }}"
+                        class="btn btn-danger btn-sm">
+                        <i class="ti ti-download me-1"></i> Download PDF (Portrait)
+                    </a>
+                    <a href="{{ route('documents.weekly-objective-matrix.download', ['orientation' => 'landscape']) }}"
+                        class="btn btn-danger btn-sm">
+                        <i class="ti ti-download me-1"></i> Download PDF (Landscape)
+                    </a>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover align-middle">
                         <thead>
@@ -196,14 +207,21 @@
                                 <th style="width: 240px;">Staff</th>
                                 <th style="width: 220px;">Sub department</th>
                                 <th>Main Objective</th>
+                                <th>Progress / Reflection</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($matrixRows as $plan)
+                                @php
+                                    $planContent = is_array($plan->content ?? null) ? $plan->content : [];
+                                    $objective = is_array($planContent['objective'] ?? null) ? $planContent['objective'] : [];
+                                    $reflectionProgress = trim((string) ($objective['reflection_progress'] ?? ''));
+                                @endphp
                                 <tr>
                                     <td class="fw-semibold">{{ $plan->user?->name ?? 'Unknown Staff' }}</td>
-                                    <td>{{ $plan->user?->sub_department ?? 'Unknown Sub Department' }}</td>
+                                    <td>{{ $plan->user?->department?->name ?? 'Unknown Sub Department' }}</td>
                                     <td>{{ $plan->main_target }}</td>
+                                    <td>{{ $reflectionProgress !== '' ? $reflectionProgress : '-' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
