@@ -87,7 +87,7 @@
                         <div class="card-body py-3">
                             <div class="row g-2">
                                 <div class="col-12 col-md-6">
-                                    <a href="{{ route('action-logs.download', $document->id) }}" class="btn btn-outline-secondary btn-sm w-100">
+                                    <a href="{{ route('action-logs.download', $document->id) }}" class="btn btn-danger btn-sm w-100">
                                         <i class="ti ti-download me-1"></i> PDF
                                     </a>
                                 </div>
