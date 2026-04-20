@@ -1336,8 +1336,9 @@ class DocumentController extends Controller
         $query = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->ofType(Document::TYPE_WEEKLY_PLAN);
 
-        // Weekly plans page is always individual: show only plans authored by the current user.
-        $query->forUser($user->id);
+        // Weekly plans page is individual + collaboration scope:
+        // show plans authored by the user and plans shared with the user.
+        $query->forOwnerOrSharedUser($user->id);
 
         // Get current period for defaults
         $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
