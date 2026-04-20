@@ -67,19 +67,12 @@ class AppServiceProvider extends ServiceProvider
 
             $matrixRows = collect();
             if ($currentPeriod && Auth::check()) {
-                /** @var \App\Models\User $user */
-                $user = Auth::user();
-                $departmentScopeIds = $user->departmentScopeIds();
-
                 $matrixRows = Document::query()
                     ->where('type', Document::TYPE_WEEKLY_PLAN)
                     ->where('state', Document::STATE_SUBMITTED)
                     ->where('period_id', $currentPeriod->id)
                     ->whereNotNull('main_target')
                     ->where('main_target', '!=', '')
-                    ->whereHas('user', function ($userQuery) use ($departmentScopeIds) {
-                        $userQuery->whereIn('department_id', $departmentScopeIds);
-                    })
                     ->with(['user:id,name,department_id', 'user.department:id,name'])
                     ->latest('updated_at')
                     ->get(['user_id', 'main_target', 'content', 'updated_at'])
