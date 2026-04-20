@@ -717,7 +717,9 @@ class DocumentController extends Controller
             if (! $relatedDocument) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
-                if ($document->type === Document::TYPE_WEEKLY_PLAN &&
+                $isAuthor = (string) $document->user_id === (string) $user->id;
+                if ($isAuthor &&
+                    $document->type === Document::TYPE_WEEKLY_PLAN &&
                     Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT, $document->period)) {
                     $relatedAction = [
                         'type' => Document::TYPE_WEEKLY_REPORT,
@@ -725,7 +727,8 @@ class DocumentController extends Controller
                         'route' => route('documents.create', ['type' => Document::TYPE_WEEKLY_REPORT]),
                         'description' => 'Weekly report is due on '.$document->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
                     ];
-                } elseif ($document->type === Document::TYPE_WEEKLY_REPORT &&
+                } elseif ($isAuthor &&
+                    $document->type === Document::TYPE_WEEKLY_REPORT &&
                     Document::canUserCreateType($user, Document::TYPE_WEEKLY_PLAN, $document->period)) {
                     $relatedAction = [
                         'type' => Document::TYPE_WEEKLY_PLAN,

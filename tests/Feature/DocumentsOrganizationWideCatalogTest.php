@@ -91,6 +91,41 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
             ->assertOk();
     }
 
+    public function test_non_author_does_not_see_related_create_action_on_weekly_plan(): void
+    {
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-13',
+            'week_end_date' => '2026-04-19',
+            'plan_deadline' => '2026-04-17',
+            'report_deadline' => '2026-04-25 23:59:00',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'Programs', 'status' => 'active']);
+        $author = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $author->givePermissionTo(['create weekly plan', 'create weekly report']);
+
+        $plan = Document::create([
+            'user_id' => $author->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Author Plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Milestone A',
+            'content' => [],
+        ]);
+
+        $viewer = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $viewer->givePermissionTo(['create weekly plan', 'create weekly report']);
+
+        $this->actingAs($viewer)
+            ->get(route('documents.show', $plan))
+            ->assertOk()
+            ->assertDontSee('Create Weekly Report for this Week', false);
+    }
+
     public function test_documents_show_redirects_action_logs_to_action_logs_show(): void
     {
         $period = WorkPeriod::create([
