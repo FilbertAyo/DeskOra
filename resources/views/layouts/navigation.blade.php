@@ -192,12 +192,9 @@
                 <div class="d-flex flex-wrap gap-2 mb-3">
                     <a href="{{ route('documents.weekly-objective-matrix.download', ['orientation' => 'portrait']) }}"
                         class="btn btn-danger btn-sm">
-                        <i class="ti ti-download me-1"></i> Download PDF (Portrait)
+                        <i class="ti ti-download me-1"></i> Download PDF 
                     </a>
-                    <a href="{{ route('documents.weekly-objective-matrix.download', ['orientation' => 'landscape']) }}"
-                        class="btn btn-danger btn-sm">
-                        <i class="ti ti-download me-1"></i> Download PDF (Landscape)
-                    </a>
+                   
                 </div>
 
                 <div class="table-responsive">
