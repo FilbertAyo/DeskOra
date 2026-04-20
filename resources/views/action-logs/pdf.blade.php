@@ -3,10 +3,16 @@
 <head>
     <meta charset="utf-8">
     <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+
         body {
             font-family: Arial, sans-serif;
-            font-size: 10pt;
+            font-size: 9pt;
             color: #222;
+            margin: 0;
         }
         h2, h4 {
             margin: 0 0 6px 0;
@@ -23,17 +29,28 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 9pt;
+            font-size: 8.5pt;
+            table-layout: fixed;
         }
         th, td {
             border: 1px solid #000;
-            padding: 6px;
+            padding: 4px;
             text-align: left;
             vertical-align: top;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         th {
             background: #f5f5f5;
         }
+        .col-no { width: 5%; }
+        .col-task { width: 28%; }
+        .col-responsible { width: 20%; }
+        .col-progress { width: 10%; }
+        .col-due { width: 11%; }
+        .col-compilation { width: 11%; }
+        .col-notes { width: 15%; }
     </style>
 </head>
 <body>
@@ -56,13 +73,13 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 40px;">No</th>
-                <th>Task</th>
-                <th style="width: 180px;">Responsible Person</th>
-                <th style="width: 90px;">Progress</th>
-                <th style="width: 100px;">Due Date</th>
-                <th style="width: 110px;">Compilation Date</th>
-                <th style="width: 220px;">Notes/Progress</th>
+                <th class="col-no">No</th>
+                <th class="col-task">Task</th>
+                <th class="col-responsible">Responsible Person</th>
+                <th class="col-progress">Progress</th>
+                <th class="col-due">Due Date</th>
+                <th class="col-compilation">Compilation Date</th>
+                <th class="col-notes">Notes/Progress</th>
             </tr>
         </thead>
         <tbody>
