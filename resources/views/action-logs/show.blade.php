@@ -159,7 +159,6 @@
                                         <th style="width: 140px;">Due Date</th>
                                         <th>Compilation Date</th>
                                         <th style="width: 300px;">Notes/Progress</th>
-                                        <th style="width: 210px;">Cancel Reason</th>
                                         <th>Timeline</th>
                                     </tr>
                                 </thead>
@@ -191,7 +190,6 @@
                                             <td>{{ $row['due_date'] ?? '-' }}</td>
                                             <td>{{ $row['compilation_date'] ?? '-' }}</td>
                                             <td class="text-muted small">{{ $row['notes_progress'] ?? '' }}</td>
-                                            <td class="text-muted small">{{ $row['status_reason'] ?? '-' }}</td>
                                             <td>
                                                 @if(!empty($history))
                                                     <button type="button"
@@ -210,7 +208,7 @@
 
                                         @if(!empty($history))
                                             <tr class="collapse bg-light" id="{{ $timelineModalId }}">
-                                                <td colspan="9">
+                                                <td colspan="8">
                                                     <h6 class="mb-2">Task Timeline</h6>
                                                     <div class="table-responsive">
                                                         <table class="table table-sm table-bordered align-middle mb-0">
