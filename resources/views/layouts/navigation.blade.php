@@ -77,7 +77,7 @@
                            aria-haspopup="true"
                            aria-expanded="false"
                            title="Resources">
-                            <i class="ti ti-message-circle"></i>
+                             <i class="ti ti-message-circle"></i>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end pc-h-dropdown">
                             @can('manage anonymous feedback')
