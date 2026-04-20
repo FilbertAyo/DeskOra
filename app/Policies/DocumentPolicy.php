@@ -10,15 +10,11 @@ class DocumentPolicy
     /**
      * Determine whether the user can view any models.
      *
-     * Rules:
-     * - Employees: Can view their own documents
-     * - Reviewers: Can view all documents
-     * - Admin: Can view all documents
+     * All authenticated users may open the documents catalogue; the controller lists
+     * submitted items organization-wide and scopes returned drafts appropriately.
      */
     public function viewAny(User $user): bool
     {
-        // All authenticated users can view documents (filtered by ownership in controller)
-        // Reviewers and admins can see all, others see only their own
         return true;
     }
 
@@ -26,12 +22,15 @@ class DocumentPolicy
      * Determine whether the user can view the model.
      *
      * Rules:
-     * - Employees: Can view their own documents
-     * - Reviewers: Can view all documents
-     * - Admin: Can view all documents
+     * - Submitted documents: Any authenticated user may view (org-wide transparency).
+     * - Drafts: Owner, weekly collaborators, reviewers/admins, or action-log assignees/managers as below.
      */
     public function view(User $user, Document $document): bool
     {
+        if ($document->isSubmitted()) {
+            return true;
+        }
+
         if ($document->type === Document::TYPE_ACTION_LOG) {
             if ($user->hasPermissionTo('view all documents') || $this->isActionLogManager($user) || $document->user_id === $user->id) {
                 return true;

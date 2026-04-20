@@ -5,7 +5,7 @@
                 <div class="col-md-12">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="page-header-title">
-                            <h5 class="m-b-10">My Documents</h5>
+                            <h5 class="m-b-10">Documents</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item" aria-current="page">Documents</li>
@@ -29,7 +29,7 @@
                 <div class="card-header bg-white border-bottom">
                     <div class="row align-items-center">
                         <div class="col-md-6">
-                            <h5 class="mb-0"><i class="ti ti-list me-2"></i>Documents List</h5>
+                            <h5 class="mb-0"><i class="ti ti-list me-2"></i>Submitted documents (all staff)</h5>
                         </div>
                         <div class="col-md-6">
                             <form method="GET" action="{{ route('documents.index') }}" class="row">
@@ -92,6 +92,11 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    @if(request('review_status') !== 'returned')
+                        <div class="alert alert-light border mb-3 mb-md-4">
+                            This page lists <strong>submitted</strong> weekly plans, weekly reports, monthly reports, and action logs from everyone, so the team can review them together (for example before Monday check-ins). Drafts and documents returned for revision stay private to authors and collaborators until they are submitted again.
+                        </div>
+                    @endif
                     @if(request('type') === 'monthly_report')
                         <div class="alert alert-light border mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
                             <div class="flex-grow-1">

@@ -33,8 +33,12 @@ class DocumentController extends Controller
         $user = Auth::user();
         $query = Document::with(['user', 'period', 'sharedUsers:id,name']);
 
-        // Users with 'view all documents' permission can see all documents, others see only their own
-        if (! $user->hasPermissionTo('view all documents')) {
+        // Submitted documents are listed organization-wide for Monday stand-ups.
+        // Returned-for-revision drafts stay limited to the author/collaborators (reviewers see all).
+        $scopedToOwnDocuments = ! $user->hasPermissionTo('view all documents')
+            && $request->input('review_status') === 'returned';
+
+        if ($scopedToOwnDocuments) {
             $query->forOwnerOrSharedUser($user->id);
         }
 
@@ -79,7 +83,7 @@ class DocumentController extends Controller
             $query->submitted();
         }
 
-        if (! $user->hasPermissionTo('view all documents')
+        if ($scopedToOwnDocuments
             && in_array($request->input('type'), [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
             $this->applyWeeklyListSortForUser($query, $user);
         } else {
