@@ -87,7 +87,7 @@
                     <button type="button" class="pc-head-link border-0 bg-transparent me-0"
                         data-bs-toggle="offcanvas" data-bs-target="#weeklyObjectiveMatrix"
                         aria-controls="weeklyObjectiveMatrix" title="Weekly Objective Matrix">
-                        <i class="ti ti-layout-grid"></i> <span class="ms-2">Weekly Objective Matrix</span>
+                        <i class="ti ti-layout-grid"></i> 
                     </button>
                 </li>
 
