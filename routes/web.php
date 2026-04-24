@@ -105,6 +105,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/users/{user}/assign-permissions', [AdminController::class, 'assignPermissions'])->name('assign.permissions');
 
     Route::post('/petty/{petty}/upload-attachment', [PettyController::class, 'updateAttachment'])->name('petty.updateAttachment');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
 });
 
@@ -173,6 +175,8 @@ Route::middleware(['auth', 'permission:view reports'])->group(function () {
 
 Route::middleware(['auth', 'permission:view settings'])->group(function () {
     Route::get('/settings/notifications', [NotificationController::class, 'index'])->name('notification.index');
+    Route::put('/settings/notifications/weekly-reminder', [NotificationController::class, 'updateWeeklyReminder'])
+        ->name('notification.weekly-reminder.update');
 });
 
 Route::middleware(['auth', 'permission:manage anonymous feedback'])->group(function () {

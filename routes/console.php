@@ -20,8 +20,8 @@ Schedule::command('work-periods:auto-create --close-ended')
     ->timezone('Africa/Dar_es_Salaam') // Adjust to your timezone
     ->description('Close work periods that ended before today');
 
-// Schedule daily deadline reminders at 8 AM local time
+// Schedule reminder evaluation frequently; config decides when to send.
 Schedule::command('work-periods:send-reminders')
-    ->dailyAt('08:00')
-    ->timezone('Africa/Dar_es_Salaam')
-    ->description('Send weekly plan/report deadline reminders to staff and verifiers');
+    ->everyMinute()
+    ->timezone(config('app.timezone', 'UTC'))
+    ->description('Dispatch configured weekly plan/report reminders');

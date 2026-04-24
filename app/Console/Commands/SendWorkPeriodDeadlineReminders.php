@@ -2,12 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
-use App\Models\WorkPeriod;
-use App\Services\NotificationService;
-use Carbon\Carbon;
+use App\Services\WeeklySubmissionReminderDispatcher;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class SendWorkPeriodDeadlineReminders extends Command
 {
@@ -23,9 +19,9 @@ class SendWorkPeriodDeadlineReminders extends Command
      *
      * @var string
      */
-    protected $description = 'Send SMS reminders for weekly plan/report deadlines (2 days before and on deadline day)';
+    protected $description = 'Send configurable weekly plan/report reminders';
 
-    public function __construct(protected NotificationService $notificationService)
+    public function __construct(protected WeeklySubmissionReminderDispatcher $dispatcher)
     {
         parent::__construct();
     }
@@ -35,112 +31,16 @@ class SendWorkPeriodDeadlineReminders extends Command
      */
     public function handle()
     {
-        $this->info('Sending work period deadline reminders...');
+        $result = $this->dispatcher->dispatchIfDue();
 
-        $period = WorkPeriod::getCurrent();
-
-        if (! $period) {
-            $this->warn('No current work period found. Skipping reminders.');
-            Log::warning('Work period reminder skipped - no current period');
+        if (! ($result['due'] ?? false)) {
+            $this->info('No reminder window matched at this tick.');
 
             return Command::SUCCESS;
         }
 
-        $today = Carbon::today();
-        $planDeadline = $period->getPlanDeadlineCutoff();
-        $reportDeadline = $period->getReportDeadlineCutoff();
-
-        $planDiff = $today->diffInDays($planDeadline, false);
-        $reportDiff = $today->diffInDays($reportDeadline, false);
-
-        $remindPlan = in_array($planDiff, [2, 0], true);
-        $remindReport = in_array($reportDiff, [2, 0], true);
-
-        if (! $remindPlan && ! $remindReport) {
-            $this->info('No reminders due today.');
-
-            return Command::SUCCESS;
-        }
-
-        $recipients = User::role(['staff', 'verifier'])
-            ->whereNotNull('phone')
-            ->where('status', 'active')
-            ->get();
-
-        if ($recipients->isEmpty()) {
-            $this->warn('No active staff/verifier users with phone numbers to notify.');
-
-            return Command::SUCCESS;
-        }
-
-        $planMessage = null;
-        if ($remindPlan) {
-            $when = $planDiff === 0 ? 'today' : 'in 2 days';
-            $nextPeriod = $period->getNextPeriod();
-            if ($nextPeriod) {
-                $planMessage = sprintf(
-                    'Reminder: Weekly Plan for next week %d (%s) is due %s (deadline: %s).',
-                    $nextPeriod->week_number,
-                    $nextPeriod->date_range,
-                    $when,
-                    $planDeadline->format('d M Y H:i')
-                );
-            } else {
-                Log::warning('Plan reminder skipped: next period missing.', [
-                    'current_period_id' => $period->id,
-                    'week_number' => $period->week_number,
-                    'year' => $period->year,
-                ]);
-            }
-        }
-
-        $reportMessage = null;
-        if ($remindReport) {
-            $when = $reportDiff === 0 ? 'today' : 'in 2 days';
-            $reportMessage = sprintf(
-                'Reminder: Weekly Report for week %d (%s) is due %s (deadline: %s).',
-                $period->week_number,
-                $period->date_range,
-                $when,
-                $reportDeadline->format('d M Y H:i')
-            );
-        }
-
-        foreach ($recipients as $user) {
-            if ($planMessage) {
-                $this->sendSms($user, $planMessage, 'plan');
-            }
-            if ($reportMessage) {
-                $this->sendSms($user, $reportMessage, 'report');
-            }
-        }
-
-        $this->info(sprintf(
-            'Reminders sent. Plan: %s, Report: %s, Recipients: %d',
-            $remindPlan ? 'YES' : 'NO',
-            $remindReport ? 'YES' : 'NO',
-            $recipients->count()
-        ));
+        $this->info(sprintf('Weekly submission reminders sent: %d', (int) ($result['sent'] ?? 0)));
 
         return Command::SUCCESS;
-    }
-
-    private function sendSms(User $user, string $message, string $type): void
-    {
-        $result = $this->notificationService->sendSms($user->phone, $message);
-
-        if ($result) {
-            Log::info('Deadline reminder sent', [
-                'user_id' => $user->id,
-                'type' => $type,
-                'phone' => $user->phone,
-            ]);
-        } else {
-            Log::error('Failed to send deadline reminder', [
-                'user_id' => $user->id,
-                'type' => $type,
-                'phone' => $user->phone,
-            ]);
-        }
     }
 }

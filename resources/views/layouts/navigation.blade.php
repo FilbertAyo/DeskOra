@@ -44,6 +44,8 @@
         @php
             $currentPeriod = $currentPeriod ?? null;
             $matrixRows = $matrixRows ?? collect();
+            $recentNotifications = Auth::user()->notifications()->latest()->limit(6)->get();
+            $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
         @endphp
 
         @if($currentPeriod)
@@ -94,6 +96,68 @@
                     </li>
                
                
+
+                <li class="dropdown pc-h-item">
+                    <a class="pc-head-link dropdown-toggle arrow-none me-0"
+                       data-bs-toggle="dropdown"
+                       href="#"
+                       role="button"
+                       aria-haspopup="true"
+                       aria-expanded="false"
+                       title="Alerts">
+                        <i class="ti ti-bell"></i>
+                        @if($unreadNotificationCount > 0)
+                            <span class="badge bg-danger rounded-pill position-absolute" style="margin-left:-8px; margin-top:-8px;">
+                                {{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}
+                            </span>
+                        @endif
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end pc-h-dropdown" style="min-width: 340px;">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                            <h6 class="mb-0">Notifications</h6>
+                            @if($unreadNotificationCount > 0)
+                                <form action="{{ route('notifications.read-all') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="btn btn-link btn-sm p-0 text-decoration-none">Mark all read</button>
+                                </form>
+                            @endif
+                        </div>
+
+                        @forelse($recentNotifications as $notification)
+                            @php
+                                $data = is_array($notification->data ?? null) ? $notification->data : [];
+                                $title = $data['title'] ?? 'Notification';
+                                $message = $data['message'] ?? 'You have a new update.';
+                                $actionUrl = $data['action_url'] ?? route('notification.index');
+                            @endphp
+                            <div class="dropdown-item {{ $notification->read_at ? '' : 'bg-light' }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div class="flex-grow-1">
+                                        <a href="{{ $actionUrl }}" class="text-decoration-none">
+                                            <div class="fw-semibold text-dark">{{ $title }}</div>
+                                        </a>
+                                        <small class="text-muted d-block">{{ $message }}</small>
+                                        <small class="text-muted">{{ $notification->created_at?->diffForHumans() }}</small>
+                                    </div>
+                                    @if(!$notification->read_at)
+                                        <form action="{{ route('notifications.read', $notification->id) }}" method="POST">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Read</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <div class="dropdown-item text-muted">No notifications yet.</div>
+                        @endforelse
+
+                        <div class="border-top">
+                            <a href="{{ route('notification.index') }}" class="dropdown-item text-primary">
+                                <i class="ti ti-settings me-1"></i>Manage notification settings
+                            </a>
+                        </div>
+                    </div>
+                </li>
 
                 <li class="pc-h-item">
                     <button type="button" class="pc-head-link border-0 bg-transparent me-0"

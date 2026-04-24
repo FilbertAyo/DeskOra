@@ -8,6 +8,12 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success mb-4">
+            <i class="ti ti-check me-1"></i>{{ session('success') }}
+        </div>
+    @endif
+
     <div class="row mb-4">
         {{-- SMS Balance Card --}}
         <div class="col-md-6">
@@ -127,6 +133,80 @@
                             </ul>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card shadow-none border">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="ti ti-calendar-event mr-2"></i>Reminder Automation
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Configure automated reminders for staff who have not submitted required weekly activities.
+                    </p>
+
+                    <form action="{{ route('notification.weekly-reminder.update') }}" method="POST" class="row g-3">
+                        @csrf
+                        @method('PUT')
+
+                        <div class="col-md-3">
+                            <label class="form-label">Enable Reminder</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" value="1"
+                                    {{ old('enabled', $reminderConfig->enabled) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="enabled">Active</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="day_of_week" class="form-label">Day</label>
+                            <select id="day_of_week" name="day_of_week" class="form-control">
+                                @foreach([0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'] as $dayValue => $dayLabel)
+                                    <option value="{{ $dayValue }}" {{ (int) old('day_of_week', $reminderConfig->day_of_week) === $dayValue ? 'selected' : '' }}>
+                                        {{ $dayLabel }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="time" class="form-label">Time</label>
+                            <input id="time" type="time" name="time" class="form-control" value="{{ old('time', $reminderConfig->time) }}">
+                            <small class="text-muted">Timezone: {{ config('app.timezone') }}</small>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label d-block">Channels</label>
+                            @php
+                                $selectedChannels = old('channels', $reminderConfig->channels ?? []);
+                            @endphp
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="channels[]" id="channel_email" value="email"
+                                    {{ in_array('email', $selectedChannels, true) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="channel_email">Email</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="channels[]" id="channel_in_app" value="in_app"
+                                    {{ in_array('in_app', $selectedChannels, true) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="channel_in_app">In-app Notification</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="alert alert-info mb-3">
+                                Separate reminders are sent for each missing activity (weekly plan and weekly report).
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-device-floppy me-1"></i>Save Reminder Settings
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
