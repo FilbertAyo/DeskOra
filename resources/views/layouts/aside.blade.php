@@ -79,9 +79,8 @@
                         $reviewActivitiesSubmittedCount = $canReviewSubmissions ? \App\Models\Document::submitted()->count() : 0;
                         $reviewActivitiesPendingBudgetCount = 0;
                         if ($canWeeklyBudgetReview) {
-                            $reviewActivitiesBudgetPeriod = app(\App\Services\WorkPeriodService::class)->periodForWeeklyPlanSubmission();
                             $reviewActivitiesPendingBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
-                                $reviewActivitiesBudgetPeriod?->id
+                                null
                             );
                         }
                     @endphp

@@ -50,6 +50,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/weekly-plans', [DocumentController::class, 'weeklyPlans'])->name('weekly-plans');
         Route::get('/weekly-reports', [DocumentController::class, 'weeklyReports'])->name('weekly-reports');
         Route::get('/weekly-budget-review', [DocumentController::class, 'weeklyBudgetReviewPanel'])->name('weekly-budget-review');
+        Route::get('/weekly-budget-review/export/pdf', [DocumentController::class, 'exportWeeklyBudgetReviewPdf'])->name('weekly-budget-review.export.pdf');
+        Route::get('/weekly-budget-review/export/excel', [DocumentController::class, 'exportWeeklyBudgetReviewExcel'])->name('weekly-budget-review.export.excel');
         Route::get('/weekly-objective-matrix/download', [WeeklyObjectiveMatrixController::class, 'download'])->name('weekly-objective-matrix.download');
         Route::get('/plan-target', [DocumentController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentController::class, 'create'])->name('create');

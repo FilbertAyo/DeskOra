@@ -172,6 +172,32 @@ class WeeklyBudgetReviewTest extends TestCase
         $response->assertSee('Desk');
     }
 
+    public function test_pending_budget_review_count_without_period_includes_older_weeks_until_processed(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $olderPlan = $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Old week item', 'description_purpose' => 'Carryover', 'amount' => '250'],
+        ]);
+        $nextPlan = $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Next week item', 'description_purpose' => 'Current review', 'amount' => '300'],
+        ]);
+
+        $this->assertSame(2, Document::countPendingWeeklyBudgetReviewForPeriod(null));
+
+        $olderUid = $olderPlan->budgetItems()[0]['budget_uid'];
+        $this->actingAs($reviewer)->post(
+            route('documents.process-weekly-budget-review', $olderPlan->id),
+            ['budget_uid' => $olderUid, 'decision' => 'approved', 'provided_amount' => 250]
+        );
+
+        $this->assertSame(1, Document::countPendingWeeklyBudgetReviewForPeriod(null));
+        $this->assertSame(1, Document::countPendingWeeklyBudgetReviewForPeriod($nextPlan->period_id));
+    }
+
     public function test_budget_review_excludes_draft_weekly_plans_even_with_budget(): void
     {
         [, $next] = $this->createPeriods();
@@ -351,6 +377,36 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertSame(Document::BUDGET_REVIEW_REJECTED, $plan->budget_review_status);
     }
 
+    public function test_reject_single_budget_item_without_note_is_allowed(): void
+    {
+        [, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $plan = $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'ItemA', 'description_purpose' => 'A', 'amount' => '100'],
+        ]);
+
+        $uid = $plan->budgetItems()[0]['budget_uid'];
+
+        $response = $this->actingAs($reviewer)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            [
+                'budget_uid' => $uid,
+                'decision' => 'rejected',
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $plan->refresh();
+        $reviewsByUid = $plan->budgetReviewItemsByUid();
+        $this->assertSame('rejected', $reviewsByUid[$uid]['decision']);
+        $this->assertNull($reviewsByUid[$uid]['note']);
+    }
+
     public function test_all_items_approved_sets_plan_status_approved(): void
     {
         [, $next] = $this->createPeriods();
@@ -470,6 +526,52 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertSame($uid, $firstItem['budget_uid']);
         $this->assertSame('approved', $firstItem['review_decision']);
         $this->assertEquals(1400, $firstItem['review_provided_amount']);
+    }
+
+    public function test_weekly_budget_review_export_pdf_respects_filters(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Laptop', 'description_purpose' => 'Dev', 'amount' => '1000'],
+        ]);
+        $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Desk', 'description_purpose' => 'Office', 'amount' => '500'],
+        ]);
+
+        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review.export.pdf', [
+            'period_id' => $current->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeader('content-disposition');
+    }
+
+    public function test_weekly_budget_review_export_excel_respects_filters(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Laptop', 'description_purpose' => 'Dev', 'amount' => '1000'],
+        ]);
+        $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Desk', 'description_purpose' => 'Office', 'amount' => '500'],
+        ]);
+
+        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review.export.excel', [
+            'period_id' => $current->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+        $this->assertStringContainsString('.xlsx', (string) $response->headers->get('content-disposition'));
     }
 
     // ------------------------------------------------------------------

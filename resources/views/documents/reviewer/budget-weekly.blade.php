@@ -17,42 +17,42 @@
     </div>
 
     {{-- Summary stats cards --}}
-    <div class="row mb-3">
+    <div class="row">
         <div class="col-md-2 col-sm-6 mb-2">
-            <div class="card border-start border h-100">
-                <div class="card-body py-3">
+            <div class="card border-start border">
+                <div class="card-body">
                     <h6 class="mb-1 text-muted">Pending Items</h6>
                     <h4 class="mb-0">{{ $stats['pending'] }}</h4>
                 </div>
             </div>
         </div>
         <div class="col-md-2 col-sm-6 mb-2">
-            <div class="card border-start border h-100">
-                <div class="card-body py-3">
+            <div class="card border-start border">
+                <div class="card-body">
                     <h6 class="mb-1 text-muted">Approved Items</h6>
                     <h4 class="mb-0">{{ $stats['approved'] }}</h4>
                 </div>
             </div>
         </div>
         <div class="col-md-2 col-sm-6 mb-2">
-            <div class="card border-start border h-100">
-                <div class="card-body py-3">
+            <div class="card border-start border">
+                <div class="card-body">
                     <h6 class="mb-1 text-muted">Rejected Items</h6>
                     <h4 class="mb-0">{{ $stats['rejected'] }}</h4>
                 </div>
             </div>
         </div>
         <div class="col-md-3 col-sm-6 mb-2">
-            <div class="card border-start border h-100">
-                <div class="card-body py-3">
+            <div class="card border-start border">
+                <div class="card-body">
                     <h6 class="mb-1 text-muted">Requested Total</h6>
                     <h4 class="mb-0">{{ number_format((float) $stats['requested_total'], 2) }}</h4>
                 </div>
             </div>
         </div>
         <div class="col-md-3 col-sm-12 mb-2">
-            <div class="card border-start border h-100">
-                <div class="card-body py-3">
+            <div class="card border-start border">
+                <div class="card-body">
                     <h6 class="mb-1 text-muted">Provided Total</h6>
                     <h4 class="mb-0">{{ number_format((float) $stats['provided_total'], 2) }}</h4>
                 </div>
@@ -111,6 +111,14 @@
                             <a href="{{ route('documents.weekly-budget-review') }}" class="btn btn-outline-secondary w-100">Clear</a>
                         </div>
                     </form>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <a href="{{ route('documents.weekly-budget-review.export.pdf', request()->query()) }}" class="btn btn-sm btn-outline-danger">
+                            <i class="ti ti-file-type-pdf me-1"></i>Download PDF
+                        </a>
+                        <a href="{{ route('documents.weekly-budget-review.export.excel', request()->query()) }}" class="btn btn-sm btn-outline-success">
+                            <i class="ti ti-file-spreadsheet me-1"></i>Download Excel
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -176,7 +184,7 @@
                                                 <th class="text-end" style="width: 140px;">Requested</th>
                                                 <th class="text-end" style="width: 140px;">Provided</th>
                                                 <th style="width: 120px;">Status</th>
-                                                <th>Note</th>
+                                                <!-- <th>Note</th> -->
                                                 <th class="text-center" style="width: 120px;">Action</th>
                                             </tr>
                                         </thead>
@@ -208,9 +216,9 @@
                                                             <span class="badge bg-warning">Pending</span>
                                                         @endif
                                                     </td>
-                                                    <td>
+                                                    <!-- <td>
                                                         <small>{{ $item['note'] ?? '' }}</small>
-                                                    </td>
+                                                    </td> -->
                                                     <td class="text-center">
                                                         @can('process weekly budgets')
                                                             <button
@@ -230,7 +238,7 @@
                                                 <td colspan="3" class="text-end">Staff Total</td>
                                                 <td class="text-end">{{ number_format($staffData['requested_total'], 2) }}</td>
                                                 <td class="text-end">{{ number_format($staffData['provided_total'], 2) }}</td>
-                                                <td colspan="3"></td>
+                                                <td colspan="2"></td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -259,12 +267,12 @@
                                                         </div>
                                                         <div class="mb-3">
                                                             <label class="form-label">Decision</label>
-                                                            <select name="decision" class="form-control" required>
+                                                            <select name="decision" class="form-control js-budget-decision" required>
                                                                 <option value="approved" {{ ($item['decision'] ?? '') === 'approved' ? 'selected' : '' }}>Approve</option>
                                                                 <option value="rejected" {{ ($item['decision'] ?? '') === 'rejected' ? 'selected' : '' }}>Reject</option>
                                                             </select>
                                                         </div>
-                                                        <div class="mb-3">
+                                                        <div class="mb-3 js-provided-amount-group">
                                                             <label class="form-label">Provided Amount</label>
                                                             <input
                                                                 type="number"
@@ -272,11 +280,13 @@
                                                                 min="0"
                                                                 name="provided_amount"
                                                                 value="{{ ($item['decision'] ?? '') === 'approved' ? number_format($item['provided_amount'], 2, '.', '') : number_format($item['amount_numeric'], 2, '.', '') }}"
-                                                                class="form-control">
+                                                                class="form-control js-provided-amount-input">
+                                                            <small class="text-muted">Visible only when decision is approve.</small>
                                                         </div>
-                                                        <div class="mb-0">
+                                                        <div class="mb-0 js-note-group">
                                                             <label class="form-label">Note</label>
-                                                            <textarea name="note" rows="3" class="form-control" placeholder="Reason (required on rejection)">{{ $item['note'] ?? '' }}</textarea>
+                                                            <textarea name="note" rows="3" class="form-control js-note-input" placeholder="Optional reason for rejection">{{ $item['note'] ?? '' }}</textarea>
+                                                            <small class="text-muted">Visible only when decision is reject.</small>
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer">
@@ -309,4 +319,45 @@
             @endif
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const modalSelector = '[id^="itemReviewModal_"]';
+                const decisionSelector = '.js-budget-decision';
+
+                function toggleDecisionFields(modalEl) {
+                    const decisionInput = modalEl.querySelector(decisionSelector);
+                    if (!decisionInput) return;
+
+                    const isApproved = decisionInput.value === 'approved';
+                    const providedGroup = modalEl.querySelector('.js-provided-amount-group');
+                    const providedInput = modalEl.querySelector('.js-provided-amount-input');
+                    const noteGroup = modalEl.querySelector('.js-note-group');
+                    const noteInput = modalEl.querySelector('.js-note-input');
+
+                    if (providedGroup && providedInput) {
+                        providedGroup.style.display = isApproved ? '' : 'none';
+                        providedInput.disabled = !isApproved;
+                        providedInput.required = isApproved;
+                    }
+
+                    if (noteGroup && noteInput) {
+                        noteGroup.style.display = isApproved ? 'none' : '';
+                        noteInput.disabled = isApproved;
+                    }
+                }
+
+                document.querySelectorAll(modalSelector).forEach(function (modalEl) {
+                    const decisionInput = modalEl.querySelector(decisionSelector);
+                    if (!decisionInput) return;
+
+                    toggleDecisionFields(modalEl);
+                    decisionInput.addEventListener('change', function () {
+                        toggleDecisionFields(modalEl);
+                    });
+                });
+            });
+        </script>
+    @endpush
 </x-app-layout>

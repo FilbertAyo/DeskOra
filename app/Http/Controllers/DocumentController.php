@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\WeeklyBudgetReviewExport;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Services\MonthlyReportYearPlanActivities;
 use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkPeriodService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DocumentController extends Controller
 {
@@ -1559,50 +1562,9 @@ class DocumentController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        // Default to next-week period (the period plans target) unless filters are explicitly provided
-        $defaultPeriod = null;
-        $hasExplicitFilter = $request->filled('period_id') || $request->filled('year') || $request->filled('user_id') || $request->filled('status');
-        if (! $hasExplicitFilter) {
-            $defaultPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
-        }
-
-        $query = Document::query()
-            ->with(['user.department', 'period', 'budgetReviewedBy'])
-            ->weeklyPlans()
-            ->submitted()
-            ->where(function ($budgetQuery) {
-                $budgetQuery
-                    ->whereNotNull('budget_review_status')
-                    ->orWhere('content', 'like', '%"budget"%');
-            });
-
-        if ($request->filled('user_id')) {
-            $query->forUser($request->string('user_id')->toString());
-        }
-
-        if ($request->filled('period_id')) {
-            $query->forPeriod($request->string('period_id')->toString());
-        } elseif ($defaultPeriod) {
-            $query->forPeriod($defaultPeriod->id);
-        }
-
-        if ($request->filled('year')) {
-            $year = (int) $request->input('year');
-            $query->whereHas('period', function ($periodQuery) use ($year) {
-                $periodQuery->where('year', $year);
-            });
-        }
-
+        $defaultPeriod = $this->resolveWeeklyBudgetReviewDefaultPeriod($request);
         $statusFilter = $request->input('status');
-        if ($statusFilter === Document::BUDGET_REVIEW_PENDING) {
-            $query->where(function ($statusQuery) {
-                $statusQuery
-                    ->whereNull('budget_review_status')
-                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
-            });
-        } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED], true)) {
-            $query->where('budget_review_status', $statusFilter);
-        }
+        $query = $this->buildWeeklyBudgetReviewQuery($request, $defaultPeriod, $statusFilter);
 
         $documents = $query->latest()->paginate(100)->withQueryString();
         $documents->setCollection(
@@ -1647,6 +1609,156 @@ class DocumentController extends Controller
             'statusFilter' => $statusFilter,
             'defaultPeriod' => $defaultPeriod,
         ]);
+    }
+
+    public function exportWeeklyBudgetReviewPdf(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (! $user->hasPermissionTo('view weekly budgets')) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $defaultPeriod = $this->resolveWeeklyBudgetReviewDefaultPeriod($request);
+        $statusFilter = $request->input('status');
+        $documents = $this->buildWeeklyBudgetReviewQuery($request, $defaultPeriod, $statusFilter)
+            ->latest()
+            ->get()
+            ->filter(fn (Document $document) => $document->hasBudgetItems())
+            ->values();
+
+        $grouped = $this->groupBudgetDocumentsByDepartment($documents);
+        $filterSummary = $this->weeklyBudgetReviewFilterSummary($request, $defaultPeriod, $statusFilter);
+        $filename = $this->weeklyBudgetReviewExportFilename('pdf', $filterSummary);
+
+        $pdf = Pdf::loadView('documents.reviewer.budget-weekly-pdf', [
+            'grouped' => $grouped,
+            'workPeriodRange' => $filterSummary['work_period_range'],
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download($filename);
+    }
+
+    public function exportWeeklyBudgetReviewExcel(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (! $user->hasPermissionTo('view weekly budgets')) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $defaultPeriod = $this->resolveWeeklyBudgetReviewDefaultPeriod($request);
+        $statusFilter = $request->input('status');
+        $documents = $this->buildWeeklyBudgetReviewQuery($request, $defaultPeriod, $statusFilter)
+            ->latest()
+            ->get()
+            ->filter(fn (Document $document) => $document->hasBudgetItems())
+            ->values();
+
+        $filterSummary = $this->weeklyBudgetReviewFilterSummary($request, $defaultPeriod, $statusFilter);
+        $filename = $this->weeklyBudgetReviewExportFilename('xlsx', $filterSummary);
+
+        return Excel::download(
+            new WeeklyBudgetReviewExport($documents),
+            $filename
+        );
+    }
+
+    private function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
+    {
+        $hasExplicitFilter = $request->filled('period_id') || $request->filled('year') || $request->filled('user_id') || $request->filled('status');
+
+        if ($hasExplicitFilter) {
+            return null;
+        }
+
+        return $this->workPeriodService->periodForWeeklyPlanSubmission();
+    }
+
+    private function buildWeeklyBudgetReviewQuery(Request $request, ?WorkPeriod $defaultPeriod, ?string $statusFilter)
+    {
+        $query = Document::query()
+            ->with(['user.department', 'period', 'budgetReviewedBy'])
+            ->weeklyPlans()
+            ->submitted()
+            ->where(function ($budgetQuery) {
+                $budgetQuery
+                    ->whereNotNull('budget_review_status')
+                    ->orWhere('content', 'like', '%"budget"%');
+            });
+
+        if ($request->filled('user_id')) {
+            $query->forUser($request->string('user_id')->toString());
+        }
+
+        if ($request->filled('period_id')) {
+            $query->forPeriod($request->string('period_id')->toString());
+        } elseif ($defaultPeriod) {
+            $query->forPeriod($defaultPeriod->id);
+        }
+
+        if ($request->filled('year')) {
+            $year = (int) $request->input('year');
+            $query->whereHas('period', function ($periodQuery) use ($year) {
+                $periodQuery->where('year', $year);
+            });
+        }
+
+        if ($statusFilter === Document::BUDGET_REVIEW_PENDING) {
+            $query->where(function ($statusQuery) {
+                $statusQuery
+                    ->whereNull('budget_review_status')
+                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
+            });
+        } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED], true)) {
+            $query->where('budget_review_status', $statusFilter);
+        }
+
+        return $query;
+    }
+
+    private function weeklyBudgetReviewFilterSummary(Request $request, ?WorkPeriod $defaultPeriod, ?string $statusFilter): array
+    {
+        $resolvedPeriodId = $request->filled('period_id')
+            ? (string) $request->string('period_id')
+            : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
+
+        $periodLabel = 'All Weeks';
+        $periodDateRange = 'All Work Periods';
+        if ($resolvedPeriodId) {
+            $period = WorkPeriod::query()->find($resolvedPeriodId);
+            if ($period) {
+                $periodLabel = sprintf('Week %s (%s)', (string) $period->week_number, (string) $period->year);
+                $start = $period->week_start_date ? $period->week_start_date->format('Y-m-d') : null;
+                $end = $period->week_end_date ? $period->week_end_date->format('Y-m-d') : null;
+                $periodDateRange = ($start && $end) ? "{$start} to {$end}" : ($period->date_range ?? 'Selected Work Period');
+            }
+        }
+
+        $userLabel = 'All Staff';
+        if ($request->filled('user_id')) {
+            $selectedUser = User::query()->find((string) $request->string('user_id'));
+            if ($selectedUser) {
+                $userLabel = $selectedUser->name;
+            }
+        }
+
+        return [
+            'period' => $periodLabel,
+            'work_period_range' => $periodDateRange,
+            'year' => $request->filled('year') ? (string) $request->input('year') : 'All Years',
+            'status' => $statusFilter ? ucfirst($statusFilter) : 'All Statuses',
+            'staff' => $userLabel,
+        ];
+    }
+
+    private function weeklyBudgetReviewExportFilename(string $extension, array $filterSummary): string
+    {
+        $periodSlug = Str::slug((string) ($filterSummary['period'] ?? 'all-weeks'));
+        $statusSlug = Str::slug((string) ($filterSummary['status'] ?? 'all-statuses'));
+        $dateStamp = now()->format('Ymd_His');
+
+        return "weekly_budget_review_{$periodSlug}_{$statusSlug}_{$dateStamp}.{$extension}";
     }
 
     /**
@@ -1774,7 +1886,7 @@ class DocumentController extends Controller
             'budget_uid' => ['required', 'string', 'max:255'],
             'decision' => ['required', 'in:approved,rejected'],
             'provided_amount' => ['nullable', 'numeric', 'min:0', 'required_if:decision,approved'],
-            'note' => ['nullable', 'string', 'max:2000', 'required_if:decision,rejected'],
+            'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $budgetUid = trim($validated['budget_uid']);
