@@ -151,6 +151,7 @@
                         Configure automated reminders for staff who have not submitted required weekly activities.
                     </p>
 
+                    @can('manage notifications')
                     <form action="{{ route('notification.weekly-reminder.update') }}" method="POST" class="row g-3">
                         @csrf
                         @method('PUT')
@@ -207,6 +208,12 @@
                             </button>
                         </div>
                     </form>
+                    @else
+                    <div class="alert alert-warning mb-0">
+                        <i class="ti ti-lock me-1"></i>
+                        You can view notification settings, but only users with <strong>manage notifications</strong> permission can configure reminder automation.
+                    </div>
+                    @endcan
                 </div>
             </div>
         </div>

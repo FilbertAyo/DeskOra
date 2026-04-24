@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Notifications\WeeklySubmissionReminderNotification;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
 
 class WeeklySubmissionReminderDispatcher
@@ -24,20 +23,22 @@ class WeeklySubmissionReminderDispatcher
     {
         $config = $this->configService->getWeeklyPlanReportConfig();
         $now = $now ?? Carbon::now($config->timezone ?: config('app.timezone', 'UTC'));
+        $slot = $this->scheduledSlotForNow($config, $now);
 
-        if (! $this->isDue($config, $now)) {
+        if ($slot === null) {
             return ['due' => false, 'sent' => 0];
         }
 
-        return $this->dispatchNow($config, $now);
+        return $this->dispatchNow($config, $now, $slot);
     }
 
-    public function dispatchNow(?ReminderConfig $config = null, ?Carbon $now = null): array
+    public function dispatchNow(?ReminderConfig $config = null, ?Carbon $now = null, ?Carbon $scheduledSlot = null): array
     {
         $config = $config ?? $this->configService->getWeeklyPlanReportConfig();
         $timezone = $config->timezone ?: config('app.timezone', 'UTC');
         $now = ($now ?? Carbon::now($timezone))->copy()->setTimezone($timezone);
-        $windowKey = $now->format('Y-m-d_H:i');
+        $scheduledSlot = $scheduledSlot ? $scheduledSlot->copy()->setTimezone($timezone) : $this->scheduledSlotForNow($config, $now);
+        $windowKey = ($scheduledSlot ?? $now)->format('Y-m-d_H:i');
         $channels = collect($config->channels ?: [])->values()->all();
         $targets = $this->resolveTargets();
         $sent = 0;
@@ -75,19 +76,27 @@ class WeeklySubmissionReminderDispatcher
         return ['due' => true, 'sent' => $sent, 'targets' => count($targets)];
     }
 
-    private function isDue(ReminderConfig $config, Carbon $now): bool
+    private function scheduledSlotForNow(ReminderConfig $config, Carbon $now): ?Carbon
     {
         if (! $config->enabled) {
-            return false;
-        }
-
-        if ((int) $config->day_of_week !== $now->dayOfWeek) {
-            return false;
+            return null;
         }
 
         [$hour, $minute] = explode(':', $config->time ?: '15:00');
+        $scheduledSlot = $now->copy()->setTime((int) $hour, (int) $minute, 0);
+        $graceMinutes = (int) (($config->meta['grace_minutes'] ?? 15));
+        $graceMinutes = max(0, $graceMinutes);
+        $windowEnd = $scheduledSlot->copy()->addMinutes($graceMinutes);
 
-        return ((int) $hour === $now->hour) && ((int) $minute === $now->minute);
+        if ((int) $config->day_of_week !== $now->dayOfWeek) {
+            return null;
+        }
+
+        if ($now->lessThan($scheduledSlot) || $now->greaterThan($windowEnd)) {
+            return null;
+        }
+
+        return $scheduledSlot;
     }
 
     /**
@@ -103,15 +112,10 @@ class WeeklySubmissionReminderDispatcher
             return [];
         }
 
+        // Pull active users first, then evaluate permissions through hasPermissionTo()
+        // so both direct permissions and role-based permissions are supported.
         $users = User::query()
             ->where('status', 'active')
-            ->where(function ($query) {
-                $query->whereHas('permissions', function ($permissionQuery) {
-                    $permissionQuery->where('name', 'create weekly plan');
-                })->orWhereHas('permissions', function ($permissionQuery) {
-                    $permissionQuery->where('name', 'create weekly report');
-                });
-            })
             ->get();
 
         $targets = [];

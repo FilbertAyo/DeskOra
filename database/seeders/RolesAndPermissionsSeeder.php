@@ -31,6 +31,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view reports',
             'upload organization reports',
             'view settings',
+            'manage notifications',
             'users management settings',
             'update other settings',
             'approve final item purchase',
@@ -94,5 +95,10 @@ class RolesAndPermissionsSeeder extends Seeder
         User::query()
             ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
             ->each(fn (User $user) => $user->givePermissionTo($activityLogPerm));
+
+        $manageNotificationsPerm = Permission::findByName('manage notifications');
+        User::query()
+            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
+            ->each(fn (User $user) => $user->givePermissionTo($manageNotificationsPerm));
     }
 }

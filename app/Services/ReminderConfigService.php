@@ -22,7 +22,10 @@ class ReminderConfigService
                 'audience_rules' => ['permissions' => ['create weekly plan', 'create weekly report'], 'status' => 'active'],
                 'criteria_rules' => ['mode' => 'separate_per_activity'],
                 'template_key' => 'weekly_plan_report',
-                'meta' => ['description' => 'Reminder for staff missing weekly plan/report submissions.'],
+                'meta' => [
+                    'description' => 'Reminder for staff missing weekly plan/report submissions.',
+                    'grace_minutes' => 15,
+                ],
             ]
         );
     }

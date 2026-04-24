@@ -175,6 +175,9 @@ Route::middleware(['auth', 'permission:view reports'])->group(function () {
 
 Route::middleware(['auth', 'permission:view settings'])->group(function () {
     Route::get('/settings/notifications', [NotificationController::class, 'index'])->name('notification.index');
+});
+
+Route::middleware(['auth', 'permission:manage notifications'])->group(function () {
     Route::put('/settings/notifications/weekly-reminder', [NotificationController::class, 'updateWeeklyReminder'])
         ->name('notification.weekly-reminder.update');
 });
