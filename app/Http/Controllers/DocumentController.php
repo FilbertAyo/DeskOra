@@ -1597,6 +1597,12 @@ class DocumentController extends Controller
             ->take(52)
             ->get();
 
+        $financeTargetUsers = User::query()
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $currentBudgetEntryPeriod = WorkPeriod::getCurrent();
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
         return view('documents.reviewer.budget-weekly', [
@@ -1605,6 +1611,8 @@ class DocumentController extends Controller
             'stats' => $aggregateStats,
             'usersWithBudgets' => $usersWithBudgets,
             'periodOptions' => $periodOptions,
+            'financeTargetUsers' => $financeTargetUsers,
+            'currentBudgetEntryPeriod' => $currentBudgetEntryPeriod,
             'years' => $years,
             'statusFilter' => $statusFilter,
             'defaultPeriod' => $defaultPeriod,
@@ -1958,6 +1966,86 @@ class DocumentController extends Controller
         return redirect()
             ->back()
             ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
+    }
+
+    public function addMidWeekBudgetEntry(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (! $user->hasPermissionTo('process weekly budgets')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $validated = $request->validate([
+            'user_id' => ['required', 'string', 'exists:users,id'],
+            'period_id' => ['required', 'string', 'exists:work_periods,id'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $targetDocument = Document::query()
+            ->weeklyPlans()
+            ->submitted()
+            ->where('user_id', (string) $validated['user_id'])
+            ->where('period_id', (string) $validated['period_id'])
+            ->latest()
+            ->first();
+
+        if (! $targetDocument) {
+            return redirect()
+                ->back()
+                ->with('error', 'No submitted weekly plan found for the selected staff and work period.');
+        }
+
+        $content = is_array($targetDocument->content) ? $targetDocument->content : [];
+        $budgetRows = is_array($content['budget'] ?? null) ? $content['budget'] : [];
+        $budgetUid = (string) Str::ulid();
+        $amountNumeric = (float) $validated['amount'];
+
+        $budgetRows[] = [
+            'budget_uid' => $budgetUid,
+            'item' => 'Mid-week Budget',
+            'description_purpose' => trim((string) $validated['reason']),
+            'amount' => number_format($amountNumeric, 2, '.', ''),
+        ];
+        $content['budget'] = $budgetRows;
+
+        $existingReviews = is_array($targetDocument->budget_review_items) ? $targetDocument->budget_review_items : [];
+        $existingReviews[] = [
+            'budget_uid' => $budgetUid,
+            'decision' => Document::BUDGET_REVIEW_APPROVED,
+            'provided_amount' => $amountNumeric,
+            'note' => null,
+            'reviewed_by' => $user->id,
+            'reviewed_at' => now()->toIso8601String(),
+        ];
+
+        $targetDocument->content = $content;
+        $targetDocument->budget_review_items = $existingReviews;
+        $summary = $targetDocument->budgetReviewSummary();
+
+        $planStatus = Document::BUDGET_REVIEW_PENDING;
+        if ($summary['all_approved']) {
+            $planStatus = Document::BUDGET_REVIEW_APPROVED;
+        } elseif ($summary['all_rejected']) {
+            $planStatus = Document::BUDGET_REVIEW_REJECTED;
+        } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
+            $planStatus = Document::BUDGET_REVIEW_APPROVED;
+        }
+
+        $targetDocument->update([
+            'content' => $content,
+            'budget_review_items' => $existingReviews,
+            'budget_review_status' => $planStatus,
+            'budget_reviewed_by' => $user->id,
+            'budget_reviewed_at' => now(),
+            'budget_provided_amount' => $summary['provided_total'],
+            'budget_review_note' => null,
+        ]);
+
+        return redirect()
+            ->back()
+            ->with('success', 'Mid-week budget entry added successfully.');
     }
 
     /**

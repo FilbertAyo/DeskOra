@@ -112,6 +112,11 @@
                         </div>
                     </form>
                     <div class="d-flex flex-wrap gap-2 mt-2">
+                        @can('process weekly budgets')
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#midWeekBudgetEntryModal">
+                                <i class="ti ti-plus me-1"></i>Add Mid-Week Budget
+                            </button>
+                        @endcan
                         <a href="{{ route('documents.weekly-budget-review.export.pdf', request()->query()) }}" class="btn btn-sm btn-outline-danger">
                             <i class="ti ti-file-type-pdf me-1"></i>Download PDF
                         </a>
@@ -319,6 +324,56 @@
             @endif
         </div>
     </div>
+
+    @can('process weekly budgets')
+        <div class="modal fade" id="midWeekBudgetEntryModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <form method="POST" action="{{ route('documents.weekly-budget-review.add-midweek-budget') }}" class="modal-content">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Mid-Week Budget</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Staff</label>
+                            <select name="user_id" class="form-control" required>
+                                <option value="">Select staff</option>
+                                @foreach($financeTargetUsers as $targetUser)
+                                    <option value="{{ $targetUser->id }}">{{ $targetUser->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Work Period</label>
+                            <select name="period_id" class="form-control" required>
+                                @foreach($periodOptions as $periodOption)
+                                    <option
+                                        value="{{ $periodOption->id }}"
+                                        {{ ($currentBudgetEntryPeriod && $periodOption->id === $currentBudgetEntryPeriod->id) ? 'selected' : '' }}>
+                                        Week {{ $periodOption->week_number }} • {{ $periodOption->date_range }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">Defaults to current week.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label">Reason (What For)</label>
+                            <textarea name="reason" rows="3" class="form-control" maxlength="2000" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save Budget Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endcan
 
     @push('scripts')
         <script>

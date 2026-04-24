@@ -574,6 +574,108 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertStringContainsString('.xlsx', (string) $response->headers->get('content-disposition'));
     }
 
+    public function test_finance_can_add_midweek_budget_entry_as_direct_approved(): void
+    {
+        [$current] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $plan = $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Planned Item', 'description_purpose' => 'Planned', 'amount' => '100'],
+        ]);
+
+        $response = $this->actingAs($reviewer)->post(
+            route('documents.weekly-budget-review.add-midweek-budget'),
+            [
+                'user_id' => $staff->id,
+                'period_id' => $current->id,
+                'amount' => 250.50,
+                'reason' => 'Emergency printing materials',
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', 'Mid-week budget entry added successfully.');
+
+        $plan->refresh();
+        $budgetItems = $plan->budgetItems();
+        $this->assertCount(2, $budgetItems);
+        $newItem = collect($budgetItems)->firstWhere('item', 'Mid-week Budget');
+        $this->assertNotNull($newItem);
+        $this->assertSame('Emergency printing materials', $newItem['description_purpose']);
+        $this->assertEquals(250.5, (float) $newItem['amount_numeric']);
+
+        $reviewsByUid = $plan->budgetReviewItemsByUid();
+        $newReview = $reviewsByUid[$newItem['budget_uid']] ?? null;
+        $this->assertNotNull($newReview);
+        $this->assertSame(Document::BUDGET_REVIEW_APPROVED, $newReview['decision']);
+        $this->assertEquals(250.5, (float) $newReview['provided_amount']);
+    }
+
+    public function test_midweek_budget_entry_shows_in_selected_period_review_listing(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Current Week Planned', 'description_purpose' => 'Current', 'amount' => '100'],
+        ]);
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Next Week Planned', 'description_purpose' => 'Next', 'amount' => '100'],
+        ]);
+
+        $this->actingAs($reviewer)->post(
+            route('documents.weekly-budget-review.add-midweek-budget'),
+            [
+                'user_id' => $staff->id,
+                'period_id' => $current->id,
+                'amount' => 80,
+                'reason' => 'Urgent dispatch',
+            ]
+        );
+
+        $currentResponse = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review', [
+            'period_id' => $current->id,
+        ]));
+        $currentResponse->assertOk();
+        $currentResponse->assertSee('Mid-week Budget');
+
+        $nextResponse = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review', [
+            'period_id' => $next->id,
+        ]));
+        $nextResponse->assertOk();
+        $nextResponse->assertDontSee('Mid-week Budget');
+    }
+
+    public function test_unauthorized_user_cannot_add_midweek_budget_entry(): void
+    {
+        [$current] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+
+        $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Planned Item', 'description_purpose' => 'Planned', 'amount' => '100'],
+        ]);
+
+        /** @var User $unauthorizedUser */
+        $unauthorizedUser = User::factory()->create(['status' => 'active']);
+
+        $response = $this->actingAs($unauthorizedUser)->post(
+            route('documents.weekly-budget-review.add-midweek-budget'),
+            [
+                'user_id' => $staff->id,
+                'period_id' => $current->id,
+                'amount' => 25,
+                'reason' => 'Need',
+            ]
+        );
+
+        $response->assertForbidden();
+    }
+
     // ------------------------------------------------------------------
     // 5. Budget UID assignment on plan creation
     // ------------------------------------------------------------------
