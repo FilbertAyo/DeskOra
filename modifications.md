@@ -1,3 +1,0 @@
-since i have already configured emails on .env so i want to structure the reminder emails to the system so just design expansive emails/reminder to the staff about activities so leave room for the future email expansion so for now i want to start with plan , report reminders
-
-so every friday at 1500 all staffs with create plan and create report permission who do not submitt should be reminded to create report and plan on system OR Better approach since there is notification panel maybe you can put place on http://localhost:8000/settings/notifications to configure reminder and send automatically that time and make expandable since there are many reminder feauture are coming

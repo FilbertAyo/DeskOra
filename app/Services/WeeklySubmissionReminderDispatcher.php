@@ -10,7 +10,9 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Notifications\WeeklySubmissionReminderNotification;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class WeeklySubmissionReminderDispatcher
 {
@@ -55,22 +57,32 @@ class WeeklySubmissionReminderDispatcher
                 continue;
             }
 
-            $this->deliver($target['user'], $target['activity_type'], $target['activity_label'], $target['period_label'], $channels);
+            $delivery = $this->deliver(
+                $target['user'],
+                $target['activity_type'],
+                $target['activity_label'],
+                $target['period_label'],
+                $channels
+            );
 
-            ReminderDispatchLog::query()->create([
-                'reminder_config_id' => $config->id,
-                'user_id' => $target['user']->id,
-                'activity_type' => $target['activity_type'],
-                'window_key' => $windowKey,
-                'channels' => $channels,
-                'status' => 'sent',
-                'meta' => [
-                    'timezone' => $timezone,
-                    'triggered_at' => $now->toIso8601String(),
-                ],
-            ]);
+            if (! empty($delivery['delivered_channels'])) {
+                ReminderDispatchLog::query()->create([
+                    'reminder_config_id' => $config->id,
+                    'user_id' => $target['user']->id,
+                    'activity_type' => $target['activity_type'],
+                    'window_key' => $windowKey,
+                    'channels' => $channels,
+                    'status' => empty($delivery['failed_channels']) ? 'sent' : 'partially_sent',
+                    'meta' => [
+                        'timezone' => $timezone,
+                        'triggered_at' => $now->toIso8601String(),
+                        'delivered_channels' => $delivery['delivered_channels'],
+                        'failed_channels' => $delivery['failed_channels'],
+                    ],
+                ]);
 
-            $sent++;
+                $sent++;
+            }
         }
 
         return ['due' => true, 'sent' => $sent, 'targets' => count($targets)];
@@ -161,14 +173,46 @@ class WeeklySubmissionReminderDispatcher
         return $targets;
     }
 
-    private function deliver(User $user, string $activityType, string $activityLabel, string $periodLabel, array $channels): void
+    /**
+     * @return array{delivered_channels: array<int, string>, failed_channels: array<string, string>}
+     */
+    private function deliver(User $user, string $activityType, string $activityLabel, string $periodLabel, array $channels): array
     {
+        $deliveredChannels = [];
+        $failedChannels = [];
+
         if (in_array('in_app', $channels, true)) {
-            $user->notify(new WeeklySubmissionReminderNotification($activityType, $activityLabel, $periodLabel));
+            try {
+                $user->notify(new WeeklySubmissionReminderNotification($activityType, $activityLabel, $periodLabel));
+                $deliveredChannels[] = 'in_app';
+            } catch (Throwable $e) {
+                $failedChannels['in_app'] = $e->getMessage();
+                Log::error('Failed sending weekly reminder via in_app channel.', [
+                    'user_id' => $user->id,
+                    'activity_type' => $activityType,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         if (in_array('email', $channels, true) && ! empty($user->email)) {
-            Mail::to($user->email)->send(new WeeklySubmissionReminderMail($user->name, $activityLabel, $periodLabel));
+            try {
+                Mail::to($user->email)->send(new WeeklySubmissionReminderMail($user->name, $activityLabel, $periodLabel));
+                $deliveredChannels[] = 'email';
+            } catch (Throwable $e) {
+                $failedChannels['email'] = $e->getMessage();
+                Log::error('Failed sending weekly reminder via email channel.', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'activity_type' => $activityType,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
+
+        return [
+            'delivered_channels' => $deliveredChannels,
+            'failed_channels' => $failedChannels,
+        ];
     }
 }
