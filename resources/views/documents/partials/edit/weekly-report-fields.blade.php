@@ -26,6 +26,18 @@
                                             ->all()
                                         : [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
+                                    $targetAccomplishedRaw = old('target_accomplished');
+                                    if ($targetAccomplishedRaw === null) {
+                                        $targetAccomplishedRaw = $document->target_accomplished;
+                                    }
+                                    $targetAccomplishedValue = null;
+                                    if ($targetAccomplishedRaw !== null && $targetAccomplishedRaw !== '') {
+                                        if ($targetAccomplishedRaw === true || $targetAccomplishedRaw === 1 || $targetAccomplishedRaw === '1') {
+                                            $targetAccomplishedValue = '1';
+                                        } elseif ($targetAccomplishedRaw === false || $targetAccomplishedRaw === 0 || $targetAccomplishedRaw === '0') {
+                                            $targetAccomplishedValue = '0';
+                                        }
+                                    }
                                         @endphp
 
                                 <!-- Main Target Accomplishment -->
@@ -60,8 +72,8 @@
                                                 id="target_accomplished"
                                                 required>
                                                 <option value="">-- Select Status --</option>
-                                                <option value="1" {{ old('target_accomplished', $document->target_accomplished) === true || old('target_accomplished') === '1' ? 'selected' : '' }}>Yes, Completed</option>
-                                                <option value="0" {{ old('target_accomplished', $document->target_accomplished) === false || (old('target_accomplished') === '0' && $document->target_accomplished !== null) ? 'selected' : '' }}>No, Not Completed</option>
+                                                <option value="1" {{ $targetAccomplishedValue === '1' ? 'selected' : '' }}>Yes, Completed</option>
+                                                <option value="0" {{ $targetAccomplishedValue === '0' ? 'selected' : '' }}>No, Not Completed</option>
                                             </select>
                                             @error('target_accomplished')
                                                 <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -69,7 +81,7 @@
                                         </div>
 
                                             @php
-                                                $showTargetExplanation = (old('target_accomplished', $document->target_accomplished) === false || old('target_accomplished') === '0');
+                                                $showTargetExplanation = $targetAccomplishedValue === '0';
                                             @endphp
                                             <div class="mb-0" id="targetExplanationContainer" @if(!$showTargetExplanation) style="display:none;" @endif>
                                             <label for="target_explanation" class="form-label">

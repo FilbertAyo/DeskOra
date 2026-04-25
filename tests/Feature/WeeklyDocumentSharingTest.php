@@ -314,6 +314,32 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertTrue($pendingForDashboard);
     }
 
+    public function test_weekly_report_edit_prefills_target_accomplished_dropdown_for_zero_value(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly report']);
+
+        $report = Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Draft report',
+            'state' => Document::STATE_DRAFT,
+            'target_accomplished' => 0,
+            'target_explanation' => 'Pending dependencies',
+        ]);
+
+        $response = $this->actingAs($owner)->view('documents.partials.edit.weekly-report-fields', [
+            'document' => $report->load('sharedUsers'),
+            'shareableUsers' => collect(),
+            'errors' => new \Illuminate\Support\ViewErrorBag,
+        ]);
+
+        $response->assertSee('option value="0" selected', false);
+        $response->assertSeeText('Pending dependencies');
+    }
+
     private function createCurrentAndNextPeriods(): array
     {
         $current = WorkPeriod::create([
