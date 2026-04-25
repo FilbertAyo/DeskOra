@@ -166,10 +166,10 @@ class DocumentController extends Controller
                 // For weekly report, default to current week
                 $defaultPeriodId = $currentPeriod->id;
                 // Get the related plan for this period to show the main target
-                $relatedPlan = Document::where('user_id', $user->id)
-                    ->where('period_id', $currentPeriod->id)
-                    ->where('type', Document::TYPE_WEEKLY_PLAN)
-                    ->first();
+                $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
+                    $currentPeriod->id,
+                    (string) $user->id
+                );
             }
         }
 
@@ -260,8 +260,10 @@ class DocumentController extends Controller
         // Make period_id required for weekly plans and reports
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
             $validationRules['period_id'] = ['required', 'string', 'ulid', 'exists:work_periods,id'];
-            $validationRules['shared_user_ids'] = ['nullable', 'array'];
-            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            if ($request->type === Document::TYPE_WEEKLY_PLAN) {
+                $validationRules['shared_user_ids'] = ['nullable', 'array'];
+                $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            }
         } else {
             $validationRules['period_id'] = ['nullable', 'string', 'ulid', 'exists:work_periods,id'];
         }
@@ -340,12 +342,11 @@ class DocumentController extends Controller
 
         $action = $request->input('action', 'draft');
         $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
-        $sharedUserIds = $this->extractRequestedSharedUserIds($request);
+        $sharedUserIds = [];
 
-        if (Document::supportsSharedEditing($request->type)) {
+        if (Document::supportsSharedEditing($request->type) && $request->type !== Document::TYPE_WEEKLY_REPORT) {
+            $sharedUserIds = $this->extractRequestedSharedUserIds($request);
             $sharedUserIds = $this->validateSharedMembersWithinDepartment($user, $sharedUserIds);
-        } else {
-            $sharedUserIds = [];
         }
 
         // Normalize and trim template payload to avoid storing empty rows.
@@ -424,6 +425,11 @@ class DocumentController extends Controller
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'This work period is closed. Please contact your administrator.');
+        }
+
+        if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+            $sharedUserIds = $this->weeklyReportSharedUserIdsFromPlanContext($user, $period?->id);
+            $sharedUserIds = $this->validateSharedMembersWithinDepartment($user, $sharedUserIds);
         }
 
         // Check if document already exists for this user, period/month/year, and type
@@ -711,9 +717,9 @@ class DocumentController extends Controller
                     (string) $document->user_id
                 );
             } elseif ($document->type === Document::TYPE_WEEKLY_REPORT) {
-                $relatedDocument = Document::findWeeklyPlanForPeriodOwner(
+                $relatedDocument = Document::findWeeklyPlanForUserAndPeriod(
                     $document->period_id,
-                    (string) $document->user_id
+                    (string) Auth::id()
                 );
             }
 
@@ -859,8 +865,6 @@ class DocumentController extends Controller
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             $validationRules['target_accomplished'] = ['nullable', 'boolean'];
             $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['shared_user_ids'] = ['nullable', 'array'];
-            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
 
             $validationRules['content.summary'] = ['nullable', 'string', 'max:5000'];
 
@@ -898,10 +902,16 @@ class DocumentController extends Controller
 
         $action = $request->input('action', 'draft');
         $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
-        $sharedUserIds = $this->extractRequestedSharedUserIds($request);
+        $sharedUserIds = [];
 
         if (Document::supportsSharedEditing($document->type)) {
-            $sharedUserIds = $this->validateSharedMembersWithinDepartment($document->user, $sharedUserIds);
+            if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+                $sharedUserIds = $this->weeklyReportSharedUserIdsFromPlanContext($actingUser, $document->period_id);
+                $sharedUserIds = $this->validateSharedMembersWithinDepartment($document->user, $sharedUserIds);
+            } else {
+                $sharedUserIds = $this->extractRequestedSharedUserIds($request);
+                $sharedUserIds = $this->validateSharedMembersWithinDepartment($document->user, $sharedUserIds);
+            }
             $conflictMessage = $this->firstCollaborationConflictMessage(
                 $document->period_id,
                 $document->type,
@@ -1410,13 +1420,7 @@ class DocumentController extends Controller
             return response()->json(['error' => 'Period ID is required'], 400);
         }
 
-        $plan = Document::query()
-            ->forOwnerOrSharedUser($user->id)
-            ->where('period_id', $periodId)
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [Document::STATE_SUBMITTED])
-            ->latest('id')
-            ->first();
+        $plan = Document::findWeeklyPlanForUserAndPeriod($periodId, (string) $user->id);
 
         if ($plan) {
             $budgetItems = [];
@@ -2146,6 +2150,26 @@ class DocumentController extends Controller
             ->where('id', '!=', $owner->id)
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function weeklyReportSharedUserIdsFromPlanContext(User $actingUser, ?string $periodId): array
+    {
+        if (! $periodId) {
+            return [];
+        }
+
+        $plan = Document::findWeeklyPlanForUserAndPeriod($periodId, (string) $actingUser->id);
+        if (! $plan) {
+            return [];
+        }
+
+        return array_values(array_unique(array_map(
+            static fn ($id) => (string) $id,
+            $plan->allEditableUserIds()
+        )));
     }
 
     /**

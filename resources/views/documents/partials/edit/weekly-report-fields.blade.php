@@ -5,10 +5,10 @@
                                     $keyAchievements = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
                                     $challengesMitigation = $content['challenges_mitigation'] ?? [];
 
-                                            $relatedPlan = \App\Models\Document::where('user_id', $document->user_id)
-                                                ->where('period_id', $document->period_id)
-                                                ->where('type', 'weekly_plan')
-                                                ->first();
+                                            $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
+                                                $document->period_id,
+                                                (string) auth()->id()
+                                            );
                                     $planBudget = is_array($relatedPlan?->content ?? null) ? ($relatedPlan->content['budget'] ?? []) : [];
                                     $planActivities = is_array($relatedPlan?->content ?? null)
                                         ? collect($relatedPlan->content['planned_activities'] ?? [])
@@ -27,32 +27,6 @@
                                         : [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
                                         @endphp
-
-                                <div class="col-12 mb-3">
-                                    <div class="card border-primary-subtle">
-                                        <div class="card-header bg-white border-bottom">
-                                            <h6 class="mb-0"><i class="ti ti-users-group me-2"></i>Collaboration</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            @php
-                                                $selectedSharedUsers = old('shared_user_ids', $document->sharedUsers->pluck('id')->all());
-                                                if (!is_array($selectedSharedUsers)) $selectedSharedUsers = [];
-                                            @endphp
-                                            <label for="shared_user_ids" class="form-label">Shared staff (same department)</label>
-                                            <select class="form-select @error('shared_user_ids') is-invalid @enderror" id="shared_user_ids" name="shared_user_ids[]" multiple>
-                                                @foreach(($shareableUsers ?? collect()) as $shareUser)
-                                                    <option value="{{ $shareUser->id }}" {{ in_array((string)$shareUser->id, array_map('strval', $selectedSharedUsers), true) ? 'selected' : '' }}>
-                                                        {{ $shareUser->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                            @error('shared_user_ids')
-                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                            @enderror
-                                            <small class="form-text text-muted">Remove staff from this list to unmerge them from this weekly report.</small>
-                                        </div>
-                                    </div>
-                                </div>
 
                                 <!-- Main Target Accomplishment -->
                                 <div class="col-12 mb-3">

@@ -325,6 +325,20 @@ class Document extends Model
     }
 
     /**
+     * Weekly plan for the same period that the user either owns or is shared on (submitted preferred).
+     */
+    public static function findWeeklyPlanForUserAndPeriod(string $periodId, string $userId): ?Document
+    {
+        return static::query()
+            ->forOwnerOrSharedUser($userId)
+            ->where('period_id', $periodId)
+            ->where('type', self::TYPE_WEEKLY_PLAN)
+            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Weekly report for the same period and owning user (submitted preferred).
      */
     public static function findWeeklyReportForPeriodOwner(string $periodId, string $ownerUserId): ?Document

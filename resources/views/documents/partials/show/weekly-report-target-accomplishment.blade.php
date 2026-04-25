@@ -4,10 +4,10 @@
         <div class="col-12">
             <!-- Weekly Report: Show Plan's Main Target and Accomplishment Status -->
             @php
-                $relatedPlan = \App\Models\Document::where('user_id', $document->user_id)
-                    ->where('period_id', $document->period_id)
-                    ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
-                    ->first();
+                $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
+                    $document->period_id,
+                    (string) auth()->id()
+                );
             @endphp
             
             <div class="card shadow-none border border-info">

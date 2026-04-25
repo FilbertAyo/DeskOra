@@ -46,17 +46,26 @@ class WeeklyDocumentSharingTest extends TestCase
         ]);
     }
 
-    public function test_owner_can_share_weekly_report_with_same_department_staff(): void
+    public function test_weekly_report_inherits_collaborators_from_weekly_plan(): void
     {
         [$currentPeriod] = $this->createCurrentAndNextPeriods();
         $department = Department::create(['name' => 'Operations']);
         $owner = $this->createUserInDepartment($department, ['create weekly report']);
         $member = $this->createUserInDepartment($department);
 
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'main_target' => 'Shared weekly plan target',
+            'title' => 'Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $plan->sharedUsers()->sync([$member->id]);
+
         $response = $this->actingAs($owner)->post(route('documents.store'), [
             'type' => Document::TYPE_WEEKLY_REPORT,
             'period_id' => $currentPeriod->id,
-            'shared_user_ids' => [$member->id],
         ]);
 
         $response->assertRedirect();
@@ -66,6 +75,83 @@ class WeeklyDocumentSharingTest extends TestCase
             'document_id' => $document->id,
             'user_id' => $member->id,
         ]);
+    }
+
+    public function test_weekly_report_ignores_manual_collaborator_payload_and_uses_plan_group(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Operations']);
+        $owner = $this->createUserInDepartment($department, ['create weekly report', 'create weekly plan']);
+        $planCollaborator = $this->createUserInDepartment($department);
+        $manualPayloadCollaborator = $this->createUserInDepartment($department);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'main_target' => 'Shared weekly plan target',
+            'title' => 'Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $plan->sharedUsers()->sync([$planCollaborator->id]);
+
+        $response = $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'shared_user_ids' => [$manualPayloadCollaborator->id],
+        ]);
+
+        $response->assertRedirect();
+        $document = Document::query()->where('user_id', $owner->id)->where('type', Document::TYPE_WEEKLY_REPORT)->firstOrFail();
+
+        $this->assertDatabaseHas('document_user_shares', [
+            'document_id' => $document->id,
+            'user_id' => $planCollaborator->id,
+        ]);
+        $this->assertDatabaseMissing('document_user_shares', [
+            'document_id' => $document->id,
+            'user_id' => $manualPayloadCollaborator->id,
+        ]);
+    }
+
+    public function test_collaborator_can_edit_weekly_report_draft_without_missing_plan_message(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $collaborator = $this->createUserInDepartment($department, ['create weekly report']);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'main_target' => 'Shared target for collaborators',
+            'title' => 'Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $plan->sharedUsers()->sync([$collaborator->id]);
+
+        $this->actingAs($collaborator)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'action' => 'draft',
+        ]);
+
+        $report = Document::query()
+            ->where('user_id', $collaborator->id)
+            ->where('type', Document::TYPE_WEEKLY_REPORT)
+            ->firstOrFail();
+
+        $this->assertSame(Document::STATE_DRAFT, $report->state);
+        $this->assertTrue($collaborator->can('update', $report));
+
+        $response = $this->actingAs($collaborator)->view('documents.partials.edit.weekly-report-fields', [
+            'document' => $report->load('sharedUsers'),
+            'shareableUsers' => collect(),
+            'errors' => new \Illuminate\Support\ViewErrorBag,
+        ]);
+        $response->assertDontSeeText('No weekly plan found for this work period.');
+        $response->assertSeeText('Shared target for collaborators');
     }
 
     public function test_cross_department_share_is_rejected(): void

@@ -198,9 +198,9 @@
                                                     @endif
                                                     @if($document->period)
                                                         @php
-                                                            $relatedPlan = \App\Models\Document::findWeeklyPlanForPeriodOwner(
+                                                            $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
                                                                 $document->period_id,
-                                                                (string) $document->user_id
+                                                                (string) auth()->id()
                                                             );
                                                         @endphp
                                                         @if($relatedPlan)
