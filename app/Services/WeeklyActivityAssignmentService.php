@@ -115,9 +115,28 @@ class WeeklyActivityAssignmentService
      */
     public function assignmentsForUser(string $userId, ?string $periodId = null): Collection
     {
+        return $this->assignmentsForUsers([$userId], $periodId);
+    }
+
+    /**
+     * @param  array<int, string>  $userIds
+     * @return Collection<int, WeeklyActivityAssignment>
+     */
+    public function assignmentsForUsers(array $userIds, ?string $periodId = null): Collection
+    {
+        $normalizedUserIds = collect($userIds)
+            ->map(static fn ($id) => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($normalizedUserIds->isEmpty()) {
+            return collect();
+        }
+
         $query = WeeklyActivityAssignment::query()
-            ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id'])
-            ->where('assignee_user_id', $userId)
+            ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id', 'assignee:id,name'])
+            ->whereIn('assignee_user_id', $normalizedUserIds->all())
             ->whereColumn('source_user_id', '!=', 'assignee_user_id')
             ->orderByDesc('updated_at');
 

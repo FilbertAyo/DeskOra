@@ -802,7 +802,14 @@ class DocumentController extends Controller
 
         $assignedWeeklyActivities = collect();
         if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
-            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) $document->user_id, (string) $document->period_id);
+            $document->loadMissing('sharedUsers:id');
+            $planParticipantIds = collect($document->allEditableUserIds())
+                ->map(static fn ($id) => (string) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
         return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities'));
@@ -867,7 +874,14 @@ class DocumentController extends Controller
         $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
         $assignedWeeklyActivities = collect();
         if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
-            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) $document->user_id, (string) $document->period_id);
+            $document->loadMissing('sharedUsers:id');
+            $planParticipantIds = collect($document->allEditableUserIds())
+                ->map(static fn ($id) => (string) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
         return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities'));

@@ -14,6 +14,11 @@
     $assignmentSubtitle = $isAssignedToCurrentUser
         ? 'Tasks from shared weekly plans where another staff member assigned you'
         : 'Tasks from shared weekly plans where another staff member assigned '.($assignmentOwner->name ?? 'this staff member');
+    $hasMultipleAssignees = $assignedRows
+        ->pluck('assignee_user_id')
+        ->filter()
+        ->unique()
+        ->count() > 1;
 @endphp
 
 @if($assignedRows->isNotEmpty())
@@ -32,6 +37,9 @@
                                 <th style="width: 100px;">Day</th>
                                 <th>Activity</th>
                                 <th style="width: 120px;">Location</th>
+                                @if($hasMultipleAssignees)
+                                    <th style="width: 170px;">Assigned To</th>
+                                @endif
                                 <th>From</th>
                                 <th style="width: 120px;">Plan</th>
                             </tr>
@@ -57,6 +65,9 @@
                                         @endif
                                     </td>
                                     <td>{{ $payload['location'] ?? '-' }}</td>
+                                    @if($hasMultipleAssignees)
+                                        <td>{{ $assignment->assignee->name ?? '-' }}</td>
+                                    @endif
                                     <td>{{ $assignment->sourceUser->name ?? '-' }}</td>
                                     <td>
                                         <a href="{{ route('documents.show', $assignment->source_document_id) }}" class="btn btn-sm btn-outline-info">

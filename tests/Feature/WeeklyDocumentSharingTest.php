@@ -636,6 +636,56 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertSame('From owner plan', data_get($rows->first()->activity_payload, 'activity'));
     }
 
+    public function test_shared_plan_participants_receive_external_assignments_in_combined_lookup(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $raiyanu = $this->createUserInDepartment($department, ['create weekly plan']);
+        $maria = $this->createUserInDepartment($department, ['create weekly plan']);
+        $theopista = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $sharedPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $raiyanu->id,
+            'title' => 'Raiyanu + Maria plan',
+            'main_target' => 'Shared target',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['planned_activities' => []],
+        ]);
+        $sharedPlan->sharedUsers()->sync([$maria->id]);
+
+        $theopistaPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $theopista->id,
+            'title' => 'Theopista plan',
+            'main_target' => 'External target',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'day' => 'Wednesday',
+                        'activity' => 'External assignment to Maria',
+                        'location' => 'Field',
+                        'team_member_ids' => [$maria->id],
+                        'notes_inclusion' => 'Assigned outside shared plan',
+                    ],
+                ],
+            ],
+        ]);
+        app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($theopistaPlan->fresh());
+
+        $participantIds = $sharedPlan->allEditableUserIds();
+        $rows = app(WeeklyActivityAssignmentService::class)
+            ->assignmentsForUsers($participantIds, (string) $nextPeriod->id);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame((string) $maria->id, (string) $rows->first()->assignee_user_id);
+        $this->assertSame('External assignment to Maria', data_get($rows->first()->activity_payload, 'activity'));
+    }
+
     public function test_assigned_user_gets_projection_even_when_not_shared_collaborator(): void
     {
         [, $nextPeriod] = $this->createCurrentAndNextPeriods();
