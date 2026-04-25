@@ -116,15 +116,41 @@
                             $docCollection = $documents->getCollection();
                             $weeklyDocs = $docCollection->whereIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
                             $otherDocs = $docCollection->whereNotIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
-                            $weeklyRows = $weeklyDocs->groupBy(fn($doc) => ($doc->period_id ?? 'none') . '_' . ($doc->user_id ?? 'none'))
+                            $weeklyRows = $weeklyDocs->groupBy(function ($doc) {
+                                $participantIds = collect([$doc->user_id])
+                                    ->merge($doc->sharedUsers->pluck('id'))
+                                    ->filter()
+                                    ->map(fn ($id) => (string) $id)
+                                    ->unique()
+                                    ->sort()
+                                    ->values();
+
+                                return ($doc->period_id ?? 'none') . '_' . $participantIds->implode('_');
+                            })
                                 ->map(function ($items) {
-                                    $plan = $items->firstWhere('type', \App\Models\Document::TYPE_WEEKLY_PLAN);
-                                    $report = $items->firstWhere('type', \App\Models\Document::TYPE_WEEKLY_REPORT);
+                                    $pickPreferred = function ($rows, $type) {
+                                        $typedRows = $rows
+                                            ->where('type', $type)
+                                            ->sortByDesc(fn ($row) => $row->updated_at?->timestamp ?? 0)
+                                            ->values();
+
+                                        return $typedRows->firstWhere('state', \App\Models\Document::STATE_SUBMITTED)
+                                            ?? $typedRows->first();
+                                    };
+
+                                    $plan = $pickPreferred($items, \App\Models\Document::TYPE_WEEKLY_PLAN);
+                                    $report = $pickPreferred($items, \App\Models\Document::TYPE_WEEKLY_REPORT);
+                                    $participants = $items
+                                        ->flatMap(fn ($row) => collect([$row->user])->merge($row->sharedUsers))
+                                        ->filter()
+                                        ->unique('id')
+                                        ->values();
+
                                     return [
                                         'plan' => $plan,
                                         'report' => $report,
                                         'period' => $plan?->period ?? $report?->period,
-                                        'user' => $plan?->user ?? $report?->user,
+                                        'participants' => $participants,
                                         'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
                                     ];
                                 })
@@ -138,7 +164,7 @@
                                         <tr>
                                             <th class="text-center" style="width: 50px;">No.</th>
                                             <th>Week Period</th>
-                                            <th>Author</th>
+                                            <th>Staff</th>
                                             <th>Weekly Plan</th>
                                             <th>Weekly Report</th>
                                             <th>Last Updated</th>
@@ -163,8 +189,8 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    @if($row['user'])
-                                                       {{ $row['user']->name }}
+                                                    @if(($row['participants'] ?? collect())->isNotEmpty())
+                                                       {{ $row['participants']->pluck('name')->implode(', ') }}
                                                     @else
                                                         <span class="text-muted">-</span>
                                                     @endif

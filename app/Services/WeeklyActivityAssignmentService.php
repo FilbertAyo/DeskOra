@@ -17,12 +17,6 @@ class WeeklyActivityAssignmentService
 
         $weeklyPlan->loadMissing(['user', 'sharedUsers:id']);
 
-        $collaboratorIds = collect($weeklyPlan->allEditableUserIds())
-            ->map(static fn ($id) => (string) $id)
-            ->filter()
-            ->unique()
-            ->values();
-
         $status = $weeklyPlan->isSubmitted()
             ? WeeklyActivityAssignment::STATUS_LOCKED
             : WeeklyActivityAssignment::STATUS_PREVIEW;
@@ -61,7 +55,6 @@ class WeeklyActivityAssignmentService
         $desiredRows = [];
         foreach ($activities as $activity) {
             $assigneeIds = collect($activity['team_member_ids'])
-                ->intersect($collaboratorIds)
                 ->values();
 
             foreach ($assigneeIds as $assigneeId) {

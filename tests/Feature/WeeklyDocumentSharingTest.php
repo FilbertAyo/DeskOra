@@ -636,7 +636,7 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertSame('From owner plan', data_get($rows->first()->activity_payload, 'activity'));
     }
 
-    public function test_non_assigned_user_does_not_get_assignment_projection(): void
+    public function test_assigned_user_gets_projection_even_when_not_shared_collaborator(): void
     {
         [, $nextPeriod] = $this->createCurrentAndNextPeriods();
         $department = Department::create(['name' => 'Programs']);
@@ -665,7 +665,7 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertDatabaseHas('weekly_activity_assignments', [
             'assignee_user_id' => $member->id,
         ]);
-        $this->assertDatabaseMissing('weekly_activity_assignments', [
+        $this->assertDatabaseHas('weekly_activity_assignments', [
             'assignee_user_id' => $outsider->id,
         ]);
     }
