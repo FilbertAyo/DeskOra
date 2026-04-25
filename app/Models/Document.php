@@ -396,6 +396,36 @@ class Document extends Model
     }
 
     /**
+     * Include documents the user owns/shares directly, plus weekly reports
+     * connected to weekly plans the user collaborates on.
+     */
+    public function scopeForOwnerSharedOrPlanCollaboratorOnWeeklyReport($query, string $userId)
+    {
+        return $query->where(function ($nested) use ($userId) {
+            $nested->forOwnerOrSharedUser($userId)
+                ->orWhere(function ($weeklyReportAccess) use ($userId) {
+                    $weeklyReportAccess
+                        ->where('type', self::TYPE_WEEKLY_REPORT)
+                        ->whereExists(function ($planQuery) use ($userId) {
+                            $planQuery->selectRaw('1')
+                                ->from('documents as weekly_plans')
+                                ->whereColumn('weekly_plans.period_id', 'documents.period_id')
+                                ->where('weekly_plans.type', self::TYPE_WEEKLY_PLAN)
+                                ->where(function ($planAccess) use ($userId) {
+                                    $planAccess->where('weekly_plans.user_id', $userId)
+                                        ->orWhereExists(function ($planShares) use ($userId) {
+                                            $planShares->selectRaw('1')
+                                                ->from('document_user_shares as weekly_plan_shares')
+                                                ->whereColumn('weekly_plan_shares.document_id', 'weekly_plans.id')
+                                                ->where('weekly_plan_shares.user_id', $userId);
+                                        });
+                                });
+                        });
+                });
+        });
+    }
+
+    /**
      * Scope: Get only draft documents
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query

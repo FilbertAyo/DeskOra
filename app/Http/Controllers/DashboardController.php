@@ -172,9 +172,12 @@ class DashboardController extends Controller
         $dashboardAvailableTypes = Document::getAvailableTypesForUser($user);
 
         // Get pending document counts by type
-        $pendingDocuments = Document::forOwnerOrSharedUser($user->id)
+        $pendingDocuments = Document::query()
+            ->with(['sharedUsers:id,name'])
+            ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
             ->drafts()
             ->get();
+        $pendingDocuments = $this->withEffectiveWeeklyReportCollaborators($pendingDocuments, $user);
 
         $dashboardPendingDocs = [
             'weekly_plan' => $pendingDocuments->where('type', Document::TYPE_WEEKLY_PLAN)->count(),
@@ -201,16 +204,19 @@ class DashboardController extends Controller
                 ->get();
 
             $allDocuments = Document::query()
-                ->forOwnerOrSharedUser($user->id)
+                ->with(['sharedUsers:id,name'])
+                ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
                 ->latest()
                 ->get();
+            $allDocuments = $this->withEffectiveWeeklyReportCollaborators($allDocuments, $user);
 
             $timelinePeriods = WorkPeriod::orderBy('year', 'desc')
                 ->orderBy('week_number', 'desc')
                 ->take(6)
                 ->get();
             $timelineDocs = Document::query()
-                ->forOwnerOrSharedUser($user->id)
+                ->with(['sharedUsers:id,name'])
+                ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
                 ->whereIn('period_id', $timelinePeriods->pluck('id'))
                 ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
                 ->get()
@@ -257,9 +263,8 @@ class DashboardController extends Controller
 
         $sharedWithMeCount = Document::query()
             ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
-            ->whereHas('sharedUsers', function ($sharedUsers) use ($user) {
-                $sharedUsers->where('users.id', $user->id);
-            })
+            ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
+            ->where('user_id', '!=', $user->id)
             ->count();
 
         $collaborationEvents = DB::table('document_share_events as dse')
@@ -331,6 +336,29 @@ class DashboardController extends Controller
             'weeklyDashboardData',
             'actionLogProgress'
         ));
+    }
+
+    private function withEffectiveWeeklyReportCollaborators($documents, User $viewer)
+    {
+        return collect($documents)->map(function (Document $document) use ($viewer) {
+            $effectiveSharedUsers = $document->sharedUsers ?? collect();
+
+            if ($document->type === Document::TYPE_WEEKLY_REPORT && $effectiveSharedUsers->isEmpty() && $document->period_id) {
+                $relatedPlan = Document::findWeeklyPlanForUserAndPeriod($document->period_id, (string) $viewer->id);
+                if ($relatedPlan) {
+                    $relatedPlan->loadMissing(['user:id,name', 'sharedUsers:id,name']);
+                    $effectiveSharedUsers = $relatedPlan->sharedUsers
+                        ->push($relatedPlan->user)
+                        ->filter(fn ($member) => $member && (string) $member->id !== (string) $document->user_id)
+                        ->unique('id')
+                        ->values();
+                }
+            }
+
+            $document->setRelation('effectiveSharedUsers', $effectiveSharedUsers);
+
+            return $document;
+        });
     }
 
     private function buildActionLogProgressForUser(User $user): array

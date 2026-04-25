@@ -244,6 +244,76 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertTrue(Document::query()->forOwnerOrSharedUser($member->id)->whereKey($document->id)->exists());
     }
 
+    public function test_legacy_weekly_report_is_accessible_through_shared_plan_scope(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $planOwner = $this->createUserInDepartment($department, ['create weekly plan', 'create weekly report']);
+        $reportAuthor = $this->createUserInDepartment($department, ['create weekly report']);
+        $otherCollaborator = $this->createUserInDepartment($department);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $planOwner->id,
+            'main_target' => 'Shared plan target',
+            'title' => 'Shared Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $plan->sharedUsers()->sync([$reportAuthor->id, $otherCollaborator->id]);
+
+        $report = Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $reportAuthor->id,
+            'title' => 'Legacy shared report draft',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $isVisibleInWeeklyReportScope = Document::query()
+            ->ofType(Document::TYPE_WEEKLY_REPORT)
+            ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($planOwner->id)
+            ->whereKey($report->id)
+            ->exists();
+
+        $this->assertTrue($isVisibleInWeeklyReportScope);
+    }
+
+    public function test_dashboard_pending_documents_include_shared_plan_weekly_report_drafts(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $planOwner = $this->createUserInDepartment($department, ['create weekly plan', 'create weekly report']);
+        $reportAuthor = $this->createUserInDepartment($department, ['create weekly report']);
+        $otherCollaborator = $this->createUserInDepartment($department);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $planOwner->id,
+            'main_target' => 'Shared plan target',
+            'title' => 'Shared Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $plan->sharedUsers()->sync([$reportAuthor->id, $otherCollaborator->id]);
+
+        $report = Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $reportAuthor->id,
+            'title' => 'Focus shared report draft',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $pendingForDashboard = Document::query()
+            ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($planOwner->id)
+            ->drafts()
+            ->whereKey($report->id)
+            ->exists();
+
+        $this->assertTrue($pendingForDashboard);
+    }
+
     private function createCurrentAndNextPeriods(): array
     {
         $current = WorkPeriod::create([

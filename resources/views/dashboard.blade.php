@@ -268,12 +268,22 @@
                         <div class="mb-3">
                             <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>
                             @foreach($returnedDocs->take(3) as $doc)
+                                @php
+                                    $docSharedUsers = $doc->relationLoaded('effectiveSharedUsers')
+                                        ? $doc->getRelation('effectiveSharedUsers')
+                                        : $doc->sharedUsers;
+                                @endphp
                                 <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
                                     <div>
                                         <strong>{{ $doc->display_title }}</strong>
                                         <div class="small text-muted">
                                             {{ $doc->type_name }} • Updated {{ $doc->updated_at?->diffForHumans() }}
                                         </div>
+                                        @if(($doc->type ?? null) === \App\Models\Document::TYPE_WEEKLY_REPORT && $docSharedUsers->isNotEmpty())
+                                            <div class="small text-info">
+                                                Shared with: {{ $docSharedUsers->pluck('name')->join(', ') }}
+                                            </div>
+                                        @endif
                                     </div>
                                     <div class="d-flex gap-2">
                                         <a href="{{ $focusTaskShowRoute($doc) }}" class="btn btn-sm btn-outline-secondary">View</a>
@@ -288,10 +298,20 @@
                         <div class="mb-3">
                             <h6 class="text-warning mb-2"><i class="ti ti-file-edit me-1"></i>Drafts To Finalize</h6>
                             @foreach($plainDraftDocs->take(3) as $doc)
+                                @php
+                                    $docSharedUsers = $doc->relationLoaded('effectiveSharedUsers')
+                                        ? $doc->getRelation('effectiveSharedUsers')
+                                        : $doc->sharedUsers;
+                                @endphp
                                 <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
                                     <div>
                                         <strong>{{ $doc->display_title }}</strong>
                                         <div class="small text-muted">{{ $doc->type_name }} • Created {{ $doc->created_at?->format('M d, Y') }}</div>
+                                        @if(($doc->type ?? null) === \App\Models\Document::TYPE_WEEKLY_REPORT && $docSharedUsers->isNotEmpty())
+                                            <div class="small text-info">
+                                                Shared with: {{ $docSharedUsers->pluck('name')->join(', ') }}
+                                            </div>
+                                        @endif
                                     </div>
                                     <a href="{{ $focusTaskEditRoute($doc) }}" class="btn btn-sm btn-warning text-dark">Continue</a>
                                 </div>

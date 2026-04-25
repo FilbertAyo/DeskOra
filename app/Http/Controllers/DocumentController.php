@@ -1505,7 +1505,7 @@ class DocumentController extends Controller
 
         // Users with 'view all documents' permission can see all documents, others see only their own
         if (! $user->hasPermissionTo('view all documents')) {
-            $query->forOwnerOrSharedUser($user->id);
+            $query->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id);
         }
 
         // Get current period for defaults
@@ -1534,6 +1534,9 @@ class DocumentController extends Controller
 
         $this->applyWeeklyListSortForUser($query, $user);
         $documents = $query->paginate(15)->withQueryString();
+        $documents->setCollection(
+            $this->withEffectiveWeeklyReportCollaborators($documents->getCollection(), $user)
+        );
         $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
             $documents->getCollection()->pluck('id')->all()
         );
@@ -2137,6 +2140,29 @@ class DocumentController extends Controller
         'Deferred',
         'Not applicable',
     ];
+
+    private function withEffectiveWeeklyReportCollaborators($documents, User $viewer)
+    {
+        return collect($documents)->map(function (Document $document) use ($viewer) {
+            $effectiveSharedUsers = $document->sharedUsers;
+
+            if ($document->type === Document::TYPE_WEEKLY_REPORT && $effectiveSharedUsers->isEmpty() && $document->period_id) {
+                $relatedPlan = Document::findWeeklyPlanForUserAndPeriod($document->period_id, (string) $viewer->id);
+                if ($relatedPlan) {
+                    $relatedPlan->loadMissing(['user:id,name', 'sharedUsers:id,name']);
+                    $effectiveSharedUsers = $relatedPlan->sharedUsers
+                        ->push($relatedPlan->user)
+                        ->filter(fn ($member) => $member && (string) $member->id !== (string) $document->user_id)
+                        ->unique('id')
+                        ->values();
+                }
+            }
+
+            $document->setRelation('effectiveSharedUsers', $effectiveSharedUsers);
+
+            return $document;
+        });
+    }
 
     private function shareableDepartmentUsersFor(User $owner)
     {

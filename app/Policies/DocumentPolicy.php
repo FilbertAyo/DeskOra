@@ -338,6 +338,19 @@ class DocumentPolicy
             return false;
         }
 
-        return $document->isSharedWith($user->id);
+        if ($document->isSharedWith($user->id)) {
+            return true;
+        }
+
+        if ($document->type !== Document::TYPE_WEEKLY_REPORT || ! $document->period_id) {
+            return false;
+        }
+
+        $relatedPlan = Document::findWeeklyPlanForUserAndPeriod($document->period_id, (string) $user->id);
+        if (! $relatedPlan) {
+            return false;
+        }
+
+        return in_array((string) $document->user_id, $relatedPlan->allEditableUserIds(), true);
     }
 }

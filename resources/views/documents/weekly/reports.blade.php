@@ -121,11 +121,16 @@
                                 </thead>
                                 <tbody>
                                     @foreach($documents as $document)
+                                        @php
+                                            $sharedUsersForDisplay = $document->relationLoaded('effectiveSharedUsers')
+                                                ? $document->getRelation('effectiveSharedUsers')
+                                                : $document->sharedUsers;
+                                        @endphp
                                         <tr>
                                             <td class="text-center">{{ ($documents->currentPage() - 1) * $documents->perPage() + $loop->iteration }}</td>
                                             <td>
                                                 <strong>{{ $document->display_title }}</strong>
-                                                @if($document->sharedUsers->isNotEmpty())
+                                                @if($sharedUsersForDisplay->isNotEmpty())
                                                     <div class="mt-1">
                                                         @if((string) auth()->id() === (string) $document->user_id)
                                                             <span class="badge bg-light-primary text-primary">Owner (Shared)</span>
