@@ -389,15 +389,17 @@ class DashboardController extends Controller
             ];
         }
 
-        // Keep one document per period: submitted first, otherwise latest draft.
+        // Keep one document per period: prefer the latest updated record,
+        // and break ties toward drafts so in-progress staff updates are reflected.
         $selectedByPeriod = $documents
             ->groupBy('period_id')
             ->map(function ($periodDocs) {
                 return $periodDocs
                     ->sortByDesc(function ($doc) {
-                        $isSubmitted = $doc->state === Document::STATE_SUBMITTED ? 1 : 0;
+                        $isDraft = $doc->state === Document::STATE_DRAFT ? 1 : 0;
+                        $updatedAt = optional($doc->updated_at)->timestamp ?? 0;
 
-                        return [$isSubmitted, $doc->id];
+                        return [$updatedAt, $isDraft, $doc->id];
                     })
                     ->first();
             })
@@ -474,7 +476,15 @@ class DashboardController extends Controller
                     'history' => $history->all(),
                 ];
             })
-            ->filter(fn ($row) => $row && ($row['latest_progress'] ?? 'Not Started') !== 'Done')
+            ->filter(function ($row) {
+                if (! $row) {
+                    return false;
+                }
+
+                $latestProgress = trim((string) ($row['latest_progress'] ?? 'Not Started'));
+
+                return ! in_array($latestProgress, ['Done', 'Cancelled'], true);
+            })
             ->sortBy('task')
             ->values()
             ->all();

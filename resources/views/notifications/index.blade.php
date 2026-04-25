@@ -103,40 +103,7 @@
         </div>
     </div>
 
-    {{-- SMS Usage Info --}}
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card shadow-none border">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="ti ti-info mr-2"></i>About SMS Notifications
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>When will you receive SMS?</h6>
-                            <ul class="mb-0">
-                                <li>New petty cash request created</li>
-                                <li>Request approved/rejected</li>
-                                <li>Payment completed</li>
-                                <li>Resubmission required</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Important Notes</h6>
-                            <ul class="mb-0">
-                                <li>SMS notifications respect your notification channel preference</li>
-                                <li>Make sure your phone number is updated in your profile</li>
-                                <li>Phone numbers are automatically normalized to Tanzanian format (255XXXXXXXXX)</li>
-                                <li>Low balance warnings appear when balance is below 100 credits</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  
 
     <div class="row mt-4">
         <div class="col-md-12">
