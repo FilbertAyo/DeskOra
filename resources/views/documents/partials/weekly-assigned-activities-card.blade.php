@@ -4,14 +4,24 @@
 
         return trim((string) ($payload['activity'] ?? '')) !== '';
     })->values();
+    $assignmentOwner = $assignedToUser ?? null;
+    $isAssignedToCurrentUser = !auth()->check()
+        || !$assignmentOwner
+        || (string) $assignmentOwner->id === (string) auth()->id();
+    $assignmentTitle = $isAssignedToCurrentUser
+        ? 'Assigned To You'
+        : 'Assigned To '.($assignmentOwner->name ?? 'Staff');
+    $assignmentSubtitle = $isAssignedToCurrentUser
+        ? 'Read-only from shared weekly plans'
+        : 'Read-only from shared weekly plans for '.($assignmentOwner->name ?? 'this staff member');
 @endphp
 
 @if($assignedRows->isNotEmpty())
     <div class="col-12 mb-3">
         <div class="card border-info-subtle">
             <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="ti ti-clipboard-list me-2"></i>Assigned To You</h6>
-                <small class="text-muted">Read-only from shared weekly plans</small>
+                <h6 class="mb-0"><i class="ti ti-clipboard-list me-2"></i>{{ $assignmentTitle }}</h6>
+                <small class="text-muted">{{ $assignmentSubtitle }}</small>
             </div>
             <div class="card-body">
                 <div class="table-responsive">

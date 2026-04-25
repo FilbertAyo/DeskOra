@@ -32,8 +32,6 @@
                                 </div>
                             </div>
 
-                            @include('documents.partials.weekly-assigned-activities-card')
-
                             <div class="col-12 mb-3">
                                     <div class="card border-primary">
                                         <div class="card-header bg-white border-bottom">
@@ -168,6 +166,8 @@
                                         </div>
                                     </div>
                                 </div>
+
+                            @include('documents.partials.weekly-assigned-activities-card', ['assignedToUser' => $document->user])
 
                                 <div class="col-12 mb-3">
                                     <div class="card border-info">
