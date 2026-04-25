@@ -24,6 +24,8 @@
     </div>
 </div>
 
+@include('documents.partials.weekly-assigned-activities-card')
+
 <div class="col-12 mb-3">
     <div class="card border-primary">
         <div class="card-header bg-white border-bottom">
@@ -94,11 +96,12 @@
                     <tbody id="plannedActivitiesBody">
                         @php
                             $dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                            $activityRows = old('content.planned_activities', [
+                            $defaultActivityRows = !empty($carriedActivities ?? []) ? $carriedActivities : [
                                 ['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => [], 'notes_inclusion' => ''],
-                            ]);
+                            ];
+                            $activityRows = old('content.planned_activities', $defaultActivityRows);
                             if (!is_array($activityRows) || empty($activityRows)) {
-                                $activityRows = [['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => [], 'notes_inclusion' => '']];
+                                $activityRows = $defaultActivityRows;
                             }
                         @endphp
                         @foreach($activityRows as $i => $activityRow)
@@ -113,6 +116,9 @@
                                     </select>
                                 </td>
                                 <td>
+                                    <input type="hidden"
+                                        name="content[planned_activities][{{ $i }}][activity_uid]"
+                                        value="{{ old("content.planned_activities.$i.activity_uid", $activityRow['activity_uid'] ?? '') }}">
                                     <textarea class="form-control" rows="5"
                                         name="content[planned_activities][{{ $i }}][activity]"
                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $activityRow['activity'] ?? '') }}</textarea>

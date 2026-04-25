@@ -78,23 +78,30 @@
             </div>
 
             <div class="mb-3">
-                <label for="target_accomplished" class="form-label">
-                    Was the target accomplished? <span class="text-danger">*</span>
+                <label for="target_accomplished_status" class="form-label">
+                    Target accomplishment status <span class="text-danger">*</span>
                 </label>
-                <select class="form-control @error('target_accomplished') is-invalid @enderror"
-                    name="target_accomplished"
-                    id="target_accomplished"
+                @php
+                    $targetStatus = old('target_accomplished_status');
+                    if ($targetStatus === null && old('target_accomplished') !== null) {
+                        $targetStatus = old('target_accomplished') === '1' ? 'completed' : 'not_completed';
+                    }
+                @endphp
+                <select class="form-control @error('target_accomplished_status') is-invalid @enderror"
+                    name="target_accomplished_status"
+                    id="target_accomplished_status"
                     required>
                     <option value="">-- Select Status --</option>
-                    <option value="1" {{ old('target_accomplished') === '1' ? 'selected' : '' }}>Yes, Completed</option>
-                    <option value="0" {{ old('target_accomplished') === '0' ? 'selected' : '' }}>No, Not Completed</option>
+                    <option value="completed" {{ $targetStatus === 'completed' ? 'selected' : '' }}>Completed</option>
+                    <option value="partially_completed" {{ $targetStatus === 'partially_completed' ? 'selected' : '' }}>Partially completed</option>
+                    <option value="not_completed" {{ $targetStatus === 'not_completed' ? 'selected' : '' }}>Not completed</option>
                 </select>
-                @error('target_accomplished')
+                @error('target_accomplished_status')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
 
-            <div class="mb-0" id="targetExplanationContainer" style="display: none;">
+            <div class="mb-0" id="targetExplanationContainer" @if(!in_array($targetStatus, ['partially_completed', 'not_completed'], true)) style="display: none;" @endif>
                 <label for="target_explanation" class="form-label">
                     Why was the target not accomplished? <span class="text-danger">*</span>
                 </label>
@@ -206,6 +213,7 @@
                                             </option>
                                         @endforeach
                                     </select>
+                                    <small class="text-muted">Not started or partially done activities are carried to next weekly plan.</small>
                                 </td>
                                 <td>
                                     <textarea class="form-control" rows="5"

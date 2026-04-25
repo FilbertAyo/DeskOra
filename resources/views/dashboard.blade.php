@@ -16,6 +16,8 @@
 
         $activeActionTasks = $actionLogProgress['activeTasks'] ?? [];
         $activeActionTaskCount = is_array($activeActionTasks) ? count($activeActionTasks) : 0;
+        $assignedWeeklyActivities = collect($assignedWeeklyActivities ?? []);
+        $assignedWeeklyActivityCount = $assignedWeeklyActivities->count();
         $sharedWithMeCount = (int) ($sharedWithMeCount ?? 0);
         $collaborationEvents = collect($collaborationEvents ?? []);
         $currentActionLogDraftId = $actionLogProgress['currentDraftId'] ?? null;
@@ -82,7 +84,7 @@
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
                     <span class="badge bg-primary">
-                        {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount }}
+                        {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount + $assignedWeeklyActivityCount }}
                     </span>
                 </div>
                 <div class="card-body">
@@ -135,6 +137,15 @@
                                         @endif
                                     </div>
                                 @endif
+                            </div>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <div class="p-3 border rounded h-100">
+                                <p class="mb-1 text-muted small">
+                                    <i class="ti ti-clipboard-list text-secondary me-1"></i>Assigned activities
+                                </p>
+                                <h4 class="mb-1 text-secondary">{{ $assignedWeeklyActivityCount }}</h4>
+                                <small class="text-muted">Read-only activities assigned to you in weekly plans.</small>
                             </div>
                         </div>
                     </div>
@@ -264,6 +275,33 @@
                         </div>
                     @endif
 
+                    @if($assignedWeeklyActivityCount > 0)
+                        <div class="mb-3">
+                            <h6 class="text-secondary mb-2"><i class="ti ti-clipboard-list me-1"></i>Assigned Weekly Activities</h6>
+                            @foreach($assignedWeeklyActivities->take(3) as $assignment)
+                                @php
+                                    $payload = is_array($assignment->activity_payload ?? null) ? $assignment->activity_payload : [];
+                                    $isLockedAssignment = ($assignment->status ?? '') === \App\Models\WeeklyActivityAssignment::STATUS_LOCKED;
+                                @endphp
+                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
+                                    <div>
+                                        <strong>{{ $payload['activity'] ?? 'Assigned activity' }}</strong>
+                                        <div class="small text-muted">
+                                            {{ $payload['day'] ?? 'Day not set' }} • From {{ $assignment->sourceUser->name ?? 'Team member' }}
+                                            @if(!empty($payload['location']))
+                                                • {{ $payload['location'] }}
+                                            @endif
+                                        </div>
+                                        <span class="badge {{ $isLockedAssignment ? 'bg-success' : 'bg-warning text-dark' }} mt-1">
+                                            {{ $isLockedAssignment ? 'Locked' : 'Preview' }}
+                                        </span>
+                                    </div>
+                                    <a href="{{ route('documents.show', $assignment->source_document_id) }}" class="btn btn-sm btn-outline-secondary">Open Plan</a>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
                     @if($returnedDocs->count() > 0)
                         <div class="mb-3">
                             <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>
@@ -333,7 +371,7 @@
                         </div>
                     @endif
 
-                    @if($activeActionTaskCount === 0 && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
+                    @if($activeActionTaskCount === 0 && $assignedWeeklyActivityCount === 0 && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
                         <div class="text-center py-4">
                             <i class="ti ti-mood-smile fs-1 text-success"></i>
                             <p class="text-muted mt-2 mb-0">Great flow. No pending revisions or drafts right now.</p>

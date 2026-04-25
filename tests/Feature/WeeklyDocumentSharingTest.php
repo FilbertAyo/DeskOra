@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyActivityAssignment;
 use App\Models\WorkPeriod;
+use App\Services\WeeklyActivityAssignmentService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -385,6 +387,224 @@ class WeeklyDocumentSharingTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Finance weekly report', false);
+    }
+
+    public function test_weekly_plan_assignments_are_projected_as_preview_on_draft_save(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department);
+
+        $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'main_target' => 'Shared target',
+            'shared_user_ids' => [$member->id],
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'day' => 'Monday',
+                        'activity' => 'Joint activity',
+                        'location' => 'Office',
+                        'team_member_ids' => [$owner->id, $member->id],
+                        'notes_inclusion' => 'Read-only for assignees',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $document = Document::query()
+            ->where('user_id', $owner->id)
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('weekly_activity_assignments', [
+            'source_document_id' => $document->id,
+            'assignee_user_id' => $owner->id,
+            'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
+        ]);
+        $this->assertDatabaseHas('weekly_activity_assignments', [
+            'source_document_id' => $document->id,
+            'assignee_user_id' => $member->id,
+            'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
+        ]);
+    }
+
+    public function test_weekly_plan_assignments_are_locked_after_submit(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department);
+
+        $document = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Draft plan',
+            'main_target' => 'Shared target',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'day' => 'Monday',
+                        'activity' => 'Joint activity',
+                        'location' => 'Office',
+                        'team_member_ids' => [$member->id],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ]);
+        $document->sharedUsers()->sync([$member->id]);
+        $activityUid = (string) data_get($document->content, 'planned_activities.0.activity_uid');
+
+        $document->update(['state' => Document::STATE_SUBMITTED]);
+        app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($document->fresh());
+
+        $this->assertDatabaseHas('weekly_activity_assignments', [
+            'source_document_id' => $document->id,
+            'assignee_user_id' => $member->id,
+            'status' => WeeklyActivityAssignment::STATUS_LOCKED,
+        ]);
+    }
+
+    public function test_weekly_plan_assignment_rows_are_removed_when_activity_no_longer_assigned(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department);
+
+        $document = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Draft plan',
+            'main_target' => 'Shared target',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'day' => 'Monday',
+                        'activity' => 'Joint activity',
+                        'location' => 'Office',
+                        'team_member_ids' => [$member->id],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ]);
+        $document->sharedUsers()->sync([$member->id]);
+        $activityUid = (string) data_get($document->content, 'planned_activities.0.activity_uid');
+
+        app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($document->fresh());
+
+        $this->assertDatabaseHas('weekly_activity_assignments', [
+            'source_document_id' => $document->id,
+            'assignee_user_id' => $member->id,
+            'activity_uid' => $activityUid,
+        ]);
+
+        $document->update([
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'activity_uid' => $activityUid,
+                        'day' => 'Monday',
+                        'activity' => 'Joint activity',
+                        'location' => 'Office',
+                        'team_member_ids' => [],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ]);
+        app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($document->fresh());
+
+        $this->assertDatabaseMissing('weekly_activity_assignments', [
+            'source_document_id' => $document->id,
+            'assignee_user_id' => $member->id,
+            'activity_uid' => $activityUid,
+        ]);
+    }
+
+    public function test_assigned_activities_show_as_read_only_reference_in_assignee_weekly_plan_context(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'main_target' => 'Owner target',
+            'shared_user_ids' => [$member->id],
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'day' => 'Tuesday',
+                        'activity' => 'Assigned partner activity',
+                        'location' => 'Field',
+                        'team_member_ids' => [$member->id],
+                        'notes_inclusion' => 'Reference only',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $assignedRows = WeeklyActivityAssignment::query()
+            ->where('assignee_user_id', $member->id)
+            ->where('period_id', $nextPeriod->id)
+            ->with(['sourceUser:id,name'])
+            ->get();
+
+        $this->actingAs($member)
+            ->view('documents.partials.weekly-assigned-activities-card', [
+                'assignedWeeklyActivities' => $assignedRows,
+                'errors' => new \Illuminate\Support\ViewErrorBag,
+            ])
+            ->assertSeeText('Assigned To You')
+            ->assertSeeText('Read-only from shared weekly plans')
+            ->assertSeeText('Assigned partner activity');
+    }
+
+    public function test_non_assigned_user_does_not_get_assignment_projection(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department, ['create weekly plan']);
+        $outsider = User::factory()->create();
+
+        $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'main_target' => 'Owner target',
+            'shared_user_ids' => [$member->id],
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'day' => 'Wednesday',
+                        'activity' => 'Department assignment only',
+                        'location' => 'Office',
+                        'team_member_ids' => [$member->id, $outsider->id],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('weekly_activity_assignments', [
+            'assignee_user_id' => $member->id,
+        ]);
+        $this->assertDatabaseMissing('weekly_activity_assignments', [
+            'assignee_user_id' => $outsider->id,
+        ]);
     }
 
     public function test_weekly_report_edit_prefills_target_accomplished_dropdown_for_zero_value(): void

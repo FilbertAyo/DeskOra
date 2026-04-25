@@ -32,6 +32,8 @@
                                 </div>
                             </div>
 
+                            @include('documents.partials.weekly-assigned-activities-card')
+
                             <div class="col-12 mb-3">
                                     <div class="card border-primary">
                                         <div class="card-header bg-white border-bottom">
@@ -119,6 +121,9 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
+                                                                    <input type="hidden"
+                                                                        name="content[planned_activities][{{ $i }}][activity_uid]"
+                                                                        value="{{ old("content.planned_activities.$i.activity_uid", $row['activity_uid'] ?? '') }}">
                                                                     <textarea class="form-control" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][activity]"
                                                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $row['activity'] ?? '') }}</textarea>

@@ -82,6 +82,7 @@
                                                                     $activityOutputRaw = trim((string) ($row['activity_output'] ?? ''));
                                                                     $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
                                                                     $activityOutputDisplay = $activityOutputRaw;
+                                                                    $carryToNextPlan = in_array(trim((string) ($row['progress'] ?? '')), ['Not started', 'Partially done'], true);
                                                                     if ($activityOutputRaw === '__off_plan__') {
                                                                         $activityOutputDisplay = $offPlanActivity !== '' ? ('Other (Not on Plan): '.$offPlanActivity) : 'Other (Not on Plan)';
                                                                     } elseif ($activityOutputRaw === '' && $offPlanActivity !== '') {
@@ -95,7 +96,12 @@
                                                                         <td>{{ $activityOutputDisplay }}</td>
                                                                         <td>{{ $row['progress'] ?? '' }}</td>
                                                                         <td>{{ $row['remarks_challenges'] ?? '' }}</td>
-                                                                        <td>{{ $row['next_step'] ?? '' }}</td>
+                                                                        <td>
+                                                                            {{ $row['next_step'] ?? '' }}
+                                                                            @if($carryToNextPlan)
+                                                                                <div><small class="text-primary">Will be carried to next weekly plan</small></div>
+                                                                            @endif
+                                                                        </td>
                                                                     </tr>
                                                                 @endif
                                                             @endforeach

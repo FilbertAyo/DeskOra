@@ -48,7 +48,7 @@
             }
 
             // Handle target accomplishment dropdown for weekly reports
-            const targetAccomplishedSelect = document.getElementById('target_accomplished');
+            const targetAccomplishedSelect = document.getElementById('target_accomplished_status');
             const targetExplanationContainer = document.getElementById('targetExplanationContainer');
             const targetExplanationTextarea = document.getElementById('target_explanation');
             const addActivityRowBtn = document.getElementById('addActivityRowBtn');
@@ -102,15 +102,15 @@
             function toggleTargetExplanation() {
                 if (targetAccomplishedSelect && targetExplanationContainer && targetExplanationTextarea) {
                     const value = targetAccomplishedSelect.value;
-                    if (value === '0') {
-                        // Not accomplished - show explanation
+                    if (value === 'not_completed' || value === 'partially_completed') {
+                        // Not/partially accomplished - show explanation
                         targetExplanationContainer.style.display = '';
                         targetExplanationTextarea.required = true;
                     } else {
-                        // Accomplished - hide explanation
+                        // Completed - hide explanation
                         targetExplanationContainer.style.display = 'none';
                         targetExplanationTextarea.required = false;
-                        if (value === '1') {
+                        if (value === 'completed') {
                             targetExplanationTextarea.value = '';
                         }
                     }
@@ -140,7 +140,7 @@
                                 <option value="Saturday">Saturday</option>
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
+                        <td><input type="hidden" name="content[planned_activities][${activityIndex}][activity_uid]" value=""><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
                         <td>
                             <select class="form-select" name="content[planned_activities][${activityIndex}][location]">
                                 <option value="">-- Select --</option>

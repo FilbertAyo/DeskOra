@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Services\MonthlyReportYearPlanActivities;
+use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkPeriodService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -23,6 +24,7 @@ class DocumentController extends Controller
     public function __construct(
         private readonly WorkPeriodService $workPeriodService,
         private readonly WeeklySubmissionReminderService $weeklySubmissionReminderService,
+        private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
     ) {}
 
     /**
@@ -160,11 +162,18 @@ class DocumentController extends Controller
         $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
         $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $relatedPlan = null;
+        $carriedActivities = [];
 
         if ($selectedType) {
             if ($selectedType === Document::TYPE_WEEKLY_PLAN && $nextPeriod) {
                 // For weekly plan, default to next week
                 $defaultPeriodId = $nextPeriod->id;
+                if ($currentPeriod) {
+                    $latestWeeklyReport = Document::findWeeklyReportForPeriodOwner($currentPeriod->id, (string) $user->id);
+                    if ($latestWeeklyReport) {
+                        $carriedActivities = $this->buildCarriedActivitiesFromWeeklyReport($latestWeeklyReport);
+                    }
+                }
             } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT && $currentPeriod) {
                 // For weekly report, default to current week
                 $defaultPeriodId = $currentPeriod->id;
@@ -210,6 +219,7 @@ class DocumentController extends Controller
                     'currentPeriod',
                     'nextPeriod',
                     'relatedPlan',
+                    'carriedActivities',
                     'teamUsers',
                     'shareableUsers',
                     'monthlyYearPlan',
@@ -224,6 +234,10 @@ class DocumentController extends Controller
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
         $shareableUsers = $this->shareableDepartmentUsersFor($user);
+        $assignedWeeklyActivities = collect();
+        if ($selectedType === Document::TYPE_WEEKLY_PLAN && $defaultPeriodId) {
+            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) $user->id, (string) $defaultPeriodId);
+        }
 
         return view('documents.create', compact(
             'availableTypes',
@@ -232,6 +246,7 @@ class DocumentController extends Controller
             'currentPeriod',
             'nextPeriod',
             'relatedPlan',
+            'carriedActivities',
             'teamUsers',
             'shareableUsers',
             'monthlyYearPlan',
@@ -239,7 +254,8 @@ class DocumentController extends Controller
             'monthlyDefaultMonth',
             'monthlyDefaultYear',
             'monthlyYearChoices',
-            'monthlyHasSubDepartments'
+            'monthlyHasSubDepartments',
+            'assignedWeeklyActivities'
         ));
     }
 
@@ -338,7 +354,7 @@ class DocumentController extends Controller
 
         // Add validation for target accomplishment for weekly reports
         if ($request->type === Document::TYPE_WEEKLY_REPORT) {
-            $validationRules['target_accomplished'] = ['nullable', 'boolean'];
+            $validationRules['target_accomplished_status'] = ['nullable', 'string', 'in:completed,partially_completed,not_completed'];
             $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
         }
 
@@ -357,6 +373,30 @@ class DocumentController extends Controller
         $templateContent = null;
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $request->has('content') && is_array($request->input('content'))) {
             $templateContent = $this->normalizeTemplateContent($request->input('content'), $request->type);
+        }
+        $weeklyReportTargetStatus = null;
+        if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+            $weeklyReportTargetStatus = $this->resolveWeeklyReportTargetStatus($request);
+            if ($weeklyReportTargetStatus === null && $action === 'submit') {
+                throw ValidationException::withMessages([
+                    'target_accomplished_status' => 'Please select target accomplishment status.',
+                ]);
+            }
+            if (in_array($weeklyReportTargetStatus, ['partially_completed', 'not_completed'], true)
+                && ! $request->filled('target_explanation')
+                && $action === 'submit') {
+                throw ValidationException::withMessages([
+                    'target_explanation' => 'Please explain why the target was not fully accomplished.',
+                ]);
+            }
+            if ($templateContent === null) {
+                $templateContent = [];
+            }
+            if ($weeklyReportTargetStatus !== null) {
+                $templateContent['target_accomplished_status'] = $weeklyReportTargetStatus;
+            } else {
+                unset($templateContent['target_accomplished_status']);
+            }
         }
 
         $monthlyContent = null;
@@ -613,7 +653,7 @@ class DocumentController extends Controller
 
             // Add target accomplishment fields for weekly reports
             if ($request->type === Document::TYPE_WEEKLY_REPORT) {
-                $updateData['target_accomplished'] = $request->has('target_accomplished') ? (bool) $request->target_accomplished : null;
+                $updateData['target_accomplished'] = $this->targetAccomplishedBooleanFromStatus($weeklyReportTargetStatus);
                 $updateData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
             }
 
@@ -626,6 +666,9 @@ class DocumentController extends Controller
             $existingDocument->update($updateData);
             if (Document::supportsSharedEditing($existingDocument->type)) {
                 $this->syncDocumentShares($existingDocument, $sharedUserIds, $user);
+            }
+            if ($existingDocument->type === Document::TYPE_WEEKLY_REPORT) {
+                $this->syncNextWeeklyPlanCarryOverFromReport($existingDocument->fresh());
             }
 
             $message = ($action === 'submit')
@@ -666,7 +709,7 @@ class DocumentController extends Controller
 
         // Add target accomplishment fields for weekly reports
         if ($request->type === Document::TYPE_WEEKLY_REPORT) {
-            $documentData['target_accomplished'] = $request->has('target_accomplished') ? (bool) $request->target_accomplished : null;
+            $documentData['target_accomplished'] = $this->targetAccomplishedBooleanFromStatus($weeklyReportTargetStatus);
             $documentData['target_explanation'] = $request->filled('target_explanation') ? $request->target_explanation : null;
         }
 
@@ -685,6 +728,10 @@ class DocumentController extends Controller
         $document = Document::create($documentData);
         if (Document::supportsSharedEditing($document->type)) {
             $this->syncDocumentShares($document, $sharedUserIds, $user);
+        }
+        $this->syncWeeklyPlanAssignments($document);
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
         }
 
         $message = ($action === 'submit')
@@ -753,7 +800,12 @@ class DocumentController extends Controller
             }
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction'));
+        $assignedWeeklyActivities = collect();
+        if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
+            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) Auth::id(), (string) $document->period_id);
+        }
+
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities'));
     }
 
     /**
@@ -813,8 +865,12 @@ class DocumentController extends Controller
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
         $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
+        $assignedWeeklyActivities = collect();
+        if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
+            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) Auth::id(), (string) $document->period_id);
+        }
 
-        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments'));
+        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities'));
     }
 
     /**
@@ -867,7 +923,7 @@ class DocumentController extends Controller
 
         // Add validation for target accomplishment for weekly reports
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-            $validationRules['target_accomplished'] = ['nullable', 'boolean'];
+            $validationRules['target_accomplished_status'] = ['nullable', 'string', 'in:completed,partially_completed,not_completed'];
             $validationRules['target_explanation'] = ['nullable', 'string', 'max:2000'];
 
             $validationRules['content.summary'] = ['nullable', 'string', 'max:5000'];
@@ -945,6 +1001,22 @@ class DocumentController extends Controller
         }
 
         $document->loadMissing('user');
+        $weeklyReportTargetStatus = null;
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $weeklyReportTargetStatus = $this->resolveWeeklyReportTargetStatus($request, $document);
+            if ($weeklyReportTargetStatus === null && $action === 'submit') {
+                throw ValidationException::withMessages([
+                    'target_accomplished_status' => 'Please select target accomplishment status.',
+                ]);
+            }
+            if (in_array($weeklyReportTargetStatus, ['partially_completed', 'not_completed'], true)
+                && ! $request->filled('target_explanation')
+                && $action === 'submit') {
+                throw ValidationException::withMessages([
+                    'target_explanation' => 'Please explain why the target was not fully accomplished.',
+                ]);
+            }
+        }
 
         $templateContent = null;
         $monthlyContent = null;
@@ -958,6 +1030,16 @@ class DocumentController extends Controller
             );
         } elseif ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
             $templateContent = $this->normalizeTemplateContent($request->input('content'), $document->type);
+        }
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            if ($templateContent === null) {
+                $templateContent = is_array($document->content) ? $document->content : [];
+            }
+            if ($weeklyReportTargetStatus !== null) {
+                $templateContent['target_accomplished_status'] = $weeklyReportTargetStatus;
+            } else {
+                unset($templateContent['target_accomplished_status']);
+            }
         }
 
         $updateData = [];
@@ -1013,9 +1095,7 @@ class DocumentController extends Controller
 
         // Update target accomplishment fields for weekly reports
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-            if ($request->has('target_accomplished')) {
-                $updateData['target_accomplished'] = (bool) $request->target_accomplished;
-            }
+            $updateData['target_accomplished'] = $this->targetAccomplishedBooleanFromStatus($weeklyReportTargetStatus);
             if ($request->filled('target_explanation')) {
                 $updateData['target_explanation'] = $request->target_explanation;
             } elseif ($request->has('target_explanation')) {
@@ -1046,6 +1126,10 @@ class DocumentController extends Controller
         if (Document::supportsSharedEditing($document->type)) {
             $this->syncDocumentShares($document, $sharedUserIds, $actingUser);
         }
+        $this->syncWeeklyPlanAssignments($document);
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
+        }
 
         $message = ($action === 'submit')
             ? 'Document submitted successfully.'
@@ -1064,6 +1148,7 @@ class DocumentController extends Controller
         // Authorize delete action
         $this->authorize('delete', $document);
 
+        $this->weeklyActivityAssignmentService->clearForSourceDocument($document);
         $document->delete();
 
         return redirect()->route('documents.index')
@@ -1080,6 +1165,7 @@ class DocumentController extends Controller
         $this->authorize('submit', $document);
 
         $document->submit();
+        $this->syncWeeklyPlanAssignments($document);
 
         return redirect()->route('documents.show', $document)
             ->with('success', 'Document submitted successfully.');
@@ -1100,6 +1186,7 @@ class DocumentController extends Controller
         $reason = trim($validated['reason']);
 
         $document->revertToDraft($reason);
+        $this->syncWeeklyPlanAssignments($document);
 
         return redirect()->route('documents.show', $document->id)
             ->with('warning', 'Document returned to draft. Staff can now update and re-submit after addressing the review reason.');
@@ -2479,6 +2566,7 @@ class DocumentController extends Controller
                 $content['planned_activities'] ?? [],
                 ['day', 'activity', 'location', 'team_member_ids', 'notes_inclusion']
             );
+            $content['planned_activities'] = $this->ensureWeeklyPlanActivityUids($content['planned_activities']);
 
             $content['key_meetings'] = $this->filterNonEmptyRows(
                 $content['key_meetings'] ?? [],
@@ -2512,6 +2600,8 @@ class DocumentController extends Controller
                 if ($activityOutput !== '__off_plan__') {
                     $offPlanActivity = '';
                 }
+                $progress = trim((string) ($row['progress'] ?? ''));
+                $row['carry_to_next_plan'] = in_array($progress, ['Not started', 'Partially done'], true);
 
                 $row['activity_output'] = $activityOutput;
                 $row['off_plan_activity'] = $offPlanActivity;
@@ -2533,6 +2623,226 @@ class DocumentController extends Controller
         }
 
         return $content;
+    }
+
+    private function resolveWeeklyReportTargetStatus(Request $request, ?Document $document = null): ?string
+    {
+        $status = trim((string) $request->input('target_accomplished_status', ''));
+        if ($status === '' && $request->has('target_accomplished')) {
+            $raw = $request->input('target_accomplished');
+            if ($raw === true || $raw === 1 || $raw === '1') {
+                $status = 'completed';
+            } elseif ($raw === false || $raw === 0 || $raw === '0') {
+                $status = 'not_completed';
+            }
+        }
+
+        if ($status === '' && $document) {
+            $content = is_array($document->content) ? $document->content : [];
+            $status = trim((string) ($content['target_accomplished_status'] ?? ''));
+            if ($status === '') {
+                if ($document->target_accomplished === true || $document->target_accomplished === 1 || $document->target_accomplished === '1') {
+                    $status = 'completed';
+                } elseif ($document->target_accomplished === false || $document->target_accomplished === 0 || $document->target_accomplished === '0') {
+                    $status = 'not_completed';
+                }
+            }
+        }
+
+        return in_array($status, ['completed', 'partially_completed', 'not_completed'], true) ? $status : null;
+    }
+
+    private function targetAccomplishedBooleanFromStatus(?string $status): ?bool
+    {
+        return match ($status) {
+            'completed' => true,
+            'partially_completed', 'not_completed' => false,
+            default => null,
+        };
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildCarriedActivitiesFromWeeklyReport(Document $weeklyReport): array
+    {
+        if ($weeklyReport->type !== Document::TYPE_WEEKLY_REPORT || ! $weeklyReport->period_id) {
+            return [];
+        }
+
+        $reportContent = is_array($weeklyReport->content) ? $weeklyReport->content : [];
+        $activityProgress = is_array($reportContent['activity_progress'] ?? null) ? $reportContent['activity_progress'] : [];
+        if ($activityProgress === []) {
+            return [];
+        }
+
+        $sourcePlan = Document::findWeeklyPlanForPeriodOwner($weeklyReport->period_id, (string) $weeklyReport->user_id);
+        $planActivities = is_array($sourcePlan?->content ?? null) ? ($sourcePlan->content['planned_activities'] ?? []) : [];
+        $planActivities = is_array($planActivities) ? $planActivities : [];
+
+        $planByLabel = [];
+        foreach ($planActivities as $planRow) {
+            if (! is_array($planRow)) {
+                continue;
+            }
+            $activity = trim((string) ($planRow['activity'] ?? ''));
+            if ($activity === '') {
+                continue;
+            }
+            $day = trim((string) ($planRow['day'] ?? ''));
+            $label = $day !== '' ? ($day.' - '.$activity) : $activity;
+            $planByLabel[$label] = $planRow;
+        }
+
+        $carriedRows = [];
+        $seenKeys = [];
+        foreach ($activityProgress as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $progress = trim((string) ($row['progress'] ?? ''));
+            if (! in_array($progress, ['Not started', 'Partially done'], true)) {
+                continue;
+            }
+
+            $activityOutput = trim((string) ($row['activity_output'] ?? ''));
+            $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
+            $day = '';
+            $activity = '';
+            $location = '';
+            $teamMemberIds = [];
+
+            if ($activityOutput === '__off_plan__') {
+                $activity = $offPlanActivity;
+            } elseif ($activityOutput !== '' && isset($planByLabel[$activityOutput]) && is_array($planByLabel[$activityOutput])) {
+                $sourceRow = $planByLabel[$activityOutput];
+                $day = trim((string) ($sourceRow['day'] ?? ''));
+                $activity = trim((string) ($sourceRow['activity'] ?? ''));
+                $location = trim((string) ($sourceRow['location'] ?? ''));
+                $teamMemberIds = is_array($sourceRow['team_member_ids'] ?? null) ? array_values(array_filter($sourceRow['team_member_ids'])) : [];
+            } else {
+                $activity = $activityOutput;
+                if (str_contains($activityOutput, ' - ')) {
+                    [$parsedDay, $parsedActivity] = array_map('trim', explode(' - ', $activityOutput, 2));
+                    if (in_array($parsedDay, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], true)) {
+                        $day = $parsedDay;
+                        $activity = $parsedActivity;
+                    }
+                }
+            }
+
+            $activity = trim($activity);
+            if ($activity === '') {
+                continue;
+            }
+
+            $dedupeKey = mb_strtolower(trim($day).'|'.$activity);
+            if (isset($seenKeys[$dedupeKey])) {
+                continue;
+            }
+            $seenKeys[$dedupeKey] = true;
+
+            $carryNote = trim((string) ($row['remarks_challenges'] ?? ''));
+            $notes = 'Carried from weekly report: '.$progress;
+            if ($carryNote !== '') {
+                $notes .= ' - '.$carryNote;
+            }
+
+            $carriedRows[] = [
+                'activity_uid' => (string) Str::ulid(),
+                'day' => $day,
+                'activity' => $activity,
+                'location' => $location,
+                'team_member_ids' => $teamMemberIds,
+                'notes_inclusion' => $this->clipString($notes, 4000),
+                'carry_over_source_report_id' => (string) $weeklyReport->id,
+            ];
+        }
+
+        return $carriedRows;
+    }
+
+    private function syncNextWeeklyPlanCarryOverFromReport(Document $weeklyReport): void
+    {
+        if ($weeklyReport->type !== Document::TYPE_WEEKLY_REPORT) {
+            return;
+        }
+
+        $weeklyReport->loadMissing('period');
+        $currentPeriod = $weeklyReport->period;
+        if (! $currentPeriod) {
+            return;
+        }
+
+        $nextPeriod = $currentPeriod->getNextPeriod();
+        if (! $nextPeriod) {
+            return;
+        }
+
+        $nextPlan = Document::findWeeklyPlanForPeriodOwner($nextPeriod->id, (string) $weeklyReport->user_id);
+        if (! $nextPlan || ! $nextPlan->isDraft()) {
+            return;
+        }
+
+        $nextPlanContent = is_array($nextPlan->content) ? $nextPlan->content : [];
+        $existingActivities = is_array($nextPlanContent['planned_activities'] ?? null) ? $nextPlanContent['planned_activities'] : [];
+        $existingActivities = array_values(array_filter($existingActivities, function ($row) use ($weeklyReport) {
+            if (! is_array($row)) {
+                return false;
+            }
+
+            return trim((string) ($row['carry_over_source_report_id'] ?? '')) !== (string) $weeklyReport->id;
+        }));
+
+        $carriedRows = $this->buildCarriedActivitiesFromWeeklyReport($weeklyReport);
+        $existingKeys = [];
+        foreach ($existingActivities as $existingRow) {
+            if (! is_array($existingRow)) {
+                continue;
+            }
+            $existingKeys[mb_strtolower(trim((string) ($existingRow['day'] ?? '')).'|'.trim((string) ($existingRow['activity'] ?? '')))] = true;
+        }
+        foreach ($carriedRows as $carriedRow) {
+            $rowKey = mb_strtolower(trim((string) ($carriedRow['day'] ?? '')).'|'.trim((string) ($carriedRow['activity'] ?? '')));
+            if (isset($existingKeys[$rowKey])) {
+                continue;
+            }
+            $existingActivities[] = $carriedRow;
+            $existingKeys[$rowKey] = true;
+        }
+
+        $nextPlanContent['planned_activities'] = $this->ensureWeeklyPlanActivityUids($existingActivities);
+        $nextPlanContent = $this->normalizeTemplateContent($nextPlanContent, Document::TYPE_WEEKLY_PLAN);
+        $nextPlan->update(['content' => $nextPlanContent]);
+        $this->syncWeeklyPlanAssignments($nextPlan);
+    }
+
+    private function ensureWeeklyPlanActivityUids(array $rows): array
+    {
+        foreach ($rows as &$row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $uid = trim((string) ($row['activity_uid'] ?? ''));
+            if ($uid === '') {
+                $row['activity_uid'] = (string) Str::ulid();
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    private function syncWeeklyPlanAssignments(Document $document): void
+    {
+        if ($document->type !== Document::TYPE_WEEKLY_PLAN) {
+            return;
+        }
+
+        $document->refresh();
+        $this->weeklyActivityAssignmentService->syncForWeeklyPlan($document);
     }
 
     private function trimDeep(mixed $value): mixed

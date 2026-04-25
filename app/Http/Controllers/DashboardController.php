@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\Petty;
 use App\Models\User;
+use App\Models\WeeklyActivityAssignment;
 use App\Models\WorkPeriod;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
@@ -302,6 +303,13 @@ class DashboardController extends Controller
             ->values();
 
         $actionLogProgress = $this->buildActionLogProgressForUser($user);
+        $assignedWeeklyActivities = WeeklyActivityAssignment::query()
+            ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id'])
+            ->where('assignee_user_id', $user->id)
+            ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [WeeklyActivityAssignment::STATUS_PREVIEW])
+            ->orderByDesc('updated_at')
+            ->take(10)
+            ->get();
 
         return view('dashboard', compact(
             'userNo',
@@ -334,7 +342,8 @@ class DashboardController extends Controller
             'collaborationEvents',
             'canSeeWeeklyDashboard',
             'weeklyDashboardData',
-            'actionLogProgress'
+            'actionLogProgress',
+            'assignedWeeklyActivities'
         ));
     }
 

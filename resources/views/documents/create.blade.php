@@ -240,7 +240,7 @@
             }
 
             // Handle target accomplishment dropdown for weekly reports
-            const targetAccomplishedSelect = document.getElementById('target_accomplished');
+            const targetAccomplishedSelect = document.getElementById('target_accomplished_status');
             const targetExplanationContainer = document.getElementById('targetExplanationContainer');
             const targetExplanationTextarea = document.getElementById('target_explanation');
             const addActivityRowBtn = document.getElementById('addActivityRowBtn');
@@ -294,12 +294,12 @@
             function toggleTargetExplanation() {
                 if (targetAccomplishedSelect && targetExplanationContainer && targetExplanationTextarea) {
                     const value = targetAccomplishedSelect.value;
-                    if (value === '0') {
-                        // Not accomplished - show explanation and make it required
+                    if (value === 'not_completed' || value === 'partially_completed') {
+                        // Not/partially accomplished - show explanation and make it required
                         targetExplanationContainer.style.display = '';
                         targetExplanationTextarea.required = true;
                     } else {
-                        // Accomplished - hide explanation and make it not required
+                        // Completed - hide explanation and make it not required
                         targetExplanationContainer.style.display = 'none';
                         targetExplanationTextarea.required = false;
                         targetExplanationTextarea.value = '';
@@ -330,7 +330,7 @@
                                 <option value="Saturday">Saturday</option>
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
+                        <td><input type="hidden" name="content[planned_activities][${activityIndex}][activity_uid]" value=""><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
                         <td>
                             <select class="form-select" name="content[planned_activities][${activityIndex}][location]">
                                 <option value="">-- Select --</option>
@@ -761,19 +761,19 @@
 
                 // Validate target accomplishment for weekly reports
                 if (selectedTypeValue === 'weekly_report') {
-                    const targetAccomplished = document.getElementById('target_accomplished');
+                    const targetAccomplished = document.getElementById('target_accomplished_status');
                     if (targetAccomplished && !targetAccomplished.value) {
                         e.preventDefault();
-                        alert('Please indicate whether the target was accomplished.');
+                        alert('Please select target accomplishment status.');
                         return false;
                     }
                     
-                    // If not accomplished, explanation is required
-                    if (targetAccomplished && targetAccomplished.value === '0') {
+                    // If not fully completed, explanation is required
+                    if (targetAccomplished && (targetAccomplished.value === 'not_completed' || targetAccomplished.value === 'partially_completed')) {
                         const targetExplanation = document.getElementById('target_explanation');
                         if (targetExplanation && !targetExplanation.value.trim()) {
                             e.preventDefault();
-                            alert('Please explain why the target was not accomplished.');
+                            alert('Please explain why the target was not fully accomplished.');
                             return false;
                         }
                     }

@@ -78,6 +78,10 @@
                                 @endphp
 
                                 <div class="p-4">
+                                    <div class="mb-4">
+                                        @include('documents.partials.weekly-assigned-activities-card')
+                                    </div>
+
                                     <div class="card shadow-none border border-primary mb-4">
                                         <div class="card-header text-white">
                                             <h6 class="mb-0"><i class="ti ti-target me-2"></i>Objective / Main Target</h6>

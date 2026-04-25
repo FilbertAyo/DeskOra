@@ -8,6 +8,17 @@
                     $document->period_id,
                     (string) $document->user_id
                 );
+                $reportContent = is_array($document->content) ? $document->content : [];
+                $targetStatus = trim((string) ($reportContent['target_accomplished_status'] ?? ''));
+                if (! in_array($targetStatus, ['completed', 'partially_completed', 'not_completed'], true)) {
+                    if ($document->target_accomplished === true || $document->target_accomplished === 1 || $document->target_accomplished === '1') {
+                        $targetStatus = 'completed';
+                    } elseif ($document->target_accomplished === false || $document->target_accomplished === 0 || $document->target_accomplished === '0') {
+                        $targetStatus = 'not_completed';
+                    } else {
+                        $targetStatus = '';
+                    }
+                }
             @endphp
             
             <div class="card shadow-none border border-info">
@@ -26,23 +37,27 @@
                         </div>
                     @endif
 
-                    @if($document->target_accomplished !== null)
+                    @if($targetStatus !== '')
                         <div class="mb-3">
                             <label class="form-label text-muted font-weight-bold">Accomplishment Status:</label>
                             <div>
-                                @if($document->target_accomplished)
+                                @if($targetStatus === 'completed')
                                     <span class="badge bg-success rounded-pill px-3 py-2">
-                                        <i class="ti ti-check-circle me-1"></i>Yes, Completed
+                                        <i class="ti ti-check-circle me-1"></i>Completed
+                                    </span>
+                                @elseif($targetStatus === 'partially_completed')
+                                    <span class="badge bg-warning rounded-pill px-3 py-2 text-dark">
+                                        <i class="ti ti-progress-check me-1"></i>Partially completed
                                     </span>
                                 @else
                                     <span class="badge bg-danger rounded-pill px-3 py-2">
-                                        <i class="ti ti-x-circle me-1"></i>No, Not Completed
+                                        <i class="ti ti-x-circle me-1"></i>Not completed
                                     </span>
                                 @endif
                             </div>
                         </div>
 
-                        @if(!$document->target_accomplished && $document->target_explanation)
+                        @if(in_array($targetStatus, ['partially_completed', 'not_completed'], true) && $document->target_explanation)
                             <div class="mb-0">
                                 <label class="form-label text-muted font-weight-bold">Explanation:</label>
                                 <div class="alert alert-warning border">

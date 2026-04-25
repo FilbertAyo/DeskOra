@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -287,6 +288,11 @@ class Document extends Model
     {
         return $this->belongsToMany(User::class, 'document_user_shares', 'document_id', 'user_id')
             ->withTimestamps();
+    }
+
+    public function weeklyActivityAssignments(): HasMany
+    {
+        return $this->hasMany(WeeklyActivityAssignment::class, 'source_document_id');
     }
 
     public function isSharedWith(string $userId): bool

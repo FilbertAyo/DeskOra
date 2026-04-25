@@ -27,16 +27,17 @@
                                         : [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
                                     $canProcessWeeklyBudgets = auth()->user()?->can('process weekly budgets') ?? false;
-                                    $targetAccomplishedRaw = old('target_accomplished');
-                                    if ($targetAccomplishedRaw === null) {
-                                        $targetAccomplishedRaw = $document->target_accomplished;
+                                    $targetStatusValue = old('target_accomplished_status');
+                                    if (! is_string($targetStatusValue) || trim($targetStatusValue) === '') {
+                                        $targetStatusValue = is_array($content) ? trim((string)($content['target_accomplished_status'] ?? '')) : '';
                                     }
-                                    $targetAccomplishedValue = null;
-                                    if ($targetAccomplishedRaw !== null && $targetAccomplishedRaw !== '') {
-                                        if ($targetAccomplishedRaw === true || $targetAccomplishedRaw === 1 || $targetAccomplishedRaw === '1') {
-                                            $targetAccomplishedValue = '1';
-                                        } elseif ($targetAccomplishedRaw === false || $targetAccomplishedRaw === 0 || $targetAccomplishedRaw === '0') {
-                                            $targetAccomplishedValue = '0';
+                                    if ($targetStatusValue === '' || ! in_array($targetStatusValue, ['completed', 'partially_completed', 'not_completed'], true)) {
+                                        if ($document->target_accomplished === true || $document->target_accomplished === 1 || $document->target_accomplished === '1') {
+                                            $targetStatusValue = 'completed';
+                                        } elseif ($document->target_accomplished === false || $document->target_accomplished === 0 || $document->target_accomplished === '0') {
+                                            $targetStatusValue = 'not_completed';
+                                        } else {
+                                            $targetStatusValue = '';
                                         }
                                     }
                                         @endphp
@@ -65,24 +66,25 @@
                                         @endif
 
                                         <div class="mb-3">
-                                            <label for="target_accomplished" class="form-label">
-                                                Was the target accomplished? <span class="text-danger">*</span>
+                                            <label for="target_accomplished_status" class="form-label">
+                                                Target accomplishment status <span class="text-danger">*</span>
                                             </label>
-                                            <select class="form-control @error('target_accomplished') is-invalid @enderror"
-                                                name="target_accomplished"
-                                                id="target_accomplished"
+                                            <select class="form-control @error('target_accomplished_status') is-invalid @enderror"
+                                                name="target_accomplished_status"
+                                                id="target_accomplished_status"
                                                 required>
                                                 <option value="">-- Select Status --</option>
-                                                <option value="1" {{ $targetAccomplishedValue === '1' ? 'selected' : '' }}>Yes, Completed</option>
-                                                <option value="0" {{ $targetAccomplishedValue === '0' ? 'selected' : '' }}>No, Not Completed</option>
+                                                <option value="completed" {{ $targetStatusValue === 'completed' ? 'selected' : '' }}>Completed</option>
+                                                <option value="partially_completed" {{ $targetStatusValue === 'partially_completed' ? 'selected' : '' }}>Partially completed</option>
+                                                <option value="not_completed" {{ $targetStatusValue === 'not_completed' ? 'selected' : '' }}>Not completed</option>
                                             </select>
-                                            @error('target_accomplished')
+                                            @error('target_accomplished_status')
                                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                                             @enderror
                                         </div>
 
                                             @php
-                                                $showTargetExplanation = $targetAccomplishedValue === '0';
+                                                $showTargetExplanation = in_array($targetStatusValue, ['partially_completed', 'not_completed'], true);
                                             @endphp
                                             <div class="mb-0" id="targetExplanationContainer" @if(!$showTargetExplanation) style="display:none;" @endif>
                                             <label for="target_explanation" class="form-label">
@@ -195,6 +197,7 @@
                                                                             <option value="{{ $opt }}" {{ $cur === $opt ? 'selected' : '' }}>{{ $opt }}</option>
                                                                         @endforeach
                                                                     </select>
+                                                                    <small class="text-muted">Not started or partially done activities are carried to next weekly plan.</small>
                                                                 </td>
                                                                 <td>
                                                                     <textarea class="form-control" rows="5"
