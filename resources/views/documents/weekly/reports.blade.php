@@ -15,7 +15,7 @@
 
                         <div class="col-auto d-flex align-items-center gap-2">
                             @if(isset($availableTypes['weekly_report']))
-                                <a href="{{ route('documents.create') }}?type=weekly_report" class="btn btn-primary btn-sm">
+                                <a href="{{ route('documents.create', ['type' => 'weekly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Report
                                 </a>
                             @endif
@@ -93,7 +93,7 @@
                                 </div>
                                 <div class="col-md-4 text-md-end">
                                     @if(isset($availableTypes['weekly_report']))
-                                        <a href="{{ route('documents.create') }}?type=weekly_report" class="btn btn-primary btn-sm">
+                                        <a href="{{ route('documents.create', ['type' => 'weekly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
                                             <i class="ti ti-circle-plus me-1"></i> Create New Report
                                         </a>
                                     @endif
@@ -191,12 +191,12 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('documents.show', $document->id) }}"
+                                                    <a href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
                                                         class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
                                                     @if($document->canBeEdited())
-                                                        <a href="{{ route('documents.edit', $document->id) }}"
+                                                        <a href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
                                                             class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
                                                         </a>
@@ -209,7 +209,7 @@
                                                             );
                                                         @endphp
                                                         @if($relatedPlan)
-                                                            <a href="{{ route('documents.show', $relatedPlan->id) }}"
+                                                            <a href="{{ route('documents.show', ['document' => $relatedPlan->id, 'return_to' => request()->fullUrl()]) }}"
                                                                 class="btn btn-outline-primary" title="View Related Plan">
                                                                 <i class="ti ti-target"></i>
                                                             </a>

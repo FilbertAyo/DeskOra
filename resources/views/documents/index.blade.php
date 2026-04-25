@@ -104,7 +104,7 @@
                                 <a href="{{ route('year-plan.index') }}">year plan</a>
                                 for your sub-departments and the month you select. Report progress on those lines and add anything done outside the plan.
                             </div>
-                            <a href="{{ route('documents.create', ['type' => 'monthly_report']) }}" class="btn btn-primary btn-sm text-nowrap">
+                            <a href="{{ route('documents.create', ['type' => 'monthly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm text-nowrap">
                                 <i class="ti ti-plus-circle me-1"></i> New monthly report
                             </a>
                         </div>
@@ -224,13 +224,13 @@
                                                 <td class="text-center">
                                                     <div class="d-flex flex-wrap gap-1 justify-content-center">
                                                         @if($planDoc)
-                                                            <a href="{{ route('documents.show', $planDoc->id) }}"
+                                                            <a href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}"
                                                                 class="btn btn-info text-white btn-sm" title="View Plan">
                                                                 <i class="ti ti-eye"></i> Plan
                                                             </a>
                                                         @endif
                                                         @if($reportDoc)
-                                                            <a href="{{ route('documents.show', $reportDoc->id) }}"
+                                                            <a href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}"
                                                                 class="btn btn-primary text-white btn-sm" title="View Report">
                                                                 <i class="ti ti-eye"></i> Report
                                                             </a>
@@ -285,7 +285,7 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-center">
-                                                    <a href="{{ $document->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $document->id) : route('documents.show', $document->id) }}"
+                                                    <a href="{{ $document->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $document->id) : route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
                                                         class="btn btn-info text-white btn-sm" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>

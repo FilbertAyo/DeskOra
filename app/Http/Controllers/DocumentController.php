@@ -31,6 +31,9 @@ class DocumentController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Document::class);
+        if ($request->hasSession()) {
+            $request->session()->put('documents.last_listing_url', $request->fullUrl());
+        }
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -1343,6 +1346,9 @@ class DocumentController extends Controller
     public function weeklyPlans(Request $request)
     {
         $this->authorize('viewAny', Document::class);
+        if ($request->hasSession()) {
+            $request->session()->put('documents.last_listing_url', $request->fullUrl());
+        }
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -1497,6 +1503,9 @@ class DocumentController extends Controller
     public function weeklyReports(Request $request)
     {
         $this->authorize('viewAny', Document::class);
+        if ($request->hasSession()) {
+            $request->session()->put('documents.last_listing_url', $request->fullUrl());
+        }
 
         /** @var \App\Models\User $user */
         $user = Auth::user();

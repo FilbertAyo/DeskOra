@@ -15,7 +15,7 @@
 
                         <div class="col-auto">
                             @if(isset($availableTypes['weekly_plan']))
-                                <a href="{{ route('documents.create') }}?type=weekly_plan" class="btn btn-info btn-sm">
+                                <a href="{{ route('documents.create', ['type' => 'weekly_plan', 'return_to' => request()->fullUrl()]) }}" class="btn btn-info btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Plan
                                 </a>
                             @endif
@@ -183,12 +183,12 @@
                                             </td>
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('documents.show', $document->id) }}"
+                                                    <a href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
                                                         class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
                                                     @if($document->canBeEdited())
-                                                        <a href="{{ route('documents.edit', $document->id) }}"
+                                                        <a href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
                                                             class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
                                                         </a>
@@ -201,7 +201,7 @@
                                                             );
                                                         @endphp
                                                         @if($relatedReport)
-                                                            <a href="{{ route('documents.show', $relatedReport->id) }}"
+                                                            <a href="{{ route('documents.show', ['document' => $relatedReport->id, 'return_to' => request()->fullUrl()]) }}"
                                                                 class="btn btn-outline-primary" title="View Related Report">
                                                                 <i class="ti ti-activity"></i>
                                                             </a>
