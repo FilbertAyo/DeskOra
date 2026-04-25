@@ -125,6 +125,7 @@ class WeeklyActivityAssignmentService
         $query = WeeklyActivityAssignment::query()
             ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id'])
             ->where('assignee_user_id', $userId)
+            ->whereColumn('source_user_id', '!=', 'assignee_user_id')
             ->orderByDesc('updated_at');
 
         if ($periodId) {

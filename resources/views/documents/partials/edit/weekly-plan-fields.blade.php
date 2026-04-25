@@ -151,7 +151,7 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea class="form-control" rows="5"
+                                                                    <textarea class="form-control bg-light" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][notes_inclusion]"
                                                                         placeholder="Notes / inclusion">{{ old("content.planned_activities.$i.notes_inclusion", $row['notes_inclusion'] ?? '') }}</textarea>
                                                                 </td>

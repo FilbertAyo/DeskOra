@@ -306,6 +306,7 @@ class DashboardController extends Controller
         $assignedWeeklyActivities = WeeklyActivityAssignment::query()
             ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id'])
             ->where('assignee_user_id', $user->id)
+            ->whereColumn('source_user_id', '!=', 'assignee_user_id')
             ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [WeeklyActivityAssignment::STATUS_PREVIEW])
             ->orderByDesc('updated_at')
             ->take(10)

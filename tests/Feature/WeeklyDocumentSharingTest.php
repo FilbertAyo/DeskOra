@@ -568,9 +568,72 @@ class WeeklyDocumentSharingTest extends TestCase
                 'assignedWeeklyActivities' => $assignedRows,
                 'errors' => new \Illuminate\Support\ViewErrorBag,
             ])
-            ->assertSeeText('Assigned To You')
-            ->assertSeeText('Read-only from shared weekly plans')
+            ->assertSeeText('Assigned by Others')
+            ->assertSeeText('Tasks from shared weekly plans where another staff member assigned you')
             ->assertSeeText('Assigned partner activity');
+    }
+
+    public function test_assignments_for_user_excludes_self_assigned_rows(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $ownerPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Owner plan',
+            'main_target' => 'Owner target',
+            'state' => Document::STATE_DRAFT,
+            'content' => [],
+        ]);
+
+        $memberPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $member->id,
+            'title' => 'Member plan',
+            'main_target' => 'Member target',
+            'state' => Document::STATE_DRAFT,
+            'content' => [],
+        ]);
+
+        WeeklyActivityAssignment::create([
+            'source_document_id' => $ownerPlan->id,
+            'source_user_id' => $owner->id,
+            'assignee_user_id' => $member->id,
+            'period_id' => $nextPeriod->id,
+            'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+            'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
+            'activity_payload' => [
+                'day' => 'Monday',
+                'activity' => 'From owner plan',
+                'location' => 'Office',
+            ],
+        ]);
+
+        WeeklyActivityAssignment::create([
+            'source_document_id' => $memberPlan->id,
+            'source_user_id' => $member->id,
+            'assignee_user_id' => $member->id,
+            'period_id' => $nextPeriod->id,
+            'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+            'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
+            'activity_payload' => [
+                'day' => 'Tuesday',
+                'activity' => 'Self assigned',
+                'location' => 'Field',
+            ],
+        ]);
+
+        $rows = app(WeeklyActivityAssignmentService::class)
+            ->assignmentsForUser((string) $member->id, (string) $nextPeriod->id);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame((string) $owner->id, (string) $rows->first()->source_user_id);
+        $this->assertSame('From owner plan', data_get($rows->first()->activity_payload, 'activity'));
     }
 
     public function test_non_assigned_user_does_not_get_assignment_projection(): void

@@ -9,11 +9,11 @@
         || !$assignmentOwner
         || (string) $assignmentOwner->id === (string) auth()->id();
     $assignmentTitle = $isAssignedToCurrentUser
-        ? 'Assigned To You'
-        : 'Assigned To '.($assignmentOwner->name ?? 'Staff');
+        ? 'Assigned by Others'
+        : 'Assigned to '.($assignmentOwner->name ?? 'Staff').' by Others';
     $assignmentSubtitle = $isAssignedToCurrentUser
-        ? 'Read-only from shared weekly plans'
-        : 'Read-only from shared weekly plans for '.($assignmentOwner->name ?? 'this staff member');
+        ? 'Tasks from shared weekly plans where another staff member assigned you'
+        : 'Tasks from shared weekly plans where another staff member assigned '.($assignmentOwner->name ?? 'this staff member');
 @endphp
 
 @if($assignedRows->isNotEmpty())
