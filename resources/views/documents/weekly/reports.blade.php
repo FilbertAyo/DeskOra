@@ -201,20 +201,6 @@
                                                             <i class="ti ti-edit"></i>
                                                         </a>
                                                     @endif
-                                                    @can('delete', $document)
-                                                        @if($document->canBeDeleted())
-                                                            <form action="{{ route('documents.destroy', $document->id) }}"
-                                                                method="POST"
-                                                                class="d-inline"
-                                                                onsubmit="return confirm('Delete this weekly report draft? This action cannot be undone.');">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit" class="btn btn-danger" title="Delete">
-                                                                    <i class="ti ti-trash"></i>
-                                                                </button>
-                                                            </form>
-                                                        @endif
-                                                    @endcan
                                                     @if($document->period)
                                                         @php
                                                             $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
