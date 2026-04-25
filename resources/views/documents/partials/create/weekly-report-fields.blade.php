@@ -122,12 +122,12 @@
                 <table class="table table-bordered align-middle mb-0">
                     <thead class="thead-light">
                         <tr>
-                            <th style="width: 70px;">No.</th>
-                            <th>Activity (from Weekly Plan)</th>
-                            <th style="width: 160px;">Progress</th>
+                            <th style="width: 60px;">No.</th>
+                            <th style="width: 320px;">Activity (from Weekly Plan)</th>
+                            <th style="width: 150px;">Progress</th>
                             <th>Remarks/Challenges</th>
-                            <th style="width: 180px;">Next Step</th>
-                            <th style="width: 60px;"></th>
+                            <th>Next Step</th>
+                            <th style="width: 50px;"></th>
                         </tr>
                     </thead>
                     <tbody id="reportActivityProgressBody">
