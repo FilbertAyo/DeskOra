@@ -5,24 +5,22 @@
         </div>
         <div class="card-body">
             @php
-                $planMainTarget = null;
-                $planActivities = [];
-                if (isset($relatedPlan) && $relatedPlan && $relatedPlan->main_target) {
-                    $planMainTarget = $relatedPlan->main_target;
-                } elseif (old('period_id')) {
+                $effectiveRelatedPlan = isset($relatedPlan) && $relatedPlan ? $relatedPlan : null;
+                if (! $effectiveRelatedPlan && old('period_id')) {
                     $selectedPeriod = \App\Models\WorkPeriod::find(old('period_id'));
                     if ($selectedPeriod) {
-                        $plan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
+                        $effectiveRelatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
                             $selectedPeriod->id,
                             (string) auth()->id()
                         );
-                        if ($plan) {
-                            $planMainTarget = $plan->main_target;
-                        }
                     }
                 }
-                if (isset($relatedPlan) && $relatedPlan && is_array($relatedPlan->content ?? null)) {
-                    $planActivities = collect($relatedPlan->content['planned_activities'] ?? [])
+
+                $planMainTarget = $effectiveRelatedPlan?->main_target;
+                $planActivities = [];
+                $planBudget = [];
+                if ($effectiveRelatedPlan && is_array($effectiveRelatedPlan->content ?? null)) {
+                    $planActivities = collect($effectiveRelatedPlan->content['planned_activities'] ?? [])
                         ->filter(fn($row) => is_array($row) && !empty(trim((string)($row['activity'] ?? ''))))
                         ->map(function($row) {
                             $day = trim((string)($row['day'] ?? ''));
@@ -35,7 +33,30 @@
                         })
                         ->values()
                         ->all();
+
+                    $planBudget = is_array($effectiveRelatedPlan->content['budget'] ?? null)
+                        ? $effectiveRelatedPlan->content['budget']
+                        : [];
                 }
+
+                $planBudgetFiltered = is_array($planBudget) ? array_values(array_filter($planBudget, function ($row) {
+                    if (! is_array($row)) {
+                        return false;
+                    }
+
+                    return trim((string) ($row['item'] ?? '')) !== '' || trim((string) ($row['amount'] ?? '')) !== '';
+                })) : [];
+                $relatedPlanReviewsByUid = $effectiveRelatedPlan ? $effectiveRelatedPlan->budgetReviewItemsByUid() : [];
+                $budgetStatuses = old('content.budget_statuses', []);
+                $budgetStatuses = is_array($budgetStatuses) ? $budgetStatuses : [];
+                $statusByUid = [];
+                foreach ($budgetStatuses as $statusRow) {
+                    $statusUid = is_array($statusRow) ? trim((string) ($statusRow['budget_uid'] ?? '')) : '';
+                    if ($statusUid !== '') {
+                        $statusByUid[$statusUid] = $statusRow;
+                    }
+                }
+                $canProcessWeeklyBudgets = auth()->user()?->can('process weekly budgets') ?? false;
             @endphp
 
             <div id="planTargetContainer">
@@ -147,6 +168,7 @@
                                     @php $selectedActivityOutput = old("content.activity_progress.$i.activity_output", $row['activity_output'] ?? ''); @endphp
                                     <select class="form-select"
                                         name="content[activity_progress][{{ $i }}][activity_output]"
+                                        data-off-plan-select="true"
                                     >
                                         <option value="">-- Select Activity --</option>
                                         @foreach($planActivities as $planActivity)
@@ -154,10 +176,25 @@
                                                 {{ $planActivity['label'] }}
                                             </option>
                                         @endforeach
-                                        @if($selectedActivityOutput !== '' && !collect($planActivities)->contains(fn($a) => ($a['label'] ?? '') === $selectedActivityOutput))
+                                        <option value="__off_plan__" {{ $selectedActivityOutput === '__off_plan__' ? 'selected' : '' }}>Other (Not on Plan)</option>
+                                        @if($selectedActivityOutput !== '' && $selectedActivityOutput !== '__off_plan__' && !collect($planActivities)->contains(fn($a) => ($a['label'] ?? '') === $selectedActivityOutput))
                                             <option value="{{ $selectedActivityOutput }}" selected>{{ $selectedActivityOutput }}</option>
                                         @endif
                                     </select>
+                                    @php
+                                        $offPlanActivity = old("content.activity_progress.$i.off_plan_activity", $row['off_plan_activity'] ?? '');
+                                        $showOffPlanActivity = $selectedActivityOutput === '__off_plan__';
+                                    @endphp
+                                    <div class="mt-2" data-off-plan-input-wrap="true" @if(!$showOffPlanActivity) style="display:none;" @endif>
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            name="content[activity_progress][{{ $i }}][off_plan_activity]"
+                                            value="{{ $offPlanActivity }}"
+                                            placeholder="Describe off-plan activity"
+                                            @if($showOffPlanActivity) required @endif
+                                        >
+                                    </div>
                                 </td>
                                 <td>
                                     <select class="form-select"
@@ -294,15 +331,87 @@
     </div>
 </div>
 
-<div class="col-12 mb-3" id="budgetStatusSectionContainer" style="display: none;">
+<div class="col-12 mb-3" id="budgetStatusSectionContainer">
     <div class="card border-success">
         <div class="card-header bg-white border-bottom">
             <h6 class="mb-0"><i class="ti ti-dollar-sign me-2"></i>5. Budget (from weekly plan)</h6>
         </div>
         <div class="card-body">
-            <div id="budgetStatusContainer"></div>
+            <div id="budgetStatusContainer">
+                <div class="table-responsive" id="budgetStatusTableWrapper" @if(count($planBudgetFiltered) === 0) style="display:none;" @endif>
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Budget Item / Activity</th>
+                                <th style="width: 200px;">Amount</th>
+                                <th style="width: 140px;">Review</th>
+                                <th style="width: 240px;">Your Status</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="budgetStatusTableBody">
+                            @foreach($planBudgetFiltered as $i => $planRow)
+                                @php
+                                    $planRow = is_array($planRow) ? $planRow : [];
+                                    $uid = trim((string)($planRow['budget_uid'] ?? ''));
+                                    $review = $uid !== '' ? ($relatedPlanReviewsByUid[$uid] ?? null) : null;
+                                    $reviewDecision = is_array($review) ? ($review['decision'] ?? null) : null;
+                                    $statusRow = ($uid !== '' && isset($statusByUid[$uid])) ? $statusByUid[$uid] : ($budgetStatuses[$i] ?? []);
+                                    $statusRow = is_array($statusRow) ? $statusRow : [];
+                                    $currentStatus = old("content.budget_statuses.$i.status", $statusRow['status'] ?? '');
+                                    if ($currentStatus === '' && $reviewDecision === 'approved') $currentStatus = 'Received';
+                                    elseif ($currentStatus === '' && $reviewDecision === 'pending') $currentStatus = 'Pending';
+                                    $currentNotes = old("content.budget_statuses.$i.notes", $statusRow['notes'] ?? '');
+                                @endphp
+                                <tr>
+                                    <td>
+                                        <input class="form-control" type="text" value="{{ $planRow['item'] ?? '' }}" disabled>
+                                        <input type="hidden" name="content[budget_statuses][{{ $i }}][budget_uid]" value="{{ $uid }}">
+                                    </td>
+                                    <td>
+                                        <input class="form-control" type="text" value="{{ $planRow['amount'] ?? '' }}" disabled>
+                                    </td>
+                                    <td class="text-center">
+                                        @if($reviewDecision === 'approved')
+                                            <span class="badge bg-success">Approved</span>
+                                        @elseif($reviewDecision === 'rejected')
+                                            <span class="badge bg-danger">Rejected</span>
+                                        @elseif($reviewDecision === 'pending')
+                                            <span class="badge bg-warning">Pending</span>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($canProcessWeeklyBudgets)
+                                            <select class="form-select" name="content[budget_statuses][{{ $i }}][status]">
+                                                @foreach(['Not started','Pending','Received','Paid'] as $opt)
+                                                    <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <input type="hidden" name="content[budget_statuses][{{ $i }}][status]" value="{{ $currentStatus }}">
+                                            <input class="form-control" type="text" value="{{ $currentStatus !== '' ? $currentStatus : '-' }}" readonly>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <textarea class="form-control" rows="2" name="content[budget_statuses][{{ $i }}][notes]" @if(!$canProcessWeeklyBudgets) readonly @endif>{{ $currentNotes }}</textarea>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="alert alert-info mb-0" id="budgetStatusEmptyAlert" @if(count($planBudgetFiltered) > 0) style="display:none;" @endif>
+                    No budget items found in the related weekly plan.
+                </div>
+            </div>
             <small class="form-text text-muted mt-2">
-                Budget statuses are based on the budget items in your weekly plan for this period.
+                @if($canProcessWeeklyBudgets)
+                    Budget statuses are based on the budget items in your weekly plan for this period.
+                @else
+                    Budget statuses are based on weekly plan budget items and are updated by finance reviewers.
+                @endif
             </small>
         </div>
     </div>

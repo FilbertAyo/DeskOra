@@ -26,6 +26,7 @@
                                             ->all()
                                         : [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
+                                    $canProcessWeeklyBudgets = auth()->user()?->can('process weekly budgets') ?? false;
                                     $targetAccomplishedRaw = old('target_accomplished');
                                     if ($targetAccomplishedRaw === null) {
                                         $targetAccomplishedRaw = $document->target_accomplished;
@@ -157,6 +158,7 @@
                                                                     @php $selectedActivityOutput = old("content.activity_progress.$i.activity_output", $row['activity_output'] ?? ''); @endphp
                                                                     <select class="form-select"
                                                                         name="content[activity_progress][{{ $i }}][activity_output]"
+                                                                        data-off-plan-select="true"
                                                                     >
                                                                         <option value="">-- Select Activity --</option>
                                                                         @foreach($planActivities as $planActivity)
@@ -164,10 +166,25 @@
                                                                                 {{ $planActivity['label'] }}
                                                                             </option>
                                                                         @endforeach
-                                                                        @if($selectedActivityOutput !== '' && !collect($planActivities)->contains(fn($a) => ($a['label'] ?? '') === $selectedActivityOutput))
+                                                                        <option value="__off_plan__" {{ $selectedActivityOutput === '__off_plan__' ? 'selected' : '' }}>Other (Not on Plan)</option>
+                                                                        @if($selectedActivityOutput !== '' && $selectedActivityOutput !== '__off_plan__' && !collect($planActivities)->contains(fn($a) => ($a['label'] ?? '') === $selectedActivityOutput))
                                                                             <option value="{{ $selectedActivityOutput }}" selected>{{ $selectedActivityOutput }}</option>
                             @endif
                                                                     </select>
+                                                                    @php
+                                                                        $offPlanActivity = old("content.activity_progress.$i.off_plan_activity", $row['off_plan_activity'] ?? '');
+                                                                        $showOffPlanActivity = $selectedActivityOutput === '__off_plan__';
+                                                                    @endphp
+                                                                    <div class="mt-2" data-off-plan-input-wrap="true" @if(!$showOffPlanActivity) style="display:none;" @endif>
+                                                                        <input
+                                                                            type="text"
+                                                                            class="form-control"
+                                                                            name="content[activity_progress][{{ $i }}][off_plan_activity]"
+                                                                            value="{{ $offPlanActivity }}"
+                                                                            placeholder="Describe off-plan activity"
+                                                                            @if($showOffPlanActivity) required @endif
+                                                                        >
+                                                                    </div>
                                                                 </td>
                                                                 <td>
                                                                     <select class="form-select"
@@ -379,16 +396,22 @@
                                                                         @endif
                                                                     </td>
                                                                     <td>
-                                                                        <select class="form-select"
-                                                                            name="content[budget_statuses][{{ $i }}][status]">
-                                                                            @foreach(['Not started','Pending','Received','Paid'] as $opt)
-                                                                                <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
-                                                                            @endforeach
-                                                                        </select>
+                                                                        @if($canProcessWeeklyBudgets)
+                                                                            <select class="form-select"
+                                                                                name="content[budget_statuses][{{ $i }}][status]">
+                                                                                @foreach(['Not started','Pending','Received','Paid'] as $opt)
+                                                                                    <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                                                                @endforeach
+                                                                            </select>
+                                                                        @else
+                                                                            <input type="hidden" name="content[budget_statuses][{{ $i }}][status]" value="{{ $currentStatus }}">
+                                                                            <input class="form-control" type="text" value="{{ $currentStatus !== '' ? $currentStatus : '-' }}" readonly>
+                                                                        @endif
                                                                     </td>
                                                                     <td>
                                                                         <textarea class="form-control" rows="2"
-                                                                            name="content[budget_statuses][{{ $i }}][notes]">{{ old("content.budget_statuses.$i.notes", $statusRow['notes'] ?? '') }}</textarea>
+                                                                            name="content[budget_statuses][{{ $i }}][notes]"
+                                                                            @if(!$canProcessWeeklyBudgets) readonly @endif>{{ old("content.budget_statuses.$i.notes", $statusRow['notes'] ?? '') }}</textarea>
                                                                     </td>
                                                                 </tr>
                                                             @endforeach
@@ -399,7 +422,11 @@
                                                 <div class="alert alert-info mb-0">No budget items found in the related weekly plan.</div>
                                             @endif
                                             <small class="form-text text-muted mt-2">
-                                                Budget statuses reflect outcomes for the budget items defined in your weekly plan. Review decisions are auto-prefilled but you can adjust.
+                                                @if($canProcessWeeklyBudgets)
+                                                    Budget statuses reflect outcomes for the budget items defined in your weekly plan. Review decisions are auto-prefilled but you can adjust.
+                                                @else
+                                                    Budget statuses are maintained by finance reviewers and are shown here for reference.
+                                                @endif
                                             </small>
                                         </div>
                                     </div>

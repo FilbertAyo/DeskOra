@@ -6,7 +6,7 @@
             @php
                 $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
                     $document->period_id,
-                    (string) auth()->id()
+                    (string) $document->user_id
                 );
             @endphp
             

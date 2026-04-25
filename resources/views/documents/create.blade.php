@@ -93,7 +93,8 @@
             "selectedType": {!! json_encode($selectedType ?? null) !!},
             "currentPeriodId": {!! json_encode(isset($currentPeriod) ? $currentPeriod->id : null) !!},
             "nextPeriodId": {!! json_encode(isset($nextPeriod) ? $nextPeriod->id : null) !!},
-            "relatedPlanMainTarget": {!! json_encode(isset($relatedPlan) && $relatedPlan ? $relatedPlan->main_target : null) !!}
+            "relatedPlanMainTarget": {!! json_encode(isset($relatedPlan) && $relatedPlan ? $relatedPlan->main_target : null) !!},
+            "canProcessWeeklyBudgets": {!! json_encode(auth()->user()?->can('process weekly budgets') ?? false) !!}
         }
     </script>
     <script>
@@ -123,6 +124,7 @@
             const currentPeriodId = formData.currentPeriodId;
             const nextPeriodId = formData.nextPeriodId;
             const relatedPlanMainTarget = formData.relatedPlanMainTarget;
+            const canProcessWeeklyBudgets = formData.canProcessWeeklyBudgets;
 
             // Show/hide work period dropdown based on document type
             function toggleWorkPeriod() {
@@ -274,6 +276,20 @@
                     cell.textContent = String(idx + 1);
                 });
             }
+            function syncOffPlanInputForSelect(selectEl) {
+                if (!selectEl) return;
+                const cell = selectEl.closest('td');
+                if (!cell) return;
+                const wrap = cell.querySelector('[data-off-plan-input-wrap="true"]');
+                const input = wrap ? wrap.querySelector('input[name$="[off_plan_activity]"]') : null;
+                const showOffPlan = selectEl.value === '__off_plan__';
+                if (!wrap || !input) return;
+                wrap.style.display = showOffPlan ? '' : 'none';
+                input.required = showOffPlan;
+                if (!showOffPlan) {
+                    input.value = '';
+                }
+            }
 
             function toggleTargetExplanation() {
                 if (targetAccomplishedSelect && targetExplanationContainer && targetExplanationTextarea) {
@@ -414,9 +430,12 @@
                     row.innerHTML = `
                         <td class="text-center align-middle js-report-activity-row-no"></td>
                         <td>
-                            <select class="form-select" name="content[activity_progress][${reportActivityIndex}][activity_output]">
+                            <select class="form-select" name="content[activity_progress][${reportActivityIndex}][activity_output]" data-off-plan-select="true">
                                 ${window.__reportActivityOptionsHtml || '<option value="">-- Select Activity --</option>'}
                             </select>
+                            <div class="mt-2" data-off-plan-input-wrap="true" style="display:none;">
+                                <input type="text" class="form-control" name="content[activity_progress][${reportActivityIndex}][off_plan_activity]" placeholder="Describe off-plan activity">
+                            </div>
                         </td>
                         <td>
                             <select class="form-select" name="content[activity_progress][${reportActivityIndex}][progress]">
@@ -434,6 +453,7 @@
                     reportActivityProgressBody.appendChild(row);
                     reportActivityIndex++;
                     updateReportActivityRowNumbers();
+                    syncOffPlanInputForSelect(row.querySelector('[data-off-plan-select="true"]'));
                 });
 
                 reportActivityProgressBody.addEventListener('click', function(event) {
@@ -446,6 +466,14 @@
                 });
 
                 updateReportActivityRowNumbers();
+                reportActivityProgressBody.querySelectorAll('[data-off-plan-select="true"]').forEach((selectEl) => {
+                    syncOffPlanInputForSelect(selectEl);
+                });
+                reportActivityProgressBody.addEventListener('change', function(event) {
+                    const selectEl = event.target.closest('[data-off-plan-select="true"]');
+                    if (!selectEl) return;
+                    syncOffPlanInputForSelect(selectEl);
+                });
             }
 
             if (addAchievementRowBtn && achievementsBody) {
@@ -497,6 +525,9 @@
             if (selectedType === 'weekly_report' && periodSelect) {
                 const budgetStatusSectionContainer = document.getElementById('budgetStatusSectionContainer');
                 const budgetStatusContainer = document.getElementById('budgetStatusContainer');
+                const budgetStatusTableWrapper = document.getElementById('budgetStatusTableWrapper');
+                const budgetStatusTableBody = document.getElementById('budgetStatusTableBody');
+                const budgetStatusEmptyAlert = document.getElementById('budgetStatusEmptyAlert');
 
                 function loadPlanData(periodId) {
                     fetch(`/documents/plan-target?period_id=${periodId}`, {
@@ -540,58 +571,70 @@
                             const budgetItems = data.budget_items || [];
                             if (budgetItems.length > 0) {
                                 budgetStatusSectionContainer.style.display = '';
-                                budgetStatusContainer.innerHTML = budgetItems.map((item, idx) => {
+                                const rowsHtml = budgetItems.map((item, idx) => {
                                     const amount = item.amount ?? '';
                                     const label = item.item ?? '';
                                     const uid = item.budget_uid ?? '';
                                     const reviewDecision = item.review_decision ?? null;
-                                    const reviewNote = item.review_note ?? '';
-
-                                    // Auto-prefill status from budget review decision
                                     let defaultStatus = 'Not started';
                                     if (reviewDecision === 'approved') defaultStatus = 'Received';
-                                    else if (reviewDecision === 'rejected') defaultStatus = 'Not started';
                                     else if (reviewDecision === 'pending') defaultStatus = 'Pending';
 
-                                    // Review badge
-                                    let reviewBadge = '';
+                                    let reviewBadge = '<span class="text-muted">-</span>';
                                     if (reviewDecision === 'approved') {
-                                        reviewBadge = '<span class="badge bg-success ms-1">Approved</span>';
+                                        reviewBadge = '<span class="badge bg-success">Approved</span>';
                                     } else if (reviewDecision === 'rejected') {
-                                        reviewBadge = '<span class="badge bg-danger ms-1">Rejected</span>';
-                                        if (reviewNote) reviewBadge += `<br><small class="text-danger">${reviewNote}</small>`;
+                                        reviewBadge = '<span class="badge bg-danger">Rejected</span>';
                                     } else if (reviewDecision === 'pending') {
-                                        reviewBadge = '<span class="badge bg-warning ms-1">Pending Review</span>';
+                                        reviewBadge = '<span class="badge bg-warning">Pending</span>';
                                     }
 
                                     return `
-                                        <div class="mb-3 border rounded p-2">
-                                            <input type="hidden" name="content[budget_statuses][${idx}][budget_uid]" value="${uid}">
-                                            <div class="d-flex justify-content-between align-items-start flex-wrap">
-                                                <div class="me-3">
-                                                    <div class="fw-semibold">${label} ${reviewBadge}</div>
-                                                    <small class="text-muted">Amount: ${amount}</small>
-                                                </div>
-                                                <div class="flex-grow-1" style="min-width: 260px;">
-                                                    <label class="form-label mb-1">Budget status</label>
-                                                    <select class="form-select"
-                                                        name="content[budget_statuses][${idx}][status]">
+                                        <tr>
+                                            <td>
+                                                <input class="form-control" type="text" value="${label}" disabled>
+                                                <input type="hidden" name="content[budget_statuses][${idx}][budget_uid]" value="${uid}">
+                                            </td>
+                                            <td>
+                                                <input class="form-control" type="text" value="${amount}" disabled>
+                                            </td>
+                                            <td class="text-center">${reviewBadge}</td>
+                                            <td>
+                                                ${canProcessWeeklyBudgets
+                                                    ? `<select class="form-select" name="content[budget_statuses][${idx}][status]">
                                                         ${['Not started','Pending','Received','Paid'].map(opt => `
                                                             <option value="${opt}" ${opt === defaultStatus ? 'selected' : ''}>${opt}</option>
                                                         `).join('')}
-                                                    </select>
-                                                    <textarea class="form-control mt-2"
-                                                        name="content[budget_statuses][${idx}][notes]"
-                                                        rows="5"
-                                                        placeholder="Notes (optional)"></textarea>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                    </select>`
+                                                    : `<input type="hidden" name="content[budget_statuses][${idx}][status]" value="${defaultStatus}">
+                                                       <input class="form-control" type="text" value="${defaultStatus}" readonly>`
+                                                }
+                                            </td>
+                                            <td>
+                                                <textarea class="form-control" name="content[budget_statuses][${idx}][notes]" rows="2" ${canProcessWeeklyBudgets ? '' : 'readonly'}></textarea>
+                                            </td>
+                                        </tr>
                                     `;
                                 }).join('');
+                                if (budgetStatusTableBody) {
+                                    budgetStatusTableBody.innerHTML = rowsHtml;
+                                }
+                                if (budgetStatusTableWrapper) {
+                                    budgetStatusTableWrapper.style.display = '';
+                                }
+                                if (budgetStatusEmptyAlert) {
+                                    budgetStatusEmptyAlert.style.display = 'none';
+                                }
                             } else {
-                                budgetStatusSectionContainer.style.display = 'none';
-                                budgetStatusContainer.innerHTML = '';
+                                if (budgetStatusTableBody) {
+                                    budgetStatusTableBody.innerHTML = '';
+                                }
+                                if (budgetStatusTableWrapper) {
+                                    budgetStatusTableWrapper.style.display = 'none';
+                                }
+                                if (budgetStatusEmptyAlert) {
+                                    budgetStatusEmptyAlert.style.display = '';
+                                }
                             }
                         }
 
@@ -600,6 +643,7 @@
                             const optionsHtml = [
                                 '<option value="">-- Select Activity --</option>',
                                 ...plannedActivities.map(item => `<option value="${item.label}">${item.label}</option>`),
+                                '<option value="__off_plan__">Other (Not on Plan)</option>',
                             ].join('');
                             window.__reportActivityOptionsHtml = optionsHtml;
                             reportActivityProgressBody.querySelectorAll('select[name^="content[activity_progress]"][name$="[activity_output]"]').forEach((select) => {
@@ -615,6 +659,7 @@
                                     }
                                     select.value = currentValue;
                                 }
+                                syncOffPlanInputForSelect(select);
                             });
                         }
                     })

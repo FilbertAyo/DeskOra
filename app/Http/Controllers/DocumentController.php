@@ -319,6 +319,7 @@ class DocumentController extends Controller
 
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
@@ -873,6 +874,7 @@ class DocumentController extends Controller
 
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
@@ -2498,8 +2500,24 @@ class DocumentController extends Controller
 
             $content['activity_progress'] = $this->filterNonEmptyRows(
                 $content['activity_progress'] ?? [],
-                ['activity_output', 'progress', 'remarks_challenges', 'next_step']
+                ['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step']
             );
+            $content['activity_progress'] = array_values(array_map(function ($row) {
+                if (! is_array($row)) {
+                    return [];
+                }
+
+                $activityOutput = trim((string) ($row['activity_output'] ?? ''));
+                $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
+                if ($activityOutput !== '__off_plan__') {
+                    $offPlanActivity = '';
+                }
+
+                $row['activity_output'] = $activityOutput;
+                $row['off_plan_activity'] = $offPlanActivity;
+
+                return $row;
+            }, $content['activity_progress']));
 
             $content['challenges_mitigation'] = $this->filterNonEmptyRows(
                 $content['challenges_mitigation'] ?? [],

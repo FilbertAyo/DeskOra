@@ -84,6 +84,20 @@
                     cell.textContent = String(idx + 1);
                 });
             }
+            function syncOffPlanInputForSelect(selectEl) {
+                if (!selectEl) return;
+                const cell = selectEl.closest('td');
+                if (!cell) return;
+                const wrap = cell.querySelector('[data-off-plan-input-wrap="true"]');
+                const input = wrap ? wrap.querySelector('input[name$="[off_plan_activity]"]') : null;
+                const showOffPlan = selectEl.value === '__off_plan__';
+                if (!wrap || !input) return;
+                wrap.style.display = showOffPlan ? '' : 'none';
+                input.required = showOffPlan;
+                if (!showOffPlan) {
+                    input.value = '';
+                }
+            }
 
             function toggleTargetExplanation() {
                 if (targetAccomplishedSelect && targetExplanationContainer && targetExplanationTextarea) {
@@ -226,9 +240,12 @@
                     row.innerHTML = `
                         <td class="text-center align-middle js-report-activity-row-no"></td>
                         <td>
-                            <select class="form-select" name="content[activity_progress][${reportActivityIndex}][activity_output]">
+                            <select class="form-select" name="content[activity_progress][${reportActivityIndex}][activity_output]" data-off-plan-select="true">
                                 ${window.__reportActivityOptionsHtml || '<option value="">-- Select Activity --</option>'}
                             </select>
+                            <div class="mt-2" data-off-plan-input-wrap="true" style="display:none;">
+                                <input type="text" class="form-control" name="content[activity_progress][${reportActivityIndex}][off_plan_activity]" placeholder="Describe off-plan activity">
+                            </div>
                         </td>
                         <td>
                             <select class="form-select" name="content[activity_progress][${reportActivityIndex}][progress]">
@@ -246,6 +263,7 @@
                     reportActivityProgressBody.appendChild(row);
                     reportActivityIndex++;
                     updateReportActivityRowNumbers();
+                    syncOffPlanInputForSelect(row.querySelector('[data-off-plan-select="true"]'));
                 });
 
                 reportActivityProgressBody.addEventListener('click', function(event) {
@@ -258,6 +276,14 @@
                 });
 
                 updateReportActivityRowNumbers();
+                reportActivityProgressBody.querySelectorAll('[data-off-plan-select="true"]').forEach((selectEl) => {
+                    syncOffPlanInputForSelect(selectEl);
+                });
+                reportActivityProgressBody.addEventListener('change', function(event) {
+                    const selectEl = event.target.closest('[data-off-plan-select="true"]');
+                    if (!selectEl) return;
+                    syncOffPlanInputForSelect(selectEl);
+                });
             }
 
             if (addAchievementRowBtn && achievementsBody) {

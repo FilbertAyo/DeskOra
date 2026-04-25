@@ -5,17 +5,17 @@
                                     $challengesMitigation = $content['challenges_mitigation'] ?? [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
 
-                                    $relatedPlan = \App\Models\Document::where('user_id', $document->user_id)
-                                        ->where('period_id', $document->period_id)
-                                        ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
-                                        ->first();
+                                    $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
+                                        $document->period_id,
+                                        (string) $document->user_id
+                                    );
                                     $planBudget = is_array($relatedPlan?->content ?? null) ? ($relatedPlan->content['budget'] ?? []) : [];
 
                                     $hasActivityProgress = collect($activityProgress ?: [])->contains(function ($row) {
                                         if (! is_array($row)) {
                                             return false;
                                         }
-                                        foreach (['activity_output', 'progress', 'remarks_challenges', 'next_step'] as $k) {
+                                        foreach (['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'] as $k) {
                                             if (trim((string) ($row[$k] ?? '')) !== '') {
                                                 return true;
                                             }
@@ -73,18 +73,26 @@
                                                                 @php $row = is_array($row) ? $row : []; @endphp
                                                                 @php
                                                                     $apEmpty = true;
-                                                                    foreach (['activity_output', 'progress', 'remarks_challenges', 'next_step'] as $apk) {
+                                                                    foreach (['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'] as $apk) {
                                                                         if (trim((string) ($row[$apk] ?? '')) !== '') {
                                                                             $apEmpty = false;
                                                                             break;
                                                                         }
+                                                                    }
+                                                                    $activityOutputRaw = trim((string) ($row['activity_output'] ?? ''));
+                                                                    $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
+                                                                    $activityOutputDisplay = $activityOutputRaw;
+                                                                    if ($activityOutputRaw === '__off_plan__') {
+                                                                        $activityOutputDisplay = $offPlanActivity !== '' ? ('Other (Not on Plan): '.$offPlanActivity) : 'Other (Not on Plan)';
+                                                                    } elseif ($activityOutputRaw === '' && $offPlanActivity !== '') {
+                                                                        $activityOutputDisplay = 'Other (Not on Plan): '.$offPlanActivity;
                                                                     }
                                                                 @endphp
                                                                 @if(!$apEmpty)
                                                                     @php $apNum++; @endphp
                                                                     <tr>
                                                                         <td class="text-center">{{ $apNum }}</td>
-                                                                        <td>{{ $row['activity_output'] ?? '' }}</td>
+                                                                        <td>{{ $activityOutputDisplay }}</td>
                                                                         <td>{{ $row['progress'] ?? '' }}</td>
                                                                         <td>{{ $row['remarks_challenges'] ?? '' }}</td>
                                                                         <td>{{ $row['next_step'] ?? '' }}</td>
