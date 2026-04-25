@@ -355,7 +355,6 @@
                                                                 <th>Budget Item / Activity</th>
                                                                 <th style="width: 200px;">Amount</th>
                                                                 <th style="width: 140px;">Review</th>
-                                                                <th style="width: 240px;">Your Status</th>
                                                                 <th>Notes</th>
                                                             </tr>
                                                         </thead>
@@ -393,19 +392,6 @@
                                                                             <span class="badge bg-warning">Pending</span>
                                                                         @else
                                                                             <span class="text-muted">-</span>
-                                                                        @endif
-                                                                    </td>
-                                                                    <td>
-                                                                        @if($canProcessWeeklyBudgets)
-                                                                            <select class="form-select"
-                                                                                name="content[budget_statuses][{{ $i }}][status]">
-                                                                                @foreach(['Not started','Pending','Received','Paid'] as $opt)
-                                                                                    <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
-                                                                                @endforeach
-                                                                            </select>
-                                                                        @else
-                                                                            <input type="hidden" name="content[budget_statuses][{{ $i }}][status]" value="{{ $currentStatus }}">
-                                                                            <input class="form-control" type="text" value="{{ $currentStatus !== '' ? $currentStatus : '-' }}" readonly>
                                                                         @endif
                                                                     </td>
                                                                     <td>

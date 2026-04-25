@@ -215,7 +215,6 @@
                                                                 <th>Budget Item</th>
                                                                 <th style="width: 150px;">Amount</th>
                                                                 <th style="width: 130px;">Review</th>
-                                                                <th style="width: 160px;">Staff Status</th>
                                                                 <th>Notes</th>
                                                             </tr>
                                                         </thead>
@@ -243,7 +242,6 @@
                                                                             <span class="text-muted">-</span>
                                                                         @endif
                                                                     </td>
-                                                                    <td>{{ $statusRow['status'] ?? '' }}</td>
                                                                     <td>{{ $statusRow['notes'] ?? '' }}</td>
                                                                 </tr>
                                                             @endforeach

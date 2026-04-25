@@ -576,10 +576,6 @@
                                     const label = item.item ?? '';
                                     const uid = item.budget_uid ?? '';
                                     const reviewDecision = item.review_decision ?? null;
-                                    let defaultStatus = 'Not started';
-                                    if (reviewDecision === 'approved') defaultStatus = 'Received';
-                                    else if (reviewDecision === 'pending') defaultStatus = 'Pending';
-
                                     let reviewBadge = '<span class="text-muted">-</span>';
                                     if (reviewDecision === 'approved') {
                                         reviewBadge = '<span class="badge bg-success">Approved</span>';
@@ -599,17 +595,6 @@
                                                 <input class="form-control" type="text" value="${amount}" disabled>
                                             </td>
                                             <td class="text-center">${reviewBadge}</td>
-                                            <td>
-                                                ${canProcessWeeklyBudgets
-                                                    ? `<select class="form-select" name="content[budget_statuses][${idx}][status]">
-                                                        ${['Not started','Pending','Received','Paid'].map(opt => `
-                                                            <option value="${opt}" ${opt === defaultStatus ? 'selected' : ''}>${opt}</option>
-                                                        `).join('')}
-                                                    </select>`
-                                                    : `<input type="hidden" name="content[budget_statuses][${idx}][status]" value="${defaultStatus}">
-                                                       <input class="form-control" type="text" value="${defaultStatus}" readonly>`
-                                                }
-                                            </td>
                                             <td>
                                                 <textarea class="form-control" name="content[budget_statuses][${idx}][notes]" rows="2" ${canProcessWeeklyBudgets ? '' : 'readonly'}></textarea>
                                             </td>
