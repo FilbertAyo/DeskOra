@@ -41,7 +41,6 @@
                                     <th style="width: 170px;">Assigned To</th>
                                 @endif
                                 <th>From</th>
-                                <th style="width: 120px;">Plan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -69,11 +68,7 @@
                                         <td>{{ $assignment->assignee->name ?? '-' }}</td>
                                     @endif
                                     <td>{{ $assignment->sourceUser->name ?? '-' }}</td>
-                                    <td>
-                                        <a href="{{ route('documents.show', $assignment->source_document_id) }}" class="btn btn-sm btn-outline-info">
-                                            View
-                                        </a>
-                                    </td>
+                                  
                                 </tr>
                             @endforeach
                         </tbody>

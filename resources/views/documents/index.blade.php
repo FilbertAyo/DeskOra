@@ -163,7 +163,7 @@
                                     <thead class="thead-light">
                                         <tr>
                                             <th class="text-center" style="width: 50px;">No.</th>
-                                            <th>Week Period</th>
+                                            <th style="width: 160px;">Week Period</th>
                                             <th>Staff</th>
                                             <th>Weekly Plan</th>
                                             <th>Weekly Report</th>
@@ -197,7 +197,7 @@
                                                 </td>
                                                 <td>
                                                     @if($planDoc)
-                                                        <div class="fw-semibold">{{ $planDoc->display_title }}</div>
+
                                                         @if($planDoc->sharedUsers->isNotEmpty())
                                                             @php
                                                                 $planSharedNames = $planDoc->sharedUsers->pluck('name')->filter()->values()->implode(', ');
@@ -218,7 +218,7 @@
                                                 </td>
                                                 <td>
                                                     @if($reportDoc)
-                                                        <div class="fw-semibold">{{ $reportDoc->display_title }}</div>
+
                                                         @if($reportDoc->sharedUsers->isNotEmpty())
                                                             @php
                                                                 $reportSharedNames = $reportDoc->sharedUsers->pluck('name')->filter()->values()->implode(', ');
@@ -240,7 +240,7 @@
                                                 <td>
                                                     @if($row['updated_at'])
                                                         <small class="text-muted">
-                                                            {{ $row['updated_at']->format('M d, Y') }}<br>
+                                                          
                                                             <span>{{ $row['updated_at']->diffForHumans() }}</span>
                                                         </small>
                                                     @else
@@ -248,16 +248,16 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-center">
-                                                    <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                                    <div class="d-flex flex-wrap gap-1 justify-content-center btn-group btn-group-sm">
                                                         @if($planDoc)
                                                             <a href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}"
-                                                                class="btn btn-info text-white btn-sm" title="View Plan">
+                                                                class="btn btn-sm btn-info text-white btn-sm" title="View Plan">
                                                                 <i class="ti ti-eye"></i> Plan
                                                             </a>
                                                         @endif
                                                         @if($reportDoc)
                                                             <a href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}"
-                                                                class="btn btn-primary text-white btn-sm" title="View Report">
+                                                                class="btn btn-sm btn-primary text-white btn-sm" title="View Report">
                                                                 <i class="ti ti-eye"></i> Report
                                                             </a>
                                                         @endif
