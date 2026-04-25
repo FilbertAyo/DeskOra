@@ -14,8 +14,18 @@
             ->take(5)
             ->values();
 
-        $activeActionTasks = $actionLogProgress['activeTasks'] ?? [];
-        $activeActionTaskCount = is_array($activeActionTasks) ? count($activeActionTasks) : 0;
+        $activeActionTasks = collect($actionLogProgress['activeTasks'] ?? [])
+            ->filter(function ($task) {
+                if (!is_array($task)) {
+                    return false;
+                }
+
+                $latestProgress = strtolower(trim((string) ($task['latest_progress'] ?? 'Not Started')));
+
+                return !in_array($latestProgress, ['done', 'cancelled'], true);
+            })
+            ->values();
+        $activeActionTaskCount = $activeActionTasks->count();
         $assignedWeeklyActivities = collect($assignedWeeklyActivities ?? []);
         $assignedWeeklyActivityCount = $assignedWeeklyActivities->count();
         $sharedWithMeCount = (int) ($sharedWithMeCount ?? 0);
@@ -80,7 +90,7 @@
 
     <div class="row">
         <div class="col-12 col-lg-8 col-md-8 mb-3">
-            <div class="card shadow-none border h-100">
+            <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
                     <span class="badge bg-primary">
@@ -89,41 +99,37 @@
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-6 col-xl-3">
+                        <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned for revision
                                 </p>
                                 <h4 class="mb-1 text-danger">{{ $returnedDocs->count() }}</h4>
-                                <small class="text-muted">Update and re-submit these first.</small>
-                            </div>
+                          </div>
                         </div>
-                        <div class="col-6 col-xl-3">
+                        <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-file-edit text-warning me-1"></i>Drafts waiting submission
                                 </p>
                                 <h4 class="mb-1 text-warning">{{ $plainDraftDocs->count() }}</h4>
-                                <small class="text-muted">Ready to review and submit.</small>
-                            </div>
+                           </div>
                         </div>
-                        <div class="col-6 col-xl-3">
+                        <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-clipboard-list text-primary me-1"></i>Open action tasks
                                 </p>
                                 <h4 class="mb-1 text-primary">{{ $activeActionTaskCount }}</h4>
-                                <small class="text-muted">Track progress updates for your assigned tasks.</small>
-                            </div>
+                           </div>
                         </div>
-                        <div class="col-6 col-xl-3">
+                        <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-users-group text-info me-1"></i>Shared weekly docs
                                 </p>
                                 <h4 class="mb-1 text-info">{{ $sharedWithMeCount }}</h4>
-                                <small class="text-muted">Plans/reports where you are a collaborator.</small>
-                                @if($sharedWithMeCount > 0)
+                              @if($sharedWithMeCount > 0)
                                     <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top small">
                                         @if(isset($dashboardAvailableTypes['weekly_plan']))
                                             <a href="{{ route('documents.weekly-plans') }}" class="text-decoration-none">
@@ -139,14 +145,13 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="col-6 col-xl-3">
+                        <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-clipboard-list text-secondary me-1"></i>Assigned activities
                                 </p>
                                 <h4 class="mb-1 text-secondary">{{ $assignedWeeklyActivityCount }}</h4>
-                                <small class="text-muted">Read-only activities assigned to you in weekly plans.</small>
-                            </div>
+                           </div>
                         </div>
                     </div>
 
@@ -183,9 +188,9 @@
         </div>
 
         <div class="col-12 col-lg-4 col-md-4 mb-3">
-            <div class="row g-3">
+            <div class="row">
                 <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border h-100">
+                    <div class="card shadow-none border">
                         <div class="card-body">
                             <h6 class="mb-2 f-w-400 text-muted">Departments</h6>
                             <h4 class="mb-0">
@@ -198,7 +203,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border h-100">
+                    <div class="card shadow-none border">
                         <div class="card-body">
                             <h6 class="mb-2 f-w-400 text-muted">Total Users</h6>
                             <h4 class="mb-0">
@@ -211,7 +216,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border h-100">
+                    <div class="card shadow-none border">
                         <div class="card-body">
                             <h6 class="mb-2 f-w-400 text-muted">Your document drafts</h6>
                             <h4 class="mb-0">
@@ -224,7 +229,7 @@
                     </div>
                 </div>
                 <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border h-100">
+                    <div class="card shadow-none border">
                         <div class="card-body">
                             <h6 class="mb-2 f-w-400 text-muted">Active work period</h6>
                             <h4 class="mb-0">
@@ -260,6 +265,17 @@
                                 <p class="mb-2 text-muted">
                                     {{ $activeActionTaskCount }} task{{ $activeActionTaskCount === 1 ? '' : 's' }} need update.
                                 </p>
+                                <div class="mb-2">
+                                    @foreach($activeActionTasks->take(3) as $task)
+                                        <div class="d-flex justify-content-between align-items-center border rounded bg-white px-2 py-1 mb-1">
+                                            <span class="small text-dark">{{ $task['task'] ?? 'Task' }}</span>
+                                            <span class="badge bg-secondary">{{ $task['latest_progress'] ?? 'Not Started' }}</span>
+                                        </div>
+                                    @endforeach
+                                    @if($activeActionTaskCount > 3)
+                                        <small class="text-muted">+ {{ $activeActionTaskCount - 3 }} more task{{ ($activeActionTaskCount - 3) === 1 ? '' : 's' }}</small>
+                                    @endif
+                                </div>
                                 <div class="d-flex justify-content-end">
                                     @if($currentActionLogDraftId)
                                         <a href="{{ route('action-logs.edit', $currentActionLogDraftId) }}" class="btn btn-sm btn-primary">

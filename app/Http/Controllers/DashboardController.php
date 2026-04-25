@@ -412,8 +412,21 @@ class DashboardController extends Controller
             ? $selectedByPeriod->first(fn ($doc) => $doc->period_id === $currentPeriod->id && $doc->isDraft())
             : null;
 
+        // Focus tasks should reflect what is still pending now.
+        // Prefer current-week action log rows; fall back to historical timeline only if current week has none.
+        $focusPeriodDocuments = $selectedByPeriod;
+        if ($currentPeriod) {
+            $currentPeriodDocs = $selectedByPeriod
+                ->filter(fn ($doc) => $doc->period_id === $currentPeriod->id)
+                ->values();
+
+            if ($currentPeriodDocs->isNotEmpty()) {
+                $focusPeriodDocuments = $currentPeriodDocs;
+            }
+        }
+
         $taskTimeline = [];
-        foreach ($selectedByPeriod as $document) {
+        foreach ($focusPeriodDocuments as $document) {
             if (! $document || ! $document->period) {
                 continue;
             }
