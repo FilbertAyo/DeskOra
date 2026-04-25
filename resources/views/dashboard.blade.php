@@ -123,7 +123,7 @@
                                 <h4 class="mb-1 text-primary">{{ $activeActionTaskCount }}</h4>
                            </div>
                         </div>
-                        <div class="col-6 col-xl-2">
+                        <div class="col-6 col-xl-4">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
                                     <i class="ti ti-users-group text-info me-1"></i>Shared weekly docs
