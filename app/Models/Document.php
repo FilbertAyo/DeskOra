@@ -419,6 +419,18 @@ class Document extends Model
                                                 ->whereColumn('weekly_plan_shares.document_id', 'weekly_plans.id')
                                                 ->where('weekly_plan_shares.user_id', $userId);
                                         });
+                                })
+                                // Prevent cross-team leaks: a weekly report is reachable via plan
+                                // collaboration only when the report author belongs to that same
+                                // plan collaboration group (owner or shared member).
+                                ->where(function ($authorAccess) {
+                                    $authorAccess->whereColumn('weekly_plans.user_id', 'documents.user_id')
+                                        ->orWhereExists(function ($authorShares) {
+                                            $authorShares->selectRaw('1')
+                                                ->from('document_user_shares as weekly_plan_member_shares')
+                                                ->whereColumn('weekly_plan_member_shares.document_id', 'weekly_plans.id')
+                                                ->whereColumn('weekly_plan_member_shares.user_id', 'documents.user_id');
+                                        });
                                 });
                         });
                 });

@@ -314,6 +314,79 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertTrue($pendingForDashboard);
     }
 
+    public function test_plan_collaborator_scope_does_not_include_unrelated_weekly_reports_from_same_period(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $programs = Department::create(['name' => 'Programs']);
+        $finance = Department::create(['name' => 'Finance']);
+
+        $planOwner = $this->createUserInDepartment($programs, ['create weekly plan', 'create weekly report']);
+        $planMember = $this->createUserInDepartment($programs, ['create weekly report']);
+        $outsideAuthor = $this->createUserInDepartment($finance, ['create weekly report']);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $planOwner->id,
+            'main_target' => 'Programs plan',
+            'title' => 'Programs Shared Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $plan->sharedUsers()->sync([$planMember->id]);
+
+        $relatedReport = Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $planOwner->id,
+            'title' => 'Programs report',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $outsideReport = Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $outsideAuthor->id,
+            'title' => 'Finance-only report',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $this->assertTrue(Document::query()
+            ->ofType(Document::TYPE_WEEKLY_REPORT)
+            ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($planMember->id)
+            ->whereKey($relatedReport->id)
+            ->exists());
+
+        $this->assertFalse(Document::query()
+            ->ofType(Document::TYPE_WEEKLY_REPORT)
+            ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($planMember->id)
+            ->whereKey($outsideReport->id)
+            ->exists());
+    }
+
+    public function test_weekly_reports_page_ignores_view_all_permission_for_unrelated_reports(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $programs = Department::create(['name' => 'Programs']);
+        $finance = Department::create(['name' => 'Finance']);
+
+        $viewer = $this->createUserInDepartment($programs);
+        $viewer->givePermissionTo(['view all documents', 'create weekly report']);
+        $outsideAuthor = $this->createUserInDepartment($finance, ['create weekly report']);
+
+        Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $outsideAuthor->id,
+            'title' => 'Finance weekly report',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $response = $this->actingAs($viewer)->get(route('documents.weekly-reports'));
+
+        $response->assertOk();
+        $response->assertDontSee('Finance weekly report', false);
+    }
+
     public function test_weekly_report_edit_prefills_target_accomplished_dropdown_for_zero_value(): void
     {
         [$currentPeriod] = $this->createCurrentAndNextPeriods();

@@ -1512,10 +1512,8 @@ class DocumentController extends Controller
         $query = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->ofType(Document::TYPE_WEEKLY_REPORT);
 
-        // Users with 'view all documents' permission can see all documents, others see only their own
-        if (! $user->hasPermissionTo('view all documents')) {
-            $query->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id);
-        }
+        // Weekly reports follow personal/collaboration visibility only.
+        $query->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id);
 
         // Get current period for defaults
         $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();

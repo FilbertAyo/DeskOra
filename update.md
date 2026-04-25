@@ -6,3 +6,5 @@ You know that when staff create plan there is place of activities where every ta
 2. Then the particular activity should appear on the plan of the staff A himself also should appear to staff B and C plan as assigned task 
 
 Note: I need full ecosystem here
+
+DO NOT RUN FRESH MIGRATION EVERYTIME PLEASE NOTE THIS
