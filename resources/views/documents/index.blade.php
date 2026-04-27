@@ -162,14 +162,6 @@
 
                                 return null;
                             };
-                            $weeklyDocs = $weeklyDocs
-                                ->flatMap(function ($doc) use ($findCompanionWeeklyDoc) {
-                                    $companionDoc = $findCompanionWeeklyDoc($doc);
-
-                                    return collect([$doc, $companionDoc])->filter();
-                                })
-                                ->unique('id')
-                                ->values();
                             $resolveWeeklyDocSharedUsers = function ($doc) use ($weeklyDocs) {
                                 if (! $doc) {
                                     return collect();
@@ -215,6 +207,13 @@
                                     ->unique('id')
                                     ->values();
                             };
+                            $explicitWeeklyDocSharedUsers = function ($doc) {
+                                if (! $doc) {
+                                    return collect();
+                                }
+
+                                return collect($doc->sharedUsers)->filter()->unique('id')->values();
+                            };
                             $weeklyRows = $weeklyDocs->groupBy(function ($doc) use ($resolveWeeklyDocSharedUsers) {
                                 $effectiveSharedUsers = $resolveWeeklyDocSharedUsers($doc);
                                 $participantIds = collect([$doc->user_id])
@@ -227,7 +226,7 @@
 
                                 return ($doc->period_id ?? 'none') . '_' . $participantIds->implode('_');
                             })
-                                ->map(function ($items) use ($resolveWeeklyDocSharedUsers) {
+                                ->map(function ($items) use ($resolveWeeklyDocSharedUsers, $findCompanionWeeklyDoc) {
                                     $pickPreferred = function ($rows, $type) {
                                         $typedRows = $rows
                                             ->where('type', $type)
@@ -240,6 +239,12 @@
 
                                     $plan = $pickPreferred($items, \App\Models\Document::TYPE_WEEKLY_PLAN);
                                     $report = $pickPreferred($items, \App\Models\Document::TYPE_WEEKLY_REPORT);
+                                    if (! $plan && $report) {
+                                        $plan = $findCompanionWeeklyDoc($report);
+                                    }
+                                    if (! $report && $plan) {
+                                        $report = $findCompanionWeeklyDoc($plan);
+                                    }
                                     $participants = $items
                                         ->flatMap(fn ($row) => collect([$row->user])->merge($resolveWeeklyDocSharedUsers($row)))
                                         ->filter()
@@ -285,8 +290,8 @@
                                                 $planDoc = $row['plan'];
                                                 $reportDoc = $row['report'];
                                                 $period = $row['period'];
-                                                $planSharedUsers = $resolveWeeklyDocSharedUsers($planDoc);
-                                                $reportSharedUsers = $resolveWeeklyDocSharedUsers($reportDoc);
+                                                $planSharedUsers = $explicitWeeklyDocSharedUsers($planDoc);
+                                                $reportSharedUsers = $explicitWeeklyDocSharedUsers($reportDoc);
                                             @endphp
                                             <tr>
                                                 <td class="text-center">{{ $idx + 1 }}</td>
