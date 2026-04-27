@@ -116,9 +116,53 @@
                             $docCollection = $documents->getCollection();
                             $weeklyDocs = $docCollection->whereIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
                             $otherDocs = $docCollection->whereNotIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
-                            $weeklyRows = $weeklyDocs->groupBy(function ($doc) {
+                            $resolveWeeklyDocSharedUsers = function ($doc) use ($weeklyDocs) {
+                                if (! $doc) {
+                                    return collect();
+                                }
+
+                                $directSharedUsers = $doc->relationLoaded('effectiveSharedUsers')
+                                    ? $doc->getRelation('effectiveSharedUsers')
+                                    : $doc->sharedUsers;
+
+                                if ($doc->type !== \App\Models\Document::TYPE_WEEKLY_REPORT
+                                    || $directSharedUsers->isNotEmpty()
+                                    || ! $doc->period_id) {
+                                    return $directSharedUsers;
+                                }
+
+                                $fallbackPlan = $weeklyDocs
+                                    ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
+                                    ->filter(function ($plan) use ($doc) {
+                                        if ((string) $plan->period_id !== (string) $doc->period_id) {
+                                            return false;
+                                        }
+
+                                        if ((string) $plan->user_id === (string) $doc->user_id) {
+                                            return true;
+                                        }
+
+                                        return $plan->sharedUsers->contains(function ($sharedUser) use ($doc) {
+                                            return (string) $sharedUser->id === (string) $doc->user_id;
+                                        });
+                                    })
+                                    ->sortByDesc(fn ($plan) => $plan->updated_at?->timestamp ?? 0)
+                                    ->first();
+
+                                if (! $fallbackPlan) {
+                                    return $directSharedUsers;
+                                }
+
+                                return $fallbackPlan->sharedUsers
+                                    ->push($fallbackPlan->user)
+                                    ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
+                                    ->unique('id')
+                                    ->values();
+                            };
+                            $weeklyRows = $weeklyDocs->groupBy(function ($doc) use ($resolveWeeklyDocSharedUsers) {
+                                $effectiveSharedUsers = $resolveWeeklyDocSharedUsers($doc);
                                 $participantIds = collect([$doc->user_id])
-                                    ->merge($doc->sharedUsers->pluck('id'))
+                                    ->merge($effectiveSharedUsers->pluck('id'))
                                     ->filter()
                                     ->map(fn ($id) => (string) $id)
                                     ->unique()
@@ -127,7 +171,7 @@
 
                                 return ($doc->period_id ?? 'none') . '_' . $participantIds->implode('_');
                             })
-                                ->map(function ($items) {
+                                ->map(function ($items) use ($resolveWeeklyDocSharedUsers) {
                                     $pickPreferred = function ($rows, $type) {
                                         $typedRows = $rows
                                             ->where('type', $type)
@@ -141,7 +185,7 @@
                                     $plan = $pickPreferred($items, \App\Models\Document::TYPE_WEEKLY_PLAN);
                                     $report = $pickPreferred($items, \App\Models\Document::TYPE_WEEKLY_REPORT);
                                     $participants = $items
-                                        ->flatMap(fn ($row) => collect([$row->user])->merge($row->sharedUsers))
+                                        ->flatMap(fn ($row) => collect([$row->user])->merge($resolveWeeklyDocSharedUsers($row)))
                                         ->filter()
                                         ->unique('id')
                                         ->values();
@@ -153,6 +197,14 @@
                                         'participants' => $participants,
                                         'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
                                     ];
+                                })
+                                ->sortByDesc(function ($row) {
+                                    $period = $row['period'];
+                                    $year = $period ? (int) $period->year : 0;
+                                    $week = $period ? (int) $period->week_number : 0;
+                                    $updatedAtTimestamp = $row['updated_at']?->timestamp ?? 0;
+
+                                    return sprintf('%04d%02d%010d', $year, $week, $updatedAtTimestamp);
                                 })
                                 ->values();
                         @endphp
@@ -177,6 +229,8 @@
                                                 $planDoc = $row['plan'];
                                                 $reportDoc = $row['report'];
                                                 $period = $row['period'];
+                                                $planSharedUsers = $resolveWeeklyDocSharedUsers($planDoc);
+                                                $reportSharedUsers = $resolveWeeklyDocSharedUsers($reportDoc);
                                             @endphp
                                             <tr>
                                                 <td class="text-center">{{ $idx + 1 }}</td>
@@ -198,9 +252,9 @@
                                                 <td>
                                                     @if($planDoc)
 
-                                                        @if($planDoc->sharedUsers->isNotEmpty())
+                                                        @if($planSharedUsers->isNotEmpty())
                                                             @php
-                                                                $planSharedNames = $planDoc->sharedUsers->pluck('name')->filter()->values()->implode(', ');
+                                                                $planSharedNames = $planSharedUsers->pluck('name')->filter()->values()->implode(', ');
                                                             @endphp
                                                             <span class="badge bg-light-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
                                                                 {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
@@ -219,9 +273,9 @@
                                                 <td>
                                                     @if($reportDoc)
 
-                                                        @if($reportDoc->sharedUsers->isNotEmpty())
+                                                        @if($reportSharedUsers->isNotEmpty())
                                                             @php
-                                                                $reportSharedNames = $reportDoc->sharedUsers->pluck('name')->filter()->values()->implode(', ');
+                                                                $reportSharedNames = $reportSharedUsers->pluck('name')->filter()->values()->implode(', ');
                                                             @endphp
                                                             <span class="badge bg-light-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
                                                                 {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
@@ -324,8 +378,9 @@
                         @endif
 
                         <div class="mt-3">
-                            {{ $documents->links() }}
+                            {{ $documents->links('pagination::bootstrap-4') }}
                         </div>
+                   
                     @else
                         <div class="text-center py-5">
                             <i class="ti ti-file-text fs-1 text-muted"></i>
