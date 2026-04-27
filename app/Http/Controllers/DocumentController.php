@@ -11,7 +11,9 @@ use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkPeriodService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -81,6 +83,9 @@ class DocumentController extends Controller
             $query->where('month', (int) $request->input('month'));
         }
 
+        // This page focuses on weekly plan/report rows.
+        $query->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]);
+
         if ($request->input('review_status') === 'returned') {
             $query->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
                 ->where('state', Document::STATE_DRAFT)
@@ -98,10 +103,32 @@ class DocumentController extends Controller
             $query->latest();
         }
 
-        $documents = $query->paginate(15)->withQueryString();
-        $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
-            $documents->getCollection()->pluck('id')->all()
+        $weeklyDocuments = $query->get();
+        $weeklyRowsCollection = $this->buildWeeklyRowsForIndex($weeklyDocuments);
+        $page = max((int) $request->input('page', 1), 1);
+        $perPage = 15;
+        $weeklyRows = new LengthAwarePaginator(
+            $weeklyRowsCollection->forPage($page, $perPage)->values(),
+            $weeklyRowsCollection->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
         );
+        $returnedIds = $weeklyRows->getCollection()
+            ->flatMap(function ($row) {
+                return [
+                    data_get($row, 'plan.id'),
+                    data_get($row, 'report.id'),
+                ];
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $returnedDocumentMap = $this->getReturnedDocumentMapForIds($returnedIds);
 
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
         if ($request->input('type') === Document::TYPE_MONTHLY_REPORT) {
@@ -118,7 +145,8 @@ class DocumentController extends Controller
         $deadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
         return view('documents.index', [
-            'documents' => $documents,
+            'documents' => $weeklyRows,
+            'weeklyRows' => $weeklyRows,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
             'years' => $years,
             'currentPeriod' => $currentPeriod,
@@ -126,6 +154,131 @@ class DocumentController extends Controller
             'deadlineStatuses' => $deadlineStatuses,
             'returnedDocumentMap' => $returnedDocumentMap,
         ]);
+    }
+
+    /**
+     * @param  Collection<int, Document>  $weeklyDocs
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildWeeklyRowsForIndex(Collection $weeklyDocs): Collection
+    {
+        $pickPreferred = function (Collection $rows, string $type): ?Document {
+            $typedRows = $rows
+                ->where('type', $type)
+                ->sortByDesc(fn (Document $row) => $row->updated_at?->timestamp ?? 0)
+                ->values();
+
+            /** @var Document|null $submitted */
+            $submitted = $typedRows->firstWhere('state', Document::STATE_SUBMITTED);
+
+            return $submitted ?? $typedRows->first();
+        };
+
+        return $weeklyDocs
+            ->groupBy(function (Document $doc) use ($weeklyDocs) {
+                $effectiveSharedUsers = $this->resolveWeeklyDocSharedUsersForIndex($doc, $weeklyDocs);
+                $participantIds = collect([$doc->user_id])
+                    ->merge($effectiveSharedUsers->pluck('id'))
+                    ->filter()
+                    ->map(fn ($id) => (string) $id)
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                return ($doc->period_id ?? 'none').'_'.$participantIds->implode('_');
+            })
+            ->map(function (Collection $items) use ($weeklyDocs, $pickPreferred) {
+                $plan = $pickPreferred($items, Document::TYPE_WEEKLY_PLAN);
+                $report = $pickPreferred($items, Document::TYPE_WEEKLY_REPORT);
+                $participants = $items
+                    ->flatMap(fn (Document $row) => collect([$row->user])->merge($this->resolveWeeklyDocSharedUsersForIndex($row, $weeklyDocs)))
+                    ->filter()
+                    ->unique('id')
+                    ->values();
+
+                return [
+                    'plan' => $plan,
+                    'report' => $report,
+                    'period' => $plan?->period ?? $report?->period,
+                    'participants' => $participants,
+                    'plan_shared_users' => $this->explicitWeeklyDocSharedUsersForIndex($plan),
+                    'report_shared_users' => $this->explicitWeeklyDocSharedUsersForIndex($report),
+                    'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
+                ];
+            })
+            ->sortByDesc(function (array $row) {
+                $period = $row['period'] ?? null;
+                $year = $period ? (int) $period->year : 0;
+                $week = $period ? (int) $period->week_number : 0;
+                $updatedAtTimestamp = data_get($row, 'updated_at.timestamp', 0);
+
+                return sprintf('%04d%02d%010d', $year, $week, (int) $updatedAtTimestamp);
+            })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, Document>  $weeklyDocs
+     * @return Collection<int, User>
+     */
+    private function resolveWeeklyDocSharedUsersForIndex(?Document $doc, Collection $weeklyDocs): Collection
+    {
+        if (! $doc) {
+            return collect();
+        }
+
+        $directSharedUsers = collect($doc->sharedUsers)
+            ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
+            ->unique('id')
+            ->values();
+
+        if ($doc->type !== Document::TYPE_WEEKLY_REPORT
+            || $directSharedUsers->isNotEmpty()
+            || ! $doc->period_id) {
+            return $directSharedUsers;
+        }
+
+        /** @var Document|null $fallbackPlan */
+        $fallbackPlan = $weeklyDocs
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->first(function (Document $plan) use ($doc) {
+                if ((string) $plan->period_id !== (string) $doc->period_id) {
+                    return false;
+                }
+
+                if ((string) $plan->user_id === (string) $doc->user_id) {
+                    return true;
+                }
+
+                return $plan->sharedUsers->contains(function ($sharedUser) use ($doc) {
+                    return (string) $sharedUser->id === (string) $doc->user_id;
+                });
+            });
+
+        if (! $fallbackPlan) {
+            return $directSharedUsers;
+        }
+
+        return $fallbackPlan->sharedUsers
+            ->push($fallbackPlan->user)
+            ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function explicitWeeklyDocSharedUsersForIndex(?Document $doc): Collection
+    {
+        if (! $doc) {
+            return collect();
+        }
+
+        return collect($doc->sharedUsers)
+            ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
+            ->unique('id')
+            ->values();
     }
 
     /**
