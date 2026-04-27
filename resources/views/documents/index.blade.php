@@ -116,6 +116,61 @@
                             $docCollection = $documents->getCollection();
                             $weeklyDocs = $docCollection->whereIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
                             $otherDocs = $docCollection->whereNotIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
+                            $findCompanionWeeklyDoc = function ($doc) {
+                                if (! $doc || ! $doc->period_id) {
+                                    return null;
+                                }
+
+                                if ($doc->type === \App\Models\Document::TYPE_WEEKLY_REPORT) {
+                                    return \App\Models\Document::query()
+                                        ->with(['user', 'period', 'sharedUsers:id,name'])
+                                        ->where('period_id', $doc->period_id)
+                                        ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
+                                        ->where(function ($query) use ($doc) {
+                                            $query->where('user_id', $doc->user_id)
+                                                ->orWhereHas('sharedUsers', function ($sharedUsers) use ($doc) {
+                                                    $sharedUsers->where('users.id', $doc->user_id);
+                                                });
+                                        })
+                                        ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [\App\Models\Document::STATE_SUBMITTED])
+                                        ->latest('updated_at')
+                                        ->latest('id')
+                                        ->first();
+                                }
+
+                                if ($doc->type === \App\Models\Document::TYPE_WEEKLY_PLAN) {
+                                    $editableMemberIds = collect([$doc->user_id])
+                                        ->merge($doc->sharedUsers->pluck('id'))
+                                        ->filter()
+                                        ->map(fn ($id) => (string) $id)
+                                        ->unique()
+                                        ->values();
+
+                                    if ($editableMemberIds->isEmpty()) {
+                                        return null;
+                                    }
+
+                                    return \App\Models\Document::query()
+                                        ->with(['user', 'period', 'sharedUsers:id,name'])
+                                        ->where('period_id', $doc->period_id)
+                                        ->where('type', \App\Models\Document::TYPE_WEEKLY_REPORT)
+                                        ->whereIn('user_id', $editableMemberIds->all())
+                                        ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [\App\Models\Document::STATE_SUBMITTED])
+                                        ->latest('updated_at')
+                                        ->latest('id')
+                                        ->first();
+                                }
+
+                                return null;
+                            };
+                            $weeklyDocs = $weeklyDocs
+                                ->flatMap(function ($doc) use ($findCompanionWeeklyDoc) {
+                                    $companionDoc = $findCompanionWeeklyDoc($doc);
+
+                                    return collect([$doc, $companionDoc])->filter();
+                                })
+                                ->unique('id')
+                                ->values();
                             $resolveWeeklyDocSharedUsers = function ($doc) use ($weeklyDocs) {
                                 if (! $doc) {
                                     return collect();
