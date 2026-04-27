@@ -115,7 +115,6 @@
                         @php
                             $docCollection = $documents->getCollection();
                             $weeklyDocs = $docCollection->whereIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
-                            $otherDocs = $docCollection->whereNotIn('type', [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT]);
                             $findCompanionWeeklyDoc = function ($doc) {
                                 if (! $doc || ! $doc->period_id) {
                                     return null;
@@ -176,9 +175,11 @@
                                     return collect();
                                 }
 
-                                $directSharedUsers = $doc->relationLoaded('effectiveSharedUsers')
+                                $directSharedUsers = $doc->type === \App\Models\Document::TYPE_WEEKLY_REPORT
+                                    && $doc->relationLoaded('effectiveSharedUsers')
                                     ? $doc->getRelation('effectiveSharedUsers')
                                     : $doc->sharedUsers;
+                                $directSharedUsers = collect($directSharedUsers)->filter()->unique('id')->values();
 
                                 if ($doc->type !== \App\Models\Document::TYPE_WEEKLY_REPORT
                                     || $directSharedUsers->isNotEmpty()
@@ -309,7 +310,7 @@
 
                                                         @if($planSharedUsers->isNotEmpty())
                                                             @php
-                                                                $planSharedNames = $planSharedUsers->pluck('name')->filter()->values()->implode(', ');
+                                                                $planSharedNames = $planSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
                                                             @endphp
                                                             <span class="badge bg-light-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
                                                                 {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
@@ -330,7 +331,7 @@
 
                                                         @if($reportSharedUsers->isNotEmpty())
                                                             @php
-                                                                $reportSharedNames = $reportSharedUsers->pluck('name')->filter()->values()->implode(', ');
+                                                                $reportSharedNames = $reportSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
                                                             @endphp
                                                             <span class="badge bg-light-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
                                                                 {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
@@ -371,59 +372,6 @@
                                                             </a>
                                                         @endif
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-
-                        @if($otherDocs->count() > 0)
-                            <h6 class="mt-4 mb-2"><i class="ti ti-file me-1"></i>Other Documents</h6>
-                            <div class="table-responsive">
-                                <table class="table table-hover table-bordered">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th class="text-center" style="width: 50px;">No.</th>
-                                            <th>Document Type</th>
-                                            <th>Title</th>
-                                            <th>Author</th>
-                                            <th>Week</th>
-                                            <th>Created</th>
-                                            <th>Last Updated</th>
-                                            <th class="text-center" style="width: 120px;">Status</th>
-                                            <th class="text-center" style="width: 100px;">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($otherDocs as $document)
-                                            <tr>
-                                                <td class="text-center">{{ $loop->iteration }}</td>
-                                                <td>
-                                                    <span class="badge bg-info">
-                                                        <i class="ti ti-file me-1"></i>
-                                                        {{ $document->type_name }}
-                                                    </span>
-                                                </td>
-                                                <td><strong>{{ $document->display_title }}</strong></td>
-                                                <td>{{ $document->user?->name ?? '-' }}</td>
-                                                <td>{{ $document->period ? ('Week ' . $document->period->week_number) : '-' }}</td>
-                                                <td><small class="text-muted">{{ $document->created_at->format('M d, Y') }}</small></td>
-                                                <td><small class="text-muted">{{ $document->updated_at->format('M d, Y') }}</small></td>
-                                                <td class="text-center">
-                                                    <span class="badge {{ $document->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
-                                                        {{ ucfirst($document->state) }}
-                                                    </span>
-                                                    @if(isset($returnedDocumentMap[$document->id]))
-                                                        <span class="badge bg-danger mt-1">Returned for Revision</span>
-                                                    @endif
-                                                </td>
-                                                <td class="text-center">
-                                                    <a href="{{ $document->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $document->id) : route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
-                                                        class="btn btn-info text-white btn-sm" title="View">
-                                                        <i class="ti ti-eye"></i>
-                                                    </a>
                                                 </td>
                                             </tr>
                                         @endforeach
