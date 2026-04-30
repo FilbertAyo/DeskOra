@@ -74,7 +74,7 @@
                                 @forelse ($user as $index => $u)
                                     <tr>
                                         <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>
+                                        <td style="min-width: 150px;">
                                         {{ $u->name }}
                                         </td>
                                         <td>
