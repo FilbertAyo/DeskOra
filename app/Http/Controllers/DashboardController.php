@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Document;
-use App\Models\Petty;
+use App\Models\Request as FinanceRequest;
 use App\Models\User;
 use App\Models\WeeklyActivityAssignment;
 use App\Models\WorkPeriod;
@@ -23,7 +23,7 @@ class DashboardController extends Controller
     {
 
         // This is very important but later should be moved to Console/Command for automatic update
-        DB::table('petties')
+        DB::table('requests')
             ->where('status', 'resubmission')
             ->where('updated_at', '<', now()->subDay())
             ->update(['status' => 'rejected']);
@@ -36,9 +36,9 @@ class DashboardController extends Controller
         $departmentScopeIds = $authUser->departmentScopeIds();
 
         $userNo = User::count();
-        $pettyNo = Petty::whereIn('department_id', $departmentScopeIds)->count();
-        $paidAmount = Petty::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->sum('amount');
-        $myExpense = Petty::where('user_id', Auth::user()->id)->where('status', 'paid')->sum('amount');
+        $pettyNo = FinanceRequest::whereIn('department_id', $departmentScopeIds)->count();
+        $paidAmount = FinanceRequest::whereIn('department_id', $departmentScopeIds)->where('status', 'paid')->with('pettyDetails')->get()->sum('amount');
+        $myExpense = FinanceRequest::where('user_id', Auth::user()->id)->where('status', 'paid')->with('pettyDetails')->get()->sum('amount');
 
         $departmentNo = Department::query()
             ->where('status', 'active')
@@ -46,7 +46,7 @@ class DashboardController extends Controller
             ->count();
 
         // Status breakdown for pie chart
-        $statusTotals = Petty::query()
+        $statusTotals = FinanceRequest::query()
             ->whereIn('department_id', $departmentScopeIds)
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
@@ -62,13 +62,18 @@ class DashboardController extends Controller
         // Monthly expense trend (last 6 months)
         $monthlyExpenses = [];
         $monthLabels = [];
-        $monthlyExpenseByKey = Petty::query()
+        $monthlyExpenseByKey = FinanceRequest::query()
             ->where('status', 'paid')
             ->whereIn('department_id', $departmentScopeIds)
-            ->whereDate('paid_date', '>=', Carbon::now()->subMonths(5)->startOfMonth())
-            ->selectRaw('YEAR(paid_date) as y, MONTH(paid_date) as m, SUM(amount) as total')
-            ->groupBy('y', 'm')
+            ->whereDate('paid_at', '>=', Carbon::now()->subMonths(5)->startOfMonth())
+            ->with('pettyDetails')
             ->get()
+            ->groupBy(fn ($row) => optional($row->paid_at)->format('Y-n'))
+            ->map(fn ($group) => (object) [
+                'y' => optional($group->first()->paid_at)->year,
+                'm' => optional($group->first()->paid_at)->month,
+                'total' => $group->sum('amount'),
+            ])
             ->keyBy(fn ($row) => $row->y.'-'.$row->m);
         for ($i = 5; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
@@ -78,33 +83,41 @@ class DashboardController extends Controller
         }
 
         // Top 5 departments by spending
-        $topDepartments = Petty::where('petties.status', 'paid')
-            ->whereIn('petties.department_id', $departmentScopeIds)
-            ->join('departments', 'petties.department_id', '=', 'departments.id')
-            ->select('departments.name', DB::raw('SUM(petties.amount) as total'))
-            ->groupBy('departments.id', 'departments.name')
-            ->orderByDesc('total')
-            ->limit(5)
-            ->get();
+        $topDepartments = FinanceRequest::with(['department', 'pettyDetails', 'requisitionDetails'])
+            ->where('status', 'paid')
+            ->whereIn('department_id', $departmentScopeIds)
+            ->get()
+            ->groupBy('department_id')
+            ->map(fn ($rows) => (object) [
+                'name' => optional($rows->first()->department)->name,
+                'total' => $rows->sum('amount'),
+            ])
+            ->sortByDesc('total')
+            ->take(5)
+            ->values();
 
         // Recent requests (last 5)
-        $recentRequests = Petty::with(['user', 'department'])
+        $recentRequests = FinanceRequest::with(['user', 'department', 'pettyDetails', 'requisitionDetails'])
             ->whereIn('department_id', $departmentScopeIds)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
 
         // Current month statistics
-        $currentMonthTotal = Petty::where('status', 'paid')
+        $currentMonthTotal = FinanceRequest::where('status', 'paid')
             ->whereIn('department_id', $departmentScopeIds)
-            ->whereYear('paid_date', Carbon::now()->year)
-            ->whereMonth('paid_date', Carbon::now()->month)
+            ->whereYear('paid_at', Carbon::now()->year)
+            ->whereMonth('paid_at', Carbon::now()->month)
+            ->with('pettyDetails')
+            ->get()
             ->sum('amount');
 
-        $lastMonthTotal = Petty::where('status', 'paid')
+        $lastMonthTotal = FinanceRequest::where('status', 'paid')
             ->whereIn('department_id', $departmentScopeIds)
-            ->whereYear('paid_date', Carbon::now()->subMonth()->year)
-            ->whereMonth('paid_date', Carbon::now()->subMonth()->month)
+            ->whereYear('paid_at', Carbon::now()->subMonth()->year)
+            ->whereMonth('paid_at', Carbon::now()->subMonth()->month)
+            ->with('pettyDetails')
+            ->get()
             ->sum('amount');
 
         $percentageChange = $lastMonthTotal > 0
@@ -112,15 +125,15 @@ class DashboardController extends Controller
             : 0;
 
         // Active users (users who made requests this month)
-        $activeUsers = Petty::whereYear('created_at', Carbon::now()->year)
+        $activeUsers = FinanceRequest::whereYear('created_at', Carbon::now()->year)
             ->whereIn('department_id', $departmentScopeIds)
             ->whereMonth('created_at', Carbon::now()->month)
             ->distinct('user_id')
             ->count('user_id');
 
         // Individual user analytics
-        $myTotalRequests = Petty::where('user_id', Auth::user()->id)->count();
-        $myStatusTotals = Petty::query()
+        $myTotalRequests = FinanceRequest::where('user_id', Auth::user()->id)->count();
+        $myStatusTotals = FinanceRequest::query()
             ->where('user_id', Auth::user()->id)
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
@@ -140,7 +153,7 @@ class DashboardController extends Controller
         // My monthly request trend (last 6 months)
         $myMonthlyRequests = [];
         $myMonthLabels = [];
-        $myMonthlyRequestsByKey = Petty::query()
+        $myMonthlyRequestsByKey = FinanceRequest::query()
             ->where('user_id', Auth::user()->id)
             ->whereDate('created_at', '>=', Carbon::now()->subMonths(5)->startOfMonth())
             ->selectRaw('YEAR(created_at) as y, MONTH(created_at) as m, COUNT(*) as total')
@@ -155,7 +168,7 @@ class DashboardController extends Controller
         }
 
         // My recent requests (last 10)
-        $myRecentRequests = Petty::where('user_id', Auth::user()->id)
+        $myRecentRequests = FinanceRequest::where('user_id', Auth::user()->id)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();

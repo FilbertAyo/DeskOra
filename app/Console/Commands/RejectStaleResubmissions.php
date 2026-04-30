@@ -3,8 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\Petty;
-use Illuminate\Support\Carbon;
+use App\Models\Request as FinanceRequest;
 
 class RejectStaleResubmissions extends Command
 {
@@ -16,7 +15,7 @@ class RejectStaleResubmissions extends Command
     {
         $cutoff = now()->subHours(24);
 
-        $updated = Petty::where('status', 'resubmission')
+        $updated = FinanceRequest::where('status', 'resubmission')
             ->where('updated_at', '<=', $cutoff)
             ->update(['status' => 'rejected']);
 

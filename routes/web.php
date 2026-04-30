@@ -104,7 +104,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/activate/{user}', [AdminController::class, 'activate'])->name('admin.activate');
     Route::post('/users/{user}/assign-permissions', [AdminController::class, 'assignPermissions'])->name('assign.permissions');
 
-    Route::post('/petty/{petty}/upload-attachment', [PettyController::class, 'updateAttachment'])->name('petty.updateAttachment');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
@@ -124,16 +123,20 @@ Route::middleware(['auth', 'permission:request pettycash'])->group(function () {
         Route::delete('/delete/{petty}', [PettyController::class, 'destroy'])->name('destroy');
     });
 
-    // Autocomplete route for destinations
-    Route::get('/stops/autocomplete', [PettyController::class, 'autocomplete'])->name('stops.autocomplete');
+});
+
+Route::middleware(['auth', 'permission:request pettycash'])->group(function () {
+    Route::get('/requisition', [PettyController::class, 'requisitionRequests'])->name('requisition.index');
+    Route::get('/requisition/create', [PettyController::class, 'createRequisition'])->name('requisition.create');
+    Route::post('/requisition', [PettyController::class, 'store'])->name('requisition.store');
+    Route::get('/requisition/{petty}', [PettyController::class, 'requisitionShow'])->name('requisition.show');
+    Route::get('/requisition/{petty}/edit', [PettyController::class, 'requisitionEdit'])->name('requisition.edit');
+    Route::put('/requisition/{petty}', [PettyController::class, 'requisitionUpdate'])->name('requisition.update');
 });
 
 Route::middleware(['auth', 'permission:view requested pettycash'])->group(function () {
     Route::get('pettycash/requests/list', [PettyController::class, 'requests_list'])->name('petty.list');
     Route::get('/pettycash/request/{petty}/details', [PettyController::class, 'request_show'])->name('petty.details');
-    Route::post('f_approve/{petty}', [PettyController::class, 'f_approve'])->name('f_approve.approve');
-    Route::post('l_approve/{petty}', [PettyController::class, 'l_approve'])->name('l_approve.approve');
-    Route::get('c_approve/{petty}', [PettyController::class, 'c_approve'])->name('c_approve.approve');
     Route::post('/petty/reject/{petty}', [PettyController::class, 'reject'])->name('petty.reject');
 
     Route::resource('replenishment', ReplenishmentController::class);
@@ -141,6 +144,30 @@ Route::middleware(['auth', 'permission:view requested pettycash'])->group(functi
     Route::post('/replenishment/last/approve/{replenishment}', [ReplenishmentController::class, 'lastApprove'])->name('last.approve');
     Route::get('/replenishment/petty/cash/list', [ReplenishmentController::class, 'pettycash'])->name('replenishment.pettycash');
     Route::get('/replenishment/{replenishment}/download', [ReplenishmentController::class, 'downloadPDF'])->name('replenishment.download');
+});
+
+Route::middleware(['auth', 'permission:review requests|review staff requisition|first pettycash approval'])->group(function () {
+    Route::post('f_approve/{petty}', [PettyController::class, 'f_approve'])->name('f_approve.approve');
+});
+
+Route::middleware(['auth', 'permission:approve requests|approve staff requisition|last pettycash approval'])->group(function () {
+    Route::post('l_approve/{petty}', [PettyController::class, 'l_approve'])->name('l_approve.approve');
+});
+
+Route::middleware(['auth', 'permission:authorize requests|authorize staff requisition'])->group(function () {
+    Route::post('authorize/{petty}', [PettyController::class, 'authorizeRequest'])->name('requests.authorize');
+});
+
+Route::middleware(['auth', 'permission:approve petycash payments'])->group(function () {
+    Route::post('c_approve/{petty}', [PettyController::class, 'c_approve'])->name('c_approve.approve');
+});
+
+Route::middleware(['auth', 'permission:review staff requisition|approve staff requisition|authorize staff requisition'])->group(function () {
+    Route::get('pettycash/requisitions/approvals', [PettyController::class, 'requisitionApprovals'])->name('petty.requisition.approvals');
+});
+
+Route::middleware(['auth', 'permission:download staff requisition|authorize staff requisition|approve petycash payments'])->group(function () {
+    Route::get('pettycash/requisitions/{petty}/download', [PettyController::class, 'downloadRequisition'])->name('petty.requisition.download');
 });
 
 Route::middleware(['auth', 'permission:last pettycash approval'])->group(function () {

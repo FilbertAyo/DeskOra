@@ -1,22 +1,36 @@
 <x-app-layout>
 
 
+<div class="page-header">
+        <div class="page-block">
+            <div class="row align-items-center">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Petty Cash Requests</h5>
+                            <ul class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                                <li class="breadcrumb-item"><a href="javascript: void(0)">Petty Cash</a></li>
+                                <li class="breadcrumb-item" aria-current="page">Petty Cash Requests</li>
+                            </ul>
+                        </div>
 
-     <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <ul class="nav nav-tabs" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab"
-                        aria-controls="home" aria-selected="true">
-                       All Requests
-                    </a>
-                </li>
-            </ul>
+                        <div class="col-auto d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-light" onclick="reloadPage()"
+                                title="Refresh">
+                                <i class="ti ti-refresh"></i>
+                            </button>
+                            <a href="{{ route('petty.create') }}" class="btn btn-primary btn-sm">New Request</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
+ 
+   
     <div class="row my-2">
-
        
         <div class="col-md-12">
             <div class="card shadow-none border">
@@ -25,7 +39,6 @@
                         <thead class="thead-light">
                             <tr>
                                 <th>No.</th>
-                                <th>Request By</th>
                                 <th>Request for</th>
                                 <th>Request Type</th>
                                 <th>Amount</th>
@@ -35,6 +48,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @if ($requests->count() > 0)
                            @foreach ($requests as $index => $item)
 
                              @if (
@@ -43,7 +57,6 @@
                                         <tr class="alert alert-danger">
                                             <td>{{ $loop->iteration }}
                                             </td>
-                                            <td> {{ $item->user->name }}</td>
                                             <td> {{ $item->request_for }}</td>
                                             <td>{{ $item->request_type }}</td>
                                             <td>{{ number_format($item->amount) }}</td>
@@ -63,7 +76,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.details', $item->id) }}"
+                                                <a href="{{ route('petty.show', $item->id) }}"
                                                     class="btn btn-sm btn-secondary text-white">
                                                     <i class="ti ti-eye"></i></a>
                                             </td>
@@ -73,10 +86,7 @@
                                             <tr>
                                             <td>{{ $loop->iteration }}
 
-
-
                                             </td>
-                                            <td> {{ $item->user->name }}</td>
                                             <td> {{ $item->request_for }}</td>
                                             <td>{{ $item->request_type }}</td>
                                             <td>{{ number_format($item->amount) }}</td>
@@ -96,7 +106,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.details', $item->id) }}"
+                                                <a href="{{ route('petty.show', $item->id) }}"
                                                     class="btn btn-sm btn-secondary text-white">
                                                     <i class="ti ti-eye"></i></a>
                                             </td>
@@ -104,6 +114,11 @@
 
                                         @endif
                                     @endforeach
+                                    @else
+                                    <tr>
+                                        <td colspan="6" class="text-center">No requests found</td>
+                                    </tr>
+                                    @endif
                         </tbody>
                     </table>
 
@@ -113,7 +128,6 @@
 
 
     </div>
-
 
 
 

@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\RunningBalanceExport;
 use App\Models\Deposit;
-use App\Models\Petty;
+use App\Models\Request as FinanceRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +30,7 @@ class DepositController extends Controller
             ->first();
         $remaining = $latestDeposit ? $latestDeposit->remaining : 0;
 
-        return view('pettycash.finance.cashier', compact('deposits', 'remaining'));
+        return view('requests.finance.cashier', compact('deposits', 'remaining'));
     }
 
     private function getCashflowTransactions($filterType)
@@ -40,8 +40,9 @@ class DepositController extends Controller
         $departmentIds = $user->departmentScopeIds();
 
         $allDeposits = Deposit::whereIn('department_id', $departmentIds)->get();
-        $allPetty = Petty::with('user')
+        $allPetty = FinanceRequest::with(['user', 'pettyDetails'])
             ->whereIn('department_id', $departmentIds)
+            ->where('request_type', '!=', 'Staff Requisition')
             ->where('status', 'paid')
             ->get();
 
@@ -63,7 +64,7 @@ class DepositController extends Controller
                 'type' => 'Petty',
                 'requested_by' => optional($petty->user)->name ?? 'Unknown',
                 'deposit' => 0,
-                'deduction' => $petty->amount ?? 0,
+                'deduction' => (float) ($petty->amount ?? 0),
             ]);
         }
 
@@ -129,7 +130,7 @@ class DepositController extends Controller
         $filterType = $request->input('filter_type');
         $data = $this->getCashflowTransactions($filterType);
 
-        return view('pettycash.finance.cashflow', $data);
+        return view('requests.finance.cashflow', $data);
     }
 
     public function download(Request $request)
@@ -148,7 +149,7 @@ class DepositController extends Controller
         }
 
         if ($format === 'pdf') {
-            $pdf = Pdf::loadView('pettycash.finance.cashflow_pdf', [
+            $pdf = Pdf::loadView('requests.finance.cashflow_pdf', [
                 'transactions' => $transactions,
                 'department' => $department,
                 'filterType' => $filterType,

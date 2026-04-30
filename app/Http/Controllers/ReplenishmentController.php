@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApprovalLog;
-use App\Models\Petty;
 use App\Models\Replenishment;
+use App\Models\Request as FinanceRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -29,14 +29,16 @@ class ReplenishmentController extends Controller
     public function pettycash(Request $request)
     {
         // Start with a base query for paid status
-        $query = Petty::where('status', 'paid');
+        $query = FinanceRequest::with(['user', 'pettyDetails'])
+            ->where('status', 'paid')
+            ->where('request_type', '!=', 'Staff Requisition');
 
         if ($request->filled('from') && $request->filled('to')) {
             $from = Carbon::parse($request->from)->startOfDay();
             $to = Carbon::parse($request->to)->endOfDay();
 
             // Use 'paid_date' for filtering since only 'paid' records are fetched
-            $query->whereBetween('paid_date', [$from, $to]);
+            $query->whereBetween('paid_at', [$from, $to]);
         }
 
         $petties = $query->get();
@@ -66,9 +68,12 @@ class ReplenishmentController extends Controller
         $fromInclusive = Carbon::parse($from)->startOfDay();
         $toInclusive = Carbon::parse($to)->endOfDay();
 
-        $totalAmount = Petty::where('status', 'paid')
-            ->whereBetween('paid_date', [$fromInclusive, $toInclusive])
-            ->whereNull('replenishment_id')
+        $totalAmount = FinanceRequest::with('pettyDetails')
+            ->where('status', 'paid')
+            ->where('request_type', '!=', 'Staff Requisition')
+            ->whereBetween('paid_at', [$fromInclusive, $toInclusive])
+            ->whereHas('pettyDetails', fn ($q) => $q->whereNull('replenishment_id'))
+            ->get()
             ->sum('amount');
 
         return view('pettycash.replenishments.create', compact('from', 'to', 'totalAmount'));
@@ -101,9 +106,10 @@ class ReplenishmentController extends Controller
         $fromInclusive = Carbon::parse($request->from)->startOfDay();
         $toInclusive = Carbon::parse($request->to)->endOfDay();
 
-        $availablePetties = Petty::where('status', 'paid')
-            ->whereBetween('paid_date', [$fromInclusive, $toInclusive])
-            ->whereNull('replenishment_id')
+        $availablePetties = FinanceRequest::where('status', 'paid')
+            ->where('request_type', '!=', 'Staff Requisition')
+            ->whereBetween('paid_at', [$fromInclusive, $toInclusive])
+            ->whereHas('pettyDetails', fn ($q) => $q->whereNull('replenishment_id'))
             ->count();
 
         if ($availablePetties == 0) {
@@ -113,9 +119,12 @@ class ReplenishmentController extends Controller
         }
 
         // Verify the calculated amount matches the provided amount
-        $calculatedAmount = Petty::where('status', 'paid')
-            ->whereBetween('paid_date', [$fromInclusive, $toInclusive])
-            ->whereNull('replenishment_id')
+        $calculatedAmount = FinanceRequest::with('pettyDetails')
+            ->where('status', 'paid')
+            ->where('request_type', '!=', 'Staff Requisition')
+            ->whereBetween('paid_at', [$fromInclusive, $toInclusive])
+            ->whereHas('pettyDetails', fn ($q) => $q->whereNull('replenishment_id'))
+            ->get()
             ->sum('amount');
 
         if (abs($calculatedAmount - $request->total_amount) > 0.01) {
@@ -159,9 +168,12 @@ class ReplenishmentController extends Controller
                 ]);
 
                 // Link petty cash records to this replenishment
-                $updatedCount = Petty::where('status', 'paid')
-                    ->whereBetween('paid_date', [$fromInclusive, $toInclusive])
-                    ->whereNull('replenishment_id')
+                $requestIds = FinanceRequest::where('status', 'paid')
+                    ->where('request_type', '!=', 'Staff Requisition')
+                    ->whereBetween('paid_at', [$fromInclusive, $toInclusive])
+                    ->whereHas('pettyDetails', fn ($q) => $q->whereNull('replenishment_id'))
+                    ->pluck('id');
+                $updatedCount = \App\Models\PettyRequest::whereIn('request_id', $requestIds)
                     ->update(['replenishment_id' => $replenishment->id]);
 
                 // Verify the update was successful
@@ -191,11 +203,15 @@ class ReplenishmentController extends Controller
     {
 
         if ($replenishment->status === 'rejected') {
-            $petties = Petty::whereDate('paid_date', '>=', $replenishment->from)
-                ->whereDate('paid_date', '<=', $replenishment->to)
+            $petties = FinanceRequest::with(['user', 'pettyDetails'])
+                ->where('request_type', '!=', 'Staff Requisition')
+                ->whereDate('paid_at', '>=', $replenishment->from)
+                ->whereDate('paid_at', '<=', $replenishment->to)
                 ->get();
         } else {
-            $petties = Petty::where('replenishment_id', $replenishment->id)->get();
+            $petties = FinanceRequest::with(['user', 'pettyDetails'])
+                ->whereHas('pettyDetails', fn ($q) => $q->where('replenishment_id', $replenishment->id))
+                ->get();
         }
 
         $numberToWords = new NumberToWords;
@@ -274,7 +290,7 @@ class ReplenishmentController extends Controller
         $replenishment->save();
 
         // Unlink all petties associated with this replenishment
-        Petty::where('replenishment_id', $replenishment->id)
+        \App\Models\PettyRequest::where('replenishment_id', $replenishment->id)
             ->update(['replenishment_id' => null]);
 
         ApprovalLog::create([
@@ -290,11 +306,15 @@ class ReplenishmentController extends Controller
     {
 
         if ($replenishment->status === 'rejected') {
-            $petties = Petty::whereDate('paid_date', '>=', $replenishment->from)
-                ->whereDate('paid_date', '<=', $replenishment->to)
+            $petties = FinanceRequest::with(['user', 'pettyDetails'])
+                ->where('request_type', '!=', 'Staff Requisition')
+                ->whereDate('paid_at', '>=', $replenishment->from)
+                ->whereDate('paid_at', '<=', $replenishment->to)
                 ->get();
         } else {
-            $petties = Petty::where('replenishment_id', $replenishment->id)->get();
+            $petties = FinanceRequest::with(['user', 'pettyDetails'])
+                ->whereHas('pettyDetails', fn ($q) => $q->where('replenishment_id', $replenishment->id))
+                ->get();
         }
 
         $numberToWords = new NumberToWords;

@@ -8,15 +8,17 @@ use App\Mail\PettyRequestMail;
 use App\Mail\RejectMail;
 use App\Mail\ResubmitMail;
 use App\Mail\SuccessPayment;
-use App\Models\ApprovalLog;
 use App\Models\Department;
 use App\Models\Deposit;
-use App\Models\Petty;
-use App\Models\PettyAttachment;
-use App\Models\Stop;
-use App\Models\Trip;
+use App\Models\PettyRequest;
+use App\Models\RequisitionItem;
+use App\Models\RequisitionRequest;
+use App\Models\Request as FinanceRequest;
+use App\Models\RequestApproval;
 use App\Models\User;
+use App\Models\YearPlanActivity;
 use App\Services\NotificationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -27,40 +29,16 @@ use NumberToWords\NumberToWords;
 
 class PettyController extends Controller
 {
-    /**
-     * Helper: Build common petty mail arguments [requesterName, reason, publicId]
-     */
-    private function buildPettyMailArgs(Petty $petty): array
+    private function buildRequestMailArgs(FinanceRequest $request): array
     {
-        $requester = User::find($petty->user_id);
+        $requester = User::find($request->user_id);
         $name = $requester?->name ?? 'User';
-        $reason = $petty->request_for;
-        $publicId = (string) $petty->id;
+        $reason = $request->request_for ?: 'request';
+        $publicId = (string) $request->id;
 
         return [$name, $reason, $publicId];
     }
 
-    /**
-     * Helper: Get emails of users in a department who have a specific permission
-     */
-    private function collectDepartmentEmails(string $permission, ?string $departmentId): array
-    {
-        $scopeIds = $this->resolveDepartmentScopeIds($departmentId);
-        if ($scopeIds === []) {
-            return [];
-        }
-
-        return User::permission($permission)
-            ->whereIn('department_id', $scopeIds)
-            ->pluck('email')
-            ->filter()
-            ->unique()
-            ->toArray();
-    }
-
-    /**
-     * Helper: Notify approvers by permission within a department via email and/or SMS based on their preferences
-     */
     private function notifyApprovers(string $permission, ?string $departmentId, object $mailable, string $smsMessage): void
     {
         $scopeIds = $this->resolveDepartmentScopeIds($departmentId);
@@ -78,7 +56,6 @@ class PettyController extends Controller
 
         $emails = [];
         $notifier = app(NotificationService::class);
-
         foreach ($users as $user) {
             $channel = $user->notification_channel ?: 'sms';
             if (in_array($channel, ['email', 'both']) && ! empty($user->email)) {
@@ -93,15 +70,11 @@ class PettyController extends Controller
             }
         }
 
-        $emails = array_values(array_unique(array_filter($emails)));
         if (! empty($emails)) {
-            $this->trySendMail($emails, $mailable);
+            $this->trySendMail(array_values(array_unique($emails)), $mailable);
         }
     }
 
-    /**
-     * Helper: Safely send an email and log failures. Returns true if attempted and recipients existed.
-     */
     private function trySendMail(array|string $recipients, object $mailable): bool
     {
         if (empty($recipients)) {
@@ -112,7 +85,7 @@ class PettyController extends Controller
 
             return true;
         } catch (\Throwable $e) {
-            Log::error('PettyController: Failed to send email', [
+            Log::error('PettyController: failed to send email', [
                 'recipients' => $recipients,
                 'mailable' => get_class($mailable),
                 'error' => $e->getMessage(),
@@ -122,227 +95,225 @@ class PettyController extends Controller
         }
     }
 
-    /**
-     * Helper: Generate unique petty cash code
-     */
-    private function generateUniquePettyCode()
+    private function generateUniqueRequestNo(): string
     {
         do {
             $code = strtoupper(Str::random(2)).rand(100, 999);
-        } while (Petty::where('code', $code)->exists());
+        } while (FinanceRequest::where('request_no', $code)->exists());
 
         return $code;
     }
 
-    /**
-     * Helper: Parse attachments from database format to array/object
-     */
-    private function parseAttachments($attachments)
+    private function ensureUserHasSignature(): ?\Illuminate\Http\RedirectResponse
     {
-        $parsed = [];
-        foreach ($attachments as $attachment) {
-            $rawProducts = $attachment->product_name ?? '';
-            $products = collect(explode(',', $rawProducts))
-                ->map(fn ($item) => trim($item))
-                ->filter()
-                ->map(function ($item) {
-                    $parts = explode('-', $item, 2);
-
-                    return [
-                        'name' => trim($parts[0] ?? ''),
-                        'qty' => trim($parts[1] ?? ''),
-                    ];
-                })
-                ->toArray();
-
-            // Return as object to maintain consistency with blade template expectations
-            $parsed[] = (object) [
-                'name' => $attachment->name,
-                'products' => $products ?: [['name' => '', 'qty' => '']],
-                'attachment' => $attachment->attachment ?? null,
-            ];
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if (! $user || empty($user->signature)) {
+            return redirect()->back()->with('error', 'Please upload your signature in profile settings before signing this requisition.');
         }
 
-        return $parsed;
+        return null;
     }
 
-    /**
-     * Helper: Create trip and stops
-     */
-    private function createTripAndStops($pettyId, $data)
+    private function canSignRequest(FinanceRequest $request, string $stage): bool
     {
-        if (isset($data['from_place']) && isset($data['destinations'])) {
-            $trip = Trip::create([
-                'petty_id' => $pettyId,
-                'from_place' => $data['from_place'],
-            ]);
-
-            foreach ($data['destinations'] as $destination) {
-                $trip->stops()->create(['destination' => $destination]);
-            }
-        }
-    }
-
-    /**
-     * Helper: Update trip and stops
-     */
-    private function updateTripAndStops($pettyId, $data)
-    {
-        $trip = Trip::where('petty_id', $pettyId)->first();
-
-        if ($trip) {
-            $trip->stops()->delete();
-            $trip->update(['from_place' => $data['from_place']]);
-        } else {
-            $trip = Trip::create([
-                'petty_id' => $pettyId,
-                'from_place' => $data['from_place'],
-            ]);
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if (! $user) {
+            return false;
         }
 
-        foreach ($data['destinations'] as $destination) {
-            $trip->stops()->create(['destination' => $destination]);
+        $reviewPermission = $request->request_type === 'Staff Requisition' ? 'review staff requisition' : 'first pettycash approval';
+        $approvePermission = $request->request_type === 'Staff Requisition' ? 'approve staff requisition' : 'last pettycash approval';
+        $authorizePermission = $request->request_type === 'Staff Requisition' ? 'authorize staff requisition' : 'authorize requests';
+
+        if ($stage === 'review') {
+            return $user->can($reviewPermission) && $request->reviewed_at === null;
         }
-    }
-
-    /**
-     * Helper: Save attachments to database
-     */
-    private function saveAttachments($pettyId, $attachments)
-    {
-        foreach ($attachments as $index => $attachment) {
-            $productLines = [];
-            foreach ($attachment['products'] as $product) {
-                $productLines[] = $product['name'].' - '.$product['qty'];
-            }
-
-            $filePath = null;
-
-            // Check if new file uploaded
-            if (! empty($attachment['file']) && is_object($attachment['file'])) {
-                $filePath = $attachment['file']->store('attachments', 'public');
-                $filePath = 'storage/'.$filePath;
-            }
-            // Preserve existing file if provided in hidden field (edit mode)
-            elseif (isset($attachment['existing_file']) && ! empty($attachment['existing_file'])) {
-                $filePath = $attachment['existing_file'];
-            }
-
-            PettyAttachment::create([
-                'petty_id' => $pettyId,
-                'name' => $attachment['customer_name'],
-                'product_name' => implode(',', $productLines),
-                'attachment' => $filePath,
-            ]);
+        if ($stage === 'approve') {
+            return $user->can($approvePermission) && $request->reviewed_at !== null && $request->approved_at === null;
         }
+        if ($stage === 'authorize') {
+            return $user->can($authorizePermission) && $request->approved_at !== null && $request->authorized_at === null;
+        }
+
+        return false;
     }
 
-    /**
-     * Helper: Send approval request emails
-     */
-    private function sendApprovalRequest($petty)
+    private function isRequisitionFullySigned(FinanceRequest $request): bool
     {
-        $requester = Auth::user();
-        [$name, $reason, $encodedId] = $this->buildPettyMailArgs($petty);
-        $sms = "New petty cash request from {$name} for {$reason}. Ref: {$encodedId}";
-        $this->notifyApprovers('first pettycash approval', $requester->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
+        return $request->reviewed_at !== null && $request->approved_at !== null && $request->authorized_at !== null;
     }
 
-    /**
-     * Display a listing of the resource.
-     */
+    private function createApproval(FinanceRequest $request, string $step, string $action, ?string $comment = null): RequestApproval
+    {
+        return RequestApproval::create([
+            'request_id' => $request->id,
+            'step' => $step,
+            'action' => $action,
+            'actor_id' => Auth::id(),
+            'comment' => $comment,
+            'acted_at' => now(),
+        ]);
+    }
+
     public function index()
     {
-        // Auto-reject stale resubmission requests
-        DB::table('petties')
+        FinanceRequest::query()
             ->where('status', 'resubmission')
             ->where('updated_at', '<', now()->subDay())
             ->update(['status' => 'rejected']);
 
-        Log::info('Dashboard-triggered auto-reject of stale petty cash requests.');
-
-        // Fetch requests only for the logged-in user
-        $requests = Petty::where('user_id', Auth::id())
-            ->orderBy('created_at', 'desc')
+        $requests = FinanceRequest::with(['pettyDetails'])
+            ->where('user_id', Auth::id())
+            ->where('request_type', '!=', 'Staff Requisition')
+            ->orderByDesc('created_at')
             ->get();
 
-        return view('pettycash.request', compact('requests'));
+        return view('requests.petty.index', compact('requests'));
     }
 
-    /**
-     * Show the form for creating a new petty cash request.
-     */
     public function create()
     {
-        return view('pettycash.create');
+        return view('requests.petty.create');
     }
 
-    /**
-     * Store a newly created petty cash request.
-     */
-    public function store(Request $request)
+    public function createRequisition()
     {
-        $validated = $request->validate([
-            'user_id' => ['required', 'string', 'ulid', 'exists:users,id'],
-            'department_id' => ['required', 'string', 'ulid', 'exists:departments,id'],
-            'request_for' => 'required|string|in:Sales Delivery,Transport,Office Supplies',
-            'amount' => 'required|numeric|min:0',
-            'reason' => 'required|string|max:1000',
-            'request_type' => 'required|string',
-        ]);
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        $subDepartmentIds = $user?->subDepartments()->pluck('departments.id')->all() ?? [];
 
-        $code = $this->generateUniquePettyCode();
-        $validated['code'] = $code;
-        $validated['status'] = 'pending';
-
-        $petty = Petty::create($validated);
-        $this->sendApprovalRequest($petty);
-
-        return redirect()->route('petty.index')->with('success', 'Petty cash request created successfully!');
-    }
-
-    /**
-     * Autocomplete for destinations
-     */
-    public function autocomplete(Request $request)
-    {
-        $term = trim((string) $request->get('term', ''));
-
-        if ($term === '') {
-            return response()->json([]);
+        if (empty($subDepartmentIds) && $user?->department_id) {
+            $primaryDepartment = Department::find($user->department_id);
+            if ($primaryDepartment) {
+                $subDepartmentIds = $primaryDepartment->parent_id ? [$primaryDepartment->id] : $primaryDepartment->children()->pluck('id')->all();
+            }
         }
 
-        $results = Stop::where('destination', 'LIKE', "%{$term}%")
-            ->distinct()
-            ->pluck('destination')
-            ->take(10)
-            ->values()
-            ->all();
+        $planActivities = collect();
+        if (! empty($subDepartmentIds)) {
+            $planActivities = YearPlanActivity::query()
+                ->with(['department', 'yearPlan'])
+                ->whereIn('department_id', $subDepartmentIds)
+                ->join('year_plans', 'year_plans.id', '=', 'year_plan_activities.year_plan_id')
+                ->orderByDesc('year_plans.year')
+                ->orderBy('year_plan_activities.sort_order')
+                ->select('year_plan_activities.*')
+                ->get()
+                ->map(fn (YearPlanActivity $activity) => [
+                    'id' => (string) $activity->id,
+                    'code' => $activity->displayCode(),
+                    'description' => $activity->description,
+                    'department_id' => (string) $activity->department_id,
+                    'year' => $activity->yearPlan?->year,
+                ]);
+        }
 
-        // Ensure we always return a plain JSON array of strings
-        return response()->json($results);
+        return view('requests.requisition.create', compact('planActivities'));
     }
 
-    // =============================================================================
-    // OTHER EXISTING METHODS (UNCHANGED)
-    // =============================================================================
-
-    public function show(Petty $petty)
+    public function store(Request $request)
     {
-        $request = $petty->load(['attachments', 'lists', 'trips.startPoint', 'trips.stops', 'transMode', 'user', 'department']);
-        $approval_logs = ApprovalLog::where('petty_id', $petty->id)->get();
+        $baseRules = [
+            'user_id' => ['required', 'string', 'ulid', 'exists:users,id'],
+            'department_id' => ['required', 'string', 'ulid', 'exists:departments,id'],
+            'request_type' => 'required|string|in:Petty Cash,Reimbursement,Staff Requisition',
+        ];
+        $requestType = (string) $request->input('request_type');
+        $rules = $requestType === 'Staff Requisition'
+            ? array_merge($baseRules, [
+                'project_program' => 'required|string|max:255',
+                'activity_code' => 'required|string|max:255',
+                'activity_title' => 'required|string|max:255',
+                'budget_code' => 'required|string|max:255',
+                'date_of_request' => 'nullable|date',
+                'date_of_requirement' => 'nullable|date',
+                'reason' => 'nullable|string|max:1000',
+                'items' => 'required|array|min:1',
+                'items.*.description' => 'required|string|max:255',
+                'items.*.unit' => 'nullable|string|max:255',
+                'items.*.cost' => 'required|numeric|min:0',
+            ])
+            : array_merge($baseRules, [
+                'request_for' => 'required|string|in:Sales Delivery,Transport,Office Supplies',
+                'amount' => 'required|numeric|min:0',
+                'reason' => 'required|string|max:1000',
+            ]);
+        $validated = $request->validate($rules);
+
+        DB::transaction(function () use ($requestType, $validated, $request) {
+            $requestRow = FinanceRequest::create([
+                'request_no' => $this->generateUniqueRequestNo(),
+                'request_type' => $requestType,
+                'user_id' => $validated['user_id'],
+                'department_id' => $validated['department_id'],
+                'status' => 'pending',
+                'submitted_at' => now(),
+            ]);
+
+            if ($requestType === 'Staff Requisition') {
+                $amount = collect($request->input('items', []))->sum(fn ($item) => (float) ($item['cost'] ?? 0));
+                RequisitionRequest::create([
+                    'request_id' => $requestRow->id,
+                    'project_program' => $validated['project_program'],
+                    'activity_code' => $validated['activity_code'],
+                    'activity_title' => $validated['activity_title'],
+                    'budget_code' => $validated['budget_code'],
+                    'date_of_request' => $validated['date_of_request'] ?? null,
+                    'date_of_requirement' => $validated['date_of_requirement'] ?? null,
+                    'reason' => $validated['reason'] ?? null,
+                    'amount' => $amount,
+                ]);
+                foreach ($request->input('items', []) as $index => $item) {
+                    RequisitionItem::create([
+                        'request_id' => $requestRow->id,
+                        'serial_no' => $index + 1,
+                        'description' => $item['description'],
+                        'unit' => $item['unit'] ?? null,
+                        'cost' => $item['cost'],
+                    ]);
+                }
+            } else {
+                PettyRequest::create([
+                    'request_id' => $requestRow->id,
+                    'request_for' => $validated['request_for'],
+                    'amount' => $validated['amount'],
+                    'reason' => $validated['reason'],
+                ]);
+            }
+
+            RequestApproval::create([
+                'request_id' => $requestRow->id,
+                'step' => 'system',
+                'action' => 'created',
+                'actor_id' => $requestRow->user_id,
+                'acted_at' => now(),
+            ]);
+
+            [$name, $reason, $encodedId] = $this->buildRequestMailArgs($requestRow->fresh(['pettyDetails', 'requisitionDetails']));
+            $permission = $requestType === 'Staff Requisition' ? 'review staff requisition' : 'first pettycash approval';
+            $sms = "New request from {$name} for {$reason}. Ref: {$encodedId}";
+            $this->notifyApprovers($permission, $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
+        });
+
+        return redirect()->route($requestType === 'Staff Requisition' ? 'requisition.index' : 'petty.index')->with('success', 'Request created successfully!');
+    }
+
+    public function show(FinanceRequest $petty)
+    {
+        $request = $petty->load(['user', 'department', 'pettyDetails', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
+        $approval_logs = $request->approvals()->with('user')->orderBy('acted_at')->get();
 
         $numberToWords = new NumberToWords;
         $numberTransformer = $numberToWords->getNumberTransformer('en');
-        $amountWords = $numberTransformer->toWords($request->amount);
-        $amountWords = ucwords($amountWords);
+        $amountWords = ucwords($numberTransformer->toWords($request->amount));
         $amountInWords = 'TZS '.$amountWords;
-
-        $verifiedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->first();
-        $approvedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->skip(1)->take(1)->first();
+        $verifiedBy = $approval_logs->where('action', 'approved')->values()->get(0);
+        $approvedBy = $approval_logs->where('action', 'approved')->values()->get(1);
         $gm = User::where('email', 'gm@marstanzania.com')->first();
 
-        return view('pettycash.view', compact('request', 'amountInWords', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
+        return view('requests.petty.view', compact('request', 'amountInWords', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
     }
 
     public function requests_list()
@@ -350,11 +321,14 @@ class PettyController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $scopeIds = $user->departmentScopeIds();
-        $requests = Petty::orderBy('created_at', 'desc')
-            ->whereIn('department_id', $scopeIds)
+        $parentScopeIds = Department::whereIn('id', $scopeIds)->pluck('parent_id')->filter()->values()->all();
+        $allScopeIds = array_values(array_unique(array_merge($scopeIds, $parentScopeIds)));
+        $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails'])
+            ->whereIn('department_id', $allScopeIds)
+            ->orderByDesc('created_at')
             ->get();
 
-        return view('pettycash.approval.index', compact('requests'));
+        return view('requests.approval.index', compact('requests'));
     }
 
     public function requestsCashier()
@@ -362,125 +336,142 @@ class PettyController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $scopeIds = $user->departmentScopeIds();
-        $requests = Petty::orderBy('created_at', 'desc')
-            ->whereIn('department_id', $scopeIds)
+        $parentScopeIds = Department::whereIn('id', $scopeIds)->pluck('parent_id')->filter()->values()->all();
+        $allScopeIds = array_values(array_unique(array_merge($scopeIds, $parentScopeIds)));
+        $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails'])
+            ->whereIn('department_id', $allScopeIds)
             ->whereIn('status', ['approved', 'paid'])
+            ->orderByDesc('created_at')
             ->get();
 
-        return view('pettycash.approval.index', compact('requests'));
+        return view('requests.approval.index', compact('requests'));
     }
 
     public function all_requests()
     {
-        $requests = Petty::orderBy('created_at', 'desc')->get();
+        $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails'])
+            ->orderByDesc('created_at')
+            ->get();
 
-        return view('pettycash.approval.index', compact('requests'));
+        return view('requests.approval.index', compact('requests'));
     }
 
-    public function request_show(Petty $petty)
+    public function request_show(FinanceRequest $petty)
     {
-        $request = $petty->load(['attachments', 'lists', 'trips.startPoint', 'trips.stops', 'transMode', 'user', 'department']);
-        $latest = ApprovalLog::where('petty_id', $petty->id)->where('user_id', Auth::user()->id)->latest()->first();
-        $approval_logs = ApprovalLog::where('petty_id', $petty->id)->get();
+        $request = $petty->load(['user', 'department', 'pettyDetails', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
+        $latest = $request->approvals()->where('actor_id', Auth::id())->latest('acted_at')->first();
+        $approval_logs = $request->approvals()->with('user')->orderBy('acted_at')->get();
         $approval = optional($latest)->action;
-
-        $verifiedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->first();
-        $approvedBy = ApprovalLog::where('petty_id', $petty->id)->where('action', 'approved')->skip(1)->take(1)->first();
+        $verifiedBy = $approval_logs->where('action', 'approved')->values()->get(0);
+        $approvedBy = $approval_logs->where('action', 'approved')->values()->get(1);
         $gm = User::where('email', 'gm@marstanzania.com')->first();
 
         $numberToWords = new NumberToWords;
         $numberTransformer = $numberToWords->getNumberTransformer('en');
-        $amountWords = $numberTransformer->toWords($request->amount);
-        $amountWords = ucwords($amountWords);
+        $amountWords = ucwords($numberTransformer->toWords($request->amount));
         $amountInWords = 'TZS '.$amountWords;
 
-        return view('pettycash.approval.details', compact('request', 'amountInWords', 'approval', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
+        return view('requests.approval.details', compact('request', 'amountInWords', 'approval', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
     }
 
-    public function f_approve(Petty $petty)
+    public function f_approve(FinanceRequest $petty)
     {
-        ApprovalLog::create([
-            'petty_id' => $petty->id,
-            'user_id' => Auth::user()->id,
-            'action' => 'approved',
-        ]);
+        if ($redirect = $this->ensureUserHasSignature()) {
+            return $redirect;
+        }
+        if (! $this->canSignRequest($petty, 'review')) {
+            return redirect()->back()->with('error', 'You are not allowed to review this request at this stage.');
+        }
 
-        $request = $petty;
-        $request->status = 'processing';
-        $request->save();
+        $this->createApproval($petty, 'review', 'approved');
+        $petty->update(['status' => 'processing']);
 
-        [$name, $reason, $encodedId] = $this->buildPettyMailArgs($request);
-        $sms = "Petty cash request {$encodedId} moved to processing.";
-        $this->notifyApprovers('last pettycash approval', $request->department_id, new FirstApprovalMail($name, $reason, $encodedId), $sms);
+        [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
+        if ($petty->request_type === 'Staff Requisition') {
+            $this->notifyApprovers('approve staff requisition', $petty->department_id, new FirstApprovalMail($name, $reason, $encodedId), "Staff requisition {$encodedId} has been reviewed and is awaiting approval.");
+        } else {
+            $this->notifyApprovers('last pettycash approval', $petty->department_id, new FirstApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been reviewed and is awaiting approval.");
+        }
 
-        return redirect()->back()->with('success', 'Request approved and status updated');
+        return redirect()->back()->with('success', 'Request reviewed successfully.');
     }
 
-    public function l_approve(Petty $petty)
+    public function l_approve(FinanceRequest $petty)
     {
-        ApprovalLog::create([
-            'petty_id' => $petty->id,
-            'user_id' => Auth::user()->id,
-            'action' => 'approved',
-        ]);
+        if ($redirect = $this->ensureUserHasSignature()) {
+            return $redirect;
+        }
+        if (! $this->canSignRequest($petty, 'approve')) {
+            return redirect()->back()->with('error', 'You are not allowed to approve this request at this stage.');
+        }
 
-        $request = $petty;
-        $request->status = 'approved';
-        $request->save();
+        $this->createApproval($petty, 'approve', 'approved');
+        $petty->update(['status' => 'processing']);
 
-        [$name, $reason, $encodedId] = $this->buildPettyMailArgs($request);
-        $sms = "Petty cash request {$encodedId} approved. Awaiting payment.";
-        $this->notifyApprovers('approve petycash payments', $request->department_id, new LastApprovalMail($name, $reason, $encodedId), $sms);
+        [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
+        if ($petty->request_type === 'Staff Requisition') {
+            $this->notifyApprovers('authorize staff requisition', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Staff requisition {$encodedId} has been approved and is awaiting authorization.");
+        } else {
+            $this->notifyApprovers('authorize requests', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been approved and is awaiting authorization.");
+        }
 
-        return redirect()->back()->with('success', 'Request approved and status updated');
+        return redirect()->back()->with('success', 'Request approved successfully.');
     }
 
-    public function c_approve(Petty $petty)
+    public function authorizeRequest(FinanceRequest $petty)
     {
-        $request = $petty;
+        if ($redirect = $this->ensureUserHasSignature()) {
+            return $redirect;
+        }
+        if (! $this->canSignRequest($petty, 'authorize')) {
+            return redirect()->back()->with('error', 'You are not allowed to authorize this request at this stage.');
+        }
 
-        // Check if already paid
-        $alreadyPaid = ApprovalLog::where('petty_id', $petty->id)
-            ->where('action', 'paid')
-            ->exists();
+        $this->createApproval($petty, 'authorize', 'approved');
+        $petty->update(['status' => 'approved', 'approved_at' => now()]);
 
+        if ($petty->request_type !== 'Staff Requisition') {
+            [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
+            $this->notifyApprovers('approve petycash payments', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} authorized. Awaiting payment.");
+        }
+
+        return redirect()->back()->with('success', 'Request authorized successfully.');
+    }
+
+    public function c_approve(FinanceRequest $petty)
+    {
+        if ($petty->authorized_at === null) {
+            return redirect()->back()->with('error', 'This request must be authorized before payment.');
+        }
+        $alreadyPaid = $petty->approvals()->where('action', 'paid')->exists();
         if ($alreadyPaid) {
-            return redirect()->back()->with('error', 'This petty cash request has already been paid.');
+            return redirect()->back()->with('error', 'This request has already been paid.');
         }
 
         $latestDeposit = Deposit::latest()->first();
-
         if (! $latestDeposit) {
             return redirect()->back()->with('error', 'No deposit available.');
         }
 
-        // Deduct amount
-        $latestDeposit->remaining -= $request->amount;
+        $latestDeposit->remaining -= $petty->amount;
         $latestDeposit->save();
 
-        $log = ApprovalLog::create([
-            'petty_id' => $petty->id,
-            'user_id' => Auth::user()->id,
-            'action' => 'paid',
-        ]);
+        $log = $this->createApproval($petty, 'payment', 'paid');
+        $petty->update(['status' => 'paid', 'paid_at' => $log->acted_at]);
+        $petty->pettyDetails()->update(['paid_date' => optional($log->acted_at)->toDateString()]);
 
-        $request->status = 'paid';
-        $request->paid_date = $log->created_at;
-        $request->save();
-
-        [$name, $reason, $encodedId] = $this->buildPettyMailArgs($request);
-        $requester = User::find($request->user_id);
+        [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
+        $requester = User::find($petty->user_id);
         if ($requester) {
-            // Email if preferred
-            if (in_array($requester->notification_channel ?? 'sms', ['email', 'both']) && $requester->email) {
+            $channel = $requester->notification_channel ?? 'sms';
+            if (in_array($channel, ['email', 'both']) && $requester->email) {
                 $this->trySendMail($requester->email, new SuccessPayment($name, $reason, $encodedId));
             }
-            // SMS if preferred
-            if (in_array($requester->notification_channel ?? 'sms', ['sms', 'both']) && $requester->phone) {
+            if (in_array($channel, ['sms', 'both']) && $requester->phone) {
                 try {
                     app(NotificationService::class)->sendSms($requester->phone, "Payment done for petty cash {$encodedId}.");
                 } catch (\Throwable $e) {
-                    Log::error('Failed to send payment SMS to requester', ['user_id' => $requester->id, 'error' => $e->getMessage()]);
+                    Log::error('Failed to send payment SMS', ['user_id' => $requester->id, 'error' => $e->getMessage()]);
                 }
             }
         }
@@ -488,28 +479,21 @@ class PettyController extends Controller
         return redirect()->back()->with('success', 'Payment done successfully, and the amount has been deducted from your deposit.');
     }
 
-    public function reject(Request $request, Petty $petty)
+    public function reject(Request $request, FinanceRequest $petty)
     {
-        $request->validate([
+        $validated = $request->validate([
             'comment' => 'required|string',
-            'action' => 'required|string',
+            'action' => 'required|string|in:rejected,resubmission',
         ]);
 
-        ApprovalLog::create([
-            'petty_id' => $petty->id,
-            'user_id' => Auth::user()->id,
-            'action' => $request->action,
-            'comment' => $request->comment,
-        ]);
+        $this->createApproval($petty, 'system', $validated['action'], $validated['comment']);
+        $petty->update(['status' => $validated['action']]);
 
-        $petty->status = $request->action;
-        $petty->save();
-
-        [$name, $reason, $publicId] = $this->buildPettyMailArgs($petty);
+        [$name, $reason, $publicId] = $this->buildRequestMailArgs($petty);
         $requester = User::find($petty->user_id);
         if ($requester) {
             $channel = $requester->notification_channel ?? 'sms';
-            if ($request->action === 'rejected') {
+            if ($validated['action'] === 'rejected') {
                 if (in_array($channel, ['email', 'both']) && $requester->email) {
                     $this->trySendMail($requester->email, new RejectMail($name, $reason, $publicId));
                 }
@@ -519,36 +503,146 @@ class PettyController extends Controller
 
                 return redirect()->back()->with('success', 'This request was rejected and feedback sent successfully.');
             }
+
             if (in_array($channel, ['email', 'both']) && $requester->email) {
                 $this->trySendMail($requester->email, new ResubmitMail($name, $reason, $publicId));
             }
             if (in_array($channel, ['sms', 'both']) && $requester->phone) {
                 app(NotificationService::class)->sendSms($requester->phone, "Your petty cash {$publicId} requires resubmission.");
             }
-
-            return redirect()->back()->with('success', 'You recommended resubmission for this petty cash request and feedback was sent successfully.');
         }
 
-        return redirect()->back()->with('error', 'Request not found.');
+        return redirect()->back()->with('success', 'Request updated and feedback sent successfully.');
     }
 
-    public function updateAttachment(Request $request, Petty $petty)
+    public function requisitionRequests()
     {
-        $request->validate([
-            'attachment' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls|max:2048',
-        ]);
+        $requests = FinanceRequest::with(['user', 'requisitionDetails'])
+            ->where('user_id', Auth::id())
+            ->where('request_type', 'Staff Requisition')
+            ->orderByDesc('created_at')
+            ->get();
 
-        if ($request->hasFile('attachment')) {
-            $attachment = $request->file('attachment');
-            $attachmentName = time().'_'.$attachment->getClientOriginalName();
-            $attachment->storeAs('public/attachments', $attachmentName);
-            $petty->attachment = 'storage/attachments/'.$attachmentName;
-            $petty->save();
+        return view('requests.requisition.index', compact('requests'));
+    }
 
-            return redirect()->back()->with('success', 'Attachment updated successfully.');
+    public function requisitionShow(FinanceRequest $petty)
+    {
+        abort_unless($petty->request_type === 'Staff Requisition', 404);
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        abort_unless((string) $petty->user_id === (string) Auth::id() || ($user && $user->can('view requested pettycash')), 403);
+
+        $request = $petty->load(['user', 'department', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
+        $approval_logs = $request->approvals()->with('user')->orderBy('acted_at')->get();
+
+        return view('requests.requisition.show', compact('request', 'approval_logs'));
+    }
+
+    public function requisitionEdit(FinanceRequest $petty)
+    {
+        abort_unless($petty->request_type === 'Staff Requisition', 404);
+        abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
+        if (! in_array($petty->status, ['pending', 'resubmission'])) {
+            return redirect()->route('requisition.show', $petty)->with('error', 'Only pending or resubmission requisitions can be edited.');
         }
 
-        return redirect()->back()->with('error', 'No file uploaded.');
+        $request = $petty->load(['requisitionDetails', 'requisitionItems']);
+
+        return view('requests.requisition.edit', compact('request'));
+    }
+
+    public function requisitionUpdate(Request $request, FinanceRequest $petty)
+    {
+        abort_unless($petty->request_type === 'Staff Requisition', 404);
+        abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
+        if (! in_array($petty->status, ['pending', 'resubmission'])) {
+            return redirect()->route('requisition.show', $petty)->with('error', 'Only pending or resubmission requisitions can be updated.');
+        }
+
+        $validated = $request->validate([
+            'project_program' => 'required|string|max:255',
+            'activity_code' => 'required|string|max:255',
+            'activity_title' => 'required|string|max:255',
+            'budget_code' => 'required|string|max:255',
+            'date_of_request' => 'nullable|date',
+            'date_of_requirement' => 'nullable|date',
+            'reason' => 'nullable|string|max:1000',
+            'items' => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:255',
+            'items.*.unit' => 'nullable|string|max:255',
+            'items.*.cost' => 'required|numeric|min:0',
+        ]);
+
+        $petty->requisitionDetails()->update([
+            'project_program' => $validated['project_program'],
+            'activity_code' => $validated['activity_code'],
+            'activity_title' => $validated['activity_title'],
+            'budget_code' => $validated['budget_code'],
+            'date_of_request' => $validated['date_of_request'] ?? null,
+            'date_of_requirement' => $validated['date_of_requirement'] ?? null,
+            'reason' => $validated['reason'] ?? null,
+            'amount' => collect($validated['items'])->sum(fn ($item) => (float) $item['cost']),
+        ]);
+        $petty->update(['status' => 'pending']);
+
+        RequisitionItem::where('request_id', $petty->id)->delete();
+        foreach ($validated['items'] as $index => $item) {
+            RequisitionItem::create([
+                'request_id' => $petty->id,
+                'serial_no' => $index + 1,
+                'description' => $item['description'],
+                'unit' => $item['unit'] ?? null,
+                'cost' => $item['cost'],
+            ]);
+        }
+
+        return redirect()->route('requisition.show', $petty)->with('success', 'Requisition updated successfully.');
+    }
+
+    public function requisitionApprovals()
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $scopeIds = $user->departmentScopeIds();
+        $requests = FinanceRequest::with(['user', 'requisitionDetails'])
+            ->where('request_type', 'Staff Requisition')
+            ->whereIn('department_id', $scopeIds)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('requests.requisition.approvals', compact('requests'));
+    }
+
+    public function downloadRequisition(FinanceRequest $petty)
+    {
+        if ($petty->request_type !== 'Staff Requisition') {
+            abort(404);
+        }
+        if (! $this->isRequisitionFullySigned($petty)) {
+            return redirect()->back()->with('error', 'Requisition can be downloaded only after all signatures are completed.');
+        }
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if (! $user || (! $user->can('approve petycash payments') && ! $user->can('authorize staff requisition'))) {
+            abort(403);
+        }
+
+        $request = $petty->load(['user', 'department', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
+        $pdf = Pdf::loadView('requests.requisition.pdf', compact('request'));
+
+        return $pdf->download('staff-requisition-'.$request->id.'.pdf');
+    }
+
+    public function destroy(FinanceRequest $petty)
+    {
+        abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
+        if (! in_array($petty->status, ['pending', 'resubmission', 'rejected'])) {
+            return redirect()->back()->with('error', 'Only pending, resubmission, or rejected requests can be deleted.');
+        }
+        $petty->delete();
+
+        return redirect()->back()->with('success', 'Request deleted successfully.');
     }
 
     private function resolveDepartmentScopeIds(?string $departmentId): array
@@ -556,9 +650,7 @@ class PettyController extends Controller
         if ($departmentId === null || $departmentId === '') {
             return [];
         }
-
         $department = Department::find($departmentId);
-
         if (! $department) {
             return [$departmentId];
         }

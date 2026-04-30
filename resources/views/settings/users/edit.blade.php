@@ -122,6 +122,29 @@
                                 </div>
                             </div>
 
+                            <!-- Title -->
+                            <div class="col-md-6 col-lg-6 mb-3">
+                                <div class="form-group">
+                                    <label for="title" class="form-label">
+                                        Job Title
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="ti ti-id-badge"></i>
+                                        </span>
+                                        <input type="text"
+                                            class="form-control @error('title') is-invalid @enderror"
+                                            name="title"
+                                            id="title"
+                                            placeholder="e.g. STEM Instructor, Finance Officer"
+                                            value="{{ old('title', $user->title) }}">
+                                    </div>
+                                    @error('title')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+
                             <!-- Department -->
                             <div class="col-md-6 col-lg-6 mb-3">
                                 <div class="form-group">

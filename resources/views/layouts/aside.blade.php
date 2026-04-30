@@ -121,6 +121,13 @@
                     <i class="ti ti-file-text"></i>
                 </li>
 
+                <li class="pc-item {{ Request::routeIs('requisition.*') ? 'active' : '' }}">
+                    <a href="{{ route('requisition.index') }}" class="pc-link">
+                         <span class="pc-micon"><i class="ti ti-file"></i></span>
+                        <span class="pc-mtext">Staff Requisitions</span>
+                    </a>
+                </li>
+
                 <li class="pc-item {{ Request::routeIs('petty.index') ? 'active' : '' }}">
                     <a href="{{ route('petty.index') }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-file-text"></i></span>
@@ -128,7 +135,7 @@
                     </a>
                 </li>
 
-                @can('first pettycash approval')
+                @canany(['first pettycash approval', 'last pettycash approval', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'review requests', 'approve requests', 'authorize requests'])
                     <li class="pc-item">
                         <a href="{{ route('petty.list') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-users"></i></span>
@@ -138,7 +145,7 @@
                             @endif
                         </a>
                     </li>
-                @endcan
+                @endcanany
 
                 <!-- Finance & Transactions -->
                 @can('view cashflow movements')

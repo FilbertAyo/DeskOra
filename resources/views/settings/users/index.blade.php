@@ -61,6 +61,7 @@
                                 <tr>
                                     <th class="text-center" style="width: 50px;">No.</th>
                                     <th>Name</th>
+                                    <th>Title</th>
                                     <th>Email</th>
                                     <th>Phone Number</th>
                                     <th>Department</th>
@@ -76,6 +77,9 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                         {{ $u->name }}
+                                        </td>
+                                        <td>
+                                            {{ $u->title ?: 'N/A' }}
                                         </td>
                                         <td>
                                             {{ $u->email }}

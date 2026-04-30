@@ -1,8 +1,18 @@
-<x-app-layout>
+@php
+    $code = '403';
+    $title = 'Permission Denied';
+    $message = "It seems like you don't have access to perform this action.";
+@endphp
 
-    <div class="alert alert-danger">
-        <h4 class="text-danger">Permission Denied !</h4>
-        <p>It seems like you don't have access to perform this action.</p>
-    </div>
+@extends('errors.layout')
 
-</x-app-layout>
+@section('actions')
+    <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">
+        <i class="ti ti-arrow-left me-1"></i>
+        Go Back
+    </a>
+    <a href="{{ url('/') }}" class="btn btn-primary">
+        <i class="ti ti-home me-1"></i>
+        Dashboard
+    </a>
+@endsection

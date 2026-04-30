@@ -8,24 +8,26 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('petties', function (Blueprint $table) {
+        Schema::create('requests', function (Blueprint $table) {
             $table->ulid('id')->primary();
+            $table->string('request_no')->unique();
+            $table->enum('request_type', ['Petty Cash', 'Reimbursement', 'Staff Requisition', 'Letter']);
             $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUlid('department_id')->nullable()->constrained('departments')->nullOnDelete();
-            $table->foreignUlid('replenishment_id')->nullable()->constrained('replenishments')->nullOnDelete();
-            $table->string('code')->nullable();
-            $table->string('request_for')->nullable();
-            $table->decimal('amount', 10, 2);
-            $table->text('reason')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'resubmission', 'resubmitted', 'paid'])->default('pending');
-            $table->enum('request_type', ['Petty Cash', 'Reimbursement']);
-            $table->date('paid_date')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('paid_at')->nullable();
             $table->timestamps();
+
+            $table->index(['request_type', 'status']);
+            $table->index(['user_id', 'created_at']);
+            $table->index(['department_id', 'created_at']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('petties');
+        Schema::dropIfExists('requests');
     }
 };

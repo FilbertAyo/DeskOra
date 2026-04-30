@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use App\Data\WeeklySubmissionReminder;
 use App\Models\Document;
-use App\Models\Petty;
+use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
 use App\Services\WeeklySubmissionReminderService;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +36,7 @@ class AppServiceProvider extends ServiceProvider
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
                 $counts = Cache::remember('petty-nav-counts-user-'.$user->id, now()->addSeconds(45), function () use ($user) {
-                    return Petty::query()
+                    return FinanceRequest::query()
                         ->whereIn('department_id', $user->departmentScopeIds())
                         ->whereIn('status', ['pending', 'approved'])
                         ->selectRaw('status, COUNT(*) as total')
@@ -50,7 +50,7 @@ class AppServiceProvider extends ServiceProvider
 
             // This one doesn't depend on user.
             $processingCount = Cache::remember('petty-nav-count-processing', now()->addSeconds(45), function () {
-                return Petty::where('status', 'processing')->count();
+                return FinanceRequest::where('status', 'processing')->count();
             });
 
             $view->with([

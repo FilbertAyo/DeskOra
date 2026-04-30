@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ApprovalLog;
-use App\Models\Petty;
+use App\Models\Request as FinanceRequest;
+use App\Models\RequestApproval;
 use Illuminate\Console\Command;
 
 class FillPettyPaidDate extends Command
@@ -29,17 +29,17 @@ class FillPettyPaidDate extends Command
     {
         $updatedCount = 0;
 
-        $petties = Petty::all();
+        $requests = FinanceRequest::where('status', 'paid')->get();
 
-        foreach ($petties as $petty) {
-            $approval = ApprovalLog::where('petty_id', $petty->id)
+        foreach ($requests as $request) {
+            $approval = RequestApproval::where('request_id', $request->id)
                 ->where('action', 'paid')
-                ->orderBy('created_at', 'desc')
+                ->orderBy('acted_at', 'desc')
                 ->first();
 
             if ($approval) {
-                $petty->paid_date = $approval->created_at;
-                $petty->save();
+                $request->paid_at = $approval->acted_at ?? $approval->created_at;
+                $request->save();
                 $updatedCount++;
             }
         }

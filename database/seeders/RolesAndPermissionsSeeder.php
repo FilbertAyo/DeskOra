@@ -38,6 +38,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage year plans',
             'manage anonymous feedback',
             'view activity log',
+            'review staff requisition',
+            'approve staff requisition',
+            'authorize staff requisition',
+            'download staff requisition',
+            'review requests',
+            'approve requests',
+            'authorize requests',
         ];
 
         // ============================================

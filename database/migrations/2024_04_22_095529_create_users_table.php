@@ -14,6 +14,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->foreignUlid('department_id')->nullable()->constrained('departments')->nullOnDelete();
+            $table->foreignUlid('branch_id')->nullable()->constrained('branches')->nullOnDelete();
+       
             $table->string('file')->nullable();
             $table->string('signature')->nullable();
             $table->string('phone');

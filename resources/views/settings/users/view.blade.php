@@ -50,6 +50,7 @@
                                 @endif
                             </div>
                             <h4 class="mb-1">{{ $user->name }}</h4>
+                            <p class="text-muted mb-1">{{ $user->title ?: 'No title assigned' }}</p>
                             <p class="text-muted mb-2">{{ $user->department?->name ?? 'No Department' }}</p>
                             
                             @if($user->roles->count() > 0)
@@ -155,6 +156,12 @@
                                     <label class="text-muted small mb-1">Email Address</label>
                                     <div class="d-flex align-items-center">
                                         <strong>{{ $user->email }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="text-muted small mb-1">Job Title</label>
+                                    <div class="d-flex align-items-center">
+                                        <strong>{{ $user->title ?: 'N/A' }}</strong>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">

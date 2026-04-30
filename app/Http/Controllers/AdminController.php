@@ -45,6 +45,7 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'phone' => ['required', 'regex:/^0[76][0-9]{8}$/'],
@@ -78,6 +79,7 @@ class AdminController extends Controller
 
         $user = User::create([
             'name' => $request->name,
+            'title' => $validated['title'] ?? null,
             'email' => $request->email,
             'password' => $validated['password'],
             'department_id' => $validated['department_id'] ?? null,
@@ -151,6 +153,7 @@ class AdminController extends Controller
         $oldDepartmentId = $user->department_id;
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'phone' => ['required', 'regex:/^0[76][0-9]{8}$/'],
             'department_id' => ['nullable', 'string', 'ulid', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNull('parent_id'))],
@@ -183,6 +186,7 @@ class AdminController extends Controller
 
         $user->update([
             'name' => $request->name,
+            'title' => $validated['title'] ?? null,
             'email' => $request->email,
             'phone' => $request->phone,
             'department_id' => $validated['department_id'] ?? null,

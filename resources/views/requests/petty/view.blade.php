@@ -18,73 +18,6 @@
         </div>
     </div>
 
-    <!-- Attachment Upload Alert -->
-    @if ($request->is_transporter == true && $request->attachment == null)
-        <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none" role="alert">
-            <div class="d-flex align-items-center flex-grow-1">
-                <div class="alert-icon me-3">
-                    <i class="ti ti-alert-triangle fs-3"></i>
-                </div>
-                <div class="flex-grow-1">
-                    <h6 class="alert-heading mb-1">Attachment Required</h6>
-                    <p class="mb-0">Please upload the required attachment for this transport request.</p>
-                </div>
-                <button class="btn btn-warning ms-3" data-toggle="modal" data-target="#uploadAttachmentModal">
-                    <i class="ti ti-upload me-2"></i>Upload Now
-                </button>
-            </div>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        </div>
-    @elseif($request->request_for == 'Office Supplies' && $request->attachment == null)
-        <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none" role="alert">
-            <div class="d-flex align-items-center flex-grow-1">
-                <div class="alert-icon me-3">
-                    <i class="ti ti-alert-triangle fs-3"></i>
-                </div>
-                <div class="flex-grow-1">
-                    <h6 class="alert-heading mb-1">Attachment Required</h6>
-                    <p class="mb-0">Please upload the required attachment for your office supplies request.</p>
-                </div>
-                <button class="btn btn-warning ms-3" data-toggle="modal" data-target="#uploadAttachmentModal">
-                    <i class="ti ti-upload me-2"></i>Upload Now
-                </button>
-            </div>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        </div>
-    @endif
-
-    <!-- Upload Attachment Modal -->
-    <div class="modal fade" id="uploadAttachmentModal" tabindex="-1" aria-labelledby="uploadAttachmentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="{{ route('petty.updateAttachment', $request->id) }}" method="POST" enctype="multipart/form-data" class="modal-content border-0 shadow-lg">
-                @csrf
-                @method('POST')
-                <div class="modal-header bg-light border-bottom-0">
-                    <h5 class="modal-title fw-bold d-flex align-items-center" id="uploadAttachmentModalLabel">
-                        <i class="ti ti-upload me-2 text-primary"></i>
-                        <span>Upload Attachment</span>
-                    </h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label for="attachment" class="form-label fw-bold">Choose File <span class="text-danger">*</span></label>
-                        <input type="file" name="attachment" id="attachment" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required>
-                        <small class="text-muted mt-1 d-block">Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)</small>
-                    </div>
-                </div>
-                <div class="modal-footer border-top-0">
-                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary d-flex align-items-center">
-                        <i class="ti ti-upload me-2"></i>Upload
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div class="row">
         <!-- Request Details Card -->
         <div class="col-12">
@@ -96,15 +29,17 @@
                             <small class="text-muted">Code: <strong class="text-primary">{{ $request->code }}</strong></small>
                         </div>
                         <div class="d-flex gap-2">
-                            @if ($request->status == 'approved' || $request->status == 'paid')
+                            @if ($request->request_type !== 'Staff Requisition' && ($request->status == 'approved' || $request->status == 'paid'))
                                 <button type="button" class="btn btn-outline-success d-flex align-items-center" data-toggle="modal" data-target="#pettyCashModal">
                                     <i class="ti ti-download me-2"></i>Download PDF
                                 </button>
                             @endif
                             @if ($request->status == 'pending' || $request->status == 'resubmission')
-                                <a href="{{ route('petty.edit.step1', $request->id) }}" class="btn btn-outline-warning d-flex align-items-center">
-                                    <i class="ti ti-edit me-2"></i>Edit Request
-                                </a>
+                                @if ($request->request_type === 'Staff Requisition')
+                                    <a href="{{ route('requisition.edit', $request->id) }}" class="btn btn-outline-warning d-flex align-items-center">
+                                        <i class="ti ti-edit me-2"></i>Edit Request
+                                    </a>
+                                @endif
                             @endif
                         </div>
                     </div>
@@ -129,6 +64,24 @@
                                 <p class="mb-0 text-dark">{!! nl2br(e($request->reason)) !!}</p>
                             </div>
                         </div>
+                        @if ($request->request_type === 'Staff Requisition')
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold text-muted small">Project/Program</label>
+                                <input type="text" class="form-control bg-light" value="{{ $request->project_program }}" disabled>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold text-muted small">Activity Code</label>
+                                <input type="text" class="form-control bg-light" value="{{ $request->activity_code }}" disabled>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold text-muted small">Activity Title</label>
+                                <input type="text" class="form-control bg-light" value="{{ $request->activity_title }}" disabled>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold text-muted small">Budget Code</label>
+                                <input type="text" class="form-control bg-light" value="{{ $request->budget_code }}" disabled>
+                            </div>
+                        @endif
                         @if ($request->paid_date)
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold text-muted small">Date Paid</label>
@@ -150,10 +103,17 @@
                                     $statusInfo = $statusMap[$request->status] ?? ['class' => 'secondary', 'icon' => 'fe-info', 'text' => ucfirst($request->status)];
                                 @endphp
                                 @if ($request->status == 'resubmission')
-                                    <a href="{{ route('petty.edit.step1', $request->id) }}" class="btn btn-{{ $statusInfo['class'] }} text-white d-inline-flex align-items-center px-3 py-2">
-                                        <i class="ti ti-edit me-2"></i>
-                                        Edit & Resubmit
-                                    </a>
+                                    @if ($request->request_type === 'Staff Requisition')
+                                        <a href="{{ route('requisition.edit', $request->id) }}" class="btn btn-{{ $statusInfo['class'] }} text-white d-inline-flex align-items-center px-3 py-2">
+                                            <i class="ti ti-edit me-2"></i>
+                                            Edit & Resubmit
+                                        </a>
+                                    @else
+                                        <span class="badge bg-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
+                                            <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
+                                            {{ $statusInfo['text'] }}
+                                        </span>
+                                    @endif
                                 @else
                                     <span class="badge bg-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
                                         <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
@@ -165,7 +125,36 @@
                     </div>
 
 
-                    @include('elements.details')
+                    @if ($request->request_type === 'Staff Requisition')
+                        <div class="mt-4">
+                            <h5 class="mb-3">Requisition Items</h5>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>S/N</th>
+                                            <th>Description</th>
+                                            <th>Unit</th>
+                                            <th>Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($request->requisitionItems as $item)
+                                            <tr>
+                                                <td>{{ $item->serial_no }}</td>
+                                                <td>{{ $item->description }}</td>
+                                                <td>{{ $item->unit }}</td>
+                                                <td>{{ number_format($item->cost, 2) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        @include('requests.partials.approval-signatories')
+                    @else
+                        @include('elements.details')
+                    @endif
 
                     <!-- Total Amount -->
                     <div class="row mt-4">
@@ -187,9 +176,11 @@
     </div>
 
 
-    @include('elements.approvals')
+    @include('requests.approval.logs')
 
-    @include('elements.print')
+    @if ($request->request_type !== 'Staff Requisition')
+        @include('elements.print')
+    @endif
 
     <style>
         /* Enhanced UI Styling */
