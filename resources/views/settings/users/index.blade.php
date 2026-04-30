@@ -78,7 +78,9 @@
                                         {{ $u->name }}
                                         </td>
                                         <td>
+                                            <small>
                                             {{ $u->title ?: 'N/A' }}
+                                            </small>
                                         </td>
                                         <td>
                                             <div class="small">
