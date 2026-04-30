@@ -13,6 +13,7 @@ use App\Http\Controllers\PettyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
@@ -102,7 +103,6 @@ Route::middleware('auth')->group(function () {
     // admin
     Route::resource('admin', AdminController::class);
     Route::post('/activate/{user}', [AdminController::class, 'activate'])->name('admin.activate');
-    Route::post('/users/{user}/assign-permissions', [AdminController::class, 'assignPermissions'])->name('assign.permissions');
 
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
@@ -218,6 +218,17 @@ Route::middleware(['auth', 'permission:manage anonymous feedback'])->group(funct
 Route::middleware(['auth', 'permission:view activity log'])->group(function () {
     Route::get('/settings/activity-log', [ActivityLogController::class, 'index'])->name('activity-log.index');
     Route::get('/settings/activity-log/{activity}', [ActivityLogController::class, 'show'])->name('activity-log.show');
+});
+
+Route::middleware(['auth', 'permission:users management settings'])->group(function () {
+    Route::resource('/settings/roles', RoleController::class)->names([
+        'index' => 'roles.index',
+        'create' => 'roles.create',
+        'store' => 'roles.store',
+        'edit' => 'roles.edit',
+        'update' => 'roles.update',
+        'destroy' => 'roles.destroy',
+    ])->except(['show']);
 });
 
 // Work Periods Management (Admin only - checked in controller)

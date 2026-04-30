@@ -50,23 +50,12 @@
                                 @endif
                             </div>
                             <h4 class="mb-1">{{ $user->name }}</h4>
-                            <p class="text-muted mb-1">{{ $user->title ?: 'No title assigned' }}</p>
-                            <p class="text-muted mb-2">{{ $user->department?->name ?? 'No Department' }}</p>
                             
-                            @if($user->roles->count() > 0)
-                                <div class="mb-2">
-                                    @foreach($user->roles as $role)
-                                        <span class="badge bg-primary rounded-pill mb-1">
-                                            <i class="ti ti-shield me-1"></i>
-                                            {{ ucwords(str_replace('_', ' ', $role->name)) }}
-                                        </span>
-                                    @endforeach
-                                </div>
-                            @endif
+                        
 
                             <div class="mb-3">
                                 <span
-                                    class="badge bg-light-{{ $user->status === 'active' ? 'success' : 'danger' }} px-3 py-2">
+                                    class="badge bg-light-{{ $user->status === 'active' ? 'success' : 'danger' }}">
                                     <i
                                         class="ti ti-{{ $user->status === 'active' ? 'circle-check' : 'circle-x' }} me-1"></i>
                                     {{ ucfirst($user->status) }}
@@ -126,12 +115,6 @@
                                 <a class="list-group-item list-group-item-action" href="tel:{{ $user->phone }}">
                                     <i class="ti ti-phone me-2 text-primary"></i> Call User
                                 </a>
-                                @can('users management settings')
-                                    <button type="button" class="list-group-item list-group-item-action"
-                                        data-bs-toggle="offcanvas" data-bs-target="#addRole">
-                                        <i class="ti ti-shield me-2 text-warning"></i> Manage Permissions
-                                    </button>
-                                @endcan
                             </div>
                         </div>
                     </div>
@@ -223,78 +206,22 @@
                         </div>
                     </div>
 
-                    <!-- Account Timeline -->
-                    <div class="card shadow-none border mb-4">
-                        <div class="card-header bg-white border-bottom">
-                            <h5 class="mb-0"><i class="ti ti-clock me-2"></i>Account Timeline</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <div class="d-flex align-items-start">
-                                        <div class="flex-shrink-0">
-                                            <div
-                                                class="avatar avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center">
-                                                <i class="ti ti-user-plus"></i>
-                                            </div>
-                                        </div>
-                                        <div class="flex-grow-1 ms-3">
-                                            <label class="text-muted small mb-1">Account Created</label>
-                                            <div><strong>{{ $user->created_at->format('M d, Y') }}</strong></div>
-                                            <small class="text-muted">{{ $user->created_at->diffForHumans() }}</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <div class="d-flex align-items-start">
-                                        <div class="flex-shrink-0">
-                                            <div
-                                                class="avatar avatar-sm bg-info text-white rounded-circle d-flex align-items-center justify-content-center">
-                                                <i class="ti ti-refresh"></i>
-                                            </div>
-                                        </div>
-                                        <div class="flex-grow-1 ms-3">
-                                            <label class="text-muted small mb-1">Last Updated</label>
-                                            <div><strong>{{ $user->updated_at->format('M d, Y') }}</strong></div>
-                                            <small class="text-muted">{{ $user->updated_at->diffForHumans() }}</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                @if ($user->email_verified_at)
-                                    <div class="col-md-6 mb-3">
-                                        <div class="d-flex align-items-start">
-                                            <div class="flex-shrink-0">
-                                                <div
-                                                    class="avatar avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
-                                                    <i class="ti ti-circle-check"></i>
-                                                </div>
-                                            </div>
-                                            <div class="flex-grow-1 ms-3">
-                                                <label class="text-muted small mb-1">Email Verified</label>
-                                                <div><strong>{{ $user->email_verified_at->format('M d, Y') }}</strong>
-                                                </div>
-                                                <small
-                                                    class="text-muted">{{ $user->email_verified_at->diffForHumans() }}</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-
+      
                     <!-- Current Permissions Summary -->
+                    @php
+                        $effectivePermissions = $user->getAllPermissions();
+                    @endphp
                     <div class="card shadow-none border">
                         <div
                             class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="ti ti-shield me-2"></i>Current Permissions</h5>
-                            <span class="badge bg-primary">{{ $user->permissions->count() }}
+                            <span class="badge bg-primary">{{ $effectivePermissions->count() }}
                                 Active</span>
                         </div>
                         <div class="card-body">
-                            @if ($user->permissions->count() > 0)
+                            @if ($effectivePermissions->count() > 0)
                                 <div class="row">
-                                    @foreach ($user->permissions as $permission)
+                                    @foreach ($effectivePermissions as $permission)
                                         <div class="col-md-6 mb-2">
                                             <span class="badge bg-light-secondary border px-3 py-2">
                                                 {{ ucwords(str_replace('_', ' ', $permission->name)) }}
@@ -306,146 +233,12 @@
                                 <div class="text-center py-4">
                                     <i class="ti ti-shield text-muted" style="font-size: 48px;"></i>
                                     <p class="text-muted mb-0 mt-2">No permissions assigned yet</p>
-                                    @can('users management settings')
-                                        <button type="button" class="btn btn-sm btn-primary mt-3" data-bs-toggle="offcanvas"
-                                            data-bs-target="#addRole">
-                                            <i class="ti ti-plus me-1"></i> Assign Permissions
-                                        </button>
-                                    @endcan
                                 </div>
                             @endif
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Permissions Tab -->
-        <div class="tab-pane fade" id="permissions" role="tabpanel" aria-labelledby="permissions-tab">
-            <div class="row">
-                <div class="col-12">
-                    <div class="card shadow-none border">
-                        <div
-                            class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="mb-1"><i class="ti ti-shield me-2"></i>Manage User Permissions</h5>
-                                <small class="text-muted">Assign or revoke permissions for this user</small>
-                            </div>
-                            @can('users management settings')
-                                <button type="button" class="btn btn-primary" data-bs-toggle="offcanvas"
-                                    data-bs-target="#addRole">
-                                    <i class="ti ti-edit me-1"></i> Edit Permissions
-                                </button>
-                            @endcan
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                @foreach ($permissions as $permission)
-                                    <div class="col-md-4 col-lg-3 mb-3">
-                                        <div
-                                            class="card h-100 {{ $user->hasPermissionTo($permission->name) ? 'border-success' : 'border-light' }}">
-                                            <div class="card-body p-3">
-                                                <div class="d-flex align-items-start">
-                                                    <div class="flex-shrink-0">
-                                                        @if ($user->hasPermissionTo($permission->name))
-                                                            <i class="ti ti-circle-check text-success fs-4"></i>
-                                                        @else
-                                                            <i class="ti ti-circle text-muted fs-4"></i>
-                                                        @endif
-                                                    </div>
-                                                    <div class="flex-grow-1 ms-2">
-                                                        <h6 class="mb-0">
-                                                            {{ ucwords(str_replace('_', ' ', $permission->name)) }}
-                                                        </h6>
-                                                        <small class="text-muted">
-                                                            @if ($user->hasPermissionTo($permission->name))
-                                                                <span class="text-success">Granted</span>
-                                                            @else
-                                                                <span class="text-muted">Not Granted</span>
-                                                            @endif
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Assign Permissions Offcanvas -->
-    <div class="offcanvas offcanvas-top permissions-offcanvas" tabindex="-1" id="addRole" aria-labelledby="addRoleLabel"
-        aria-hidden="true">
-        <div class="offcanvas-header">
-            <h5 class="offcanvas-title" id="addRoleLabel">
-                <i class="ti ti-shield me-2"></i>Assign Permissions to {{ $user->name }}
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
-        <div class="offcanvas-body">
-            <form action="{{ route('assign.permissions', $user->id) }}" method="POST" id="permissionsForm">
-                @csrf
-
-                <div class="alert alert-info d-flex align-items-start mb-3">
-                    <i class="ti ti-info-circle me-2 mt-1"></i>
-                    <div>
-                        <strong>Note:</strong> Select the permissions you want to grant to this user.
-                        Unchecked permissions will be revoked.
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                        <h6 class="mb-0">Available Permissions</h6>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-primary rounded-pill">{{ $permissions->count() }}</span>
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAll()">
-                                Select All
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
-                                Deselect All
-                            </button>
-                        </div>
-                    </div>
-                    <div class="row g-2">
-                        @foreach ($permissions as $permission)
-                            <div class="col-md-4 col-lg-3">
-                                <label class="list-group-item permission-item d-flex align-items-center gap-2 h-100">
-                                    <input class="form-check-input permission-checkbox"
-                                        type="checkbox"
-                                        name="permissions[]"
-                                        value="{{ $permission->name }}"
-                                        id="perm_{{ $permission->id }}"
-                                        {{ $user->hasPermissionTo($permission->name) ? 'checked' : '' }}>
-                                    <span class="text-truncate">
-                                        {{ ucwords(str_replace('_', ' ', $permission->name)) }}
-                                    </span>
-                                </label>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-end gap-2 pt-3 border-top sticky-actions">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="offcanvas">
-                        <i class="ti ti-x me-1"></i> Cancel
-                    </button>
-                    @can('users management settings')
-                        <button type="submit" class="btn btn-primary" id="assignBtn">
-                            <i class="ti ti-check me-1"></i> Save Permissions
-                        </button>
-                    @else
-                        <button type="button" class="btn btn-primary permission-alert">
-                            <i class="ti ti-check me-1"></i> Save Permissions
-                        </button>
-                    @endcan
-                </div>
-            </form>
         </div>
     </div>
 
@@ -465,51 +258,6 @@
             background-color: #f8f9fa !important;
         }
 
-        .permissions-offcanvas {
-            --bs-offcanvas-height: min(90vh, 760px);
-        }
-
-        .permission-item {
-            min-height: 72px;
-            transition: all 0.2s ease;
-        }
-
-        .permission-item:hover {
-            border-color: #0d6efd !important;
-            box-shadow: 0 0 0 0.08rem rgba(13, 110, 253, 0.15);
-        }
-
-        .sticky-actions {
-            position: sticky;
-            bottom: 0;
-            background: #fff;
-            z-index: 2;
-        }
     </style>
-
-    <script>
-        function selectAll() {
-            document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
-                checkbox.checked = true;
-            });
-        }
-
-        function deselectAll() {
-            document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-        }
-
-        // Form submission handler
-        const permissionsForm = document.getElementById('permissionsForm');
-        const assignBtn = document.getElementById('assignBtn');
-
-        if (permissionsForm && assignBtn) {
-            permissionsForm.addEventListener('submit', function() {
-                assignBtn.disabled = true;
-                assignBtn.innerHTML = '<i class="ti ti-loader-2 spinning me-1"></i> Saving...';
-            });
-        }
-    </script>
 
 </x-app-layout>

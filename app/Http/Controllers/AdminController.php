@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class AdminController extends Controller
@@ -32,10 +31,9 @@ class AdminController extends Controller
     {
         $departments = $this->hierarchicalDepartments();
         $topDepartments = $this->topDepartmentsWithChildren();
-        $permissions = Permission::all();
         $roles = Role::all();
 
-        return view('settings.users.create', compact('departments', 'topDepartments', 'permissions', 'roles'));
+        return view('settings.users.create', compact('departments', 'topDepartments', 'roles'));
     }
 
     /**
@@ -53,8 +51,8 @@ class AdminController extends Controller
             'sub_department_ids' => ['nullable', 'array'],
             'sub_department_ids.*' => ['string', 'ulid', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNotNull('parent_id'))],
             'is_department_head' => ['nullable', 'boolean'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['exists:permissions,name'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
         $subDepartmentIds = array_values(array_unique($validated['sub_department_ids'] ?? []));
@@ -90,10 +88,7 @@ class AdminController extends Controller
 
         $user->subDepartments()->sync($subDepartmentIds);
 
-        // Assign permissions if provided
-        if ($request->has('permissions')) {
-            $user->syncPermissions($request->input('permissions', []));
-        }
+        $user->syncRoles($validated['roles'] ?? []);
 
         $this->syncDepartmentHeadAssignment(
             $user,
@@ -113,27 +108,9 @@ class AdminController extends Controller
      */
     public function show(User $admin)
     {
-        $user = $admin->load(['department', 'subDepartments']);
-        $permissions = Permission::all();
+        $user = $admin->load(['department', 'subDepartments', 'roles', 'permissions']);
 
-        return view('settings.users.view', compact('user', 'permissions'));
-    }
-
-    public function assignPermissions(Request $request, User $user)
-    {
-
-        // Get submitted permissions or empty array if none checked
-        $submittedPermissions = $request->input('permissions', []);
-
-        // Sync the user's permissions (this will add and remove as needed)
-        $user->syncPermissions($submittedPermissions);
-
-        activity('users')
-            ->performedOn($user)
-            ->withProperties(['permissions' => array_values($submittedPermissions)])
-            ->log('User permissions updated');
-
-        return redirect()->back()->with('success', 'Permissions updated successfully.');
+        return view('settings.users.view', compact('user'));
     }
 
     public function edit(User $admin)
@@ -141,10 +118,9 @@ class AdminController extends Controller
         $user = $admin->load(['department', 'subDepartments']);
         $departments = $this->hierarchicalDepartments();
         $topDepartments = $this->topDepartmentsWithChildren();
-        $permissions = Permission::all();
         $roles = Role::all();
 
-        return view('settings.users.edit', compact('user', 'departments', 'topDepartments', 'permissions', 'roles'));
+        return view('settings.users.edit', compact('user', 'departments', 'topDepartments', 'roles'));
     }
 
     public function update(Request $request, User $admin)
@@ -160,8 +136,8 @@ class AdminController extends Controller
             'sub_department_ids' => ['nullable', 'array'],
             'sub_department_ids.*' => ['string', 'ulid', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNotNull('parent_id'))],
             'is_department_head' => ['nullable', 'boolean'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['exists:permissions,name'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
         $subDepartmentIds = array_values(array_unique($validated['sub_department_ids'] ?? []));
@@ -194,16 +170,7 @@ class AdminController extends Controller
 
         $user->subDepartments()->sync($subDepartmentIds);
 
-        // Update user permissions if provided
-        if ($request->has('permissions')) {
-            $synced = $request->input('permissions', []);
-            $user->syncPermissions($synced);
-
-            activity('users')
-                ->performedOn($user)
-                ->withProperties(['permissions' => array_values($synced)])
-                ->log('User permissions updated');
-        }
+        $user->syncRoles($validated['roles'] ?? []);
 
         $this->syncDepartmentHeadAssignment(
             $user,

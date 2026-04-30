@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -88,24 +89,22 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission]);
         }
 
-        $yearPlanPerm = Permission::findByName('manage year plans');
-        User::query()
-            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
-            ->each(fn (User $user) => $user->givePermissionTo($yearPlanPerm));
+        $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
+        $staffRole = Role::firstOrCreate(['name' => 'staff']);
+        $employeeRole = Role::firstOrCreate(['name' => 'employee']);
 
-        $anonymousFeedbackPerm = Permission::findByName('manage anonymous feedback');
-        User::query()
-            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
-            ->each(fn (User $user) => $user->givePermissionTo($anonymousFeedbackPerm));
+        $superadminRole->syncPermissions($allPermissions);
+        $staffRole->syncPermissions($staffRole->permissions()->pluck('name')->all());
+        $employeeRole->syncPermissions($employeeRole->permissions()->pluck('name')->all());
 
-        $activityLogPerm = Permission::findByName('view activity log');
+        // Keep existing direct permission assignments untouched for compatibility,
+        // but role assignment should be preferred moving forward.
         User::query()
-            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
-            ->each(fn (User $user) => $user->givePermissionTo($activityLogPerm));
-
-        $manageNotificationsPerm = Permission::findByName('manage notifications');
-        User::query()
-            ->whereHas('permissions', fn ($q) => $q->where('name', 'update other settings'))
-            ->each(fn (User $user) => $user->givePermissionTo($manageNotificationsPerm));
+            ->whereHas('permissions')
+            ->each(function (User $user) use ($superadminRole) {
+                if ($user->roles()->doesntExist()) {
+                    $user->assignRole($superadminRole);
+                }
+            });
     }
 }

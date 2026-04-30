@@ -226,29 +226,36 @@
                             <!-- Role -->
                             <div class="col-md-6 col-lg-6 mb-3">
                                 <div class="form-group">
-                                    <label for="role" class="form-label">
-                                        Role
+                                    <label for="roles" class="form-label">
+                                        Roles
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">
                                             <i class="ti ti-shield"></i>
                                         </span>
-                                        <select class="form-control @error('role') is-invalid @enderror"
-                                            name="role"
-                                            id="role">
-                                            <option value="">-- No Role --</option>
+                                        <select class="form-control @error('roles') is-invalid @enderror @error('roles.*') is-invalid @enderror"
+                                            name="roles[]"
+                                            id="roles"
+                                            multiple
+                                            size="6">
+                                            @php
+                                                $selectedRoles = old('roles', $user->roles->pluck('name')->all());
+                                            @endphp
                                             @foreach($roles as $role)
-                                                <option value="{{ $role->name }}" 
-                                                    {{ old('role', $user->roles->first()?->name) == $role->name ? 'selected' : '' }}>
+                                                <option value="{{ $role->name }}"
+                                                    {{ in_array($role->name, $selectedRoles, true) ? 'selected' : '' }}>
                                                     {{ ucwords(str_replace('_', ' ', $role->name)) }}
                                                 </option>
                                             @endforeach
                                         </select>
                                     </div>
-                                    @error('role')
+                                    @error('roles')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
-                                    <small class="form-text text-muted">Current: {{ $user->roles->first()?->name ? ucwords(str_replace('_', ' ', $user->roles->first()->name)) : 'No role assigned' }}</small>
+                                    @error('roles.*')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                    <small class="form-text text-muted">Hold Ctrl (Windows) or Cmd (Mac) to select multiple roles.</small>
                                 </div>
                             </div>
 

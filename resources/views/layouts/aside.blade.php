@@ -200,7 +200,7 @@
                     </li>
              
                     <li
-                        class="pc-item pc-hasmenu {{ Request::routeIs('admin.index') || Request::routeIs('departments') || Request::routeIs('settings.*') ? 'pc-triggered' : '' }}">
+                        class="pc-item pc-hasmenu {{ Request::routeIs('admin.*') || Request::routeIs('roles.*') || Request::routeIs('departments') || Request::routeIs('activity-log.*') || Request::routeIs('settings.*') ? 'pc-triggered' : '' }}">
                         <a href="#!" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-settings"></i></span>
                             <span class="pc-mtext">Settings</span>
@@ -210,6 +210,11 @@
                             <li class="pc-item {{ Request::routeIs('admin.index') ? 'active' : '' }}">
                                 <a href="{{ route('admin.index') }}" class="pc-link">
                                     <span class="pc-mtext">Users</span>
+                                </a>
+                            </li>
+                            <li class="pc-item {{ Request::routeIs('roles.*') ? 'active' : '' }}">
+                                <a href="{{ route('roles.index') }}" class="pc-link">
+                                    <span class="pc-mtext">Roles</span>
                                 </a>
                             </li>
                             <li class="pc-item {{ Request::routeIs('departments') ? 'active' : '' }}">

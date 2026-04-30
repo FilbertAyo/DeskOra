@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class UsersSeeder extends Seeder
 {
@@ -51,8 +51,6 @@ class UsersSeeder extends Seeder
             'parent_id' => null,
         ]);
 
-        $adminPermissions = Permission::all()->pluck('name')->toArray();
-
         $user = User::create([
             'name' => 'Administrator',
             'email' => 'admin@adilisha.or.tz',
@@ -62,7 +60,8 @@ class UsersSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        $user->syncPermissions($adminPermissions);
+        $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
+        $user->syncRoles([$superadminRole->name]);
 
         $this->command->info('Users seeded: admin@adilisha.or.tz (password: password).');
         $this->command->info('Departments: Programs, Finance and Administration, Communications and Advocacy.');
