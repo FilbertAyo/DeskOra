@@ -62,11 +62,10 @@
                                     <th class="text-center" style="width: 50px;">No.</th>
                                     <th>Name</th>
                                     <th>Title</th>
-                                    <th>Email</th>
-                                    <th>Phone Number</th>
+                                    <th>Contacts</th>
                                     <th>Department</th>
                                     <th>Sub-Departments</th>
-                                    <!-- <th>Role</th> -->
+                                    <th>Roles</th>
                                     <th class="text-center" style="width: 100px;">Status</th>
                                     <th class="text-center" style="width: 150px;">Action</th>
                                 </tr>
@@ -82,10 +81,10 @@
                                             {{ $u->title ?: 'N/A' }}
                                         </td>
                                         <td>
-                                            {{ $u->email }}
-                                        </td>
-                                        <td>
-                                            {{ $u->phone }}
+                                            <div class="small">
+                                                <div>{{ $u->email }}</div>
+                                                <div class="text-muted">{{ $u->phone }}</div>
+                                            </div>
                                         </td>
 
                                         <td>
@@ -98,26 +97,26 @@
                                         </td>
                                         <td>
                                             @if($u->subDepartments->isNotEmpty())
-                                                {{ $u->subDepartments->pluck('name')->implode(', ') }}
+                                                <span class="small">{{ $u->subDepartments->pluck('name')->implode(', ') }}</span>
                                             @else
-                                                <span class="text-muted">All / Not assigned</span>
+                                                <span class="text-muted small">All / Not assigned</span>
                                             @endif
                                         </td>
-                                        <!-- <td>
+                                        <td>
                                             @if($u->roles->count() > 0)
                                                 @foreach($u->roles as $role)
-                                                    <span class="badge bg-primary mb-1">
+                                                    <span class="badge bg-light-primary mb-1 me-1 small">
                                                         <i class="ti ti-shield me-1"></i>
                                                         {{ ucwords(str_replace('_', ' ', $role->name)) }}
                                                     </span>
                                                 @endforeach
                                             @else
-                                                <span class="text-muted">
+                                                <span class="text-muted small">
                                                     <i class="ti ti-shield-off me-1"></i>
                                                     No role
                                                 </span>
                                             @endif
-                                        </td> -->
+                                        </td>
                                         <td class="text-center">
                                             <span class="badge {{ $u->status === 'active' ? 'bg-success' : 'bg-danger' }}">
                                                 <i class="ti {{ $u->status === 'active' ? 'ti-circle-check' : 'ti-circle-x' }} me-1"></i>
