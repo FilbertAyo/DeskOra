@@ -14,8 +14,8 @@ class WorkPeriodController extends Controller
      */
     private function checkAdmin()
     {
-        if (! Auth::user()->hasPermissionTo('approve documents')) {
-            abort(403, 'Unauthorized access. Only users with approve permissions can manage work periods.');
+        if (! Auth::user()->hasPermissionTo('manage work periods')) {
+            abort(403, 'Unauthorized access. Only users with work period permissions can manage work periods.');
         }
     }
 
@@ -25,7 +25,7 @@ class WorkPeriodController extends Controller
      */
     public function index(Request $request)
     {
-        if (! $request->user()->hasPermissionTo('approve documents')) {
+        if (! $request->user()->hasPermissionTo('manage work periods')) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -104,7 +104,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $request->validate([
             'year' => ['required', 'integer', 'min:2020', 'max:2100'],
@@ -173,7 +173,7 @@ class WorkPeriodController extends Controller
      */
     public function show(WorkPeriod $work_period)
     {
-        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period->load(['documents.user', 'weeklyPlans.user', 'weeklyReports.user']);
 
@@ -196,7 +196,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period;
 
@@ -211,7 +211,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period;
 
@@ -253,7 +253,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('approve documents'), 403, 'Unauthorized.');
+        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period;
 

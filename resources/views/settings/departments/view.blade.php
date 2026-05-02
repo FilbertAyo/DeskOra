@@ -14,7 +14,7 @@
                             </ul>
                         </div>
                         <div class="d-flex gap-2">
-                            @can('update other settings')
+                            @can('manage departments')
                                 <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSubDepartmentModal">
                                     <i class="ti ti-circle-plus me-1"></i> Add Sub-Department
                                 </button>
@@ -80,7 +80,7 @@
                                                 <a href="{{ route('department.show', $child->id) }}" class="btn btn-info text-white" title="View">
                                                     <i class="ti ti-eye"></i>
                                                 </a>
-                                                @can('update other settings')
+                                                @can('manage departments')
                                                     <button type="button" class="btn btn-primary edit-sub-dept-btn" title="Edit"
                                                         data-bs-toggle="modal" data-bs-target="#editSubDepartmentModal"
                                                         data-hashid="{{ $child->id }}"
@@ -109,7 +109,7 @@
     </div>
 
     @if ($department->parent_id)
-        @can('update other settings')
+        @can('manage departments')
             <div class="row">
                 <div class="col-md-12">
                     <div class="card border shadow-none">
@@ -232,7 +232,7 @@
         </div>
     </div>
 
-    @can('update other settings')
+    @can('manage departments')
         <div class="modal fade" id="editSubDepartmentModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">

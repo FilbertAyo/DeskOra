@@ -94,11 +94,13 @@ Route::middleware('auth')->group(function () {
     });
 
     // departments
-    Route::get('/departments', [DepartmentController::class, 'index'])->name('departments');          // list
-    Route::post('/department', [DepartmentController::class, 'store'])->name('department.store');    // create
-    Route::put('/department/{department}', [DepartmentController::class, 'update'])->name('department.update'); // update
-    Route::delete('/department/{department}', [DepartmentController::class, 'destroy'])->name('department.destroy'); // delete
-    Route::get('/department/{department}', [DepartmentController::class, 'show'])->name('department.show');       // show
+    Route::middleware('permission:manage departments')->group(function () {
+        Route::get('/departments', [DepartmentController::class, 'index'])->name('departments');          // list
+        Route::post('/department', [DepartmentController::class, 'store'])->name('department.store');    // create
+        Route::put('/department/{department}', [DepartmentController::class, 'update'])->name('department.update'); // update
+        Route::delete('/department/{department}', [DepartmentController::class, 'destroy'])->name('department.destroy'); // delete
+        Route::get('/department/{department}', [DepartmentController::class, 'show'])->name('department.show');       // show
+    });
 
     // admin
     Route::resource('admin', AdminController::class);
@@ -158,7 +160,7 @@ Route::middleware(['auth', 'permission:authorize requests|authorize staff requis
     Route::post('authorize/{petty}', [PettyController::class, 'authorizeRequest'])->name('requests.authorize');
 });
 
-Route::middleware(['auth', 'permission:approve petycash payments'])->group(function () {
+Route::middleware(['auth', 'permission:approve pettycash payments'])->group(function () {
     Route::post('c_approve/{petty}', [PettyController::class, 'c_approve'])->name('c_approve.approve');
 });
 
@@ -166,7 +168,7 @@ Route::middleware(['auth', 'permission:review staff requisition|approve staff re
     Route::get('pettycash/requisitions/approvals', [PettyController::class, 'requisitionApprovals'])->name('petty.requisition.approvals');
 });
 
-Route::middleware(['auth', 'permission:download staff requisition|authorize staff requisition|approve petycash payments'])->group(function () {
+Route::middleware(['auth', 'permission:download staff requisition|authorize staff requisition|approve pettycash payments'])->group(function () {
     Route::get('pettycash/requisitions/{petty}/download', [PettyController::class, 'downloadRequisition'])->name('petty.requisition.download');
 });
 
@@ -200,7 +202,7 @@ Route::middleware(['auth', 'permission:view reports'])->group(function () {
     Route::get('/reports/routes/download', [ReportController::class, 'downloadRouteReport'])->name('reports.route.download');
 });
 
-Route::middleware(['auth', 'permission:view settings'])->group(function () {
+Route::middleware(['auth', 'permission:view notification settings'])->group(function () {
     Route::get('/settings/notifications', [NotificationController::class, 'index'])->name('notification.index');
 });
 
@@ -231,8 +233,8 @@ Route::middleware(['auth', 'permission:users management settings'])->group(funct
     ])->except(['show']);
 });
 
-// Work Periods Management (Admin only - checked in controller)
-Route::middleware('auth')->group(function () {
+// Work Periods Management
+Route::middleware(['auth', 'permission:manage work periods'])->group(function () {
     Route::resource('work-periods', WorkPeriodController::class)->names([
         'index' => 'work-periods.index',
         'create' => 'work-periods.create',

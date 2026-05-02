@@ -283,6 +283,18 @@ class DocumentPolicy
     }
 
     /**
+     * Determine whether the user can perform elevated action-log management actions.
+     */
+    public function manageActionLogs(User $user, Document $document): bool
+    {
+        if ($document->type !== Document::TYPE_ACTION_LOG) {
+            return false;
+        }
+
+        return $this->isActionLogManager($user);
+    }
+
+    /**
      * Ensure documents tied to work periods can only be modified when the period is open.
      */
     private function hasOpenPeriod(Document $document): bool
@@ -305,7 +317,7 @@ class DocumentPolicy
 
     private function isActionLogManager(User $user): bool
     {
-        return $user->hasAnyPermission(['create action logs', 'approve documents']);
+        return $user->hasAnyPermission(['create action logs', 'manage action logs']);
     }
 
     private function isUserAssignedToActionLog(User $user, Document $document): bool

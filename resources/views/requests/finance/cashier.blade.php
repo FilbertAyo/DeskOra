@@ -14,7 +14,7 @@
                         <button type="button" class="btn btn-sm" onclick="reloadPage()">
                             <i class="ti ti-16 fe-refresh-ccw text-muted"></i>
                         </button>
-                        @can('approve petycash payments')
+                        @can('approve pettycash payments')
                             <button type="button" class="btn mb-2 btn-primary btn-sm"
                                 data-toggle="modal" data-target="#staticBackdrop"
                                 onclick="openNewDepositModal()">

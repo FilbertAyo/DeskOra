@@ -40,7 +40,7 @@ class ActionLogController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $canViewAllActionLogs = $user->hasAnyPermission(['create action logs', 'approve documents', 'view action logs', 'view all documents']);
+        $canViewAllActionLogs = $user->hasAnyPermission(['create action logs', 'manage action logs', 'view action logs', 'view all documents']);
         $query = Document::with(['user', 'period'])->actionLogs();
 
         // Filter by state if provided
@@ -483,7 +483,7 @@ class ActionLogController extends Controller
 
     private function isActionLogManager(User $user): bool
     {
-        return $user->hasAnyPermission(['create action logs', 'approve documents']);
+        return $user->hasAnyPermission(['create action logs', 'manage action logs']);
     }
 
     private function getCarryForwardTasks(WorkPeriod $period): array

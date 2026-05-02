@@ -19,7 +19,7 @@
                             <button type="button" class="btn btn-sm btn-light" onclick="window.location.reload()" title="Refresh">
                                 <i class="ti ti-refresh"></i>
                             </button>
-                            @if(Auth::user()->hasPermissionTo('approve documents'))
+                            @if(Auth::user()->hasPermissionTo('manage work periods'))
                                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
                                     <i class="ti ti-plus-circle me-1"></i> Add Work Period
                                 </button>
@@ -182,7 +182,7 @@
                                                        class="btn btn-info text-white" title="View">
                                                         <i class="ti ti-eye"></i>
                                                     </a>
-                                                    @if(Auth::user()->hasPermissionTo('approve documents'))
+                                                    @if(Auth::user()->hasPermissionTo('manage work periods'))
                                                         <a href="{{ route('work-periods.edit', $period->id) }}"
                                                            class="btn btn-primary text-white" title="Edit">
                                                             <i class="ti ti-edit"></i>
@@ -214,7 +214,7 @@
                         <div class="text-center py-5">
                             <i class="ti ti-calendar fs-1 text-muted"></i>
                             <p class="text-muted mt-3">No work periods found.</p>
-                            @if(Auth::user()->hasPermissionTo('approve documents'))
+                            @if(Auth::user()->hasPermissionTo('manage work periods'))
                                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
                                     <i class="ti ti-plus-circle me-1"></i> Create First Work Period
                                 </button>
@@ -227,7 +227,7 @@
     </div>
 
     <!-- Create Work Period Modal -->
-    @if(Auth::user()->hasPermissionTo('approve documents'))
+    @if(Auth::user()->hasPermissionTo('manage work periods'))
     <div class="modal fade" id="createWorkPeriodModal" tabindex="-1" role="dialog" aria-labelledby="createWorkPeriodModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">

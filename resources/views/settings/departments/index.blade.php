@@ -17,7 +17,7 @@
                             <button type="button" class="btn btn-sm btn-light" onclick="location.reload()" title="Refresh">
                                 <i class="ti ti-refresh"></i>
                             </button>
-                            @can('update other settings')
+                            @can('manage departments')
                                 <button type="button" class="btn btn-primary btn-sm" id="newDepartmentBtn">
                                     <i class="ti ti-circle-plus me-1"></i> New Department
                                 </button>
@@ -89,7 +89,7 @@
                                                     title="View Details">
                                                     <i class="ti ti-eye"></i>
                                                 </a>
-                                                @can('update other settings')
+                                                @can('manage departments')
                                                     <button type="button" class="btn btn-primary edit-btn"
                                                         data-id="{{ $department->id }}"
                                                         data-name="{{ $department->name }}"
@@ -247,7 +247,7 @@
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">
                                 <i class="ti ti-x me-1"></i> Cancel
                             </button>
-                            @can('update other settings')
+                            @can('manage departments')
                                 <button type="submit" class="btn btn-primary" id="submitBtn">
                                     <i class="ti ti-device-floppy me-1"></i> Save Department
                                 </button>

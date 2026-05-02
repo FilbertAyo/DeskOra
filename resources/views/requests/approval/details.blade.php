@@ -62,7 +62,7 @@
                     $request->reviewed_at &&
                         $request->approved_at &&
                         $request->authorized_at &&
-                        (auth()->user()->can('approve petycash payments') || auth()->user()->can('authorize staff requisition')))
+                        (auth()->user()->can('approve pettycash payments') || auth()->user()->can('authorize staff requisition')))
                     <a href="{{ route('petty.requisition.download', $request->id) }}"
                         class="btn btn-outline-secondary d-flex align-items-center shadow-sm">
                         <i class="ti ti-download me-2"></i>
@@ -136,7 +136,7 @@
                             <h5 class="mb-1 fw-bold">Request Details</h5>
                             <small class="text-muted">
                                 Code: <strong class="text-primary">
-                                    @can('approve petycash payments')
+                                    @can('approve pettycash payments')
                                         {{ $request->code }}
                                     @endcan
                                 </strong>

@@ -18,25 +18,23 @@ class RolesAndPermissionsSeeder extends Seeder
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         // ============================================
-        // EXISTING PERMISSIONS (Petty Cash & System)
+        // PETTY CASH, REQUISITIONS, REPORTS, SETTINGS
         // ============================================
         $existingPermissions = [
             'request pettycash',
             'view requested pettycash',
             'first pettycash approval',
             'last pettycash approval',
-            'approve petycash payments',
+            'approve pettycash payments',
             'view cashflow movements',
-            'request item purchase',
-            'approve item purchase',
             'view reports',
             'upload organization reports',
-            'view settings',
+            'view notification settings',
             'manage notifications',
             'users management settings',
-            'update other settings',
-            'approve final item purchase',
+            'manage departments',
             'manage year plans',
+            'manage work periods',
             'manage anonymous feedback',
             'view activity log',
             'review staff requisition',
@@ -58,13 +56,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'create monthly report',
 
             // Document Viewing Permissions
-            'view own documents',
             'view all documents',
-
-            // Document Management Permissions
-            'edit own documents',
-            'delete own documents',
-            'submit documents',
 
             // Approval Permissions (removed verify, only approve)
             'approve documents',
@@ -76,9 +68,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'create action logs',
             'manage action logs',
 
-            // Dashboard Permissions
-            'view dashboard',
-            'view reviewer dashboard',
         ];
 
         // Combine all permissions
@@ -91,11 +80,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
-        $employeeRole = Role::firstOrCreate(['name' => 'employee']);
 
         $superadminRole->syncPermissions($allPermissions);
         $staffRole->syncPermissions($staffRole->permissions()->pluck('name')->all());
-        $employeeRole->syncPermissions($employeeRole->permissions()->pluck('name')->all());
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.

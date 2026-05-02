@@ -13,7 +13,7 @@
                             </ul>
                         </div>
                         <div class="d-flex gap-2">
-                            @if(Auth::user()->hasPermissionTo('approve documents'))
+                            @if(Auth::user()->hasPermissionTo('manage work periods'))
                                 <a href="{{ route('work-periods.edit', $period) }}" class="btn btn-sm btn-primary">
                                     <i class="ti ti-edit me-1"></i> Edit
                                 </a>

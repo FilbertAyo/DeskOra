@@ -386,7 +386,7 @@ class DashboardController extends Controller
 
     private function buildActionLogProgressForUser(User $user): array
     {
-        $isActionLogManager = $user->hasAnyPermission(['create action logs', 'approve documents']);
+        $isActionLogManager = $user->hasAnyPermission(['create action logs', 'manage action logs']);
         $documentsQuery = Document::with('period')
             ->where('type', Document::TYPE_ACTION_LOG)
             ->whereNotNull('period_id');

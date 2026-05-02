@@ -99,7 +99,7 @@
                                     </div>
                                 @endcan
 
-                                @can('manage action logs', $document)
+                                @can('manageActionLogs', $document)
                                     @if($document->canBeDeleted())
                                         <div class="col-12 col-md-6">
                                             <form action="{{ route('action-logs.destroy', $document->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this action log? This action cannot be undone.');">

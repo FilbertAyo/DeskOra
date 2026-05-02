@@ -432,7 +432,7 @@ class PettyController extends Controller
 
         if ($petty->request_type !== 'Staff Requisition') {
             [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
-            $this->notifyApprovers('approve petycash payments', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} authorized. Awaiting payment.");
+            $this->notifyApprovers('approve pettycash payments', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} authorized. Awaiting payment.");
         }
 
         return redirect()->back()->with('success', 'Request authorized successfully.');
@@ -624,7 +624,7 @@ class PettyController extends Controller
         }
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        if (! $user || (! $user->can('approve petycash payments') && ! $user->can('authorize staff requisition'))) {
+        if (! $user || (! $user->can('approve pettycash payments') && ! $user->can('authorize staff requisition'))) {
             abort(403);
         }
 

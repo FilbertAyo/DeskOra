@@ -34,7 +34,7 @@ class WeeklyReminderAutomationTest extends TestCase
     {
         /** @var User $admin */
         $admin = User::factory()->create(['status' => 'active']);
-        $admin->givePermissionTo('view settings');
+        $admin->givePermissionTo('view notification settings');
         $admin->givePermissionTo('manage notifications');
 
         $response = $this->actingAs($admin)->put(route('notification.weekly-reminder.update'), [
@@ -61,7 +61,7 @@ class WeeklyReminderAutomationTest extends TestCase
     {
         /** @var User $user */
         $user = User::factory()->create(['status' => 'active']);
-        $user->givePermissionTo('view settings');
+        $user->givePermissionTo('view notification settings');
 
         $response = $this->actingAs($user)->put(route('notification.weekly-reminder.update'), [
             'enabled' => '1',

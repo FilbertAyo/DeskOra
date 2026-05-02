@@ -46,7 +46,7 @@
                                 <span class="pc-mtext">Weekly Reports</span>
                             </a>
                         </li>
-                        @if(Auth::user()->hasAnyPermission(['view action logs', 'approve documents', 'create action logs']))
+                        @if(Auth::user()->hasAnyPermission(['view action logs', 'manage action logs', 'create action logs']))
                             <li class="{{ Request::routeIs('action-logs.*') ? 'active' : '' }}">
                                 <a href="{{ route('action-logs.index') }}" class="pc-link">
                                     <span class="pc-mtext">Action Log</span>
@@ -185,12 +185,14 @@
                     <i class="ti ti-settings"></i>
                 </li>
 
-                <li class="pc-item {{ Request::routeIs('work-periods.*') ? 'active' : '' }}">
-                    <a href="{{ route('work-periods.index') }}" class="pc-link">
-                        <span class="pc-micon"><i class="ti ti-calendar"></i></span>
-                        <span class="pc-mtext">Manage Work Periods</span>
-                    </a>
-                </li>
+                @can('manage work periods')
+                    <li class="pc-item {{ Request::routeIs('work-periods.*') ? 'active' : '' }}">
+                        <a href="{{ route('work-periods.index') }}" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-calendar"></i></span>
+                            <span class="pc-mtext">Manage Work Periods</span>
+                        </a>
+                    </li>
+                @endcan
                
                     <li class="pc-item {{ Request::routeIs('reports') ? 'active' : '' }}">
                         <a href="{{ route('reports') }}" class="pc-link">
@@ -217,11 +219,13 @@
                                     <span class="pc-mtext">Roles</span>
                                 </a>
                             </li>
-                            <li class="pc-item {{ Request::routeIs('departments') ? 'active' : '' }}">
-                                <a href="{{ route('departments') }}" class="pc-link">
-                                    <span class="pc-mtext">Departments</span>
-                                </a>
-                            </li>
+                            @can('manage departments')
+                                <li class="pc-item {{ Request::routeIs('departments') ? 'active' : '' }}">
+                                    <a href="{{ route('departments') }}" class="pc-link">
+                                        <span class="pc-mtext">Departments</span>
+                                    </a>
+                                </li>
+                            @endcan
                            
                          
                             @can('view activity log')
