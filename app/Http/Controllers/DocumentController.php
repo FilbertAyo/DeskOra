@@ -9,10 +9,11 @@ use App\Models\WorkPeriod;
 use App\Services\MonthlyReportYearPlanActivities;
 use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WeeklySubmissionReminderService;
+use App\Services\WorkflowEmailNotificationService;
 use App\Services\WorkPeriodService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class DocumentController extends Controller
         private readonly WorkPeriodService $workPeriodService,
         private readonly WeeklySubmissionReminderService $weeklySubmissionReminderService,
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
+        private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
     ) {}
 
     /**
@@ -823,6 +825,11 @@ class DocumentController extends Controller
             if ($existingDocument->type === Document::TYPE_WEEKLY_REPORT) {
                 $this->syncNextWeeklyPlanCarryOverFromReport($existingDocument->fresh());
             }
+            if ($action === 'submit') {
+                $existingDocument->loadMissing('period');
+                $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($existingDocument, $user);
+                $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($existingDocument, $user);
+            }
 
             $message = ($action === 'submit')
                 ? 'Document updated and submitted successfully.'
@@ -885,6 +892,11 @@ class DocumentController extends Controller
         $this->syncWeeklyPlanAssignments($document);
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
+        }
+        if ($action === 'submit') {
+            $document->loadMissing('period');
+            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $user);
+            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $user);
         }
 
         $message = ($action === 'submit')
@@ -1047,6 +1059,7 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $actingUser */
         $actingUser = Auth::user();
+        $wasSubmitted = $document->isSubmitted();
 
         // Authorize update action
         $this->authorize('update', $document);
@@ -1297,6 +1310,11 @@ class DocumentController extends Controller
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
         }
+        if ($action === 'submit' && ! $wasSubmitted) {
+            $document->loadMissing('period');
+            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $actingUser);
+            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $actingUser);
+        }
 
         $message = ($action === 'submit')
             ? 'Document submitted successfully.'
@@ -1327,12 +1345,20 @@ class DocumentController extends Controller
      */
     public function submit(Request $request, Document $document)
     {
+        /** @var \App\Models\User $actingUser */
+        $actingUser = Auth::user();
+        $wasSubmitted = $document->isSubmitted();
 
         // Authorize submit action
         $this->authorize('submit', $document);
 
         $document->submit();
         $this->syncWeeklyPlanAssignments($document);
+        if (! $wasSubmitted) {
+            $document->loadMissing('period');
+            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $actingUser);
+            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $actingUser);
+        }
 
         return redirect()->route('documents.show', $document)
             ->with('success', 'Document submitted successfully.');
@@ -1343,6 +1369,8 @@ class DocumentController extends Controller
      */
     public function reject(Request $request, Document $document)
     {
+        /** @var \App\Models\User $actingUser */
+        $actingUser = Auth::user();
 
         $this->authorize('reject', $document);
 
@@ -1354,6 +1382,8 @@ class DocumentController extends Controller
 
         $document->revertToDraft($reason);
         $this->syncWeeklyPlanAssignments($document);
+        $document->loadMissing('user', 'period');
+        $this->workflowEmailNotificationService->notifyWeeklyDocumentReturnedToDraft($document, $actingUser, $reason);
 
         return redirect()->route('documents.show', $document->id)
             ->with('warning', 'Document returned to draft. Staff can now update and re-submit after addressing the review reason.');

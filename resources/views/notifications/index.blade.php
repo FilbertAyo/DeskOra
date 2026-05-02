@@ -170,17 +170,92 @@
                             <div class="alert alert-info mb-3">
                                 Separate reminders are sent for each missing activity (weekly plan and weekly report).
                             </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="ti ti-device-floppy me-1"></i>Save Reminder Settings
-                            </button>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="ti ti-device-floppy me-1"></i>Save Reminder Settings
+                                </button>
+                            </div>
                         </div>
                     </form>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between">
+                        <div>
+                            <h6 class="mb-1">Reminder Delivery Health</h6>
+                            <p class="mb-0 text-muted small">
+                                Last sent:
+                                @if($lastReminderSentAt)
+                                    {{ \Carbon\Carbon::parse($lastReminderSentAt)->timezone(config('app.timezone'))->format('M d, Y H:i') }}
+                                @else
+                                    Never sent yet
+                                @endif
+                            </p>
+                        </div>
+                        <form action="{{ route('notification.weekly-reminder.run-now') }}" method="POST" class="mt-2 mt-md-0">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="ti ti-send me-1"></i>Run Reminder Now
+                            </button>
+                        </form>
+                    </div>
                     @else
                     <div class="alert alert-warning mb-0">
                         <i class="ti ti-lock me-1"></i>
                         You can view notification settings, but only users with <strong>manage notifications</strong> permission can configure reminder automation.
                     </div>
                     @endcan
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card shadow-none border">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="ti ti-history mr-2"></i>Recent Reminder Deliveries
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if($recentReminderLogs->isEmpty())
+                        <div class="alert alert-info mb-0">
+                            No reminder deliveries logged yet.
+                        </div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Sent At</th>
+                                        <th>User</th>
+                                        <th>Activity</th>
+                                        <th>Status</th>
+                                        <th>Channels</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($recentReminderLogs as $log)
+                                        <tr>
+                                            <td>{{ $log->created_at?->timezone(config('app.timezone'))->format('M d, Y H:i') }}</td>
+                                            <td>
+                                                <div>{{ $log->user?->name ?? 'Unknown user' }}</div>
+                                                <small class="text-muted">{{ $log->user?->email }}</small>
+                                            </td>
+                                            <td>{{ ucfirst(str_replace('_', ' ', $log->activity_type)) }}</td>
+                                            <td>
+                                                <span class="badge {{ $log->status === 'sent' ? 'bg-success' : 'bg-warning text-dark' }}">
+                                                    {{ ucfirst(str_replace('_', ' ', $log->status)) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ implode(', ', $log->channels ?? []) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

@@ -217,8 +217,8 @@ class WorkPeriodController extends Controller
 
         $request->validate([
             'week_start_date' => ['required', 'date'],
-            'plan_deadline' => ['nullable', 'date'],
-            'report_deadline' => ['nullable', 'date'],
+            'plan_deadline' => ['required', 'date'],
+            'report_deadline' => ['required', 'date'],
             'status' => ['required', 'in:open,closed,archived'],
         ]);
 
@@ -226,18 +226,11 @@ class WorkPeriodController extends Controller
         $startDate = Carbon::parse($request->week_start_date);
         $endDate = $startDate->copy()->addDays(6);
 
-        // Deadlines are fixed by business rule:
-        // - Plan deadline: Saturday before week start
-        // - Report deadline: Saturday of the same week
-        // Time cutoff is handled in model logic as 23:59.
-        $planDeadline = $startDate->copy()->subDays(2);
-        $reportDeadline = $startDate->copy()->addDays(5);
-
         $period->update([
             'week_start_date' => $startDate->format('Y-m-d'),
             'week_end_date' => $endDate->format('Y-m-d'),
-            'plan_deadline' => $planDeadline->format('Y-m-d'),
-            'report_deadline' => $reportDeadline->format('Y-m-d'),
+            'plan_deadline' => Carbon::parse($request->plan_deadline)->format('Y-m-d'),
+            'report_deadline' => Carbon::parse($request->report_deadline)->format('Y-m-d'),
             'status' => $request->status,
         ]);
 

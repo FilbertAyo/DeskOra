@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\WorkflowEmailNotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,10 @@ use Illuminate\Support\Str;
 
 class ActionLogController extends Controller
 {
+    public function __construct(
+        private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
+    ) {}
+
     private const PROGRESS_NOT_STARTED = 'Not Started';
 
     private const PROGRESS_IN_PROGRESS = 'In Progress';
@@ -172,6 +177,7 @@ class ActionLogController extends Controller
             ->where('period_id', $period->id)
             ->latest('id')
             ->first();
+        $wasSubmitted = $existingDocument?->isSubmitted() ?? false;
 
         $title = $this->buildActionLogTitle($period);
 
@@ -250,6 +256,10 @@ class ActionLogController extends Controller
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
             : 'Action Log saved as draft.';
+        if ($action === 'submit' && ! $wasSubmitted) {
+            $document->loadMissing('period');
+            $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $user);
+        }
 
         return redirect()->route('action-logs.show', $document)
             ->with('success', $message);
@@ -362,6 +372,8 @@ class ActionLogController extends Controller
      */
     public function update(Request $request, Document $document)
     {
+        /** @var \App\Models\User $actingUser */
+        $actingUser = Auth::user();
 
         // Ensure it's an action log document
         if ($document->type !== Document::TYPE_ACTION_LOG) {
@@ -409,6 +421,7 @@ class ActionLogController extends Controller
 
         // Determine state based on action
         $action = $request->input('action', 'draft');
+        $wasSubmitted = $document->isSubmitted();
 
         // If submitting, authorize submit action
         if ($action === 'submit' && ! $document->isSubmitted()) {
@@ -456,6 +469,10 @@ class ActionLogController extends Controller
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
             : 'Action Log updated successfully.';
+        if ($action === 'submit' && ! $wasSubmitted) {
+            $document->loadMissing('period');
+            $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $actingUser);
+        }
 
         return redirect()->route('action-logs.show', $document)
             ->with('success', $message);

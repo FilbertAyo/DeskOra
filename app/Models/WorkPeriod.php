@@ -93,23 +93,33 @@ class WorkPeriod extends Model
     }
 
     /**
-     * Canonical plan deadline date for this period (Saturday before week start).
+     * Plan deadline calendar date (stored value; admins may extend via edit).
+     * Falls back to Saturday before week start when unset (legacy rows).
      */
     private function canonicalPlanDeadlineDate(): Carbon
     {
+        if ($this->plan_deadline !== null) {
+            return Carbon::parse($this->plan_deadline)->startOfDay();
+        }
+
         return Carbon::parse($this->week_start_date)->subDays(2)->startOfDay();
     }
 
     /**
-     * Canonical report deadline date for this period (Saturday of current week).
+     * Report deadline calendar date (stored value; admins may extend via edit).
+     * Falls back to Saturday of the work week when unset (legacy rows).
      */
     private function canonicalReportDeadlineDate(): Carbon
     {
+        if ($this->report_deadline !== null) {
+            return Carbon::parse($this->report_deadline)->startOfDay();
+        }
+
         return Carbon::parse($this->week_start_date)->addDays(5)->startOfDay();
     }
 
     /**
-     * Plan deadline cutoff timestamp (Saturday 23:59 local time).
+     * Plan deadline cutoff timestamp (23:59 local time on the stored plan deadline date).
      */
     public function getPlanDeadlineCutoff(): Carbon
     {
@@ -117,7 +127,7 @@ class WorkPeriod extends Model
     }
 
     /**
-     * Report deadline cutoff timestamp (Saturday 23:59 local time).
+     * Report deadline cutoff timestamp (23:59 local time on the stored report deadline date).
      */
     public function getReportDeadlineCutoff(): Carbon
     {

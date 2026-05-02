@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\ReminderConfigService;
+use App\Models\ReminderDispatchLog;
 use App\Services\NotificationService;
-use Illuminate\Http\Request;
+use App\Services\ReminderConfigService;
+use App\Services\WeeklySubmissionReminderDispatcher;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
@@ -13,8 +15,18 @@ class NotificationController extends Controller
     {
         $smsInfo = $notificationService->getSmsAccountInfo();
         $reminderConfig = $reminderConfigService->getWeeklyPlanReportConfig();
+        $recentReminderLogs = ReminderDispatchLog::query()
+            ->with(['user:id,name,email'])
+            ->where('reminder_config_id', $reminderConfig->id)
+            ->latest()
+            ->limit(20)
+            ->get();
+        $lastReminderSentAt = ReminderDispatchLog::query()
+            ->where('reminder_config_id', $reminderConfig->id)
+            ->latest('created_at')
+            ->value('created_at');
 
-        return view('notifications.index', compact('smsInfo', 'reminderConfig'));
+        return view('notifications.index', compact('smsInfo', 'reminderConfig', 'recentReminderLogs', 'lastReminderSentAt'));
     }
 
     public function updateWeeklyReminder(Request $request, ReminderConfigService $reminderConfigService)
@@ -61,5 +73,15 @@ class NotificationController extends Controller
 
         return back();
     }
-}
 
+    public function runWeeklyReminderNow(WeeklySubmissionReminderDispatcher $dispatcher): RedirectResponse
+    {
+        $result = $dispatcher->dispatchNow();
+        $sent = (int) ($result['sent'] ?? 0);
+        $targets = (int) ($result['targets'] ?? 0);
+
+        return redirect()
+            ->route('notification.index')
+            ->with('success', "Manual reminder run completed. Sent to {$sent} recipient activity rows out of {$targets} targets.");
+    }
+}

@@ -13,11 +13,11 @@ use App\Http\Controllers\PettyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
-use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\WeeklyObjectiveMatrixController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
-use App\Http\Controllers\WeeklyObjectiveMatrixController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('feedback/{token}')
@@ -209,6 +209,8 @@ Route::middleware(['auth', 'permission:view notification settings'])->group(func
 Route::middleware(['auth', 'permission:manage notifications'])->group(function () {
     Route::put('/settings/notifications/weekly-reminder', [NotificationController::class, 'updateWeeklyReminder'])
         ->name('notification.weekly-reminder.update');
+    Route::post('/settings/notifications/weekly-reminder/run-now', [NotificationController::class, 'runWeeklyReminderNow'])
+        ->name('notification.weekly-reminder.run-now');
 });
 
 Route::middleware(['auth', 'permission:manage anonymous feedback'])->group(function () {

@@ -73,6 +73,45 @@ class WeeklyReminderAutomationTest extends TestCase
         $response->assertForbidden();
     }
 
+    public function test_manage_notifications_user_can_run_weekly_reminders_manually_from_settings(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-24 15:00:00', config('app.timezone')));
+        Mail::fake();
+
+        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        /** @var User $staff */
+        $staff = User::factory()->create(['status' => 'active', 'department_id' => $department->id]);
+        $staff->givePermissionTo(['create weekly plan', 'create weekly report']);
+
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo(['view notification settings', 'manage notifications']);
+
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 17,
+            'week_start_date' => '2026-04-20',
+            'week_end_date' => '2026-04-26',
+            'plan_deadline' => '2026-04-24',
+            'report_deadline' => '2026-04-25',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 18,
+            'week_start_date' => '2026-04-27',
+            'week_end_date' => '2026-05-03',
+            'plan_deadline' => '2026-05-01',
+            'report_deadline' => '2026-05-02',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('notification.weekly-reminder.run-now'));
+        $response->assertRedirect(route('notification.index'));
+
+        $this->assertGreaterThan(0, ReminderDispatchLog::query()->count());
+    }
+
     public function test_dispatch_sends_separate_reminders_for_missing_plan_and_report(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-04-24 15:00:00', config('app.timezone')));
@@ -161,6 +200,7 @@ class WeeklyReminderAutomationTest extends TestCase
 
     public function test_dispatch_allows_late_cron_within_grace_window_and_uses_single_slot_key(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-04-24 15:07:00', config('app.timezone')));
         Mail::fake();
 
         $department = Department::create(['name' => 'Finance', 'status' => 'active']);

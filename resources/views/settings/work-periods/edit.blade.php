@@ -54,27 +54,27 @@
                             @error('week_start_date')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted">Week end is recalculated as six days after the start.</small>
+                            <small class="text-muted">Week end is recalculated as six days after the start. Changing the start date resets plan and report deadlines below to the standard Saturdays.</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="plan_deadline" class="form-label">Plan deadline <span class="text-danger">*</span></label>
                             <input type="date" name="plan_deadline" id="plan_deadline" class="form-control @error('plan_deadline') is-invalid @enderror"
-                                   value="{{ old('plan_deadline', $period->plan_deadline?->format('Y-m-d')) }}" readonly required>
+                                   value="{{ old('plan_deadline', $period->plan_deadline?->format('Y-m-d')) }}" required>
                             @error('plan_deadline')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted">Auto-set to Saturday 23:59 before the selected week.</small>
+                            <small class="text-muted">Default is the Saturday before this week (cutoff 23:59 that day). Adjust here if you need more time.</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="report_deadline" class="form-label">Report deadline <span class="text-danger">*</span></label>
                             <input type="date" name="report_deadline" id="report_deadline" class="form-control @error('report_deadline') is-invalid @enderror"
-                                   value="{{ old('report_deadline', $period->report_deadline?->format('Y-m-d')) }}" readonly required>
+                                   value="{{ old('report_deadline', $period->report_deadline?->format('Y-m-d')) }}" required>
                             @error('report_deadline')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted">Auto-set to Saturday 23:59 of the selected week.</small>
+                            <small class="text-muted">Default is the Saturday of this week (cutoff 23:59). Adjust here if you need more time.</small>
                         </div>
 
                         <div class="mb-4">
@@ -97,4 +97,36 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var weekStart = document.getElementById('week_start_date');
+            var planDl = document.getElementById('plan_deadline');
+            var reportDl = document.getElementById('report_deadline');
+            if (!weekStart || !planDl || !reportDl) return;
+
+            function formatYmd(y, monthIndex, day) {
+                var m = String(monthIndex + 1).padStart(2, '0');
+                var d = String(day).padStart(2, '0');
+                return y + '-' + m + '-' + d;
+            }
+
+            function applyDefaultDeadlinesFromWeekStart() {
+                var raw = weekStart.value;
+                if (!raw) return;
+                var parts = raw.split('-').map(Number);
+                var monday = new Date(parts[0], parts[1] - 1, parts[2]);
+                var plan = new Date(monday);
+                plan.setDate(plan.getDate() - 2);
+                var report = new Date(monday);
+                report.setDate(report.getDate() + 5);
+                planDl.value = formatYmd(plan.getFullYear(), plan.getMonth(), plan.getDate());
+                reportDl.value = formatYmd(report.getFullYear(), report.getMonth(), report.getDate());
+            }
+
+            weekStart.addEventListener('change', applyDefaultDeadlinesFromWeekStart);
+        });
+    </script>
+    @endpush
 </x-app-layout>

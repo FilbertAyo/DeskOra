@@ -153,7 +153,7 @@
                                                 @if($period->isReportDeadlineToday())
                                                     <span class="badge bg-warning ml-1">Today</span>
                                                 @elseif($period->isReportDeadlinePassed())
-                                                    <span class="badge bg-danger ml-1">Passed</span>
+                                                    <span class="badge bg-light-secondary ml-1">Passed</span>
                                                 @else
                                                     <span class="badge bg-info ml-1">{{ $period->getDaysUntilReportDeadline() }} days</span>
                                                 @endif
