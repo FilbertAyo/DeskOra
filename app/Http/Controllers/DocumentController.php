@@ -3013,7 +3013,16 @@ class DocumentController extends Controller
             return [];
         }
 
-        $latestWeeklyReport = Document::findWeeklyReportForPeriodOwner($previousPeriod->id, (string) $document->user_id);
+        $ownerUserId = (string) $document->user_id;
+        $latestWeeklyReport = Document::findWeeklyReportForPeriodOwner($previousPeriod->id, $ownerUserId);
+        if (! $latestWeeklyReport) {
+            // Fallback for draft plans created/edited outside expected week cadence:
+            // use the active weekly-report period as a carry source when available.
+            $currentReportPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
+            if ($currentReportPeriod) {
+                $latestWeeklyReport = Document::findWeeklyReportForPeriodOwner($currentReportPeriod->id, $ownerUserId);
+            }
+        }
         if (! $latestWeeklyReport) {
             return [];
         }

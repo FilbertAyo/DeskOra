@@ -87,6 +87,9 @@
                                             </div>
                                         </div>
                                         <div class="card-body">
+                                            <div class="mb-2">
+                                                <small class="text-muted">Activities marked with this badge were carried from previous week: <span class="badge bg-light-info text-info">Carried</span></small>
+                                            </div>
                                             <div class="table-responsive">
                                                 <table class="table table-bordered align-middle mb-0">
                                                     <thead class="thead-light">
@@ -150,6 +153,9 @@
                                                                     <textarea class="form-control" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][activity]"
                                                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $row['activity'] ?? '') }}</textarea>
+                                                                    @if(trim((string) ($row['carry_over_source_report_id'] ?? '')) !== '')
+                                                                        <small class="badge bg-light-info text-info mt-1">Carried</small>
+                                                                    @endif
                                                                 </td>
                                                                 <td>
                                                                     <select class="form-select"

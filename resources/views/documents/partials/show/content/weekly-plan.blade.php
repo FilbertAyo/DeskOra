@@ -3,9 +3,15 @@
                                     $plannedActivities = $content['planned_activities'] ?? [];
                                     $keyMeetings = $content['key_meetings'] ?? [];
                                     $budget = $content['budget'] ?? [];
+                                    $carriedActivitiesFromPreviousWeek = is_array($carriedActivities ?? null) ? $carriedActivities : [];
                                     $plannedTeamIds = collect($plannedActivities)
                                         ->filter(fn($row) => is_array($row) && !empty($row['team_member_ids']) && is_array($row['team_member_ids']))
                                         ->flatMap(fn($row) => $row['team_member_ids'])
+                                        ->merge(
+                                            collect($carriedActivitiesFromPreviousWeek)
+                                                ->filter(fn($row) => is_array($row) && !empty($row['team_member_ids']) && is_array($row['team_member_ids']))
+                                                ->flatMap(fn($row) => $row['team_member_ids'])
+                                        )
                                         ->filter()
                                         ->map(fn($id) => (string) $id)
                                         ->unique()
@@ -36,11 +42,12 @@
                                                 'location' => $location,
                                                 'notes_inclusion' => $notes,
                                                 'team_member_ids' => $teamIds,
+                                                'carry_over_source_report_id' => trim((string) ($row['carry_over_source_report_id'] ?? '')),
                                             ];
                                         })
                                         ->filter()
                                         ->values();
-                                    $carriedRows = collect(is_array($carriedActivities ?? null) ? $carriedActivities : [])
+                                    $carriedRows = collect($carriedActivitiesFromPreviousWeek)
                                         ->map(function ($row) {
                                             if (!is_array($row)) {
                                                 return null;
@@ -51,6 +58,7 @@
                                                 'location' => trim((string) ($row['location'] ?? '')),
                                                 'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')),
                                                 'team_member_ids' => is_array($row['team_member_ids'] ?? null) ? $row['team_member_ids'] : [],
+                                                'carry_over_source_report_id' => trim((string) ($row['carry_over_source_report_id'] ?? '')),
                                             ];
                                         })
                                         ->filter(function ($row) {
@@ -180,7 +188,12 @@
                                                                             @endphp
                                                                             {{ !empty($rowTeamNames) ? implode(', ', $rowTeamNames) : '' }}
                                                                         </td>
-                                                                        <td>{{ $row['notes_inclusion'] ?? '' }}</td>
+                                                                        <td>
+                                                                            {{ $row['notes_inclusion'] ?? '' }}
+                                                                            @if(trim((string) ($row['carry_over_source_report_id'] ?? '')) !== '')
+                                                                                <div><small class="badge bg-light-info text-info mt-1">Carried from previous week</small></div>
+                                                                            @endif
+                                                                        </td>
                                                                     </tr>
                                                                 @endforeach
                                                             @endif
