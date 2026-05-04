@@ -47,6 +47,30 @@
             && ($currentPeriod ?? null)
             && $wr
             && ($wr->report !== null && $wr->report->showCta);
+        $now = \Carbon\Carbon::now();
+        $planGraceActive = false;
+        $reportGraceActive = false;
+        $planGraceEndsAt = null;
+        $reportGraceEndsAt = null;
+
+        if (($nextPeriod ?? null) && $nextPeriod->plan_deadline) {
+            $defaultPlanCutoff = \Carbon\Carbon::parse($nextPeriod->week_start_date)->subDays(2)->setTime(23, 59, 0);
+            $currentPlanCutoff = $nextPeriod->getPlanDeadlineCutoff();
+            $planGraceActive = $currentPlanCutoff->greaterThan($defaultPlanCutoff)
+                && $now->greaterThan($defaultPlanCutoff)
+                && $now->lessThanOrEqualTo($currentPlanCutoff);
+            $planGraceEndsAt = $currentPlanCutoff;
+        }
+
+        if (($currentPeriod ?? null) && $currentPeriod->report_deadline) {
+            $defaultReportCutoff = \Carbon\Carbon::parse($currentPeriod->week_start_date)->addDays(5)->setTime(23, 59, 0);
+            $currentReportCutoff = $currentPeriod->getReportDeadlineCutoff();
+            $reportGraceActive = $currentReportCutoff->greaterThan($defaultReportCutoff)
+                && $now->greaterThan($defaultReportCutoff)
+                && $now->lessThanOrEqualTo($currentReportCutoff);
+            $reportGraceEndsAt = $currentReportCutoff;
+        }
+        $hasWeeklyGraceWindow = $planGraceActive || $reportGraceActive;
         $focusTaskShowRoute = function ($doc) {
             if (($doc->type ?? null) === \App\Models\Document::TYPE_ACTION_LOG) {
                 return route('action-logs.show', $doc->id);
@@ -174,6 +198,20 @@
                                 @foreach($weeklySubmissionReminder->missedMessages as $line)
                                     <li>{{ $line }}</li>
                                 @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if($hasWeeklyGraceWindow)
+                        <div class="alert alert-warning border mb-0 mt-3">
+                            <p class="mb-1 fw-semibold"><i class="ti ti-clock-hour-4 me-1"></i>Grace period is active</p>
+                            <ul class="mb-0 ps-3 small">
+                                @if($planGraceActive && $planGraceEndsAt)
+                                    <li>Weekly plan deadline was extended. You can still submit until {{ $planGraceEndsAt->format('M d, Y H:i') }}.</li>
+                                @endif
+                                @if($reportGraceActive && $reportGraceEndsAt)
+                                    <li>Weekly report deadline was extended. You can still submit until {{ $reportGraceEndsAt->format('M d, Y H:i') }}.</li>
+                                @endif
                             </ul>
                         </div>
                     @endif
