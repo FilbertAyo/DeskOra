@@ -231,8 +231,9 @@
                                                             <tbody>
                                                                 @foreach(collect($history)->reverse() as $entry)
                                                                     @php
+                                                                        $isEmptyRow = (bool) ($entry['is_empty'] ?? false);
                                                                         $updaterId = (string) ($entry['updated_by'] ?? '');
-                                                                        $updaterName = $responsibleNameMap[$updaterId] ?? 'Unknown user';
+                                                                        $updaterName = $updaterId !== '' ? ($responsibleNameMap[$updaterId] ?? 'Unknown user') : '-';
                                                                         $fromProgress = $entry['from_progress'] ?? null;
                                                                         $toProgress = $entry['to_progress'] ?? '-';
                                                                     @endphp
@@ -240,7 +241,9 @@
                                                                         <td>{{ $entry['period_label'] ?? '-' }}</td>
                                                                         <td>{{ $updaterName }}</td>
                                                                         <td>
-                                                                            @if($fromProgress)
+                                                                            @if($isEmptyRow)
+                                                                                -
+                                                                            @elseif($fromProgress)
                                                                                 {{ $fromProgress }} -> {{ $toProgress }}
                                                                             @else
                                                                                 Initial: {{ $toProgress }}

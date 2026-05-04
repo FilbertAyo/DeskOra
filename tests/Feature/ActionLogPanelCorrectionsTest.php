@@ -298,6 +298,82 @@ class ActionLogPanelCorrectionsTest extends TestCase
             });
     }
 
+    public function test_action_log_timeline_includes_empty_weeks_between_last_update_and_current_week(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+
+        $period16 = $this->createOpenPeriod(2026, 16, '2026-04-13', '2026-04-19');
+        $period17 = $this->createOpenPeriod(2026, 17, '2026-04-20', '2026-04-26');
+        $period18 = $this->createOpenPeriod(2026, 18, '2026-04-27', '2026-05-03');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period18->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 18 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_uid' => 'task_gap',
+                        'task_no' => 1,
+                        'task' => 'Follow-up task',
+                        'responsible_user_ids' => [],
+                        'progress' => 'In Progress',
+                        'due_date' => null,
+                        'compilation_date' => null,
+                        'notes_progress' => 'Latest row cache',
+                        'status_reason' => null,
+                        'history' => [
+                            [
+                                'period_id' => (string) $period16->id,
+                                'period_label' => 'Week 16 of 2026',
+                                'updated_by' => $manager->id,
+                                'from_progress' => 'Not Started',
+                                'to_progress' => 'In Progress',
+                                'notes_progress' => 'Updated on week 16 only',
+                                'status_reason' => null,
+                                'changed_at' => '2026-04-15 09:00:00',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('action-logs.show', $document))
+            ->assertOk()
+            ->assertViewHas('tasks', function (array $tasks): bool {
+                if (count($tasks) !== 1) {
+                    return false;
+                }
+
+                $row = $tasks[0];
+                $timeline = is_array($row['display_history'] ?? null) ? $row['display_history'] : [];
+                if (count($timeline) !== 3) {
+                    return false;
+                }
+
+                $byLabel = collect($timeline)->keyBy(fn ($entry) => (string) ($entry['period_label'] ?? ''));
+                $week16 = $byLabel->get('Week 16 of 2026');
+                $week17 = $byLabel->get('Week 17 of 2026');
+                $week18 = $byLabel->get('Week 18 of 2026');
+
+                return ($row['display_notes_progress'] ?? null) === ''
+                    && array_key_exists('display_progress', $row)
+                    && $row['display_progress'] === null
+                    && is_array($week16)
+                    && ($week16['is_empty'] ?? false) === false
+                    && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
+                    && is_array($week17)
+                    && ($week17['is_empty'] ?? false) === true
+                    && is_array($week18)
+                    && ($week18['is_empty'] ?? false) === true;
+            });
+    }
+
     public function test_manager_update_uses_existing_period_when_period_id_not_submitted(): void
     {
         /** @var User $manager */
