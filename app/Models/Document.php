@@ -193,10 +193,11 @@ class Document extends Model
 
     /**
      * Action log tasks with notes/progress scoped to this document's work period
-     * (for read-only views and PDF). Uses timeline entries whose period_id matches
-     * this document for row values. When none exist for that period, notes/progress
-     * remain empty for that week. Task timeline remains complete across periods so
-     * older updates can still be viewed in the timeline panel.
+     * (for read-only views and PDF). The row display uses the current doc's own
+     * real entry for its period_id only. The timeline aggregates real history
+     * entries across every action log document that shares the same task_uid,
+     * and fills non-updated weeks with empty placeholders so users can see the
+     * last real update (e.g. Week 16) even when opening a later week's doc.
      *
      * @return list<array<string, mixed>>
      */
@@ -212,13 +213,26 @@ class Document extends Model
             ? (string) $this->period_id
             : null;
 
+        $currentPeriod = $periodId !== null ? WorkPeriod::query()->find($periodId) : null;
+        $otherActionLogDocs = null;
+        if ($currentPeriod) {
+            $otherActionLogDocs = self::query()
+                ->where('type', self::TYPE_ACTION_LOG)
+                ->where('id', '!=', $this->id)
+                ->whereHas('period', function ($query) use ($currentPeriod): void {
+                    $query->whereDate('week_start_date', '<=', $currentPeriod->week_start_date);
+                })
+                ->with('period')
+                ->get();
+        }
+
         $result = [];
         foreach ($tasks as $task) {
             if (! is_array($task)) {
                 continue;
             }
 
-            if ($periodId === null) {
+            if ($periodId === null || $currentPeriod === null) {
                 $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
                 $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
                 $task['display_history'] = is_array($task['history'] ?? null)
@@ -229,32 +243,34 @@ class Document extends Model
                 continue;
             }
 
-            $history = is_array($task['history'] ?? null)
+            $ownHistory = is_array($task['history'] ?? null)
                 ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
                 : [];
+            $taskUid = trim((string) ($task['task_uid'] ?? ''));
 
-            usort($history, static function (array $a, array $b): int {
-                $ta = strtotime((string) ($a['changed_at'] ?? '')) ?: 0;
-                $tb = strtotime((string) ($b['changed_at'] ?? '')) ?: 0;
+            $aggregatedByPeriod = $this->aggregateActionLogTaskHistory(
+                $taskUid,
+                $ownHistory,
+                $otherActionLogDocs ?? collect(),
+                $periodId
+            );
 
-                return $ta <=> $tb;
-            });
+            $task['display_history'] = $this->buildActionLogDisplayTimeline($aggregatedByPeriod, $currentPeriod);
 
-            $task['display_history'] = $this->buildActionLogDisplayTimeline($history, $periodId);
-            $currentPeriodEntry = collect($task['display_history'])
-                ->first(fn ($entry) => is_array($entry) && (string) ($entry['period_id'] ?? '') === $periodId);
-
-            if (is_array($currentPeriodEntry) && ! ($currentPeriodEntry['is_empty'] ?? false)) {
-                $task['display_notes_progress'] = trim((string) ($currentPeriodEntry['notes_progress'] ?? ''));
-                $toProgress = trim((string) ($currentPeriodEntry['to_progress'] ?? ''));
+            $currentEntry = $aggregatedByPeriod[$periodId] ?? null;
+            if (is_array($currentEntry)) {
+                $task['display_notes_progress'] = trim((string) ($currentEntry['notes_progress'] ?? ''));
+                $toProgress = trim((string) ($currentEntry['to_progress'] ?? ''));
                 $task['display_progress'] = $toProgress !== '' ? $toProgress : 'Not Started';
-            } elseif ($history === []) {
+            } elseif ($ownHistory === [] && $task['display_history'] === []) {
+                // Legacy/seeded rows with no history at all: keep stored row values.
                 $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
                 $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
             } else {
                 $task['display_notes_progress'] = '';
                 $task['display_progress'] = null;
             }
+
             $result[] = $task;
         }
 
@@ -262,91 +278,156 @@ class Document extends Model
     }
 
     /**
-     * Build a week-by-week timeline for display, including empty weeks.
+     * Collect the latest real history entry per period_id for a given task,
+     * aggregating from the current document's own history plus all action log
+     * documents sharing the same task_uid (capped at the current period).
      *
-     * @param  list<array<string, mixed>>  $history
+     * @param  list<array<string, mixed>>  $ownHistory
+     * @param  \Illuminate\Support\Collection<int, self>  $otherDocs
+     * @return array<string, array<string, mixed>>
+     */
+    private function aggregateActionLogTaskHistory(
+        string $taskUid,
+        array $ownHistory,
+        $otherDocs,
+        string $currentPeriodId
+    ): array {
+        $collected = [];
+
+        $collectFromDoc = function (array $history, ?string $fallbackPeriodId) use (&$collected): void {
+            foreach ($history as $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                $periodId = trim((string) ($entry['period_id'] ?? ''));
+                if ($periodId === '' && $fallbackPeriodId !== null) {
+                    $periodId = $fallbackPeriodId;
+                    $entry['period_id'] = $fallbackPeriodId;
+                }
+                if ($periodId === '' || ! $this->isRealActionLogHistoryEntry($entry)) {
+                    continue;
+                }
+
+                $existing = $collected[$periodId] ?? null;
+                if ($existing === null
+                    || (strtotime((string) ($entry['changed_at'] ?? '')) ?: 0)
+                        >= (strtotime((string) ($existing['changed_at'] ?? '')) ?: 0)
+                ) {
+                    $collected[$periodId] = $entry;
+                }
+            }
+        };
+
+        $collectFromDoc($ownHistory, (string) $this->period_id);
+
+        if ($taskUid !== '') {
+            foreach ($otherDocs as $doc) {
+                $docContent = is_array($doc->content) ? $doc->content : [];
+                $docTasks = is_array($docContent['tasks'] ?? null) ? $docContent['tasks'] : [];
+                foreach ($docTasks as $docTask) {
+                    if (! is_array($docTask)) {
+                        continue;
+                    }
+                    if (trim((string) ($docTask['task_uid'] ?? '')) !== $taskUid) {
+                        continue;
+                    }
+                    $docHistory = is_array($docTask['history'] ?? null)
+                        ? array_values(array_filter($docTask['history'], static fn ($e) => is_array($e)))
+                        : [];
+                    $collectFromDoc($docHistory, (string) $doc->period_id);
+                }
+            }
+        }
+
+        return $collected;
+    }
+
+    /**
+     * Decide whether a history entry represents a real user update (not a
+     * carry-forward init artifact). Newer entries carry `source => 'update'`,
+     * but legacy docs never set that flag, so fall back to a heuristic:
+     * an entry is real when it has notes, a reason, or a genuine progress
+     * transition (from_progress set and differs from to_progress).
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function isRealActionLogHistoryEntry(array $entry): bool
+    {
+        $source = trim((string) ($entry['source'] ?? ''));
+        if ($source === 'auto_init') {
+            return false;
+        }
+        if ($source === 'update') {
+            return true;
+        }
+
+        $notes = trim((string) ($entry['notes_progress'] ?? ''));
+        $reason = trim((string) ($entry['status_reason'] ?? ''));
+        if ($notes !== '' || $reason !== '') {
+            return true;
+        }
+
+        $fromProgress = trim((string) ($entry['from_progress'] ?? ''));
+        $toProgress = trim((string) ($entry['to_progress'] ?? ''));
+
+        return $fromProgress !== '' && $toProgress !== '' && $fromProgress !== $toProgress;
+    }
+
+    /**
+     * Build a week-by-week timeline spanning from the earliest real-update
+     * period through the current period, emitting empty placeholders for
+     * weeks without a real update.
+     *
+     * @param  array<string, array<string, mixed>>  $entriesByPeriod
      * @return list<array<string, mixed>>
      */
-    private function buildActionLogDisplayTimeline(array $history, string $currentPeriodId): array
+    private function buildActionLogDisplayTimeline(array $entriesByPeriod, WorkPeriod $currentPeriod): array
     {
-        $currentPeriod = WorkPeriod::query()->find($currentPeriodId);
-        if (! $currentPeriod) {
-            return $history;
-        }
-
-        $latestByPeriod = [];
-        $firstHistoryPeriodId = null;
-        foreach ($history as $entry) {
-            if (! is_array($entry)) {
-                continue;
-            }
-            $entryPeriodId = trim((string) ($entry['period_id'] ?? ''));
-            if ($entryPeriodId === '') {
-                continue;
-            }
-            if ($firstHistoryPeriodId === null) {
-                $firstHistoryPeriodId = $entryPeriodId;
-            }
-            $latestByPeriod[$entryPeriodId] = $entry;
-        }
-
-        if ($firstHistoryPeriodId === null) {
+        if ($entriesByPeriod === []) {
             return [];
         }
 
-        $firstHistoryPeriod = WorkPeriod::query()->find($firstHistoryPeriodId);
-        if (! $firstHistoryPeriod) {
-            return $history;
+        $periodIds = array_keys($entriesByPeriod);
+        $firstPeriod = WorkPeriod::query()
+            ->whereIn('id', $periodIds)
+            ->orderBy('week_start_date')
+            ->first();
+
+        if (! $firstPeriod) {
+            return [];
         }
 
-        $firstStartTs = strtotime((string) $firstHistoryPeriod->week_start_date) ?: 0;
+        $firstStartTs = strtotime((string) $firstPeriod->week_start_date) ?: 0;
         $currentStartTs = strtotime((string) $currentPeriod->week_start_date) ?: 0;
         if ($currentStartTs === 0 || $firstStartTs > $currentStartTs) {
-            return $history;
+            $firstPeriod = $currentPeriod;
         }
 
         $periods = WorkPeriod::query()
-            ->whereDate('week_start_date', '>=', $firstHistoryPeriod->week_start_date)
+            ->whereDate('week_start_date', '>=', $firstPeriod->week_start_date)
             ->whereDate('week_start_date', '<=', $currentPeriod->week_start_date)
             ->orderBy('week_start_date')
             ->get();
 
         if ($periods->isEmpty()) {
-            return $history;
+            return [];
         }
 
         $timeline = [];
-        $lastProgress = null;
         foreach ($periods as $period) {
             $periodId = (string) $period->id;
-            $entry = $latestByPeriod[$periodId] ?? null;
+            $entry = $entriesByPeriod[$periodId] ?? null;
             if (! is_array($entry)) {
                 $timeline[] = $this->buildEmptyTimelineEntry($period);
 
                 continue;
             }
 
-            $notes = trim((string) ($entry['notes_progress'] ?? ''));
-            $reason = trim((string) ($entry['status_reason'] ?? ''));
-            $fromProgress = trim((string) ($entry['from_progress'] ?? ''));
-            $toProgress = trim((string) ($entry['to_progress'] ?? ''));
-
-            $hasMeaningfulUpdate = $notes !== ''
-                || $reason !== ''
-                || ($fromProgress !== '' && $toProgress !== '' && $fromProgress !== $toProgress)
-                || ($lastProgress !== null && $toProgress !== '' && $toProgress !== $lastProgress);
-
-            if (! $hasMeaningfulUpdate) {
-                $timeline[] = $this->buildEmptyTimelineEntry($period);
-            } else {
-                $entry['period_label'] = $entry['period_label'] ?? ('Week '.$period->week_number.' of '.$period->year);
-                $entry['is_empty'] = false;
-                $timeline[] = $entry;
-            }
-
-            if ($toProgress !== '') {
-                $lastProgress = $toProgress;
-            }
+            $entry['period_label'] = ! empty($entry['period_label'])
+                ? $entry['period_label']
+                : 'Week '.$period->week_number.' of '.$period->year;
+            $entry['is_empty'] = false;
+            $timeline[] = $entry;
         }
 
         return $timeline;

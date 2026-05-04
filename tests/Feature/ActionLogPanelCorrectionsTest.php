@@ -236,69 +236,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('Week 14 progress update', $latest['notes_progress'] ?? null);
     }
 
-    public function test_action_log_show_scopes_notes_and_progress_to_document_work_period(): void
-    {
-        /** @var User $manager */
-        $manager = User::factory()->create();
-
-        $period1 = $this->createOpenPeriod(2026, 13, '2026-03-23', '2026-03-29');
-        $period2 = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
-
-        $document = Document::create([
-            'user_id' => $manager->id,
-            'period_id' => $period1->id,
-            'type' => Document::TYPE_ACTION_LOG,
-            'title' => 'Action Log - Week 13 of 2026',
-            'state' => Document::STATE_SUBMITTED,
-            'content' => [
-                'tasks' => [
-                    [
-                        'task_uid' => 'task_mixed',
-                        'task_no' => 1,
-                        'task' => 'Shared task',
-                        'responsible_user_ids' => [],
-                        'progress' => 'Done',
-                        'due_date' => null,
-                        'compilation_date' => null,
-                        'notes_progress' => 'Latest field text from another week',
-                        'status_reason' => null,
-                        'history' => [
-                            [
-                                'period_id' => (string) $period2->id,
-                                'period_label' => 'Week 14 of 2026',
-                                'updated_by' => $manager->id,
-                                'from_progress' => 'Not Started',
-                                'to_progress' => 'In Progress',
-                                'notes_progress' => 'Staff only updated week 14',
-                                'status_reason' => null,
-                                'changed_at' => '2026-04-01 10:00:00',
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ]);
-
-        $this->actingAs($manager)
-            ->get(route('action-logs.show', $document))
-            ->assertOk()
-            ->assertViewHas('tasks', function (array $tasks): bool {
-                if (count($tasks) !== 1) {
-                    return false;
-                }
-                $row = $tasks[0];
-
-                return ($row['task'] ?? null) === 'Shared task'
-                    && ($row['display_notes_progress'] ?? null) === ''
-                    && array_key_exists('display_progress', $row)
-                    && $row['display_progress'] === null
-                    && is_array($row['display_history'] ?? null)
-                    && count($row['display_history']) === 1
-                    && (($row['display_history'][0]['notes_progress'] ?? null) === 'Staff only updated week 14');
-            });
-    }
-
-    public function test_action_log_timeline_includes_empty_weeks_between_last_update_and_current_week(): void
+    public function test_action_log_timeline_aggregates_real_updates_across_separate_weekly_documents(): void
     {
         /** @var User $manager */
         $manager = User::factory()->create();
@@ -307,7 +245,79 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $period17 = $this->createOpenPeriod(2026, 17, '2026-04-20', '2026-04-26');
         $period18 = $this->createOpenPeriod(2026, 18, '2026-04-27', '2026-05-03');
 
-        $document = Document::create([
+        $week16Doc = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period16->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 16 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_uid' => 'task_gap',
+                        'task_no' => 1,
+                        'task' => 'Follow-up task',
+                        'responsible_user_ids' => [],
+                        'progress' => 'In Progress',
+                        'due_date' => null,
+                        'compilation_date' => null,
+                        'notes_progress' => 'Updated on week 16 only',
+                        'status_reason' => null,
+                        'history' => [
+                            [
+                                'period_id' => (string) $period16->id,
+                                'period_label' => 'Week 16 of 2026',
+                                'updated_by' => $manager->id,
+                                'from_progress' => 'Not Started',
+                                'to_progress' => 'In Progress',
+                                'notes_progress' => 'Updated on week 16 only',
+                                'status_reason' => null,
+                                'changed_at' => '2026-04-15 09:00:00',
+                                'source' => 'update',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $week17Doc = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period17->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 17 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_uid' => 'task_gap',
+                        'task_no' => 1,
+                        'task' => 'Follow-up task',
+                        'responsible_user_ids' => [],
+                        'progress' => 'In Progress',
+                        'due_date' => null,
+                        'compilation_date' => null,
+                        'notes_progress' => '',
+                        'status_reason' => null,
+                        'history' => [
+                            [
+                                'period_id' => (string) $period17->id,
+                                'period_label' => 'Week 17 of 2026',
+                                'updated_by' => $manager->id,
+                                'from_progress' => null,
+                                'to_progress' => 'In Progress',
+                                'notes_progress' => null,
+                                'status_reason' => null,
+                                'changed_at' => '2026-04-20 08:00:00',
+                                'source' => 'auto_init',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $week18Doc = Document::create([
             'user_id' => $manager->id,
             'period_id' => $period18->id,
             'type' => Document::TYPE_ACTION_LOG,
@@ -323,18 +333,19 @@ class ActionLogPanelCorrectionsTest extends TestCase
                         'progress' => 'In Progress',
                         'due_date' => null,
                         'compilation_date' => null,
-                        'notes_progress' => 'Latest row cache',
+                        'notes_progress' => '',
                         'status_reason' => null,
                         'history' => [
                             [
-                                'period_id' => (string) $period16->id,
-                                'period_label' => 'Week 16 of 2026',
+                                'period_id' => (string) $period18->id,
+                                'period_label' => 'Week 18 of 2026',
                                 'updated_by' => $manager->id,
-                                'from_progress' => 'Not Started',
+                                'from_progress' => null,
                                 'to_progress' => 'In Progress',
-                                'notes_progress' => 'Updated on week 16 only',
+                                'notes_progress' => null,
                                 'status_reason' => null,
-                                'changed_at' => '2026-04-15 09:00:00',
+                                'changed_at' => '2026-04-27 08:00:00',
+                                'source' => 'auto_init',
                             ],
                         ],
                     ],
@@ -342,8 +353,9 @@ class ActionLogPanelCorrectionsTest extends TestCase
             ],
         ]);
 
+        // Viewing Week 18: row empty, timeline shows Week 16 (real) + Week 17/18 empty.
         $this->actingAs($manager)
-            ->get(route('action-logs.show', $document))
+            ->get(route('action-logs.show', $week18Doc))
             ->assertOk()
             ->assertViewHas('tasks', function (array $tasks): bool {
                 if (count($tasks) !== 1) {
@@ -365,12 +377,59 @@ class ActionLogPanelCorrectionsTest extends TestCase
                     && array_key_exists('display_progress', $row)
                     && $row['display_progress'] === null
                     && is_array($week16)
-                    && ($week16['is_empty'] ?? false) === false
+                    && ($week16['is_empty'] ?? null) === false
+                    && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
+                    && (string) ($week16['period_id'] ?? '') === (string) WorkPeriod::where('week_number', 16)->value('id')
+                    && is_array($week17)
+                    && ($week17['is_empty'] ?? null) === true
+                    && is_array($week18)
+                    && ($week18['is_empty'] ?? null) === true;
+            });
+
+        // Viewing Week 17: row empty, timeline shows Week 16 (real) + Week 17 empty (no Week-17-labeled clone of Week 16 content).
+        $this->actingAs($manager)
+            ->get(route('action-logs.show', $week17Doc))
+            ->assertOk()
+            ->assertViewHas('tasks', function (array $tasks): bool {
+                if (count($tasks) !== 1) {
+                    return false;
+                }
+                $row = $tasks[0];
+                $timeline = is_array($row['display_history'] ?? null) ? $row['display_history'] : [];
+                if (count($timeline) !== 2) {
+                    return false;
+                }
+
+                $byLabel = collect($timeline)->keyBy(fn ($entry) => (string) ($entry['period_label'] ?? ''));
+                $week16 = $byLabel->get('Week 16 of 2026');
+                $week17 = $byLabel->get('Week 17 of 2026');
+
+                return ($row['display_notes_progress'] ?? null) === ''
+                    && array_key_exists('display_progress', $row)
+                    && $row['display_progress'] === null
+                    && is_array($week16)
+                    && ($week16['is_empty'] ?? null) === false
                     && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
                     && is_array($week17)
-                    && ($week17['is_empty'] ?? false) === true
-                    && is_array($week18)
-                    && ($week18['is_empty'] ?? false) === true;
+                    && ($week17['is_empty'] ?? null) === true;
+            });
+
+        // Viewing Week 16: row filled from its own real entry, timeline shows only Week 16.
+        $this->actingAs($manager)
+            ->get(route('action-logs.show', $week16Doc))
+            ->assertOk()
+            ->assertViewHas('tasks', function (array $tasks): bool {
+                if (count($tasks) !== 1) {
+                    return false;
+                }
+                $row = $tasks[0];
+                $timeline = is_array($row['display_history'] ?? null) ? $row['display_history'] : [];
+
+                return ($row['display_notes_progress'] ?? null) === 'Updated on week 16 only'
+                    && ($row['display_progress'] ?? null) === 'In Progress'
+                    && count($timeline) === 1
+                    && ($timeline[0]['period_label'] ?? null) === 'Week 16 of 2026'
+                    && ($timeline[0]['is_empty'] ?? null) === false;
             });
     }
 

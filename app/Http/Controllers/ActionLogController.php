@@ -775,6 +775,7 @@ class ActionLogController extends Controller
                 'notes_progress' => $newNotes !== '' ? $newNotes : null,
                 'status_reason' => $newReason !== '' ? $newReason : null,
                 'changed_at' => now()->toDateTimeString(),
+                'source' => $isNewTask ? 'auto_init' : 'update',
             ];
         }
 
