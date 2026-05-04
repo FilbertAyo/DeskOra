@@ -280,7 +280,9 @@ class ActionLogController extends Controller
         // Authorize view action
         $this->authorize('view', $document);
 
-        return view('action-logs.show', compact('document'));
+        $tasks = $document->getActionLogTasksForPeriodDisplay();
+
+        return view('action-logs.show', compact('document', 'tasks'));
     }
 
     /**
@@ -296,8 +298,7 @@ class ActionLogController extends Controller
 
         $this->authorize('view', $document);
 
-        $content = is_array($document->content) ? $document->content : [];
-        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+        $tasks = $document->getActionLogTasksForPeriodDisplay();
 
         $responsibleIds = collect($tasks)
             ->filter(fn ($row) => is_array($row) && is_array($row['responsible_user_ids'] ?? null))
@@ -526,6 +527,13 @@ class ActionLogController extends Controller
 
             return ! in_array($progress, [self::PROGRESS_DONE, self::PROGRESS_CANCELLED], true);
         }));
+
+        $tasks = array_map(function (array $task): array {
+            $task['notes_progress'] = '';
+            $task['history'] = [];
+
+            return $task;
+        }, $tasks);
 
         return $this->renumberTasks($tasks);
     }

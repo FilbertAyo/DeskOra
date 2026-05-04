@@ -22,52 +22,57 @@ class ActionLogPanelCorrectionsTest extends TestCase
 
     public function test_manager_can_add_tasks_to_submitted_action_log_and_keep_single_weekly_log(): void
     {
-        /** @var User $manager */
-        $manager = User::factory()->create();
-        $manager->givePermissionTo('create action logs');
-        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 12, 0, 0));
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+            $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
 
-        $document = Document::create([
-            'user_id' => $manager->id,
-            'period_id' => $period->id,
-            'type' => Document::TYPE_ACTION_LOG,
-            'title' => 'Old custom title',
-            'state' => Document::STATE_SUBMITTED,
-            'content' => [
-                'tasks' => [
-                    $this->taskRow('task_a', 'Initial submitted task'),
+            $document = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $period->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Old custom title',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_a', 'Initial submitted task'),
+                    ],
                 ],
-            ],
-        ]);
+            ]);
 
-        $response = $this->actingAs($manager)->post(route('action-logs.store'), [
-            'period_id' => $period->id,
-            'action' => 'draft',
-            'content' => [
-                'tasks' => [
-                    $this->taskRow('task_b', 'Follow-up task on Friday'),
+            $response = $this->actingAs($manager)->post(route('action-logs.store'), [
+                'period_id' => $period->id,
+                'action' => 'draft',
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_b', 'Follow-up task on Friday'),
+                    ],
                 ],
-            ],
-        ]);
+            ]);
 
-        $response->assertRedirect(route('action-logs.show', $document));
+            $response->assertRedirect(route('action-logs.show', $document));
 
-        $this->assertEquals(
-            1,
-            Document::query()
-                ->where('type', Document::TYPE_ACTION_LOG)
-                ->where('period_id', $period->id)
-                ->count()
-        );
+            $this->assertEquals(
+                1,
+                Document::query()
+                    ->where('type', Document::TYPE_ACTION_LOG)
+                    ->where('period_id', $period->id)
+                    ->count()
+            );
 
-        $document->refresh();
-        $tasks = $document->content['tasks'] ?? [];
+            $document->refresh();
+            $tasks = $document->content['tasks'] ?? [];
 
-        $this->assertSame(Document::STATE_SUBMITTED, $document->state);
-        $this->assertSame('Action Log - Week 14 of 2026', $document->title);
-        $this->assertCount(2, $tasks);
-        $this->assertSame('Initial submitted task', $tasks[0]['task'] ?? null);
-        $this->assertSame('Follow-up task on Friday', $tasks[1]['task'] ?? null);
+            $this->assertSame(Document::STATE_SUBMITTED, $document->state);
+            $this->assertSame('Action Log - Week 14 of 2026', $document->title);
+            $this->assertCount(2, $tasks);
+            $this->assertSame('Initial submitted task', $tasks[0]['task'] ?? null);
+            $this->assertSame('Follow-up task on Friday', $tasks[1]['task'] ?? null);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_carry_forward_shows_only_not_done_or_cancelled_tasks(): void
@@ -101,10 +106,14 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $response->assertOk();
         $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
             $texts = collect($carryForwardTasks)->map(fn ($task) => $task['task'] ?? null)->filter()->values()->all();
+            $carried = collect($carryForwardTasks)->firstWhere('task', 'Carry this open task');
 
             return in_array('Carry this open task', $texts, true)
                 && ! in_array('Done task', $texts, true)
-                && ! in_array('Cancelled task', $texts, true);
+                && ! in_array('Cancelled task', $texts, true)
+                && is_array($carried)
+                && ($carried['notes_progress'] ?? null) === ''
+                && ($carried['history'] ?? null) === [];
         });
 
         Carbon::setTestNow();
@@ -225,6 +234,65 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertNotEmpty($history);
         $this->assertSame('In Progress', $latest['to_progress'] ?? null);
         $this->assertSame('Week 14 progress update', $latest['notes_progress'] ?? null);
+    }
+
+    public function test_action_log_show_scopes_notes_and_progress_to_document_work_period(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+
+        $period1 = $this->createOpenPeriod(2026, 13, '2026-03-23', '2026-03-29');
+        $period2 = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period1->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 13 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_uid' => 'task_mixed',
+                        'task_no' => 1,
+                        'task' => 'Shared task',
+                        'responsible_user_ids' => [],
+                        'progress' => 'Done',
+                        'due_date' => null,
+                        'compilation_date' => null,
+                        'notes_progress' => 'Latest field text from another week',
+                        'status_reason' => null,
+                        'history' => [
+                            [
+                                'period_id' => (string) $period2->id,
+                                'period_label' => 'Week 14 of 2026',
+                                'updated_by' => $manager->id,
+                                'from_progress' => 'Not Started',
+                                'to_progress' => 'In Progress',
+                                'notes_progress' => 'Staff only updated week 14',
+                                'status_reason' => null,
+                                'changed_at' => '2026-04-01 10:00:00',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('action-logs.show', $document))
+            ->assertOk()
+            ->assertViewHas('tasks', function (array $tasks): bool {
+                if (count($tasks) !== 1) {
+                    return false;
+                }
+                $row = $tasks[0];
+
+                return ($row['task'] ?? null) === 'Shared task'
+                    && ($row['display_notes_progress'] ?? null) === ''
+                    && array_key_exists('display_progress', $row)
+                    && $row['display_progress'] === null;
+            });
     }
 
     public function test_manager_update_uses_existing_period_when_period_id_not_submitted(): void

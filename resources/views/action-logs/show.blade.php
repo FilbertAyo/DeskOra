@@ -130,8 +130,6 @@
                 </div>
                 <div class="card-body">
                     @php
-                        $content = is_array($document->content) ? $document->content : [];
-                        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
                         $responsibleIds = collect($tasks)
                             ->filter(fn($row) => is_array($row) && is_array($row['responsible_user_ids'] ?? null))
                             ->flatMap(fn($row) => $row['responsible_user_ids'])
@@ -141,8 +139,8 @@
                             ->values()
                             ->all();
                         $historyUpdaterIds = collect($tasks)
-                            ->filter(fn($row) => is_array($row) && is_array($row['history'] ?? null))
-                            ->flatMap(fn($row) => $row['history'])
+                            ->filter(fn($row) => is_array($row) && is_array($row['display_history'] ?? null))
+                            ->flatMap(fn($row) => $row['display_history'])
                             ->filter(fn($entry) => is_array($entry) && !empty($entry['updated_by']))
                             ->map(fn($entry) => (string) $entry['updated_by'])
                             ->unique()
@@ -173,28 +171,31 @@
                                             $row = is_array($row) ? $row : [];
                                             $ids = is_array($row['responsible_user_ids'] ?? null) ? array_map('strval', $row['responsible_user_ids']) : [];
                                             $names = collect($ids)->map(fn($id) => $responsibleNameMap[$id] ?? null)->filter()->values()->all();
-                                            $history = is_array($row['history'] ?? null) ? array_values(array_filter($row['history'], fn($entry) => is_array($entry))) : [];
+                                            $history = is_array($row['display_history'] ?? null) ? array_values(array_filter($row['display_history'], fn($entry) => is_array($entry))) : [];
                                             $timelineModalId = 'taskTimelineModal' . $loop->index;
+                                            $displayNotes = array_key_exists('display_notes_progress', $row) ? (string) $row['display_notes_progress'] : (string) ($row['notes_progress'] ?? '');
+                                            $displayProgress = array_key_exists('display_progress', $row) ? $row['display_progress'] : ($row['progress'] ?? 'Not Started');
                                         @endphp
                                         <tr>
                                             <td class="text-center">{{ $row['task_no'] ?? $loop->iteration }}</td>
                                             <td class="text-wrap">{{ $row['task'] ?? '' }}</td>
                                             <td class="text-muted small">{{ !empty($names) ? implode(', ', $names) : '-' }}</td>
                                             <td>
-                                                @php $progress = $row['progress'] ?? 'Not Started'; @endphp
-                                                @if($progress === 'Done')
-                                                    <span class="badge bg-success">{{ $progress }}</span>
-                                                @elseif($progress === 'Cancelled')
-                                                    <span class="badge bg-danger">{{ $progress }}</span>
-                                                @elseif($progress === 'In Progress')
-                                                    <span class="badge bg-info">{{ $progress }}</span>
+                                                @if($displayProgress === null)
+                                                    <span class="text-muted">—</span>
+                                                @elseif($displayProgress === 'Done')
+                                                    <span class="badge bg-success">{{ $displayProgress }}</span>
+                                                @elseif($displayProgress === 'Cancelled')
+                                                    <span class="badge bg-danger">{{ $displayProgress }}</span>
+                                                @elseif($displayProgress === 'In Progress')
+                                                    <span class="badge bg-info">{{ $displayProgress }}</span>
                                                 @else
-                                                    <span class="badge bg-secondary">{{ $progress }}</span>
+                                                    <span class="badge bg-secondary">{{ $displayProgress }}</span>
                                                 @endif
                                             </td>
                                             <td>{{ $row['due_date'] ?? '-' }}</td>
                                             <td>{{ $row['compilation_date'] ?? '-' }}</td>
-                                            <td class="text-muted small">{{ $row['notes_progress'] ?? '' }}</td>
+                                            <td class="text-muted small">{{ $displayNotes !== '' ? $displayNotes : '—' }}</td>
                                             <td>
                                                 @if(!empty($history))
                                                     <button type="button"

@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -189,6 +189,80 @@ class Document extends Model
     public function isSubmitted(): bool
     {
         return $this->state === self::STATE_SUBMITTED;
+    }
+
+    /**
+     * Action log tasks with notes/progress scoped to this document's work period
+     * (for read-only views and PDF). Uses timeline entries whose period_id matches
+     * this document; when none exist for that period, notes are empty and progress
+     * is treated as not reported for that week. Falls back to stored row values
+     * only when the task has no history at all (legacy data).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getActionLogTasksForPeriodDisplay(): array
+    {
+        if ($this->type !== self::TYPE_ACTION_LOG) {
+            return [];
+        }
+
+        $content = is_array($this->content) ? $this->content : [];
+        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+        $periodId = $this->period_id !== null && $this->period_id !== ''
+            ? (string) $this->period_id
+            : null;
+
+        $result = [];
+        foreach ($tasks as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+
+            if ($periodId === null) {
+                $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
+                $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
+                $task['display_history'] = is_array($task['history'] ?? null)
+                    ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
+                    : [];
+                $result[] = $task;
+
+                continue;
+            }
+
+            $history = is_array($task['history'] ?? null)
+                ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
+                : [];
+
+            $periodHistory = array_values(array_filter(
+                $history,
+                static fn (array $e): bool => (string) ($e['period_id'] ?? '') === $periodId
+            ));
+
+            usort($periodHistory, static function (array $a, array $b): int {
+                $ta = strtotime((string) ($a['changed_at'] ?? '')) ?: 0;
+                $tb = strtotime((string) ($b['changed_at'] ?? '')) ?: 0;
+
+                return $ta <=> $tb;
+            });
+
+            if ($periodHistory !== []) {
+                $last = $periodHistory[count($periodHistory) - 1];
+                $task['display_notes_progress'] = trim((string) ($last['notes_progress'] ?? ''));
+                $toProgress = trim((string) ($last['to_progress'] ?? ''));
+                $task['display_progress'] = $toProgress !== '' ? $toProgress : 'Not Started';
+            } elseif ($history === []) {
+                $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
+                $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
+            } else {
+                $task['display_notes_progress'] = '';
+                $task['display_progress'] = null;
+            }
+
+            $task['display_history'] = $periodHistory;
+            $result[] = $task;
+        }
+
+        return $result;
     }
 
     /**

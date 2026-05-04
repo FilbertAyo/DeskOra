@@ -88,15 +88,19 @@
                     $row = is_array($row) ? $row : [];
                     $ids = is_array($row['responsible_user_ids'] ?? null) ? array_map('strval', $row['responsible_user_ids']) : [];
                     $names = collect($ids)->map(fn ($id) => $responsibleNameMap[$id] ?? null)->filter()->values()->all();
+                    $displayNotes = array_key_exists('display_notes_progress', $row) ? (string) $row['display_notes_progress'] : (string) ($row['notes_progress'] ?? '');
+                    $displayProgress = array_key_exists('display_progress', $row) ? $row['display_progress'] : ($row['progress'] ?? 'Not Started');
+                    $progressCell = $displayProgress === null ? '—' : (string) $displayProgress;
+                    $notesCell = $displayNotes !== '' ? $displayNotes : '—';
                 @endphp
                 <tr>
                     <td>{{ $row['task_no'] ?? ($index + 1) }}</td>
                     <td>{{ $row['task'] ?? '' }}</td>
                     <td>{{ !empty($names) ? implode(', ', $names) : '-' }}</td>
-                    <td>{{ $row['progress'] ?? 'Not Started' }}</td>
+                    <td>{{ $progressCell }}</td>
                     <td>{{ $row['due_date'] ?? '-' }}</td>
                     <td>{{ $row['compilation_date'] ?? '-' }}</td>
-                    <td>{{ $row['notes_progress'] ?? '-' }}</td>
+                    <td>{{ $notesCell }}</td>
                 </tr>
             @empty
                 <tr>
