@@ -14,10 +14,17 @@
                         </div>
 
                         <div class="col-auto">
-                            @if(isset($availableTypes['weekly_plan']))
+                            @php
+                                $canCreateWeeklyPlan = isset($availableTypes['weekly_plan']) && isset($nextPeriod) && $nextPeriod && ! $nextPeriod->isPlanDeadlinePassed();
+                            @endphp
+                            @if($canCreateWeeklyPlan)
                                 <a href="{{ route('documents.create', ['type' => 'weekly_plan', 'return_to' => request()->fullUrl()]) }}" class="btn btn-info btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Plan
                                 </a>
+                            @elseif(isset($availableTypes['weekly_plan']))
+                                <button type="button" class="btn btn-light btn-sm" disabled title="Plan deadline has passed for the current window">
+                                    <i class="ti ti-calendar-off me-1"></i> Weekly plan window closed
+                                </button>
                             @endif
                         </div>
                     </div>

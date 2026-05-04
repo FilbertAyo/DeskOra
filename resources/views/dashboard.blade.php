@@ -158,7 +158,18 @@
                     @if($weeklySubmissionReminder && count($weeklySubmissionReminder->missedMessages) > 0)
                         <div class="alert alert-danger border mb-0 mt-3">
                             <p class="mb-1 fw-semibold"><i class="ti ti-alert-circle me-1"></i>Missed submission window</p>
-                            <p class="mb-2 small text-muted">Weekly plan and report cut-off is every Saturday at 23:59.</p>
+                            <p class="mb-2 small text-muted">
+                                @if(isset($deadlineStatuses['plan_due']) || isset($deadlineStatuses['report_due']))
+                                    @if(isset($deadlineStatuses['plan_due']))
+                                        Plan cutoff: {{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y H:i') }}.
+                                    @endif
+                                    @if(isset($deadlineStatuses['report_due']))
+                                        Report cutoff: {{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}.
+                                    @endif
+                                @else
+                                    Weekly plan and report cut-off is managed by the active work period deadlines.
+                                @endif
+                            </p>
                             <ul class="mb-0 ps-3 small">
                                 @foreach($weeklySubmissionReminder->missedMessages as $line)
                                     <li>{{ $line }}</li>

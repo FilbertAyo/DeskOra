@@ -5,6 +5,9 @@
         $resolvedBackUrl = is_string($requestedBackUrl) && \Illuminate\Support\Str::startsWith($requestedBackUrl, url('/documents'))
             ? $requestedBackUrl
             : ((is_string($sessionBackUrl) && \Illuminate\Support\Str::startsWith($sessionBackUrl, url('/documents'))) ? $sessionBackUrl : route('documents.index'));
+        $isWeeklyPlanWindowClosed = isset($selectedType) && $selectedType === 'weekly_plan' && isset($nextPeriod) && $nextPeriod && $nextPeriod->isPlanDeadlinePassed();
+        $isWeeklyReportWindowClosed = isset($selectedType) && $selectedType === 'weekly_report' && isset($currentPeriod) && $currentPeriod && $currentPeriod->isReportDeadlinePassed();
+        $isWeeklyWindowClosed = $isWeeklyPlanWindowClosed || $isWeeklyReportWindowClosed;
     @endphp
     <div class="page-header">
         <div class="page-block">
@@ -34,6 +37,16 @@
 
     <div class="row">
         <div class="col-md-12">
+            @if($isWeeklyWindowClosed)
+                <div class="alert alert-warning border mb-3" role="alert">
+                    <i class="ti ti-lock me-1"></i>
+                    @if($isWeeklyPlanWindowClosed)
+                        Weekly plan submission window is currently closed for this period.
+                    @elseif($isWeeklyReportWindowClosed)
+                        Weekly report submission window is currently closed for this period.
+                    @endif
+                </div>
+            @endif
             <form method="POST" action="{{ route('documents.store') }}" id="createDocumentForm" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="action" id="hiddenAction" value="draft">
@@ -72,10 +85,10 @@
                                 <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div class="btn-group">
-                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
+                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn" @disabled($isWeeklyWindowClosed)>
                                     <i class="ti ti-save me-1"></i> Save Draft
                                 </button>
-                                <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn">
+                                <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn" @disabled($isWeeklyWindowClosed)>
                                     <i class="ti ti-send me-1"></i> Submit
                                 </button>
                             </div>

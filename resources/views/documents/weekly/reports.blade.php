@@ -14,10 +14,17 @@
                         </div>
 
                         <div class="col-auto d-flex align-items-center gap-2">
-                            @if(isset($availableTypes['weekly_report']))
+                            @php
+                                $canCreateWeeklyReport = isset($availableTypes['weekly_report']) && isset($currentPeriod) && $currentPeriod && ! $currentPeriod->isReportDeadlinePassed();
+                            @endphp
+                            @if($canCreateWeeklyReport)
                                 <a href="{{ route('documents.create', ['type' => 'weekly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Report
                                 </a>
+                            @elseif(isset($availableTypes['weekly_report']))
+                                <button type="button" class="btn btn-light btn-sm" disabled title="Report deadline has passed for the current window">
+                                    <i class="ti ti-file-minus me-1"></i> Weekly report window closed
+                                </button>
                             @endif
                         </div>
                     </div>
@@ -92,10 +99,14 @@
                                     </p>
                                 </div>
                                 <div class="col-md-4 text-md-end">
-                                    @if(isset($availableTypes['weekly_report']))
+                                    @if($canCreateWeeklyReport)
                                         <a href="{{ route('documents.create', ['type' => 'weekly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
                                             <i class="ti ti-circle-plus me-1"></i> Create New Report
                                         </a>
+                                    @elseif(isset($availableTypes['weekly_report']))
+                                        <button type="button" class="btn btn-light btn-sm" disabled title="Report deadline has passed for the current window">
+                                            <i class="ti ti-file-minus me-1"></i> Weekly report window closed
+                                        </button>
                                     @endif
                                 </div>
                             </div>
