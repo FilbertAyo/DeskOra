@@ -291,6 +291,10 @@ class DocumentController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $selectedType = $request->query('type');
+        $requestedPeriodId = $request->query('period_id');
+        $requestedPeriod = is_string($requestedPeriodId) && $requestedPeriodId !== ''
+            ? WorkPeriod::find($requestedPeriodId)
+            : null;
 
         // Authorize create action
         $this->authorize('create', Document::class);
@@ -320,23 +324,33 @@ class DocumentController extends Controller
         $carriedActivities = [];
 
         if ($selectedType) {
-            if ($selectedType === Document::TYPE_WEEKLY_PLAN && $nextPeriod) {
-                // For weekly plan, default to next week
-                $defaultPeriodId = $nextPeriod->id;
+            if ($selectedType === Document::TYPE_WEEKLY_PLAN) {
+                // For weekly plan, default to explicit period when its submission window is open; otherwise next week.
+                $targetPlanPeriod = $nextPeriod;
+                if ($requestedPeriod && $requestedPeriod->isOpen() && ! $requestedPeriod->isPlanDeadlinePassed()) {
+                    $targetPlanPeriod = $requestedPeriod;
+                }
+                $defaultPeriodId = $targetPlanPeriod?->id;
                 if ($currentPeriod) {
                     $latestWeeklyReport = Document::findWeeklyReportForPeriodOwner($currentPeriod->id, (string) $user->id);
                     if ($latestWeeklyReport) {
                         $carriedActivities = $this->buildCarriedActivitiesFromWeeklyReport($latestWeeklyReport);
                     }
                 }
-            } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT && $currentPeriod) {
-                // For weekly report, default to current week
-                $defaultPeriodId = $currentPeriod->id;
+            } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT) {
+                // For weekly report, default to explicit period when its submission window is open; otherwise current week.
+                $targetReportPeriod = $currentPeriod;
+                if ($requestedPeriod && $requestedPeriod->isOpen() && ! $requestedPeriod->isReportDeadlinePassed()) {
+                    $targetReportPeriod = $requestedPeriod;
+                }
+                $defaultPeriodId = $targetReportPeriod?->id;
                 // Get the related plan for this period to show the main target
-                $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
-                    $currentPeriod->id,
-                    (string) $user->id
-                );
+                if ($targetReportPeriod) {
+                    $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
+                        $targetReportPeriod->id,
+                        (string) $user->id
+                    );
+                }
             }
         }
 
@@ -609,14 +623,21 @@ class DocumentController extends Controller
                 ? $this->workPeriodService->periodForWeeklyPlanSubmission()
                 : $this->workPeriodService->periodForWeeklyReportSubmission();
 
-            if (! $expectedPeriod || $period->id !== $expectedPeriod->id) {
-                $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
-                    ? 'Weekly plan must be submitted for next week.'
-                    : 'Weekly report must be submitted for the current week.';
+            $isExpectedPeriod = $expectedPeriod && $period->id === $expectedPeriod->id;
+            if (! $isExpectedPeriod) {
+                $isWindowOpen = $request->type === Document::TYPE_WEEKLY_PLAN
+                    ? ! $period->isPlanDeadlinePassed()
+                    : ! $period->isReportDeadlinePassed();
 
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', $errorMessage);
+                if (! $isWindowOpen) {
+                    $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
+                        ? 'The selected weekly plan window is closed.'
+                        : 'The selected weekly report window is closed.';
+
+                    return redirect()->back()
+                        ->withInput()
+                        ->with('error', $errorMessage);
+                }
             }
         }
 
@@ -949,7 +970,11 @@ class DocumentController extends Controller
                     $relatedAction = [
                         'type' => Document::TYPE_WEEKLY_REPORT,
                         'label' => 'Create Weekly Report for this Week',
-                        'route' => route('documents.create', ['type' => Document::TYPE_WEEKLY_REPORT]),
+                        'route' => route('documents.create', [
+                            'type' => Document::TYPE_WEEKLY_REPORT,
+                            'period_id' => $document->period_id,
+                            'return_to' => request()->fullUrl(),
+                        ]),
                         'description' => 'Weekly report is due on '.$document->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
                     ];
                 } elseif ($isAuthor &&
@@ -958,7 +983,11 @@ class DocumentController extends Controller
                     $relatedAction = [
                         'type' => Document::TYPE_WEEKLY_PLAN,
                         'label' => 'Create Weekly Plan for this Week',
-                        'route' => route('documents.create', ['type' => Document::TYPE_WEEKLY_PLAN]),
+                        'route' => route('documents.create', [
+                            'type' => Document::TYPE_WEEKLY_PLAN,
+                            'period_id' => $document->period_id,
+                            'return_to' => request()->fullUrl(),
+                        ]),
                         'description' => 'Weekly plan should outline goals for this week.',
                     ];
                 }

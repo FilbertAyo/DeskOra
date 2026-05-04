@@ -5,8 +5,18 @@
         $resolvedBackUrl = is_string($requestedBackUrl) && \Illuminate\Support\Str::startsWith($requestedBackUrl, url('/documents'))
             ? $requestedBackUrl
             : ((is_string($sessionBackUrl) && \Illuminate\Support\Str::startsWith($sessionBackUrl, url('/documents'))) ? $sessionBackUrl : route('documents.index'));
-        $isWeeklyPlanWindowClosed = isset($selectedType) && $selectedType === 'weekly_plan' && isset($nextPeriod) && $nextPeriod && $nextPeriod->isPlanDeadlinePassed();
-        $isWeeklyReportWindowClosed = isset($selectedType) && $selectedType === 'weekly_report' && isset($currentPeriod) && $currentPeriod && $currentPeriod->isReportDeadlinePassed();
+        $resolvedWeeklyPeriod = null;
+        if (isset($selectedType) && in_array($selectedType, ['weekly_plan', 'weekly_report'], true) && isset($workPeriods)) {
+            $resolvedWeeklyPeriod = collect($workPeriods)->firstWhere('id', old('period_id', $defaultPeriodId ?? null));
+        }
+        $isWeeklyPlanWindowClosed = isset($selectedType)
+            && $selectedType === 'weekly_plan'
+            && $resolvedWeeklyPeriod
+            && $resolvedWeeklyPeriod->isPlanDeadlinePassed();
+        $isWeeklyReportWindowClosed = isset($selectedType)
+            && $selectedType === 'weekly_report'
+            && $resolvedWeeklyPeriod
+            && $resolvedWeeklyPeriod->isReportDeadlinePassed();
         $isWeeklyWindowClosed = $isWeeklyPlanWindowClosed || $isWeeklyReportWindowClosed;
     @endphp
     <div class="page-header">

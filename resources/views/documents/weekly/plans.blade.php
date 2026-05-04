@@ -15,10 +15,21 @@
 
                         <div class="col-auto">
                             @php
-                                $canCreateWeeklyPlan = isset($availableTypes['weekly_plan']) && isset($nextPeriod) && $nextPeriod && ! $nextPeriod->isPlanDeadlinePassed();
+                                $selectedCreatePeriod = request('period_id')
+                                    ? collect($periods)->firstWhere('id', request('period_id'))
+                                    : null;
+                                $planCreatePeriod = null;
+                                if ($selectedCreatePeriod && $selectedCreatePeriod->isOpen() && ! $selectedCreatePeriod->isPlanDeadlinePassed()) {
+                                    $planCreatePeriod = $selectedCreatePeriod;
+                                } elseif (isset($nextPeriod) && $nextPeriod && $nextPeriod->isOpen() && ! $nextPeriod->isPlanDeadlinePassed()) {
+                                    $planCreatePeriod = $nextPeriod;
+                                } elseif (isset($currentPeriod) && $currentPeriod && $currentPeriod->isOpen() && ! $currentPeriod->isPlanDeadlinePassed()) {
+                                    $planCreatePeriod = $currentPeriod;
+                                }
+                                $canCreateWeeklyPlan = isset($availableTypes['weekly_plan']) && $planCreatePeriod !== null;
                             @endphp
                             @if($canCreateWeeklyPlan)
-                                <a href="{{ route('documents.create', ['type' => 'weekly_plan', 'return_to' => request()->fullUrl()]) }}" class="btn btn-info btn-sm">
+                                <a href="{{ route('documents.create', ['type' => 'weekly_plan', 'period_id' => $planCreatePeriod->id, 'return_to' => request()->fullUrl()]) }}" class="btn btn-info btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Plan
                                 </a>
                             @elseif(isset($availableTypes['weekly_plan']))

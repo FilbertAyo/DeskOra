@@ -15,10 +15,19 @@
 
                         <div class="col-auto d-flex align-items-center gap-2">
                             @php
-                                $canCreateWeeklyReport = isset($availableTypes['weekly_report']) && isset($currentPeriod) && $currentPeriod && ! $currentPeriod->isReportDeadlinePassed();
+                                $selectedCreatePeriod = request('period_id')
+                                    ? collect($periods)->firstWhere('id', request('period_id'))
+                                    : null;
+                                $reportCreatePeriod = null;
+                                if ($selectedCreatePeriod && $selectedCreatePeriod->isOpen() && ! $selectedCreatePeriod->isReportDeadlinePassed()) {
+                                    $reportCreatePeriod = $selectedCreatePeriod;
+                                } elseif (isset($currentPeriod) && $currentPeriod && $currentPeriod->isOpen() && ! $currentPeriod->isReportDeadlinePassed()) {
+                                    $reportCreatePeriod = $currentPeriod;
+                                }
+                                $canCreateWeeklyReport = isset($availableTypes['weekly_report']) && $reportCreatePeriod !== null;
                             @endphp
                             @if($canCreateWeeklyReport)
-                                <a href="{{ route('documents.create', ['type' => 'weekly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
+                                <a href="{{ route('documents.create', ['type' => 'weekly_report', 'period_id' => $reportCreatePeriod->id, 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Report
                                 </a>
                             @elseif(isset($availableTypes['weekly_report']))
@@ -100,7 +109,7 @@
                                 </div>
                                 <div class="col-md-4 text-md-end">
                                     @if($canCreateWeeklyReport)
-                                        <a href="{{ route('documents.create', ['type' => 'weekly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
+                                        <a href="{{ route('documents.create', ['type' => 'weekly_report', 'period_id' => $reportCreatePeriod->id, 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
                                             <i class="ti ti-circle-plus me-1"></i> Create New Report
                                         </a>
                                     @elseif(isset($availableTypes['weekly_report']))

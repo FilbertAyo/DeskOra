@@ -21,7 +21,7 @@ class DocumentPeriodAlignmentTest extends TestCase
         Carbon::setTestNow(Carbon::create(2025, 4, 2, 10, 0, 0)); // Week 14
     }
 
-    public function test_weekly_plan_cannot_be_submitted_for_current_week(): void
+    public function test_weekly_plan_can_be_submitted_for_current_week_when_window_is_open(): void
     {
         [$currentPeriod] = $this->createCurrentAndNextPeriods();
         $user = $this->createPlannerUser();
@@ -32,14 +32,15 @@ class DocumentPeriodAlignmentTest extends TestCase
             'main_target' => 'Plan target',
         ]);
 
-        $response->assertSessionHas('error', 'Weekly plan must be submitted for next week.');
-        $this->assertDatabaseMissing('documents', [
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('documents', [
             'user_id' => $user->id,
             'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
         ]);
     }
 
-    public function test_weekly_report_cannot_be_submitted_for_next_week(): void
+    public function test_weekly_report_can_be_submitted_for_next_week_when_window_is_open(): void
     {
         [, $nextPeriod] = $this->createCurrentAndNextPeriods();
         $user = $this->createReporterUser();
@@ -49,10 +50,66 @@ class DocumentPeriodAlignmentTest extends TestCase
             'period_id' => $nextPeriod->id,
         ]);
 
-        $response->assertSessionHas('error', 'Weekly report must be submitted for the current week.');
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('documents', [
+            'user_id' => $user->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $nextPeriod->id,
+        ]);
+    }
+
+    public function test_weekly_plan_still_blocks_when_selected_period_window_is_closed(): void
+    {
+        $this->createCurrentAndNextPeriods();
+        $user = $this->createPlannerUser();
+        $closedWindowPeriod = WorkPeriod::create([
+            'year' => 2025,
+            'week_number' => 13,
+            'week_start_date' => '2025-03-24',
+            'week_end_date' => '2025-03-30',
+            'plan_deadline' => '2025-03-28',
+            'report_deadline' => '2025-03-29',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $closedWindowPeriod->id,
+            'main_target' => 'Late plan',
+        ]);
+
+        $response->assertSessionHas('error', 'The selected weekly plan window is closed.');
+        $this->assertDatabaseMissing('documents', [
+            'user_id' => $user->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $closedWindowPeriod->id,
+        ]);
+    }
+
+    public function test_weekly_report_still_blocks_when_selected_period_window_is_closed(): void
+    {
+        $this->createCurrentAndNextPeriods();
+        $user = $this->createReporterUser();
+        $closedWindowPeriod = WorkPeriod::create([
+            'year' => 2025,
+            'week_number' => 13,
+            'week_start_date' => '2025-03-24',
+            'week_end_date' => '2025-03-30',
+            'plan_deadline' => '2025-03-28',
+            'report_deadline' => '2025-03-29',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $closedWindowPeriod->id,
+        ]);
+
+        $response->assertSessionHas('error', 'The selected weekly report window is closed.');
         $this->assertDatabaseMissing('documents', [
             'user_id' => $user->id,
             'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $closedWindowPeriod->id,
         ]);
     }
 
