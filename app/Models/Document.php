@@ -194,9 +194,9 @@ class Document extends Model
     /**
      * Action log tasks with notes/progress scoped to this document's work period
      * (for read-only views and PDF). Uses timeline entries whose period_id matches
-     * this document; when none exist for that period, notes are empty and progress
-     * is treated as not reported for that week. Falls back to stored row values
-     * only when the task has no history at all (legacy data).
+     * this document for row values. When none exist for that period, notes/progress
+     * remain empty for that week. Task timeline remains complete across periods so
+     * older updates can still be viewed in the timeline panel.
      *
      * @return list<array<string, mixed>>
      */
@@ -258,7 +258,8 @@ class Document extends Model
                 $task['display_progress'] = null;
             }
 
-            $task['display_history'] = $periodHistory;
+            // Keep full timeline visible so users can inspect last week's updates.
+            $task['display_history'] = $history;
             $result[] = $task;
         }
 

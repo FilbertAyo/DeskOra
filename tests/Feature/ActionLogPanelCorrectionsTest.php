@@ -291,7 +291,10 @@ class ActionLogPanelCorrectionsTest extends TestCase
                 return ($row['task'] ?? null) === 'Shared task'
                     && ($row['display_notes_progress'] ?? null) === ''
                     && array_key_exists('display_progress', $row)
-                    && $row['display_progress'] === null;
+                    && $row['display_progress'] === null
+                    && is_array($row['display_history'] ?? null)
+                    && count($row['display_history']) === 1
+                    && (($row['display_history'][0]['notes_progress'] ?? null) === 'Staff only updated week 14');
             });
     }
 
