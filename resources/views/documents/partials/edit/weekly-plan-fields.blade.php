@@ -103,7 +103,32 @@
                                                         @php
                                                             $dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                                                             $activityRows = old('content.planned_activities', $plannedActivities ?? []);
-                                                            if (!is_array($activityRows) || empty($activityRows)) {
+                                                            if (!is_array($activityRows)) {
+                                                                $activityRows = [];
+                                                            }
+
+                                                            $carryRows = is_array($carriedActivities ?? null) ? $carriedActivities : [];
+                                                            $activityKeys = [];
+                                                            foreach ($activityRows as $existingRow) {
+                                                                if (!is_array($existingRow)) {
+                                                                    continue;
+                                                                }
+                                                                $activityKey = mb_strtolower(trim((string) ($existingRow['day'] ?? '')).'|'.trim((string) ($existingRow['activity'] ?? '')));
+                                                                $activityKeys[$activityKey] = true;
+                                                            }
+                                                            foreach ($carryRows as $carryRow) {
+                                                                if (!is_array($carryRow)) {
+                                                                    continue;
+                                                                }
+                                                                $carryKey = mb_strtolower(trim((string) ($carryRow['day'] ?? '')).'|'.trim((string) ($carryRow['activity'] ?? '')));
+                                                                if (isset($activityKeys[$carryKey])) {
+                                                                    continue;
+                                                                }
+                                                                $activityRows[] = $carryRow;
+                                                                $activityKeys[$carryKey] = true;
+                                                            }
+
+                                                            if (empty($activityRows)) {
                                                                 $activityRows = [['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => [], 'notes_inclusion' => '']];
                                                             }
                                                         @endphp

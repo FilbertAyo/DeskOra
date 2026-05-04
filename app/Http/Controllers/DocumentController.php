@@ -940,6 +940,7 @@ class DocumentController extends Controller
         }
 
         $document->load(['user', 'period', 'sharedUsers']);
+        $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
 
         // Authorize view action
         $this->authorize('view', $document);
@@ -1006,7 +1007,7 @@ class DocumentController extends Controller
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities', 'carriedActivities'));
     }
 
     /**
@@ -1027,12 +1028,13 @@ class DocumentController extends Controller
         $this->authorize('view', $document);
 
         $document->load(['user', 'period']);
+        $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
 
         $relatedDocument = null;
         $relatedAction = null;
         $reviewerPresentation = true;
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'carriedActivities'));
     }
 
     /**
@@ -1049,7 +1051,8 @@ class DocumentController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
-        $document->loadMissing(['user', 'sharedUsers']);
+        $document->loadMissing(['user', 'sharedUsers', 'period']);
+        $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
         $monthlyYearPlan = null;
         $monthlyPlannedActivities = collect();
         $monthlyHasSubDepartments = false;
@@ -1078,7 +1081,7 @@ class DocumentController extends Controller
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
-        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities'));
+        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities'));
     }
 
     /**
@@ -2987,6 +2990,35 @@ class DocumentController extends Controller
         }
 
         return $carriedRows;
+    }
+
+    /**
+     * Resolve activities carried from previous week for weekly-plan view/edit fallbacks.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function carriedActivitiesForWeeklyPlanDocument(Document $document): array
+    {
+        if ($document->type !== Document::TYPE_WEEKLY_PLAN) {
+            return [];
+        }
+
+        $period = $document->period;
+        if (! $period) {
+            return [];
+        }
+
+        $previousPeriod = $period->getPreviousPeriod();
+        if (! $previousPeriod) {
+            return [];
+        }
+
+        $latestWeeklyReport = Document::findWeeklyReportForPeriodOwner($previousPeriod->id, (string) $document->user_id);
+        if (! $latestWeeklyReport) {
+            return [];
+        }
+
+        return $this->buildCarriedActivitiesFromWeeklyReport($latestWeeklyReport);
     }
 
     private function syncNextWeeklyPlanCarryOverFromReport(Document $weeklyReport): void

@@ -40,6 +40,43 @@
                                         })
                                         ->filter()
                                         ->values();
+                                    $carriedRows = collect(is_array($carriedActivities ?? null) ? $carriedActivities : [])
+                                        ->map(function ($row) {
+                                            if (!is_array($row)) {
+                                                return null;
+                                            }
+                                            return [
+                                                'day' => trim((string) ($row['day'] ?? '')),
+                                                'activity' => trim((string) ($row['activity'] ?? '')),
+                                                'location' => trim((string) ($row['location'] ?? '')),
+                                                'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')),
+                                                'team_member_ids' => is_array($row['team_member_ids'] ?? null) ? $row['team_member_ids'] : [],
+                                            ];
+                                        })
+                                        ->filter(function ($row) {
+                                            return is_array($row)
+                                                && (
+                                                    $row['day'] !== ''
+                                                    || $row['activity'] !== ''
+                                                    || $row['location'] !== ''
+                                                    || $row['notes_inclusion'] !== ''
+                                                    || !empty($row['team_member_ids'])
+                                                );
+                                        })
+                                        ->values();
+                                    $existingActivityKeys = $normalizedActivities
+                                        ->map(fn ($row) => mb_strtolower(trim((string) ($row['day'] ?? '')).'|'.trim((string) ($row['activity'] ?? ''))))
+                                        ->filter()
+                                        ->values()
+                                        ->all();
+                                    foreach ($carriedRows as $carryRow) {
+                                        $carryKey = mb_strtolower(trim((string) ($carryRow['day'] ?? '')).'|'.trim((string) ($carryRow['activity'] ?? '')));
+                                        if (in_array($carryKey, $existingActivityKeys, true)) {
+                                            continue;
+                                        }
+                                        $normalizedActivities->push($carryRow);
+                                        $existingActivityKeys[] = $carryKey;
+                                    }
                                     $groupedActivities = collect($dayOrder)
                                         ->mapWithKeys(fn ($day) => [$day => []])
                                         ->merge(
