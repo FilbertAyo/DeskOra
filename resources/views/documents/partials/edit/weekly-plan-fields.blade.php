@@ -226,8 +226,38 @@
                                                     <tbody id="keyMeetingsBody">
                                                         @php
                                                             $meetingRows = old('content.key_meetings', $keyMeetings ?? []);
-                                                            if (!is_array($meetingRows) || empty($meetingRows)) {
-                                                                $meetingRows = [['date' => '', 'meeting' => '', 'participants' => '', 'location' => '', 'reactions_notes' => '']];
+                                                            if (!is_array($meetingRows)) {
+                                                                $meetingRows = [];
+                                                            }
+                                                            $incomingRows = is_array($incomingMeetings ?? null) ? $incomingMeetings : [];
+                                                            $meetingKeys = [];
+                                                            foreach ($meetingRows as $existingMeetingRow) {
+                                                                if (!is_array($existingMeetingRow)) {
+                                                                    continue;
+                                                                }
+                                                                $participantIds = is_array($existingMeetingRow['participant_user_ids'] ?? null) ? $existingMeetingRow['participant_user_ids'] : [];
+                                                                $participantIds = array_values(array_unique(array_filter(array_map('strval', $participantIds))));
+                                                                sort($participantIds);
+                                                                $meetingKey = mb_strtolower(trim((string) ($existingMeetingRow['date'] ?? '')).'|'.trim((string) ($existingMeetingRow['meeting'] ?? '')).'|'.trim((string) ($existingMeetingRow['location'] ?? '')).'|'.implode(',', $participantIds));
+                                                                $meetingKeys[$meetingKey] = true;
+                                                            }
+                                                            foreach ($incomingRows as $incomingRow) {
+                                                                if (!is_array($incomingRow)) {
+                                                                    continue;
+                                                                }
+                                                                $incomingParticipantIds = is_array($incomingRow['participant_user_ids'] ?? null) ? $incomingRow['participant_user_ids'] : [];
+                                                                $incomingParticipantIds = array_values(array_unique(array_filter(array_map('strval', $incomingParticipantIds))));
+                                                                sort($incomingParticipantIds);
+                                                                $meetingKey = mb_strtolower(trim((string) ($incomingRow['date'] ?? '')).'|'.trim((string) ($incomingRow['meeting'] ?? '')).'|'.trim((string) ($incomingRow['location'] ?? '')).'|'.implode(',', $incomingParticipantIds));
+                                                                if (isset($meetingKeys[$meetingKey])) {
+                                                                    continue;
+                                                                }
+                                                                $meetingRows[] = $incomingRow;
+                                                                $meetingKeys[$meetingKey] = true;
+                                                            }
+
+                                                            if (empty($meetingRows)) {
+                                                                $meetingRows = [['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '']];
                                                             }
                                                         @endphp
                                                         @foreach($meetingRows as $i => $meetingRow)
@@ -239,16 +269,30 @@
                                                                         value="{{ old("content.key_meetings.$i.date", $row['date'] ?? '') }}">
                                                                 </td>
                                                                 <td>
+                                                                    <input type="hidden"
+                                                                        name="content[key_meetings][{{ $i }}][meeting_uid]"
+                                                                        value="{{ old("content.key_meetings.$i.meeting_uid", $row['meeting_uid'] ?? '') }}">
                                                                     <input class="form-control"
                                                                         name="content[key_meetings][{{ $i }}][meeting]"
                                                                         value="{{ old("content.key_meetings.$i.meeting", $row['meeting'] ?? '') }}"
                                                                         placeholder="e.g., MIT Engagement ...">
+                                                                    @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
+                                                                        <small class="badge bg-light-info text-info mt-1">From another participant plan</small>
+                                                                    @endif
                                                                 </td>
                                                                 <td>
-                                                                    <input class="form-control"
-                                                                        name="content[key_meetings][{{ $i }}][participants]"
-                                                                        value="{{ old("content.key_meetings.$i.participants", $row['participants'] ?? '') }}"
-                                                                        placeholder="e.g., Dr. Theo / DUCE / Name of institution">
+                                                                    @php
+                                                                        $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $row['participant_user_ids'] ?? []);
+                                                                        if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
+                                                                    @endphp
+                                                                    <select class="form-select" multiple
+                                                                        name="content[key_meetings][{{ $i }}][participant_user_ids][]">
+                                                                        @foreach(($teamUsers ?? collect()) as $teamUser)
+                                                                            <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedParticipantIds), true) ? 'selected' : '' }}>
+                                                                                {{ $teamUser->name }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    </select>
                                                                 </td>
                                                                 <td>
                                                                     <select class="form-select"

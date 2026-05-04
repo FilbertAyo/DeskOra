@@ -2,6 +2,7 @@
                                     $objective = $content['objective'] ?? [];
                                     $plannedActivities = $content['planned_activities'] ?? [];
                                     $keyMeetings = $content['key_meetings'] ?? [];
+                                    $incomingMeetings = is_array($incomingMeetings ?? null) ? $incomingMeetings : [];
                                     $budget = $content['budget'] ?? [];
                                     $carriedActivitiesFromPreviousWeek = is_array($carriedActivities ?? null) ? $carriedActivities : [];
                                     $plannedTeamIds = collect($plannedActivities)
@@ -18,6 +19,18 @@
                                         ->values()
                                         ->all();
                                     $teamUserNames = \App\Models\User::whereIn('id', $plannedTeamIds)
+                                        ->pluck('name', 'id')
+                                        ->toArray();
+                                    $meetingParticipantIds = collect($keyMeetings)
+                                        ->merge($incomingMeetings)
+                                        ->filter(fn($row) => is_array($row) && !empty($row['participant_user_ids']) && is_array($row['participant_user_ids']))
+                                        ->flatMap(fn($row) => $row['participant_user_ids'])
+                                        ->filter()
+                                        ->map(fn($id) => (string) $id)
+                                        ->unique()
+                                        ->values()
+                                        ->all();
+                                    $meetingUserNames = \App\Models\User::whereIn('id', $meetingParticipantIds)
                                         ->pluck('name', 'id')
                                         ->toArray();
                                     $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -95,7 +108,32 @@
                                                 ->toArray()
                                         );
 
-                                    $hasKeyMeetings = collect($keyMeetings ?: [])->contains(function ($row) {
+                                    $normalizedMeetings = collect($keyMeetings ?: [])
+                                        ->merge($incomingMeetings)
+                                        ->map(function ($row) {
+                                            if (! is_array($row)) {
+                                                return null;
+                                            }
+                                            $participantIds = is_array($row['participant_user_ids'] ?? null) ? $row['participant_user_ids'] : [];
+                                            $participantIds = array_values(array_unique(array_filter(array_map('strval', $participantIds))));
+                                            sort($participantIds);
+
+                                            return [
+                                                'date' => trim((string) ($row['date'] ?? '')),
+                                                'meeting' => trim((string) ($row['meeting'] ?? '')),
+                                                'participants' => trim((string) ($row['participants'] ?? '')),
+                                                'participant_user_ids' => $participantIds,
+                                                'location' => trim((string) ($row['location'] ?? '')),
+                                                'reactions_notes' => trim((string) ($row['reactions_notes'] ?? '')),
+                                                'incoming_source_plan_id' => trim((string) ($row['incoming_source_plan_id'] ?? '')),
+                                            ];
+                                        })
+                                        ->filter()
+                                        ->unique(function ($row) {
+                                            return mb_strtolower(($row['date'] ?? '').'|'.($row['meeting'] ?? '').'|'.($row['location'] ?? '').'|'.implode(',', $row['participant_user_ids'] ?? []));
+                                        })
+                                        ->values();
+                                    $hasKeyMeetings = $normalizedMeetings->contains(function ($row) {
                                         if (! is_array($row)) {
                                             return false;
                                         }
@@ -103,6 +141,9 @@
                                             if (trim((string) ($row[$k] ?? '')) !== '') {
                                                 return true;
                                             }
+                                        }
+                                        if (! empty($row['participant_user_ids'] ?? [])) {
+                                            return true;
                                         }
 
                                         return false;
@@ -231,7 +272,7 @@
                                                     </thead>
                                                     <tbody>
                                                         @if($hasKeyMeetings)
-                                                            @foreach(($keyMeetings ?: []) as $row)
+                                                            @foreach($normalizedMeetings as $row)
                                                                 @php $row = is_array($row) ? $row : []; @endphp
                                                                 @php
                                                                     $kmEmpty = true;
@@ -241,14 +282,29 @@
                                                                             break;
                                                                         }
                                                                     }
+                                                                    if (!empty($row['participant_user_ids'] ?? [])) {
+                                                                        $kmEmpty = false;
+                                                                    }
+                                                                    $participantNames = collect(is_array($row['participant_user_ids'] ?? null) ? $row['participant_user_ids'] : [])
+                                                                        ->map(fn($id) => $meetingUserNames[(string) $id] ?? null)
+                                                                        ->filter()
+                                                                        ->values()
+                                                                        ->all();
                                                                 @endphp
                                                                 @if(!$kmEmpty)
                                                                     <tr>
                                                                         <td>{{ $row['date'] ?? '' }}</td>
                                                                         <td>{{ $row['meeting'] ?? '' }}</td>
-                                                                        <td>{{ $row['participants'] ?? '' }}</td>
+                                                                        <td>
+                                                                            {{ !empty($participantNames) ? implode(', ', $participantNames) : ($row['participants'] ?? '') }}
+                                                                        </td>
                                                                         <td>{{ $row['location'] ?? '' }}</td>
-                                                                        <td>{{ $row['reactions_notes'] ?? '' }}</td>
+                                                                        <td>
+                                                                            {{ $row['reactions_notes'] ?? '' }}
+                                                                            @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
+                                                                                <div><small class="badge bg-light-info text-info mt-1">From another participant plan</small></div>
+                                                                            @endif
+                                                                        </td>
                                                                     </tr>
                                                                 @endif
                                                             @endforeach

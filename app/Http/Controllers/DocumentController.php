@@ -489,7 +489,8 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
-            $validationRules['content.key_meetings.*.participants'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -941,6 +942,7 @@ class DocumentController extends Controller
 
         $document->load(['user', 'period', 'sharedUsers']);
         $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
+        $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
 
         // Authorize view action
         $this->authorize('view', $document);
@@ -1007,7 +1009,7 @@ class DocumentController extends Controller
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities', 'carriedActivities'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings'));
     }
 
     /**
@@ -1029,12 +1031,13 @@ class DocumentController extends Controller
 
         $document->load(['user', 'period']);
         $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
+        $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
 
         $relatedDocument = null;
         $relatedAction = null;
         $reviewerPresentation = true;
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'carriedActivities'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'carriedActivities', 'incomingMeetings'));
     }
 
     /**
@@ -1053,6 +1056,7 @@ class DocumentController extends Controller
 
         $document->loadMissing(['user', 'sharedUsers', 'period']);
         $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
+        $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
         $monthlyYearPlan = null;
         $monthlyPlannedActivities = collect();
         $monthlyHasSubDepartments = false;
@@ -1081,7 +1085,7 @@ class DocumentController extends Controller
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
-        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities'));
+        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings'));
     }
 
     /**
@@ -1123,7 +1127,8 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
-            $validationRules['content.key_meetings.*.participants'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -2799,8 +2804,27 @@ class DocumentController extends Controller
 
             $content['key_meetings'] = $this->filterNonEmptyRows(
                 $content['key_meetings'] ?? [],
-                ['date', 'meeting', 'participants', 'location', 'reactions_notes']
+                ['date', 'meeting', 'participant_user_ids', 'participants', 'location', 'reactions_notes']
             );
+            $content['key_meetings'] = array_values(array_map(function ($row) {
+                if (! is_array($row)) {
+                    return [];
+                }
+
+                $participantIds = is_array($row['participant_user_ids'] ?? null)
+                    ? $row['participant_user_ids']
+                    : [];
+                $row['participant_user_ids'] = array_values(array_unique(array_filter(array_map(
+                    static fn ($id) => trim((string) $id),
+                    $participantIds
+                ))));
+                $uid = trim((string) ($row['meeting_uid'] ?? ''));
+                if ($uid === '') {
+                    $row['meeting_uid'] = (string) Str::ulid();
+                }
+
+                return $row;
+            }, $content['key_meetings']));
 
             $content['budget'] = $this->filterNonEmptyRows(
                 $content['budget'] ?? [],
@@ -3028,6 +3052,55 @@ class DocumentController extends Controller
         }
 
         return $this->buildCarriedActivitiesFromWeeklyReport($latestWeeklyReport);
+    }
+
+    /**
+     * Collect meeting rows from peer weekly plans in same period where this
+     * plan owner was selected as a participant.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function incomingMeetingsForWeeklyPlanDocument(Document $document): array
+    {
+        if ($document->type !== Document::TYPE_WEEKLY_PLAN || ! $document->period_id) {
+            return [];
+        }
+
+        $ownerUserId = (string) $document->user_id;
+        $peerPlans = Document::query()
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->where('period_id', $document->period_id)
+            ->where('id', '!=', $document->id)
+            ->select(['id', 'user_id', 'content'])
+            ->get();
+
+        $incomingRows = [];
+        foreach ($peerPlans as $peerPlan) {
+            $peerContent = is_array($peerPlan->content) ? $peerPlan->content : [];
+            $meetingRows = is_array($peerContent['key_meetings'] ?? null) ? $peerContent['key_meetings'] : [];
+            foreach ($meetingRows as $meetingRow) {
+                if (! is_array($meetingRow)) {
+                    continue;
+                }
+
+                $participantIds = is_array($meetingRow['participant_user_ids'] ?? null)
+                    ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $meetingRow['participant_user_ids'])))
+                    : [];
+                if (! in_array($ownerUserId, $participantIds, true)) {
+                    continue;
+                }
+
+                $uid = trim((string) ($meetingRow['meeting_uid'] ?? ''));
+                if ($uid === '') {
+                    $meetingRow['meeting_uid'] = (string) Str::ulid();
+                }
+                $meetingRow['incoming_source_plan_id'] = (string) $peerPlan->id;
+                $meetingRow['incoming_source_user_id'] = (string) $peerPlan->user_id;
+                $incomingRows[] = $meetingRow;
+            }
+        }
+
+        return $incomingRows;
     }
 
     private function syncNextWeeklyPlanCarryOverFromReport(Document $weeklyReport): void

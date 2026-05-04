@@ -190,10 +190,10 @@
                     <tbody id="keyMeetingsBody">
                         @php
                             $meetingRows = old('content.key_meetings', [
-                                ['date' => '', 'meeting' => '', 'participants' => '', 'location' => '', 'reactions_notes' => ''],
+                                ['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => ''],
                             ]);
                             if (!is_array($meetingRows) || empty($meetingRows)) {
-                                $meetingRows = [['date' => '', 'meeting' => '', 'participants' => '', 'location' => '', 'reactions_notes' => '']];
+                                $meetingRows = [['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '']];
                             }
                         @endphp
                         @foreach($meetingRows as $i => $meetingRow)
@@ -205,16 +205,27 @@
                                         value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}">
                                 </td>
                                 <td>
+                                    <input type="hidden"
+                                        name="content[key_meetings][{{ $i }}][meeting_uid]"
+                                        value="{{ old("content.key_meetings.$i.meeting_uid", $meetingRow['meeting_uid'] ?? '') }}">
                                     <input class="form-control" 
                                         name="content[key_meetings][{{ $i }}][meeting]"
                                         value="{{ old("content.key_meetings.$i.meeting", $meetingRow['meeting'] ?? '') }}"
                                         placeholder="e.g., MIT Engagement ...">
                                 </td>
                                 <td>
-                                    <input class="form-control"
-                                        name="content[key_meetings][{{ $i }}][participants]"
-                                        value="{{ old("content.key_meetings.$i.participants", $meetingRow['participants'] ?? '') }}"
-                                        placeholder="e.g., Dr. Theo / DUCE / Name of institution">
+                                    @php
+                                        $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $meetingRow['participant_user_ids'] ?? []);
+                                        if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
+                                    @endphp
+                                    <select class="form-select" multiple
+                                        name="content[key_meetings][{{ $i }}][participant_user_ids][]">
+                                        @foreach(($teamUsers ?? collect()) as $teamUser)
+                                            <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedParticipantIds), true) ? 'selected' : '' }}>
+                                                {{ $teamUser->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
                                 </td>
                                 <td>
                                     <select class="form-select"

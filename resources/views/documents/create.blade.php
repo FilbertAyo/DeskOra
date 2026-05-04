@@ -392,8 +392,12 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td><input type="date" class="form-control" name="content[key_meetings][${meetingIndex}][date]"></td>
-                        <td><input class="form-control" name="content[key_meetings][${meetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
-                        <td><input class="form-control" name="content[key_meetings][${meetingIndex}][participants]" placeholder="e.g., Dr. Theo / DUCE"></td>
+                        <td><input type="hidden" name="content[key_meetings][${meetingIndex}][meeting_uid]" value=""><input class="form-control" name="content[key_meetings][${meetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
+                        <td>
+                            <select class="form-select" multiple name="content[key_meetings][${meetingIndex}][participant_user_ids][]">
+                                ${(window.__teamUsersOptionsHtml || '')}
+                            </select>
+                        </td>
                         <td>
                             <select class="form-select" name="content[key_meetings][${meetingIndex}][location]">
                                 <option value="">-- Select --</option>
