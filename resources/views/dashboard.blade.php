@@ -48,27 +48,54 @@
             && $wr
             && ($wr->report !== null && $wr->report->showCta);
         $now = \Carbon\Carbon::now();
+        $previousPeriod = ($currentPeriod ?? null) ? $currentPeriod->getPreviousPeriod() : null;
         $planGraceActive = false;
         $reportGraceActive = false;
         $planGraceEndsAt = null;
         $reportGraceEndsAt = null;
+        $planGracePeriod = null;
+        $reportGracePeriod = null;
+        $resolveGraceWindow = function ($period, string $type) use ($now) {
+            if (! $period || ! $period->isOpen()) {
+                return null;
+            }
 
-        if (($nextPeriod ?? null) && $nextPeriod->plan_deadline) {
-            $defaultPlanCutoff = \Carbon\Carbon::parse($nextPeriod->week_start_date)->subDays(2)->setTime(23, 59, 0);
-            $currentPlanCutoff = $nextPeriod->getPlanDeadlineCutoff();
-            $planGraceActive = $currentPlanCutoff->greaterThan($defaultPlanCutoff)
-                && $now->greaterThan($defaultPlanCutoff)
-                && $now->lessThanOrEqualTo($currentPlanCutoff);
-            $planGraceEndsAt = $currentPlanCutoff;
+            if ($type === 'plan') {
+                $defaultCutoff = \Carbon\Carbon::parse($period->week_start_date)->subDays(2)->setTime(23, 59, 0);
+                $currentCutoff = $period->getPlanDeadlineCutoff();
+            } else {
+                $defaultCutoff = \Carbon\Carbon::parse($period->week_start_date)->addDays(5)->setTime(23, 59, 0);
+                $currentCutoff = $period->getReportDeadlineCutoff();
+            }
+
+            $isGraceActive = $currentCutoff->greaterThan($defaultCutoff)
+                && $now->greaterThan($defaultCutoff)
+                && $now->lessThanOrEqualTo($currentCutoff);
+
+            if (! $isGraceActive) {
+                return null;
+            }
+
+            return [
+                'period' => $period,
+                'ends_at' => $currentCutoff,
+            ];
+        };
+
+        $planGraceCandidate = $resolveGraceWindow($currentPeriod ?? null, 'plan')
+            ?? $resolveGraceWindow($nextPeriod ?? null, 'plan');
+        if ($planGraceCandidate) {
+            $planGraceActive = true;
+            $planGraceEndsAt = $planGraceCandidate['ends_at'];
+            $planGracePeriod = $planGraceCandidate['period'];
         }
 
-        if (($currentPeriod ?? null) && $currentPeriod->report_deadline) {
-            $defaultReportCutoff = \Carbon\Carbon::parse($currentPeriod->week_start_date)->addDays(5)->setTime(23, 59, 0);
-            $currentReportCutoff = $currentPeriod->getReportDeadlineCutoff();
-            $reportGraceActive = $currentReportCutoff->greaterThan($defaultReportCutoff)
-                && $now->greaterThan($defaultReportCutoff)
-                && $now->lessThanOrEqualTo($currentReportCutoff);
-            $reportGraceEndsAt = $currentReportCutoff;
+        $reportGraceCandidate = $resolveGraceWindow($previousPeriod, 'report')
+            ?? $resolveGraceWindow($currentPeriod ?? null, 'report');
+        if ($reportGraceCandidate) {
+            $reportGraceActive = true;
+            $reportGraceEndsAt = $reportGraceCandidate['ends_at'];
+            $reportGracePeriod = $reportGraceCandidate['period'];
         }
         $hasWeeklyGraceWindow = $planGraceActive || $reportGraceActive;
         $focusTaskShowRoute = function ($doc) {
@@ -207,10 +234,22 @@
                             <p class="mb-1 fw-semibold"><i class="ti ti-clock-hour-4 me-1"></i>Grace period is active</p>
                             <ul class="mb-0 ps-3 small">
                                 @if($planGraceActive && $planGraceEndsAt)
-                                    <li>Weekly plan deadline was extended. You can still submit until {{ $planGraceEndsAt->format('M d, Y H:i') }}.</li>
+                                    <li>
+                                        Weekly plan deadline was extended
+                                        @if($planGracePeriod)
+                                            for Week {{ $planGracePeriod->week_number }} of {{ $planGracePeriod->year }}
+                                        @endif.
+                                        You can still submit until {{ $planGraceEndsAt->format('M d, Y H:i') }}.
+                                    </li>
                                 @endif
                                 @if($reportGraceActive && $reportGraceEndsAt)
-                                    <li>Weekly report deadline was extended. You can still submit until {{ $reportGraceEndsAt->format('M d, Y H:i') }}.</li>
+                                    <li>
+                                        Weekly report deadline was extended
+                                        @if($reportGracePeriod)
+                                            for Week {{ $reportGracePeriod->week_number }} of {{ $reportGracePeriod->year }}
+                                        @endif.
+                                        You can still submit until {{ $reportGraceEndsAt->format('M d, Y H:i') }}.
+                                    </li>
                                 @endif
                             </ul>
                         </div>
