@@ -153,6 +153,7 @@
                                                 </td>
                                                 <td>
                                                     @if($planDoc)
+                                                        <div class="fw-semibold">{{ $planDoc->display_title }}</div>
 
                                                         @if($planSharedUsers->isNotEmpty())
                                                             @php
@@ -174,6 +175,7 @@
                                                 </td>
                                                 <td>
                                                     @if($reportDoc)
+                                                        <div class="fw-semibold">{{ $reportDoc->display_title }}</div>
 
                                                         @if($reportSharedUsers->isNotEmpty())
                                                             @php

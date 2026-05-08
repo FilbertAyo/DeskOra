@@ -124,7 +124,7 @@
                                 <select class="form-control form-control-sm" name="work_period_id">
                                     <option value="">Any Week</option>
                                     @foreach($periodOptions as $periodOption)
-                                        <option value="{{ $periodOption->id }}" {{ request('work_period_id') == $periodOption->id ? 'selected' : '' }}>
+                                        <option value="{{ $periodOption->id }}" {{ (($selectedWorkPeriodId ?? request('work_period_id')) == $periodOption->id) ? 'selected' : '' }}>
                                             Week {{ $periodOption->week_number }} • {{ $periodOption->date_range }}
                                         </option>
                                     @endforeach

@@ -6,7 +6,10 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DepositController;
-use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DocumentBudgetReviewController;
+use App\Http\Controllers\DocumentCrudController;
+use App\Http\Controllers\DocumentDashboardController;
+use App\Http\Controllers\DocumentWorkflowController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PettyController;
@@ -47,29 +50,29 @@ Route::middleware('auth')->group(function () {
 
     // Documents routes
     Route::prefix('documents')->name('documents.')->group(function () {
-        Route::get('/', [DocumentController::class, 'index'])->name('index');
-        Route::get('/weekly-plans', [DocumentController::class, 'weeklyPlans'])->name('weekly-plans');
-        Route::get('/weekly-reports', [DocumentController::class, 'weeklyReports'])->name('weekly-reports');
-        Route::get('/weekly-budget-review', [DocumentController::class, 'weeklyBudgetReviewPanel'])->name('weekly-budget-review');
-        Route::post('/weekly-budget-review/add-midweek-budget', [DocumentController::class, 'addMidWeekBudgetEntry'])->name('weekly-budget-review.add-midweek-budget');
-        Route::get('/weekly-budget-review/export/pdf', [DocumentController::class, 'exportWeeklyBudgetReviewPdf'])->name('weekly-budget-review.export.pdf');
-        Route::get('/weekly-budget-review/export/excel', [DocumentController::class, 'exportWeeklyBudgetReviewExcel'])->name('weekly-budget-review.export.excel');
+        Route::get('/', [DocumentCrudController::class, 'index'])->name('index');
+        Route::get('/weekly-plans', [DocumentDashboardController::class, 'weeklyPlans'])->name('weekly-plans');
+        Route::get('/weekly-reports', [DocumentDashboardController::class, 'weeklyReports'])->name('weekly-reports');
+        Route::get('/weekly-budget-review', [DocumentBudgetReviewController::class, 'weeklyBudgetReviewPanel'])->name('weekly-budget-review');
+        Route::post('/weekly-budget-review/add-midweek-budget', [DocumentBudgetReviewController::class, 'addMidWeekBudgetEntry'])->name('weekly-budget-review.add-midweek-budget');
+        Route::get('/weekly-budget-review/export/pdf', [DocumentBudgetReviewController::class, 'exportWeeklyBudgetReviewPdf'])->name('weekly-budget-review.export.pdf');
+        Route::get('/weekly-budget-review/export/excel', [DocumentBudgetReviewController::class, 'exportWeeklyBudgetReviewExcel'])->name('weekly-budget-review.export.excel');
         Route::get('/weekly-objective-matrix/download', [WeeklyObjectiveMatrixController::class, 'download'])->name('weekly-objective-matrix.download');
-        Route::get('/plan-target', [DocumentController::class, 'getPlanTarget'])->name('plan-target');
-        Route::get('/create', [DocumentController::class, 'create'])->name('create');
-        Route::post('/', [DocumentController::class, 'store'])->name('store');
-        Route::post('/{document}/weekly-budget-review', [DocumentController::class, 'processWeeklyBudgetReview'])->name('process-weekly-budget-review');
+        Route::get('/plan-target', [DocumentDashboardController::class, 'getPlanTarget'])->name('plan-target');
+        Route::get('/create', [DocumentCrudController::class, 'create'])->name('create');
+        Route::post('/', [DocumentCrudController::class, 'store'])->name('store');
+        Route::post('/{document}/weekly-budget-review', [DocumentBudgetReviewController::class, 'processWeeklyBudgetReview'])->name('process-weekly-budget-review');
 
         // Reviewer routes (must be registered before /{document} so "reviewer" is not captured as a document id)
-        Route::get('/reviewer/dashboard', [DocumentController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
-        Route::get('/reviewer/{document}', [DocumentController::class, 'reviewerShow'])->name('reviewer-show');
+        Route::get('/reviewer/dashboard', [DocumentDashboardController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
+        Route::get('/reviewer/{document}', [DocumentWorkflowController::class, 'reviewerShow'])->name('reviewer-show');
 
-        Route::get('/{document}', [DocumentController::class, 'show'])->name('show');
-        Route::get('/{document}/edit', [DocumentController::class, 'edit'])->name('edit');
-        Route::put('/{document}', [DocumentController::class, 'update'])->name('update');
-        Route::delete('/{document}', [DocumentController::class, 'destroy'])->name('destroy');
-        Route::post('/{document}/submit', [DocumentController::class, 'submit'])->name('submit');
-        Route::post('/{document}/reject', [DocumentController::class, 'reject'])->name('reject');
+        Route::get('/{document}', [DocumentCrudController::class, 'show'])->name('show');
+        Route::get('/{document}/edit', [DocumentCrudController::class, 'edit'])->name('edit');
+        Route::put('/{document}', [DocumentCrudController::class, 'update'])->name('update');
+        Route::delete('/{document}', [DocumentCrudController::class, 'destroy'])->name('destroy');
+        Route::post('/{document}/submit', [DocumentWorkflowController::class, 'submit'])->name('submit');
+        Route::post('/{document}/reject', [DocumentWorkflowController::class, 'reject'])->name('reject');
     });
 
     // Action Logs routes (restricted to minutes_preparer and admin - authorization handled in controller)

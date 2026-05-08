@@ -28,6 +28,14 @@
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
                                     $canProcessWeeklyBudgets = auth()->user()?->can('process weekly budgets') ?? false;
                                     $targetStatusValue = old('target_accomplished_status');
+                                    if ((! is_string($targetStatusValue) || trim($targetStatusValue) === '') && old('target_accomplished') !== null) {
+                                        $legacyTargetAccomplished = trim((string) old('target_accomplished'));
+                                        if ($legacyTargetAccomplished === '1') {
+                                            $targetStatusValue = 'completed';
+                                        } elseif ($legacyTargetAccomplished === '0') {
+                                            $targetStatusValue = 'not_completed';
+                                        }
+                                    }
                                     if (! is_string($targetStatusValue) || trim($targetStatusValue) === '') {
                                         $targetStatusValue = is_array($content) ? trim((string)($content['target_accomplished_status'] ?? '')) : '';
                                     }
@@ -40,6 +48,15 @@
                                             $targetStatusValue = '';
                                         }
                                     }
+                                    $storedTargetStatus = is_array($content) ? trim((string) ($content['target_accomplished_status'] ?? '')) : '';
+                                    $preferLegacyBooleanOption = $storedTargetStatus === ''
+                                        && old('target_accomplished_status') === null
+                                        && ($document->target_accomplished === true
+                                            || $document->target_accomplished === false
+                                            || $document->target_accomplished === 1
+                                            || $document->target_accomplished === 0
+                                            || $document->target_accomplished === '1'
+                                            || $document->target_accomplished === '0');
                                         @endphp
 
                                 <!-- Main Target Accomplishment -->
@@ -74,9 +91,11 @@
                                                 id="target_accomplished_status"
                                                 required>
                                                 <option value="">-- Select Status --</option>
-                                                <option value="completed" {{ $targetStatusValue === 'completed' ? 'selected' : '' }}>Completed</option>
+                                                <option value="1" {{ $preferLegacyBooleanOption && $targetStatusValue === 'completed' ? 'selected' : '' }}>Completed</option>
+                                                <option value="0" {{ $preferLegacyBooleanOption && $targetStatusValue === 'not_completed' ? 'selected' : '' }}>Not completed</option>
+                                                <option value="completed" {{ (! $preferLegacyBooleanOption) && $targetStatusValue === 'completed' ? 'selected' : '' }}>Completed</option>
                                                 <option value="partially_completed" {{ $targetStatusValue === 'partially_completed' ? 'selected' : '' }}>Partially completed</option>
-                                                <option value="not_completed" {{ $targetStatusValue === 'not_completed' ? 'selected' : '' }}>Not completed</option>
+                                                <option value="not_completed" {{ (! $preferLegacyBooleanOption) && $targetStatusValue === 'not_completed' ? 'selected' : '' }}>Not completed</option>
                                             </select>
                                             @error('target_accomplished_status')
                                                 <div class="invalid-feedback d-block">{{ $message }}</div>

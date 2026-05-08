@@ -6,6 +6,8 @@ use App\Exports\WeeklyBudgetReviewExport;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\Documents\DocumentListingService;
+use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\MonthlyReportYearPlanActivities;
 use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WeeklySubmissionReminderService;
@@ -29,6 +31,8 @@ class DocumentController extends Controller
         private readonly WeeklySubmissionReminderService $weeklySubmissionReminderService,
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
         private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
+        private readonly DocumentListingService $documentListingService,
+        private readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
     ) {}
 
     /**
@@ -83,6 +87,20 @@ class DocumentController extends Controller
 
         if ($request->filled('month') && $request->input('type') === Document::TYPE_MONTHLY_REPORT) {
             $query->where('month', (int) $request->input('month'));
+        }
+
+        // Default to the latest 2 work periods unless user explicitly filters by a specific period.
+        if (! $periodId) {
+            $latestWorkPeriodIds = WorkPeriod::query()
+                ->orderBy('year', 'desc')
+                ->orderBy('week_number', 'desc')
+                ->limit(2)
+                ->pluck('id')
+                ->all();
+
+            if (! empty($latestWorkPeriodIds)) {
+                $query->whereIn('period_id', $latestWorkPeriodIds);
+            }
         }
 
         // This page focuses on weekly plan/report rows.
@@ -164,59 +182,7 @@ class DocumentController extends Controller
      */
     private function buildWeeklyRowsForIndex(Collection $weeklyDocs): Collection
     {
-        $pickPreferred = function (Collection $rows, string $type): ?Document {
-            $typedRows = $rows
-                ->where('type', $type)
-                ->sortByDesc(fn (Document $row) => $row->updated_at?->timestamp ?? 0)
-                ->values();
-
-            /** @var Document|null $submitted */
-            $submitted = $typedRows->firstWhere('state', Document::STATE_SUBMITTED);
-
-            return $submitted ?? $typedRows->first();
-        };
-
-        return $weeklyDocs
-            ->groupBy(function (Document $doc) use ($weeklyDocs) {
-                $effectiveSharedUsers = $this->resolveWeeklyDocSharedUsersForIndex($doc, $weeklyDocs);
-                $participantIds = collect([$doc->user_id])
-                    ->merge($effectiveSharedUsers->pluck('id'))
-                    ->filter()
-                    ->map(fn ($id) => (string) $id)
-                    ->unique()
-                    ->sort()
-                    ->values();
-
-                return ($doc->period_id ?? 'none').'_'.$participantIds->implode('_');
-            })
-            ->map(function (Collection $items) use ($weeklyDocs, $pickPreferred) {
-                $plan = $pickPreferred($items, Document::TYPE_WEEKLY_PLAN);
-                $report = $pickPreferred($items, Document::TYPE_WEEKLY_REPORT);
-                $participants = $items
-                    ->flatMap(fn (Document $row) => collect([$row->user])->merge($this->resolveWeeklyDocSharedUsersForIndex($row, $weeklyDocs)))
-                    ->filter()
-                    ->unique('id')
-                    ->values();
-
-                return [
-                    'plan' => $plan,
-                    'report' => $report,
-                    'period' => $plan?->period ?? $report?->period,
-                    'participants' => $participants,
-                    'plan_shared_users' => $this->explicitWeeklyDocSharedUsersForIndex($plan),
-                    'report_shared_users' => $this->explicitWeeklyDocSharedUsersForIndex($report),
-                    'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
-                ];
-            })
-            ->sortByDesc(function (array $row) {
-                $period = $row['period'] ?? null;
-                $year = $period ? (int) $period->year : 0;
-                $week = $period ? (int) $period->week_number : 0;
-                $updatedAtTimestamp = data_get($row, 'updated_at.timestamp', 0);
-
-                return sprintf('%04d%02d%010d', $year, $week, (int) $updatedAtTimestamp);
-            })
-            ->values();
+        return $this->documentListingService->buildWeeklyRowsForIndex($weeklyDocs);
     }
 
     /**
@@ -225,47 +191,7 @@ class DocumentController extends Controller
      */
     private function resolveWeeklyDocSharedUsersForIndex(?Document $doc, Collection $weeklyDocs): Collection
     {
-        if (! $doc) {
-            return collect();
-        }
-
-        $directSharedUsers = collect($doc->sharedUsers)
-            ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
-            ->unique('id')
-            ->values();
-
-        if ($doc->type !== Document::TYPE_WEEKLY_REPORT
-            || $directSharedUsers->isNotEmpty()
-            || ! $doc->period_id) {
-            return $directSharedUsers;
-        }
-
-        /** @var Document|null $fallbackPlan */
-        $fallbackPlan = $weeklyDocs
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->first(function (Document $plan) use ($doc) {
-                if ((string) $plan->period_id !== (string) $doc->period_id) {
-                    return false;
-                }
-
-                if ((string) $plan->user_id === (string) $doc->user_id) {
-                    return true;
-                }
-
-                return $plan->sharedUsers->contains(function ($sharedUser) use ($doc) {
-                    return (string) $sharedUser->id === (string) $doc->user_id;
-                });
-            });
-
-        if (! $fallbackPlan) {
-            return $directSharedUsers;
-        }
-
-        return $fallbackPlan->sharedUsers
-            ->push($fallbackPlan->user)
-            ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
-            ->unique('id')
-            ->values();
+        return $this->documentListingService->resolveWeeklyDocSharedUsersForIndex($doc, $weeklyDocs);
     }
 
     /**
@@ -273,14 +199,7 @@ class DocumentController extends Controller
      */
     private function explicitWeeklyDocSharedUsersForIndex(?Document $doc): Collection
     {
-        if (! $doc) {
-            return collect();
-        }
-
-        return collect($doc->sharedUsers)
-            ->filter(fn ($member) => $member && (string) $member->id !== (string) $doc->user_id)
-            ->unique('id')
-            ->values();
+        return $this->documentListingService->explicitWeeklyDocSharedUsersForIndex($doc);
     }
 
     /**
@@ -1442,6 +1361,12 @@ class DocumentController extends Controller
         $baseQuery = Document::with(['user'])
             ->submitted();
 
+        $currentWorkPeriodId = WorkPeriod::getCurrent()?->id;
+        $selectedWorkPeriodId = $request->input('work_period_id');
+        if (($selectedWorkPeriodId === null || $selectedWorkPeriodId === '') && $currentWorkPeriodId) {
+            $selectedWorkPeriodId = (string) $currentWorkPeriodId;
+        }
+
         // Filter by user if provided
         if ($request->has('user_id') && $request->user_id) {
             $baseQuery->forUser($request->user_id);
@@ -1469,8 +1394,8 @@ class DocumentController extends Controller
             }
         }
 
-        if ($request->has('work_period_id') && $request->work_period_id) {
-            $baseQuery->where('period_id', $request->work_period_id);
+        if ($selectedWorkPeriodId) {
+            $baseQuery->where('period_id', $selectedWorkPeriodId);
         }
 
         if ($request->has('year') && $request->year) {
@@ -1535,6 +1460,7 @@ class DocumentController extends Controller
             'stats',
             'usersWithDocuments',
             'selectedType',
+            'selectedWorkPeriodId',
             'periodOptions',
             'years'
         ));
@@ -2011,99 +1937,22 @@ class DocumentController extends Controller
 
     private function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
     {
-        $hasExplicitFilter = $request->filled('period_id') || $request->filled('year') || $request->filled('user_id') || $request->filled('status');
-
-        if ($hasExplicitFilter) {
-            return null;
-        }
-
-        return $this->workPeriodService->periodForWeeklyPlanSubmission();
+        return $this->weeklyBudgetReviewService->resolveWeeklyBudgetReviewDefaultPeriod($request);
     }
 
     private function buildWeeklyBudgetReviewQuery(Request $request, ?WorkPeriod $defaultPeriod, ?string $statusFilter)
     {
-        $query = Document::query()
-            ->with(['user.department', 'period', 'budgetReviewedBy'])
-            ->weeklyPlans()
-            ->submitted()
-            ->where(function ($budgetQuery) {
-                $budgetQuery
-                    ->whereNotNull('budget_review_status')
-                    ->orWhere('content', 'like', '%"budget"%');
-            });
-
-        if ($request->filled('user_id')) {
-            $query->forUser($request->string('user_id')->toString());
-        }
-
-        if ($request->filled('period_id')) {
-            $query->forPeriod($request->string('period_id')->toString());
-        } elseif ($defaultPeriod) {
-            $query->forPeriod($defaultPeriod->id);
-        }
-
-        if ($request->filled('year')) {
-            $year = (int) $request->input('year');
-            $query->whereHas('period', function ($periodQuery) use ($year) {
-                $periodQuery->where('year', $year);
-            });
-        }
-
-        if ($statusFilter === Document::BUDGET_REVIEW_PENDING) {
-            $query->where(function ($statusQuery) {
-                $statusQuery
-                    ->whereNull('budget_review_status')
-                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
-            });
-        } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED], true)) {
-            $query->where('budget_review_status', $statusFilter);
-        }
-
-        return $query;
+        return $this->weeklyBudgetReviewService->buildWeeklyBudgetReviewQuery($request, $defaultPeriod, $statusFilter);
     }
 
     private function weeklyBudgetReviewFilterSummary(Request $request, ?WorkPeriod $defaultPeriod, ?string $statusFilter): array
     {
-        $resolvedPeriodId = $request->filled('period_id')
-            ? (string) $request->string('period_id')
-            : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
-
-        $periodLabel = 'All Weeks';
-        $periodDateRange = 'All Work Periods';
-        if ($resolvedPeriodId) {
-            $period = WorkPeriod::query()->find($resolvedPeriodId);
-            if ($period) {
-                $periodLabel = sprintf('Week %s (%s)', (string) $period->week_number, (string) $period->year);
-                $start = $period->week_start_date ? $period->week_start_date->format('Y-m-d') : null;
-                $end = $period->week_end_date ? $period->week_end_date->format('Y-m-d') : null;
-                $periodDateRange = ($start && $end) ? "{$start} to {$end}" : ($period->date_range ?? 'Selected Work Period');
-            }
-        }
-
-        $userLabel = 'All Staff';
-        if ($request->filled('user_id')) {
-            $selectedUser = User::query()->find((string) $request->string('user_id'));
-            if ($selectedUser) {
-                $userLabel = $selectedUser->name;
-            }
-        }
-
-        return [
-            'period' => $periodLabel,
-            'work_period_range' => $periodDateRange,
-            'year' => $request->filled('year') ? (string) $request->input('year') : 'All Years',
-            'status' => $statusFilter ? ucfirst($statusFilter) : 'All Statuses',
-            'staff' => $userLabel,
-        ];
+        return $this->weeklyBudgetReviewService->weeklyBudgetReviewFilterSummary($request, $defaultPeriod, $statusFilter);
     }
 
     private function weeklyBudgetReviewExportFilename(string $extension, array $filterSummary): string
     {
-        $periodSlug = Str::slug((string) ($filterSummary['period'] ?? 'all-weeks'));
-        $statusSlug = Str::slug((string) ($filterSummary['status'] ?? 'all-statuses'));
-        $dateStamp = now()->format('Ymd_His');
-
-        return "weekly_budget_review_{$periodSlug}_{$statusSlug}_{$dateStamp}.{$extension}";
+        return $this->weeklyBudgetReviewService->weeklyBudgetReviewExportFilename($extension, $filterSummary);
     }
 
     /**
@@ -2113,68 +1962,7 @@ class DocumentController extends Controller
      */
     private function groupBudgetDocumentsByDepartment(\Illuminate\Support\Collection $documents): array
     {
-        $grouped = [];
-
-        foreach ($documents as $document) {
-            $departmentName = $document->user?->department?->name ?? 'No Department';
-            $departmentId = (string) ($document->user?->department_id ?? 'none');
-
-            if (! isset($grouped[$departmentId])) {
-                $grouped[$departmentId] = [
-                    'department_name' => $departmentName,
-                    'department_id' => $departmentId,
-                    'requested_total' => 0.0,
-                    'provided_total' => 0.0,
-                    'staff' => [],
-                ];
-            }
-
-            $userId = (string) $document->user_id;
-            if (! isset($grouped[$departmentId]['staff'][$userId])) {
-                $grouped[$departmentId]['staff'][$userId] = [
-                    'user' => $document->user,
-                    'document' => $document,
-                    'items' => [],
-                    'requested_total' => 0.0,
-                    'provided_total' => 0.0,
-                    'summary' => $document->budgetReviewSummary(),
-                ];
-            }
-
-            $budgetItems = $document->budgetItems();
-            $reviewsByUid = $document->budgetReviewItemsByUid();
-
-            foreach ($budgetItems as $item) {
-                $uid = $item['budget_uid'];
-                $review = $reviewsByUid[$uid] ?? null;
-                $amountNumeric = (float) ($item['amount_numeric'] ?? 0);
-                $providedAmount = (float) ($review['provided_amount'] ?? 0);
-
-                $grouped[$departmentId]['staff'][$userId]['items'][] = [
-                    'budget_uid' => $uid,
-                    'item' => $item['item'],
-                    'description_purpose' => $item['description_purpose'],
-                    'amount' => $item['amount'],
-                    'amount_numeric' => $amountNumeric,
-                    'decision' => $review['decision'] ?? Document::BUDGET_REVIEW_PENDING,
-                    'provided_amount' => $providedAmount,
-                    'note' => $review['note'] ?? null,
-                    'reviewed_by' => $review['reviewed_by'] ?? null,
-                    'reviewed_at' => $review['reviewed_at'] ?? null,
-                    'document_id' => $document->id,
-                ];
-
-                $grouped[$departmentId]['staff'][$userId]['requested_total'] += $amountNumeric;
-                $grouped[$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
-                $grouped[$departmentId]['requested_total'] += $amountNumeric;
-                $grouped[$departmentId]['provided_total'] += $providedAmount;
-            }
-        }
-
-        // Sort departments alphabetically
-        uasort($grouped, fn ($a, $b) => strcasecmp($a['department_name'], $b['department_name']));
-
-        return $grouped;
+        return $this->weeklyBudgetReviewService->groupBudgetDocumentsByDepartment($documents);
     }
 
     /**
@@ -2182,32 +1970,7 @@ class DocumentController extends Controller
      */
     private function computeBudgetStats(\Illuminate\Support\Collection $documents): array
     {
-        $totalItems = 0;
-        $pendingItems = 0;
-        $approvedItems = 0;
-        $rejectedItems = 0;
-        $requestedTotal = 0.0;
-        $providedTotal = 0.0;
-
-        foreach ($documents as $document) {
-            $summary = $document->budgetReviewSummary();
-            $totalItems += $summary['items_total'];
-            $pendingItems += $summary['pending'];
-            $approvedItems += $summary['approved'];
-            $rejectedItems += $summary['rejected'];
-            $requestedTotal += $summary['requested_total'];
-            $providedTotal += $summary['provided_total'];
-        }
-
-        return [
-            'total' => $documents->count(),
-            'total_items' => $totalItems,
-            'pending' => $pendingItems,
-            'approved' => $approvedItems,
-            'rejected' => $rejectedItems,
-            'requested_total' => $requestedTotal,
-            'provided_total' => $providedTotal,
-        ];
+        return $this->weeklyBudgetReviewService->computeBudgetStats($documents);
     }
 
     /**
@@ -2390,19 +2153,7 @@ class DocumentController extends Controller
      */
     private function getReturnedDocumentMapForIds(array $documentIds): array
     {
-        if (empty($documentIds)) {
-            return [];
-        }
-
-        return Document::query()
-            ->whereIn('id', $documentIds)
-            ->whereNotNull('review_rejection_reason')
-            ->where('review_rejection_reason', '!=', '')
-            ->get(['id', 'review_rejection_reason'])
-            ->mapWithKeys(function (Document $doc) {
-                return [(string) $doc->id => trim((string) $doc->review_rejection_reason)];
-            })
-            ->all();
+        return $this->documentListingService->getReturnedDocumentMapForIds($documentIds);
     }
 
     private function budgetReviewDefaultsForWeeklyPlan(?array $content, ?array $existingReviewItems = null): array
@@ -2682,14 +2433,7 @@ class DocumentController extends Controller
      */
     private function applyWeeklyListSortForUser($query, User $user): void
     {
-        if ($user->hasPermissionTo('view all documents')) {
-            $query->orderByDesc('documents.updated_at');
-
-            return;
-        }
-
-        $query->orderByRaw('CASE WHEN documents.user_id = ? THEN 1 ELSE 0 END', [$user->id])
-            ->orderByDesc('documents.updated_at');
+        $this->documentListingService->applyWeeklyListSortForUser($query, $user);
     }
 
     /**

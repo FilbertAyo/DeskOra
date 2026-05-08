@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PeriodStatsController;
-use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DocumentDashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->prefix('period-stats')->group(function () {
@@ -11,5 +11,5 @@ Route::middleware('auth:sanctum')->prefix('period-stats')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->prefix('documents')->group(function () {
-    Route::get('/plan-target', [DocumentController::class, 'getPlanTarget']);
+    Route::get('/plan-target', [DocumentDashboardController::class, 'getPlanTarget']);
 });
