@@ -112,6 +112,12 @@
 
             return route('documents.edit', $doc->id);
         };
+        $planCoverageAlert = $yearPlanMonthCoverageAlert ?? null;
+        $showPlanCoverageAlert = (bool) ($planCoverageAlert['show'] ?? false);
+        $planCoverageMissingCount = (int) ($planCoverageAlert['missingMonthCount'] ?? 0);
+        $planCoverageTotalCount = (int) ($planCoverageAlert['totalActivities'] ?? 0);
+        $planCoverageYear = (int) ($planCoverageAlert['year'] ?? now()->year);
+        $planCoverageActionUrl = $planCoverageAlert['actionUrl'] ?? null;
     @endphp
 
     @if($showWeeklyToast)
@@ -140,6 +146,29 @@
     </div>
 
     <div class="row">
+        @if($showPlanCoverageAlert)
+            <div class="col-12 mb-3">
+                <div class="alert alert-danger border shadow-sm d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-0">
+                    <div>
+                        <h6 class="alert-heading mb-1">
+                            <i class="ti ti-alert-triangle me-1"></i>Year Plan Update Required
+                        </h6>
+                        <p class="mb-1">
+                            Some {{ $planCoverageYear }} sub-department activities still have no planned month selected.
+                        </p>
+                        <p class="mb-0 small">
+                            {{ number_format($planCoverageMissingCount) }} of {{ number_format($planCoverageTotalCount) }} scoped activities need at least one month (Jan-Dec) checked.
+                        </p>
+                    </div>
+                    @if($planCoverageActionUrl)
+                        <a href="{{ $planCoverageActionUrl }}" class="btn btn-danger fw-semibold text-nowrap">
+                            <i class="ti ti-calendar-edit me-1"></i>Update Year Plan Months
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <div class="col-12 col-lg-8 col-md-8 mb-3">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">

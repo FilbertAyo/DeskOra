@@ -8,6 +8,8 @@ use App\Models\Request as FinanceRequest;
 use App\Models\User;
 use App\Models\WeeklyActivityAssignment;
 use App\Models\WorkPeriod;
+use App\Models\YearPlan;
+use App\Models\YearPlanActivity;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -325,6 +327,42 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
+        $currentPlanYear = (int) now()->year;
+        $currentYearPlan = YearPlan::query()
+            ->where('year', $currentPlanYear)
+            ->first();
+        $yearPlanMonthCoverageAlert = [
+            'show' => false,
+            'year' => $currentPlanYear,
+            'totalActivities' => 0,
+            'missingMonthCount' => 0,
+            'actionUrl' => null,
+        ];
+
+        if ($currentYearPlan) {
+            $scopeDepartmentIds = $user->departmentScopeIds();
+            $scopedYearPlanActivities = YearPlanActivity::query()
+                ->where('year_plan_id', $currentYearPlan->id)
+                ->whereIn('department_id', $scopeDepartmentIds);
+
+            $totalScopedActivities = (clone $scopedYearPlanActivities)->count();
+            $missingPlannedMonthCount = (clone $scopedYearPlanActivities)
+                ->where(function ($query) {
+                    $query
+                        ->whereNull('planned_months')
+                        ->orWhereJsonLength('planned_months', '=', 0);
+                })
+                ->count();
+
+            $yearPlanMonthCoverageAlert = [
+                'show' => $totalScopedActivities > 0 && $missingPlannedMonthCount > 0,
+                'year' => $currentYearPlan->year,
+                'totalActivities' => $totalScopedActivities,
+                'missingMonthCount' => $missingPlannedMonthCount,
+                'actionUrl' => route('year-plan.show', $currentYearPlan->year),
+            ];
+        }
+
         return view('dashboard', compact(
             'userNo',
             'pettyNo',
@@ -357,7 +395,8 @@ class DashboardController extends Controller
             'canSeeWeeklyDashboard',
             'weeklyDashboardData',
             'actionLogProgress',
-            'assignedWeeklyActivities'
+            'assignedWeeklyActivities',
+            'yearPlanMonthCoverageAlert'
         ));
     }
 
