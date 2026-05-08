@@ -154,10 +154,10 @@
                             <i class="ti ti-alert-triangle me-1"></i>Year Plan Update Required
                         </h6>
                         <p class="mb-1">
-                            Some {{ $planCoverageYear }} sub-department activities still have no planned month selected.
+                            Update your sub-department tasks for {{ $planCoverageYear }}. Some tasks still have no planned month selected.
                         </p>
                         <p class="mb-0 small">
-                            {{ number_format($planCoverageMissingCount) }} of {{ number_format($planCoverageTotalCount) }} scoped activities need at least one month (Jan-Dec) checked.
+                            {{ number_format($planCoverageMissingCount) }} of {{ number_format($planCoverageTotalCount) }} tasks in your assigned sub-department(s) need at least one month (Jan-Dec) checked.
                         </p>
                     </div>
                     @if($planCoverageActionUrl)

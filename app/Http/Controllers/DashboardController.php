@@ -340,7 +340,19 @@ class DashboardController extends Controller
         ];
 
         if ($currentYearPlan) {
-            $scopeDepartmentIds = $user->departmentScopeIds();
+            $userSubDepartmentIds = $user->subDepartments()
+                ->pluck('departments.id')
+                ->filter()
+                ->values()
+                ->all();
+
+            if (empty($userSubDepartmentIds) && $user->department && $user->department->parent_id !== null) {
+                $userSubDepartmentIds = [(string) $user->department_id];
+            }
+
+            $scopeDepartmentIds = ! empty($userSubDepartmentIds)
+                ? $userSubDepartmentIds
+                : $user->departmentScopeIds();
             $scopedYearPlanActivities = YearPlanActivity::query()
                 ->where('year_plan_id', $currentYearPlan->id)
                 ->whereIn('department_id', $scopeDepartmentIds);
