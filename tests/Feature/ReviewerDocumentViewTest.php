@@ -134,4 +134,98 @@ class ReviewerDocumentViewTest extends TestCase
             ->get(route('documents.reviewer-show', $plan->id))
             ->assertForbidden();
     }
+
+    public function test_reviewer_dashboard_only_includes_documents_from_two_latest_periods(): void
+    {
+        $week14 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 14,
+            'week_start_date' => '2026-03-31',
+            'week_end_date' => '2026-04-06',
+            'plan_deadline' => '2026-04-03',
+            'report_deadline' => '2026-04-04',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $week15 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 15,
+            'week_start_date' => '2026-04-07',
+            'week_end_date' => '2026-04-13',
+            'plan_deadline' => '2026-04-11',
+            'report_deadline' => '2026-04-12',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $week16 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-14',
+            'week_end_date' => '2026-04-20',
+            'plan_deadline' => '2026-04-18',
+            'report_deadline' => '2026-04-19',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'Dept', 'status' => 'active']);
+        $staff = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $staff->givePermissionTo(['create weekly plan', 'create weekly report']);
+
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $week14->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Older week fourteen report',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => null,
+            'content' => ['summary' => 'Old'],
+        ]);
+
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $week15->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Middle week fifteen report',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => null,
+            'content' => ['summary' => 'Mid'],
+        ]);
+
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $week16->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Latest week sixteen report',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => null,
+            'content' => ['summary' => 'New'],
+        ]);
+
+        $reviewer = User::factory()->create(['status' => 'active']);
+        $reviewer->givePermissionTo('view all documents');
+
+        $this->actingAs($reviewer)->get(route('documents.reviewer-dashboard'))->assertOk()
+            ->assertSee('Latest week sixteen report', false)
+            ->assertDontSee('Older week fourteen report', false)
+            ->assertDontSee('Middle week fifteen report', false);
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.reviewer-dashboard', ['work_period_id' => $week15->id]))
+            ->assertOk()
+            ->assertSee('Middle week fifteen report', false)
+            ->assertDontSee('Older week fourteen report', false);
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.reviewer-dashboard', [
+                'work_period_id' => $week14->id,
+            ]))
+            ->assertOk()
+            ->assertDontSee('Older week fourteen report', false);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 }

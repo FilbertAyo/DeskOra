@@ -71,7 +71,7 @@
                     </a>
                 </li>
                 @php
-                    $canReviewSubmissions = Auth::user()->hasPermissionTo('view all documents') || Auth::user()->hasPermissionTo('approve documents');
+                    $canReviewSubmissions = Auth::user()->hasPermissionTo('approve documents');
                     $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');
                 @endphp
                 @if($canReviewSubmissions || $canWeeklyBudgetReview)

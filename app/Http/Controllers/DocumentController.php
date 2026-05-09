@@ -1414,10 +1414,31 @@ class DocumentController extends Controller
         $baseQuery = Document::with(['user'])
             ->submitted();
 
-        $currentWorkPeriodId = WorkPeriod::getCurrent()?->id;
+        $latestPeriods = WorkPeriod::query()
+            ->orderBy('year', 'desc')
+            ->orderBy('week_number', 'desc')
+            ->limit(2)
+            ->get();
+
+        $latestPeriodIds = $latestPeriods->pluck('id')->map(fn ($id): string => (string) $id)->all();
+
+        if ($latestPeriodIds !== []) {
+            $baseQuery->whereIn('period_id', $latestPeriodIds);
+        }
+
         $selectedWorkPeriodId = $request->input('work_period_id');
-        if (($selectedWorkPeriodId === null || $selectedWorkPeriodId === '') && $currentWorkPeriodId) {
-            $selectedWorkPeriodId = (string) $currentWorkPeriodId;
+        if (($selectedWorkPeriodId !== null && $selectedWorkPeriodId !== '')
+            && ! in_array((string) $selectedWorkPeriodId, $latestPeriodIds, true)) {
+            $selectedWorkPeriodId = '';
+        }
+
+        $currentWorkPeriodId = WorkPeriod::getCurrent()?->id;
+        if (($selectedWorkPeriodId === null || $selectedWorkPeriodId === '') && $latestPeriodIds !== []) {
+            if ($currentWorkPeriodId && in_array((string) $currentWorkPeriodId, $latestPeriodIds, true)) {
+                $selectedWorkPeriodId = (string) $currentWorkPeriodId;
+            } else {
+                $selectedWorkPeriodId = (string) $latestPeriods->first()->id;
+            }
         }
 
         // Filter by user if provided
@@ -1496,14 +1517,14 @@ class DocumentController extends Controller
             'action_logs' => (clone $statsQuery)->actionLogs()->count(),
         ];
 
-        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) {
+        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) use ($latestPeriodIds) {
             $q->submitted();
+            if ($latestPeriodIds !== []) {
+                $q->whereIn('period_id', $latestPeriodIds);
+            }
         })->orderBy('name')->get();
 
-        $periodOptions = WorkPeriod::orderBy('year', 'desc')
-            ->orderBy('week_number', 'desc')
-            ->take(20)
-            ->get();
+        $periodOptions = $latestPeriods;
 
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
@@ -1877,7 +1898,7 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasPermissionTo('view weekly budgets')) {
+        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -1942,7 +1963,7 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasPermissionTo('view weekly budgets')) {
+        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -1970,7 +1991,7 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasPermissionTo('view weekly budgets')) {
+        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
             abort(403, 'Unauthorized access.');
         }
 
