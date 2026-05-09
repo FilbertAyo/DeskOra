@@ -117,7 +117,8 @@
             "currentPeriodId": {!! json_encode(isset($currentPeriod) ? $currentPeriod->id : null) !!},
             "nextPeriodId": {!! json_encode(isset($nextPeriod) ? $nextPeriod->id : null) !!},
             "relatedPlanMainTarget": {!! json_encode(isset($relatedPlan) && $relatedPlan ? $relatedPlan->main_target : null) !!},
-            "canProcessWeeklyBudgets": {!! json_encode(auth()->user()?->can('process weekly budgets') ?? false) !!}
+            "canProcessWeeklyBudgets": {!! json_encode(auth()->user()?->can('process weekly budgets') ?? false) !!},
+            "currentUserId": {!! json_encode((string) (auth()->id() ?? '')) !!}
         }
     </script>
     <script>
@@ -148,6 +149,7 @@
             const nextPeriodId = formData.nextPeriodId;
             const relatedPlanMainTarget = formData.relatedPlanMainTarget;
             const canProcessWeeklyBudgets = formData.canProcessWeeklyBudgets;
+            const currentUserId = formData.currentUserId;
 
             // Show/hide work period dropdown based on document type
             function toggleWorkPeriod() {
@@ -276,6 +278,7 @@
             const reportActivityProgressBody = document.getElementById('reportActivityProgressBody');
             const addReportMeetingRowBtn = document.getElementById('addReportMeetingRowBtn');
             const reportMeetingsBody = document.getElementById('reportMeetingsBody');
+            let reportMeetingIndex = reportMeetingsBody ? reportMeetingsBody.querySelectorAll('tr').length : 0;
             const addAchievementRowBtn = document.getElementById('addAchievementRowBtn');
             const achievementsBody = document.getElementById('achievementsBody');
             const addChallengeRowBtn = document.getElementById('addChallengeRowBtn');
@@ -285,7 +288,8 @@
                 : null;
             window.__reportActivityOptionsHtml = reportActivityOptionsSource ? reportActivityOptionsSource.innerHTML : '<option value="">-- Select Activity --</option>';
             if (!window.__teamUsersOptionsHtml) {
-                const teamSelect = document.querySelector('select[name^="content[planned_activities]"][name$="[team_member_ids][]"]');
+                const teamSelect = document.querySelector('select[name^="content[planned_activities]"][name$="[team_member_ids][]"]')
+                    || document.querySelector('select[name^="content[key_meetings]"][name$="[participant_user_ids][]"]');
                 window.__teamUsersOptionsHtml = teamSelect ? teamSelect.innerHTML : '';
             }
 
@@ -537,41 +541,105 @@
                 updateAchievementRowNumbers();
             }
 
-            if (addReportMeetingRowBtn && reportMeetingsBody) {
-                let reportMeetingIndex = reportMeetingsBody.querySelectorAll('tr').length;
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
 
+            function buildReportMeetingRowHtml(meetingRow, idx) {
+                const row = meetingRow || {};
+                const readonlyRaw = row.is_readonly_for_current_user;
+                const isReadonly = readonlyRaw === true || readonlyRaw === 1 || String(readonlyRaw) === '1' || String(readonlyRaw).toLowerCase() === 'true';
+                const selectedParticipants = Array.isArray(row.participant_user_ids)
+                    ? row.participant_user_ids.map((id) => String(id))
+                    : [];
+                const selectedSet = new Set(selectedParticipants);
+                const sourceType = row.source_type ? String(row.source_type) : 'report_manual';
+                const sourcePlanId = row.source_plan_id ? String(row.source_plan_id) : '';
+                const sourceOwnerUserId = row.source_owner_user_id ? String(row.source_owner_user_id) : (currentUserId || '');
+                const meetingUid = row.meeting_uid ? String(row.meeting_uid) : '';
+
+                let participantOptionsHtml = '';
+                if (window.__teamUsersOptionsHtml) {
+                    const container = document.createElement('div');
+                    container.innerHTML = `<select>${window.__teamUsersOptionsHtml}</select>`;
+                    const options = container.querySelectorAll('option');
+                    options.forEach((option) => {
+                        const val = String(option.value || '');
+                        if (selectedSet.has(val)) {
+                            option.setAttribute('selected', 'selected');
+                        } else {
+                            option.removeAttribute('selected');
+                        }
+                    });
+                    participantOptionsHtml = container.querySelector('select')?.innerHTML || '';
+                }
+
+                return `
+                    <tr data-report-meeting-readonly="${isReadonly ? '1' : '0'}">
+                        <td>
+                            <input type="hidden" name="content[key_meetings][${idx}][meeting_uid]" value="${escapeHtml(meetingUid)}">
+                            <input type="hidden" name="content[key_meetings][${idx}][source_type]" value="${escapeHtml(sourceType)}">
+                            <input type="hidden" name="content[key_meetings][${idx}][source_plan_id]" value="${escapeHtml(sourcePlanId)}">
+                            <input type="hidden" name="content[key_meetings][${idx}][source_owner_user_id]" value="${escapeHtml(sourceOwnerUserId)}">
+                            <input type="hidden" name="content[key_meetings][${idx}][is_readonly_for_current_user]" value="${isReadonly ? '1' : '0'}">
+                            <input type="date" class="form-control" name="content[key_meetings][${idx}][date]" value="${escapeHtml(row.date || '')}" ${isReadonly ? 'disabled' : ''}>
+                        </td>
+                        <td>
+                            <input class="form-control" name="content[key_meetings][${idx}][meeting]" value="${escapeHtml(row.meeting || '')}" placeholder="Meeting / engagement" ${isReadonly ? 'disabled' : ''}>
+                            ${isReadonly ? '<small class="badge bg-light-warning text-warning mt-1">Assigned (View only)</small>' : ''}
+                        </td>
+                        <td>
+                            <select class="form-select" multiple name="content[key_meetings][${idx}][participant_user_ids][]" ${isReadonly ? 'disabled' : ''}>
+                                ${participantOptionsHtml}
+                            </select>
+                        </td>
+                        <td>
+                            <select class="form-select" name="content[key_meetings][${idx}][location]" ${isReadonly ? 'disabled' : ''}>
+                                <option value="" ${(row.location || '') === '' ? 'selected' : ''}>-- Select --</option>
+                                <option value="Office" ${(row.location || '') === 'Office' ? 'selected' : ''}>Office</option>
+                                <option value="Field" ${(row.location || '') === 'Field' ? 'selected' : ''}>Field</option>
+                                <option value="Virtual" ${(row.location || '') === 'Virtual' ? 'selected' : ''}>Virtual</option>
+                                <option value="On site" ${(row.location || '') === 'On site' ? 'selected' : ''}>On site</option>
+                            </select>
+                        </td>
+                        <td><textarea class="form-control" rows="5" name="content[key_meetings][${idx}][reactions_notes]" placeholder="What happened?" ${isReadonly ? 'disabled' : ''}>${escapeHtml(row.reactions_notes || '')}</textarea></td>
+                        <td class="text-center align-middle">
+                            ${isReadonly ? '' : '<button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button>'}
+                        </td>
+                    </tr>
+                `;
+            }
+
+            if (addReportMeetingRowBtn && reportMeetingsBody) {
                 addReportMeetingRowBtn.addEventListener('click', function() {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td><input type="date" class="form-control" name="content[key_meetings][${reportMeetingIndex}][date]"></td>
-                        <td><input class="form-control" name="content[key_meetings][${reportMeetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
-                        <td>
-                            <select class="form-select" multiple name="content[key_meetings][${reportMeetingIndex}][participant_user_ids][]">
-                                ${(window.__teamUsersOptionsHtml || '')}
-                            </select>
-                        </td>
-                        <td>
-                            <select class="form-select" name="content[key_meetings][${reportMeetingIndex}][location]">
-                                <option value="">-- Select --</option>
-                                <option value="Office">Office</option>
-                                <option value="Field">Field</option>
-                                <option value="Virtual">Virtual</option>
-                                <option value="On site">On site</option>
-                            </select>
-                        </td>
-                        <td><textarea class="form-control" rows="5" name="content[key_meetings][${reportMeetingIndex}][reactions_notes]" placeholder="What happened?"></textarea></td>
-                        <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button></td>
-                    `;
-                    reportMeetingsBody.appendChild(row);
+                    reportMeetingsBody.insertAdjacentHTML('beforeend', buildReportMeetingRowHtml({
+                        meeting_uid: '',
+                        date: '',
+                        meeting: '',
+                        participant_user_ids: [],
+                        location: '',
+                        reactions_notes: '',
+                        source_type: 'report_manual',
+                        source_plan_id: '',
+                        source_owner_user_id: currentUserId || '',
+                        is_readonly_for_current_user: false,
+                    }, reportMeetingIndex));
                     reportMeetingIndex++;
                 });
 
                 reportMeetingsBody.addEventListener('click', function(event) {
                     const btn = event.target.closest('.remove-report-meeting-row');
                     if (!btn) return;
+                    const row = btn.closest('tr');
+                    if (!row || row.getAttribute('data-report-meeting-readonly') === '1') return;
                     const rows = reportMeetingsBody.querySelectorAll('tr');
                     if (rows.length <= 1) return;
-                    btn.closest('tr')?.remove();
+                    row.remove();
                 });
             }
 
@@ -721,6 +789,29 @@
                                 }
                                 syncOffPlanInputForSelect(select);
                             });
+                        }
+
+                        if (reportMeetingsBody) {
+                            const meetingRows = Array.isArray(data.meeting_rows) ? data.meeting_rows : [];
+                            const safeRows = meetingRows.length > 0
+                                ? meetingRows
+                                : [{
+                                    meeting_uid: '',
+                                    date: '',
+                                    meeting: '',
+                                    participant_user_ids: [],
+                                    location: '',
+                                    reactions_notes: '',
+                                    source_type: 'report_manual',
+                                    source_plan_id: '',
+                                    source_owner_user_id: currentUserId || '',
+                                    is_readonly_for_current_user: false,
+                                }];
+
+                            reportMeetingsBody.innerHTML = safeRows
+                                .map((meetingRow, idx) => buildReportMeetingRowHtml(meetingRow, idx))
+                                .join('');
+                            reportMeetingIndex = safeRows.length;
                         }
                     })
                     .catch(error => {

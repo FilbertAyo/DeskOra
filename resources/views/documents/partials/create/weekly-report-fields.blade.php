@@ -262,33 +262,50 @@
                     </thead>
                     <tbody id="reportMeetingsBody">
                         @php
-                            $reportMeetingRows = old('content.key_meetings', [
-                                ['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => ''],
+                            $resolvedReportMeetingRows = old('content.key_meetings', $reportMeetingRows ?? [
+                                ['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '', 'source_type' => 'report_manual', 'source_plan_id' => '', 'source_owner_user_id' => (string) auth()->id(), 'is_readonly_for_current_user' => false],
                             ]);
-                            if (!is_array($reportMeetingRows) || empty($reportMeetingRows)) {
-                                $reportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '']];
+                            if (!is_array($resolvedReportMeetingRows) || empty($resolvedReportMeetingRows)) {
+                                $resolvedReportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '', 'source_type' => 'report_manual', 'source_plan_id' => '', 'source_owner_user_id' => (string) auth()->id(), 'is_readonly_for_current_user' => false]];
                             }
                         @endphp
-                        @foreach($reportMeetingRows as $i => $meetingRow)
-                            @php $meetingRow = is_array($meetingRow) ? $meetingRow : []; @endphp
-                            <tr>
+                        @foreach($resolvedReportMeetingRows as $i => $meetingRow)
+                            @php
+                                $meetingRow = is_array($meetingRow) ? $meetingRow : [];
+                                $readonlyRaw = old("content.key_meetings.$i.is_readonly_for_current_user", $meetingRow['is_readonly_for_current_user'] ?? false);
+                                $isReadonlyMeeting = in_array((string) $readonlyRaw, ['1', 'true', 'yes', 'on'], true) || $readonlyRaw === true || $readonlyRaw === 1;
+                                $sourceType = old("content.key_meetings.$i.source_type", $meetingRow['source_type'] ?? 'report_manual');
+                                $sourcePlanId = old("content.key_meetings.$i.source_plan_id", $meetingRow['source_plan_id'] ?? '');
+                                $sourceOwnerUserId = old("content.key_meetings.$i.source_owner_user_id", $meetingRow['source_owner_user_id'] ?? (string) auth()->id());
+                            @endphp
+                            <tr data-report-meeting-readonly="{{ $isReadonlyMeeting ? '1' : '0' }}">
                                 <td>
+                                    <input type="hidden" name="content[key_meetings][{{ $i }}][meeting_uid]" value="{{ old("content.key_meetings.$i.meeting_uid", $meetingRow['meeting_uid'] ?? '') }}">
+                                    <input type="hidden" name="content[key_meetings][{{ $i }}][source_type]" value="{{ $sourceType }}">
+                                    <input type="hidden" name="content[key_meetings][{{ $i }}][source_plan_id]" value="{{ $sourcePlanId }}">
+                                    <input type="hidden" name="content[key_meetings][{{ $i }}][source_owner_user_id]" value="{{ $sourceOwnerUserId }}">
+                                    <input type="hidden" name="content[key_meetings][{{ $i }}][is_readonly_for_current_user]" value="{{ $isReadonlyMeeting ? '1' : '0' }}">
                                     <input type="date" class="form-control"
                                         name="content[key_meetings][{{ $i }}][date]"
-                                        value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}">
+                                        value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}"
+                                        @if($isReadonlyMeeting) disabled @endif>
                                 </td>
                                 <td>
                                     <input class="form-control"
                                         name="content[key_meetings][{{ $i }}][meeting]"
                                         value="{{ old("content.key_meetings.$i.meeting", $meetingRow['meeting'] ?? '') }}"
-                                        placeholder="Meeting / engagement">
+                                        placeholder="Meeting / engagement"
+                                        @if($isReadonlyMeeting) disabled @endif>
+                                    @if($isReadonlyMeeting)
+                                        <small class="badge bg-light-warning text-warning mt-1">Assigned (View only)</small>
+                                    @endif
                                 </td>
                                 <td>
                                     @php
                                         $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $meetingRow['participant_user_ids'] ?? []);
                                         if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
                                     @endphp
-                                    <select class="form-select" multiple name="content[key_meetings][{{ $i }}][participant_user_ids][]">
+                                    <select class="form-select" multiple name="content[key_meetings][{{ $i }}][participant_user_ids][]" @if($isReadonlyMeeting) disabled @endif>
                                         @foreach(($teamUsers ?? collect()) as $teamUser)
                                             <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedParticipantIds), true) ? 'selected' : '' }}>
                                                 {{ $teamUser->name }}
@@ -297,7 +314,7 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <select class="form-select" name="content[key_meetings][{{ $i }}][location]">
+                                    <select class="form-select" name="content[key_meetings][{{ $i }}][location]" @if($isReadonlyMeeting) disabled @endif>
                                         <option value="">-- Select --</option>
                                         @foreach(['Office', 'Field', 'Virtual', 'On site'] as $loc)
                                             <option value="{{ $loc }}" {{ old("content.key_meetings.$i.location", $meetingRow['location'] ?? '') === $loc ? 'selected' : '' }}>
@@ -309,10 +326,13 @@
                                 <td>
                                     <textarea class="form-control" rows="5"
                                         name="content[key_meetings][{{ $i }}][reactions_notes]"
-                                        placeholder="What happened?">{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}</textarea>
+                                        placeholder="What happened?"
+                                        @if($isReadonlyMeeting) disabled @endif>{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}</textarea>
                                 </td>
                                 <td class="text-center align-middle">
-                                    <button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button>
+                                    @if(!$isReadonlyMeeting)
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

@@ -70,7 +70,8 @@
                 : null;
             window.__reportActivityOptionsHtml = reportActivityOptionsSource ? reportActivityOptionsSource.innerHTML : '<option value="">-- Select Activity --</option>';
             if (!window.__teamUsersOptionsHtml) {
-                const teamSelect = document.querySelector('select[name^="content[planned_activities]"][name$="[team_member_ids][]"]');
+                const teamSelect = document.querySelector('select[name^="content[planned_activities]"][name$="[team_member_ids][]"]')
+                    || document.querySelector('select[name^="content[key_meetings]"][name$="[participant_user_ids][]"]');
                 window.__teamUsersOptionsHtml = teamSelect ? teamSelect.innerHTML : '';
             }
 
@@ -329,8 +330,16 @@
 
                 addReportMeetingRowBtn.addEventListener('click', function() {
                     const row = document.createElement('tr');
+                    row.setAttribute('data-report-meeting-readonly', '0');
                     row.innerHTML = `
-                        <td><input type="date" class="form-control" name="content[key_meetings][${reportMeetingIndex}][date]"></td>
+                        <td>
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][meeting_uid]" value="">
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][source_type]" value="report_manual">
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][source_plan_id]" value="">
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][source_owner_user_id]" value="{{ (string) auth()->id() }}">
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][is_readonly_for_current_user]" value="0">
+                            <input type="date" class="form-control" name="content[key_meetings][${reportMeetingIndex}][date]">
+                        </td>
                         <td><input class="form-control" name="content[key_meetings][${reportMeetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
                         <td>
                             <select class="form-select" multiple name="content[key_meetings][${reportMeetingIndex}][participant_user_ids][]">
@@ -356,9 +365,11 @@
                 reportMeetingsBody.addEventListener('click', function(event) {
                     const btn = event.target.closest('.remove-report-meeting-row');
                     if (!btn) return;
+                    const row = btn.closest('tr');
+                    if (!row || row.getAttribute('data-report-meeting-readonly') === '1') return;
                     const rows = reportMeetingsBody.querySelectorAll('tr');
                     if (rows.length <= 1) return;
-                    btn.closest('tr')?.remove();
+                    row.remove();
                 });
             }
 

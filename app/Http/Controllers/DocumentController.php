@@ -241,6 +241,7 @@ class DocumentController extends Controller
         $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $relatedPlan = null;
         $carriedActivities = [];
+        $reportMeetingRows = [];
 
         if ($selectedType) {
             if ($selectedType === Document::TYPE_WEEKLY_PLAN) {
@@ -267,6 +268,10 @@ class DocumentController extends Controller
                 if ($targetReportPeriod) {
                     $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
                         $targetReportPeriod->id,
+                        (string) $user->id
+                    );
+                    $reportMeetingRows = $this->weeklyReportMeetingRowsForUserPeriod(
+                        (string) $targetReportPeriod->id,
                         (string) $user->id
                     );
                 }
@@ -308,6 +313,7 @@ class DocumentController extends Controller
                     'nextPeriod',
                     'relatedPlan',
                     'carriedActivities',
+                    'reportMeetingRows',
                     'teamUsers',
                     'shareableUsers',
                     'monthlyYearPlan',
@@ -335,6 +341,7 @@ class DocumentController extends Controller
             'nextPeriod',
             'relatedPlan',
             'carriedActivities',
+            'reportMeetingRows',
             'teamUsers',
             'shareableUsers',
             'monthlyYearPlan',
@@ -469,7 +476,15 @@ class DocumentController extends Controller
         // Normalize and trim template payload to avoid storing empty rows.
         $templateContent = null;
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $request->has('content') && is_array($request->input('content'))) {
-            $templateContent = $this->normalizeTemplateContent($request->input('content'), $request->type);
+            $rawTemplateContent = $request->input('content');
+            if ($request->type === Document::TYPE_WEEKLY_REPORT) {
+                $rawTemplateContent = $this->stripReadonlyAssignedMeetingsFromWeeklyReportContent(
+                    is_array($rawTemplateContent) ? $rawTemplateContent : [],
+                    $user,
+                    $request->input('period_id')
+                );
+            }
+            $templateContent = $this->normalizeTemplateContent(is_array($rawTemplateContent) ? $rawTemplateContent : [], $request->type);
         }
         $weeklyReportTargetStatus = null;
         if ($request->type === Document::TYPE_WEEKLY_REPORT) {
@@ -972,6 +987,9 @@ class DocumentController extends Controller
      */
     public function edit(Document $document)
     {
+        /** @var \App\Models\User $viewer */
+        $viewer = Auth::user();
+
         if ($document->type === Document::TYPE_ACTION_LOG) {
             $this->authorize('update', $document);
 
@@ -1011,8 +1029,17 @@ class DocumentController extends Controller
                 ->all();
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
+        $reportMeetingRows = [];
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->period_id) {
+            $existingMeetingRows = is_array($document->content) ? ($document->content['key_meetings'] ?? []) : [];
+            $reportMeetingRows = $this->weeklyReportMeetingRowsForUserPeriod(
+                (string) $document->period_id,
+                (string) $viewer->id,
+                is_array($existingMeetingRows) ? $existingMeetingRows : []
+            );
+        }
 
-        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings'));
+        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'reportMeetingRows'));
     }
 
     /**
@@ -1181,7 +1208,15 @@ class DocumentController extends Controller
                 $action
             );
         } elseif ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
-            $templateContent = $this->normalizeTemplateContent($request->input('content'), $document->type);
+            $rawTemplateContent = $request->input('content');
+            if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+                $rawTemplateContent = $this->stripReadonlyAssignedMeetingsFromWeeklyReportContent(
+                    is_array($rawTemplateContent) ? $rawTemplateContent : [],
+                    $actingUser,
+                    $document->period_id
+                );
+            }
+            $templateContent = $this->normalizeTemplateContent(is_array($rawTemplateContent) ? $rawTemplateContent : [], $document->type);
         }
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
             if ($templateContent === null) {
@@ -1692,6 +1727,7 @@ class DocumentController extends Controller
         }
 
         $plan = Document::findWeeklyPlanForUserAndPeriod($periodId, (string) $user->id);
+        $meetingRows = $this->weeklyReportMeetingRowsForUserPeriod((string) $periodId, (string) $user->id);
 
         if ($plan) {
             $budgetItems = [];
@@ -1751,6 +1787,7 @@ class DocumentController extends Controller
                 'plan_exists' => true,
                 'budget_items' => $budgetItems,
                 'planned_activities' => $plannedActivities,
+                'meeting_rows' => $meetingRows,
             ]);
         }
 
@@ -1759,6 +1796,7 @@ class DocumentController extends Controller
             'plan_exists' => false,
             'budget_items' => [],
             'planned_activities' => [],
+            'meeting_rows' => $meetingRows,
         ]);
     }
 
@@ -2881,6 +2919,281 @@ class DocumentController extends Controller
         }
 
         return $incomingRows;
+    }
+
+    /**
+     * Build weekly report meeting rows for a viewer in a period:
+     * - own planned meetings (editable)
+     * - assigned meetings from peer plans (view-only)
+     * - unmatched draft report rows (editable)
+     *
+     * @param  array<int, mixed>  $existingReportRows
+     * @return array<int, array<string, mixed>>
+     */
+    private function weeklyReportMeetingRowsForUserPeriod(string $periodId, string $viewerUserId, array $existingReportRows = []): array
+    {
+        if (trim($periodId) === '' || trim($viewerUserId) === '') {
+            return [];
+        }
+
+        $existingByKey = [];
+        foreach ($existingReportRows as $existingReportRow) {
+            if (! is_array($existingReportRow)) {
+                continue;
+            }
+            $normalizedExisting = $this->normalizeWeeklyReportMeetingRow(
+                $existingReportRow,
+                'report_manual',
+                null,
+                $viewerUserId,
+                false
+            );
+            $existingKey = $this->weeklyReportMeetingRowKey($normalizedExisting);
+            $existingByKey[$existingKey] = $normalizedExisting;
+        }
+
+        $rows = [];
+        $seen = [];
+
+        $ownPlan = Document::findWeeklyPlanForUserAndPeriod($periodId, $viewerUserId);
+        if ($ownPlan && is_array($ownPlan->content)) {
+            $ownPlanMeetings = is_array($ownPlan->content['key_meetings'] ?? null)
+                ? $ownPlan->content['key_meetings']
+                : [];
+            foreach ($ownPlanMeetings as $ownPlanMeetingRow) {
+                if (! is_array($ownPlanMeetingRow)) {
+                    continue;
+                }
+                $normalizedOwnRow = $this->normalizeWeeklyReportMeetingRow(
+                    $ownPlanMeetingRow,
+                    'own_plan',
+                    (string) $ownPlan->id,
+                    (string) $viewerUserId,
+                    false
+                );
+                $rowKey = $this->weeklyReportMeetingRowKey($normalizedOwnRow);
+                if (isset($existingByKey[$rowKey])) {
+                    $existingRow = $existingByKey[$rowKey];
+                    $normalizedOwnRow['date'] = (string) ($existingRow['date'] ?? $normalizedOwnRow['date']);
+                    $normalizedOwnRow['meeting'] = (string) ($existingRow['meeting'] ?? $normalizedOwnRow['meeting']);
+                    $normalizedOwnRow['participant_user_ids'] = is_array($existingRow['participant_user_ids'] ?? null)
+                        ? $existingRow['participant_user_ids']
+                        : $normalizedOwnRow['participant_user_ids'];
+                    $normalizedOwnRow['location'] = (string) ($existingRow['location'] ?? $normalizedOwnRow['location']);
+                    $normalizedOwnRow['reactions_notes'] = (string) ($existingRow['reactions_notes'] ?? $normalizedOwnRow['reactions_notes']);
+                }
+                if (isset($seen[$rowKey])) {
+                    continue;
+                }
+                $seen[$rowKey] = true;
+                $rows[] = $normalizedOwnRow;
+            }
+        }
+
+        $peerPlans = Document::query()
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->where('period_id', $periodId)
+            ->where('user_id', '!=', $viewerUserId)
+            ->select(['id', 'user_id', 'content'])
+            ->get();
+
+        foreach ($peerPlans as $peerPlan) {
+            $peerContent = is_array($peerPlan->content) ? $peerPlan->content : [];
+            $peerMeetings = is_array($peerContent['key_meetings'] ?? null)
+                ? $peerContent['key_meetings']
+                : [];
+            foreach ($peerMeetings as $peerMeetingRow) {
+                if (! is_array($peerMeetingRow)) {
+                    continue;
+                }
+                $participantIds = is_array($peerMeetingRow['participant_user_ids'] ?? null)
+                    ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $peerMeetingRow['participant_user_ids'])))
+                    : [];
+                if (! in_array($viewerUserId, $participantIds, true)) {
+                    continue;
+                }
+                $normalizedAssignedRow = $this->normalizeWeeklyReportMeetingRow(
+                    $peerMeetingRow,
+                    'assigned_plan',
+                    (string) $peerPlan->id,
+                    (string) $peerPlan->user_id,
+                    true
+                );
+                $rowKey = $this->weeklyReportMeetingRowKey($normalizedAssignedRow);
+                if (isset($seen[$rowKey])) {
+                    continue;
+                }
+                $seen[$rowKey] = true;
+                $rows[] = $normalizedAssignedRow;
+            }
+        }
+
+        foreach ($existingByKey as $existingKey => $existingRow) {
+            if (isset($seen[$existingKey])) {
+                continue;
+            }
+            $sourceType = trim((string) ($existingRow['source_type'] ?? ''));
+            $sourceOwnerUserId = trim((string) ($existingRow['source_owner_user_id'] ?? ''));
+            if ($sourceType === 'assigned_plan' && $sourceOwnerUserId !== '' && $sourceOwnerUserId !== $viewerUserId) {
+                continue;
+            }
+            $existingRow['is_readonly_for_current_user'] = false;
+            if ($sourceType === '') {
+                $existingRow['source_type'] = 'report_manual';
+            }
+            if ($sourceOwnerUserId === '') {
+                $existingRow['source_owner_user_id'] = $viewerUserId;
+            }
+            $rows[] = $existingRow;
+        }
+
+        if ($rows === []) {
+            $rows[] = $this->normalizeWeeklyReportMeetingRow(
+                ['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => ''],
+                'report_manual',
+                null,
+                $viewerUserId,
+                false
+            );
+        }
+
+        return array_values($rows);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function normalizeWeeklyReportMeetingRow(
+        array $row,
+        string $sourceType,
+        ?string $sourcePlanId,
+        string $sourceOwnerUserId,
+        bool $isReadonlyForCurrentUser
+    ): array {
+        $participantIds = is_array($row['participant_user_ids'] ?? null)
+            ? array_values(array_unique(array_filter(array_map(static fn ($id) => trim((string) $id), $row['participant_user_ids']))))
+            : [];
+        sort($participantIds);
+
+        $meetingUid = trim((string) ($row['meeting_uid'] ?? ''));
+        if ($meetingUid === '' && $sourcePlanId !== null && in_array($sourceType, ['own_plan', 'assigned_plan'], true)) {
+            $meetingUid = 'derived_'.substr(sha1(implode('|', [
+                $sourcePlanId,
+                trim((string) ($row['date'] ?? '')),
+                trim((string) ($row['meeting'] ?? '')),
+                trim((string) ($row['location'] ?? '')),
+                implode(',', $participantIds),
+            ])), 0, 20);
+        }
+
+        return [
+            'meeting_uid' => $meetingUid,
+            'date' => trim((string) ($row['date'] ?? '')),
+            'meeting' => trim((string) ($row['meeting'] ?? '')),
+            'participant_user_ids' => $participantIds,
+            'location' => trim((string) ($row['location'] ?? '')),
+            'reactions_notes' => trim((string) ($row['reactions_notes'] ?? '')),
+            'source_type' => trim($sourceType) !== '' ? trim($sourceType) : 'report_manual',
+            'source_plan_id' => $sourcePlanId !== null ? trim($sourcePlanId) : '',
+            'source_owner_user_id' => trim($sourceOwnerUserId),
+            'is_readonly_for_current_user' => $isReadonlyForCurrentUser,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function weeklyReportMeetingRowKey(array $row): string
+    {
+        $meetingUid = trim((string) ($row['meeting_uid'] ?? ''));
+        if ($meetingUid !== '') {
+            return 'uid:'.$meetingUid;
+        }
+
+        $participantIds = is_array($row['participant_user_ids'] ?? null)
+            ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $row['participant_user_ids'])))
+            : [];
+        sort($participantIds);
+
+        return mb_strtolower(implode('|', [
+            trim((string) ($row['date'] ?? '')),
+            trim((string) ($row['meeting'] ?? '')),
+            trim((string) ($row['location'] ?? '')),
+            implode(',', $participantIds),
+            trim((string) ($row['source_plan_id'] ?? '')),
+            trim((string) ($row['source_owner_user_id'] ?? '')),
+        ]));
+    }
+
+    /**
+     * Keep only editable own/manual meeting rows for weekly report save.
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    private function stripReadonlyAssignedMeetingsFromWeeklyReportContent(array $content, User $actingUser, ?string $periodId): array
+    {
+        if (trim((string) $periodId) === '') {
+            return $content;
+        }
+
+        $resolvedRows = $this->weeklyReportMeetingRowsForUserPeriod((string) $periodId, (string) $actingUser->id);
+        $lockedUidSet = [];
+        $lockedKeySet = [];
+        foreach ($resolvedRows as $resolvedRow) {
+            if (! is_array($resolvedRow) || ! ($resolvedRow['is_readonly_for_current_user'] ?? false)) {
+                continue;
+            }
+            $uid = trim((string) ($resolvedRow['meeting_uid'] ?? ''));
+            if ($uid !== '') {
+                $lockedUidSet[$uid] = true;
+            }
+            $lockedKeySet[$this->weeklyReportMeetingRowKey($resolvedRow)] = true;
+        }
+
+        $inputRows = is_array($content['key_meetings'] ?? null) ? $content['key_meetings'] : [];
+        $filteredRows = [];
+        foreach ($inputRows as $inputRow) {
+            if (! is_array($inputRow)) {
+                continue;
+            }
+
+            $submittedSourceType = trim((string) ($inputRow['source_type'] ?? ''));
+            $submittedOwnerUserId = trim((string) ($inputRow['source_owner_user_id'] ?? ''));
+            if ($submittedSourceType === 'assigned_plan' && $submittedOwnerUserId !== '' && $submittedOwnerUserId !== (string) $actingUser->id) {
+                continue;
+            }
+
+            $uid = trim((string) ($inputRow['meeting_uid'] ?? ''));
+            if ($uid !== '' && isset($lockedUidSet[$uid])) {
+                continue;
+            }
+
+            $normalizedInputRow = $this->normalizeWeeklyReportMeetingRow(
+                $inputRow,
+                (string) ($inputRow['source_type'] ?? ''),
+                isset($inputRow['source_plan_id']) ? trim((string) $inputRow['source_plan_id']) : null,
+                (string) ($inputRow['source_owner_user_id'] ?? ''),
+                false
+            );
+            $inputKey = $this->weeklyReportMeetingRowKey($normalizedInputRow);
+            if (isset($lockedKeySet[$inputKey])) {
+                continue;
+            }
+
+            unset(
+                $inputRow['source_type'],
+                $inputRow['source_plan_id'],
+                $inputRow['source_owner_user_id'],
+                $inputRow['is_readonly_for_current_user']
+            );
+            $filteredRows[] = $inputRow;
+        }
+
+        $content['key_meetings'] = $filteredRows;
+
+        return $content;
     }
 
     private function syncNextWeeklyPlanCarryOverFromReport(Document $weeklyReport): void
