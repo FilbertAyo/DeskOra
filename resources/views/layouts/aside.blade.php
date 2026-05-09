@@ -76,10 +76,26 @@
                 @endphp
                 @if($canReviewSubmissions || $canWeeklyBudgetReview)
                     @php
-                        $currentWorkPeriodId = \App\Models\WorkPeriod::getCurrent()?->id;
-                        $reviewActivitiesSubmittedCount = $canReviewSubmissions && $currentWorkPeriodId
-                            ? \App\Models\Document::submitted()->forPeriod((string) $currentWorkPeriodId)->count()
-                            : 0;
+                        $currentPeriod = \App\Models\WorkPeriod::getCurrent();
+                        $nextPeriod = $currentPeriod?->getNextPeriod();
+                        $reviewActivitiesSubmittedCount = 0;
+                        if ($canReviewSubmissions) {
+                            if ($currentPeriod) {
+                                $reviewActivitiesSubmittedCount += \App\Models\Document::query()
+                                    ->submitted()
+                                    ->where('type', \App\Models\Document::TYPE_WEEKLY_REPORT)
+                                    ->forPeriod((string) $currentPeriod->id)
+                                    ->count();
+                            }
+
+                            if ($nextPeriod) {
+                                $reviewActivitiesSubmittedCount += \App\Models\Document::query()
+                                    ->submitted()
+                                    ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
+                                    ->forPeriod((string) $nextPeriod->id)
+                                    ->count();
+                            }
+                        }
                         $reviewActivitiesPendingBudgetCount = 0;
                         if ($canWeeklyBudgetReview) {
                             $reviewActivitiesPendingBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
