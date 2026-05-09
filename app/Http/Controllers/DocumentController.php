@@ -1720,6 +1720,37 @@ class DocumentController extends Controller
 
         $availableTypes = Document::getAvailableTypesForUser($user);
 
+        /*
+         * New Weekly Plan button: offer creating a plan for the earliest open target week where
+         * (1) plan_deadline for that week is not passed (supports admin-extended deadlines into the target week),
+         * (2) the user does not already own a plan for that period (draft or submitted).
+         * Check both current and next periods so a late Week N plan still appears while calendar is in Week N
+         * after the deadline was extended past the usual pre-week window.
+         */
+        $planCreatePeriod = null;
+        if (isset($availableTypes['weekly_plan']) && $currentPeriod) {
+            $candidatePeriods = collect([$currentPeriod, $nextPeriod])
+                ->filter()
+                ->unique(fn (WorkPeriod $p) => $p->id)
+                ->sortBy(fn (WorkPeriod $p) => $p->week_start_date);
+
+            foreach ($candidatePeriods as $period) {
+                if (! $period->isOpen()) {
+                    continue;
+                }
+                if ($period->isPlanDeadlinePassed()) {
+                    continue;
+                }
+                if (Document::findWeeklyPlanForPeriodOwner((string) $period->id, (string) $user->id)) {
+                    continue;
+                }
+                $planCreatePeriod = $period;
+                break;
+            }
+        }
+
+        $canCreateWeeklyPlan = $planCreatePeriod !== null;
+
         return view('documents.weekly.plans', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
@@ -1729,6 +1760,8 @@ class DocumentController extends Controller
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
+            'planCreatePeriod' => $planCreatePeriod,
+            'canCreateWeeklyPlan' => $canCreateWeeklyPlan,
         ]);
     }
 
