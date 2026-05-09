@@ -42,7 +42,7 @@
                                         if (! is_array($row)) {
                                             return false;
                                         }
-                                        foreach (['date', 'meeting', 'participant_user_ids', 'location', 'reactions_notes'] as $k) {
+                                        foreach (['date', 'meeting', 'participant_user_ids', 'participants', 'status', 'location', 'reactions_notes'] as $k) {
                                             $value = $row[$k] ?? null;
                                             if (is_array($value)) {
                                                 if (count(array_filter(array_map(static fn ($item) => trim((string) $item), $value))) > 0) {
@@ -194,24 +194,27 @@
                                                                     $meetingRow = is_array($meetingRow) ? $meetingRow : [];
                                                                     $participantIds = is_array($meetingRow['participant_user_ids'] ?? null) ? $meetingRow['participant_user_ids'] : [];
                                                                     $participantIds = array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $participantIds)));
+                                                                    $participantIdSet = array_fill_keys($participantIds, true);
                                                                     $participantNames = collect(($teamUsers ?? collect()))
-                                                                        ->whereIn('id', $participantIds)
+                                                                        ->filter(static fn ($u) => isset($participantIdSet[(string) $u->id]))
                                                                         ->pluck('name')
                                                                         ->values()
                                                                         ->all();
+                                                                    $legacyParticipantsText = trim((string) ($meetingRow['participants'] ?? ''));
                                                                     $meetingEmpty = trim((string) ($meetingRow['date'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['meeting'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['status'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['location'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['reactions_notes'] ?? '')) === ''
-                                                                        && count($participantIds) === 0;
+                                                                        && count($participantIds) === 0
+                                                                        && $legacyParticipantsText === '';
                                                                 @endphp
                                                                 @if(!$meetingEmpty)
                                                                     <tr>
                                                                         <td>{{ $meetingRow['date'] ?? '' }}</td>
                                                                         <td>{{ $meetingRow['meeting'] ?? '' }}</td>
-                                                                        <td>{{ implode(', ', $participantNames) }}</td>
-                                                                        <td>{{ $meetingRow['status'] ?? '' }}</td>
+                                                                        <td>{{ ! empty($participantNames) ? implode(', ', $participantNames) : $legacyParticipantsText }}</td>
+                                                                        <td>{{ trim((string) ($meetingRow['status'] ?? '')) }}</td>
                                                                         <td>{{ $meetingRow['location'] ?? '' }}</td>
                                                                         <td>{{ $meetingRow['reactions_notes'] ?? '' }}</td>
                                                                     </tr>

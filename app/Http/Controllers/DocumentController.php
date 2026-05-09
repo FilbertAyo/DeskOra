@@ -953,7 +953,9 @@ class DocumentController extends Controller
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings'));
+        $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
+
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
     }
 
     /**
@@ -981,7 +983,9 @@ class DocumentController extends Controller
         $relatedAction = null;
         $reviewerPresentation = true;
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'carriedActivities', 'incomingMeetings'));
+        $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
+
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
     }
 
     /**
