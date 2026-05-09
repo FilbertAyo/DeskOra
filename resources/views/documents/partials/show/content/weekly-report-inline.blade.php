@@ -75,7 +75,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered">
+                                                <table class="table table-bordered table-striped">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 70px;">No.</th>
@@ -147,7 +147,7 @@
                                             @endphp
                                             @if(count($achievementRows) > 0)
                                                 <div class="table-responsive">
-                                                    <table class="table table-bordered mb-0">
+                                                    <table class="table table-bordered table-striped mb-0">
                                                         <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th style="width: 70px;">No.</th>
@@ -176,7 +176,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered">
+                                                <table class="table table-bordered table-striped">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 140px;">Date</th>
@@ -237,7 +237,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered">
+                                                <table class="table table-bordered table-striped">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th>Challenge(s)</th>
@@ -295,7 +295,7 @@
                                             @endphp
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
-                                                    <table class="table table-bordered">
+                                                    <table class="table table-bordered table-striped">
                                                         <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th>Budget Item</th>

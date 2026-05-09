@@ -91,7 +91,7 @@
                                                 <small class="text-muted">Activities marked with this badge were carried from previous week: <span class="badge bg-light-info text-info">Carried</span></small>
                                             </div>
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 100px;">Day</th>
@@ -212,7 +212,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 150px;">Date</th>
@@ -333,7 +333,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th>Budget Item / Activity</th>

@@ -30,8 +30,8 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered align-middle mb-0">
-                        <thead class="thead-light">
+                    <table class="table table-bordered table-striped align-middle mb-0">
+                        <thead class="wh-thead-weekly-plan">
                             <tr>
                                 <th style="width: 110px;">Status</th>
                                 <th style="width: 100px;">Day</th>

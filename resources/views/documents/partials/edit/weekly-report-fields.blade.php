@@ -154,7 +154,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 60px;">No.</th>
@@ -254,7 +254,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 160px;">Date</th>
@@ -351,7 +351,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 70px;">No.</th>
@@ -400,7 +400,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered align-middle mb-0">
+                                                <table class="table table-bordered table-striped align-middle mb-0">
                                                     <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th>Challenge(s)</th>
@@ -469,7 +469,7 @@
 
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
-                                                    <table class="table table-bordered align-middle mb-0">
+                                                    <table class="table table-bordered table-striped align-middle mb-0">
                                                         <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th>Budget Item / Activity</th>

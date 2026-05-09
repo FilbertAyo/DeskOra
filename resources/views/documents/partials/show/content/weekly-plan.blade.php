@@ -170,7 +170,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered mb-0">
+                                                <table class="table table-bordered table-striped mb-0">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th>Main Target</th>
@@ -196,7 +196,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered">
+                                                <table class="table table-bordered table-striped">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 90px;">Day</th>
@@ -260,7 +260,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered">
+                                                <table class="table table-bordered table-striped">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 140px;">Date</th>
@@ -325,7 +325,7 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered">
+                                                <table class="table table-bordered table-striped">
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 360px;">Budget Item / Activity</th>

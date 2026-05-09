@@ -80,7 +80,7 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered align-middle mb-0">
+                <table class="table table-bordered table-striped align-middle mb-0">
                     <thead class="wh-thead-weekly-plan">
                         <tr>
                             <th style="width: 100px;">Day</th>
@@ -176,7 +176,7 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered align-middle mb-0">
+                <table class="table table-bordered table-striped align-middle mb-0">
                     <thead class="wh-thead-weekly-plan">
                         <tr>
                             <th style="width: 150px;">Date</th>
@@ -266,7 +266,7 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered align-middle mb-0">
+                <table class="table table-bordered table-striped align-middle mb-0">
                     <thead class="wh-thead-weekly-plan">
                         <tr>
                             <th style="width: 500px;">Budget Item / Activity</th>
