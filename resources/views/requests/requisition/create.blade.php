@@ -80,7 +80,7 @@
                     <button type="button" class="btn btn-sm btn-outline-primary" id="addItemRow">Add Row</button>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-bordered" id="itemsTable">
+                    <table class="table table-bordered table-striped" id="itemsTable">
                         <thead>
                             <tr>
                                 <th style="width: 8%;">S/N</th>

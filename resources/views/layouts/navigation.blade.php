@@ -257,7 +257,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle">
+                    <table class="table table-bordered table-hover table-striped align-middle">
                         <thead>
                             <tr>
                                 <th style="width: 240px;">Staff</th>

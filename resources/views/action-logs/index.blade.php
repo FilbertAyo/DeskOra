@@ -108,7 +108,7 @@
                 <div class="card-body">
                     @if($documents->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
+                            <table class="table table-hover table-bordered table-striped align-middle">
                                 <thead class="thead-light">
                                     <tr>
                                         <th class="text-center" style="width: 50px;">No.</th>

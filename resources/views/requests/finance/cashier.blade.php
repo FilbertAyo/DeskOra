@@ -43,7 +43,7 @@
                             </div>
                             <div class="card-body">
                                 <!-- table -->
-                                <table class="table table-bordered datatables" id="dataTable-1">
+                                <table class="table table-bordered table-striped datatables" id="dataTable-1">
                                     <thead class="thead-light">
                                         <tr>
                                             <th>No.</th>
@@ -136,7 +136,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <table class="table table-bordered table-sm">
+                    <table class="table table-bordered table-striped table-sm">
                         <tbody>
                             <tr>
                                 <th scope="row">Amount Deposited</th>

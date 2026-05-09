@@ -180,7 +180,7 @@
 
                                 {{-- Item rows --}}
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-bordered mb-0">
+                                    <table class="table table-sm table-bordered table-striped mb-0">
                                         <thead class="thead-light">
                                             <tr>
                                                 <th style="width: 50px;" class="text-center">#</th>

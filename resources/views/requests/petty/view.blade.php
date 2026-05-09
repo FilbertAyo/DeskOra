@@ -129,7 +129,7 @@
                         <div class="mt-4">
                             <h5 class="mb-3">Requisition Items</h5>
                             <div class="table-responsive">
-                                <table class="table table-bordered">
+                                <table class="table table-bordered table-striped">
                                     <thead>
                                         <tr>
                                             <th>S/N</th>

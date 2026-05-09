@@ -85,7 +85,7 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered mb-0" id="anonymousFeedbackTable">
+                        <table class="table table-hover table-bordered table-striped mb-0" id="anonymousFeedbackTable">
                             <thead class="thead-light">
                                 <tr>
                                     <th class="text-center" style="width: 56px;">#</th>

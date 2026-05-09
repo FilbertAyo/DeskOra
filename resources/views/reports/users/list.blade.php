@@ -48,7 +48,7 @@
 
                     <!-- Users Table -->
                     <div class="table-responsive">
-                        <table class="table table-bordered">
+                        <table class="table table-bordered table-striped">
                             <thead class="thead-light">
                                 <tr>
                                     <th>#</th>

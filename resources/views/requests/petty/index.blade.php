@@ -35,7 +35,7 @@
         <div class="col-md-12">
             <div class="card shadow-none border">
                 <div class="card-body">
-                    <table class="table table-bordered datatables" id="dataTable-1">
+                    <table class="table table-bordered table-striped datatables" id="dataTable-1">
                         <thead class="thead-light">
                             <tr>
                                 <th>No.</th>

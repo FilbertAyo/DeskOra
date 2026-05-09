@@ -46,7 +46,7 @@
                                         @if($monthlyPlannedActivities->isNotEmpty())
                                             <h6 class="text-primary mb-2">Planned activities (year plan)</h6>
                                             <div class="table-responsive mb-4">
-                                                <table class="table table-bordered align-middle">
+                                                <table class="table table-bordered table-striped align-middle">
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th style="min-width: 72px;">Code</th>
@@ -107,7 +107,7 @@
                                             </button>
                                         </div>
                                         <div class="table-responsive mb-2">
-                                            <table class="table table-bordered align-middle">
+                                            <table class="table table-bordered table-striped align-middle">
                                                 <thead class="table-light">
                                                     <tr>
                                                         <th>Title</th>

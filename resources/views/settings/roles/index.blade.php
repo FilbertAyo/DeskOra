@@ -32,7 +32,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered">
+                        <table class="table table-hover table-bordered table-striped">
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px;">No.</th>

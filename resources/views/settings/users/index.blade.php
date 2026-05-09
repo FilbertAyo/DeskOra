@@ -56,7 +56,7 @@
                  
 
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered" id="usersTable">
+                        <table class="table table-hover table-bordered table-striped" id="usersTable">
                             <thead class="thead-light">
                                 <tr>
                                     <th class="text-center" style="width: 50px;">No.</th>

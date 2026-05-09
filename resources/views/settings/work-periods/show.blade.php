@@ -110,7 +110,7 @@
                         <p class="text-muted mb-0">No documents linked to this work period yet.</p>
                     @else
                         <div class="table-responsive">
-                            <table class="table table-hover table-bordered mb-0">
+                            <table class="table table-hover table-bordered table-striped mb-0">
                                 <thead class="thead-light">
                                     <tr>
                                         <th>Type</th>

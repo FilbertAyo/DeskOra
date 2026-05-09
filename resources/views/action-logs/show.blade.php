@@ -152,7 +152,7 @@
 
                     @if(!empty($tasks))
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover align-middle">
+                            <table class="table table-bordered table-hover table-striped align-middle">
                                 <thead class="thead-light">
                                     <tr>
                                         <th style="width: 70px;">No</th>
@@ -217,7 +217,7 @@
                                                 <td colspan="8">
                                                     <h6 class="mb-2">Task Timeline</h6>
                                                     <div class="table-responsive">
-                                                        <table class="table table-sm table-bordered align-middle mb-0">
+                                                        <table class="table table-sm table-bordered table-striped align-middle mb-0">
                                                             <thead class="thead-light">
                                                                 <tr>
                                                                     <th>Week Period</th>

@@ -34,7 +34,7 @@
                         </div>
                     @endif
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered mb-0">
+                        <table class="table table-hover table-bordered table-striped mb-0">
                             <thead class="table-light">
                                 <tr>
                                     <th>Year</th>

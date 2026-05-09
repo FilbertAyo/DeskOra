@@ -54,7 +54,7 @@
                 <div class="card-body">
                    
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered" id="departmentsTable">
+                        <table class="table table-hover table-bordered table-striped" id="departmentsTable">
                             <thead class="thead-light">
                                 <tr>
                                     <th class="text-center" style="width: 50px;">No.</th>

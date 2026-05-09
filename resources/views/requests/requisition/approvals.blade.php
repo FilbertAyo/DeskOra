@@ -7,7 +7,7 @@
 
     <div class="card shadow-none border">
         <div class="card-body">
-            <table class="table table-bordered datatables">
+            <table class="table table-bordered table-striped datatables">
                 <thead>
                     <tr>
                         <th>No.</th>

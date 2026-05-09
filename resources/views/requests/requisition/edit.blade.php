@@ -53,7 +53,7 @@
                             $defaultItems = $request->requisitionItems->map(fn($i) => ['description' => $i->description, 'unit' => $i->unit, 'cost' => $i->cost])->toArray();
                             $oldItems = old('items', $defaultItems);
                         @endphp
-                        <table class="table table-bordered" id="itemsTable">
+                        <table class="table table-bordered table-striped" id="itemsTable">
                             <thead><tr><th>S/N</th><th>Description</th><th>Unit</th><th>Cost</th><th></th></tr></thead>
                             <tbody>
                                 @foreach ($oldItems as $index => $item)

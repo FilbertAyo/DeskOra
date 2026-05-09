@@ -34,7 +34,7 @@
         </div>
 
         <div class="table-responsive">
-            <table class="table table-bordered mb-3">
+            <table class="table table-bordered table-striped mb-3">
                 <thead class="thead-light">
                     <tr>
                         <th style="width: 8%;">S/NO</th>

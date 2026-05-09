@@ -43,7 +43,7 @@
         <div class="col-md-12">
             <div class="card shadow-none border">
                 <div class="card-body">
-                    <table class="table table-bordered">
+                    <table class="table table-bordered table-striped">
                         <thead>
                             <tr>
                                 <th>{{ $filterType ? 'Date' : 'Transaction Date' }}</th>

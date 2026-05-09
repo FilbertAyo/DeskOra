@@ -38,7 +38,7 @@
                                         </div>
                                         <div class="card-body p-0">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered mb-0 align-middle">
+                                                <table class="table table-bordered table-striped mb-0 align-middle">
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th>Code</th>
@@ -86,7 +86,7 @@
                                         </div>
                                         <div class="card-body p-0">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered mb-0">
+                                                <table class="table table-bordered table-striped mb-0">
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th>Title</th>

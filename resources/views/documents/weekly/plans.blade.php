@@ -119,7 +119,7 @@
                     <!-- Plans List -->
                     @if($documents->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover table-bordered">
+                            <table class="table table-hover table-bordered table-striped">
                                 <thead class="thead-light">
                                     <tr>
                                         <th class="text-center" style="width: 50px;">No.</th>

@@ -54,7 +54,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover mb-0">
+                        <table class="table table-bordered table-hover table-striped mb-0">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -152,7 +152,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover mb-0">
+                        <table class="table table-bordered table-hover table-striped mb-0">
                             <thead>
                                 <tr>
                                     <th>Name</th>
