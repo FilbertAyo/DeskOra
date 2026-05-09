@@ -260,8 +260,7 @@
                                                             <th style="width: 160px;">Date</th>
                                                             <th>Meeting / Engagement</th>
                                                             <th style="width: 220px;">Participant(s)</th>
-                                                            <th style="width: 180px;">Location</th>
-                                                            <th>Reactions / Notes</th>
+                                                            <th style="width: 170px;">Status</th>
                                                             <th style="width: 50px;"></th>
                                                         </tr>
                                                     </thead>
@@ -269,7 +268,7 @@
                                                         @php
                                                             $resolvedReportMeetingRows = old('content.key_meetings', $reportMeetingRows ?? $reportMeetings ?? []);
                                                             if (!is_array($resolvedReportMeetingRows) || empty($resolvedReportMeetingRows)) {
-                                                                $resolvedReportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '', 'source_type' => 'report_manual', 'source_plan_id' => '', 'source_owner_user_id' => (string) auth()->id(), 'is_readonly_for_current_user' => false]];
+                                                                $resolvedReportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'status' => '', 'location' => '', 'reactions_notes' => '', 'source_type' => 'report_manual', 'source_plan_id' => '', 'source_owner_user_id' => (string) auth()->id(), 'is_readonly_for_current_user' => false]];
                                                             }
                                                         @endphp
                                                         @foreach($resolvedReportMeetingRows as $i => $meetingRow)
@@ -288,6 +287,8 @@
                                                                     <input type="hidden" name="content[key_meetings][{{ $i }}][source_plan_id]" value="{{ $sourcePlanId }}">
                                                                     <input type="hidden" name="content[key_meetings][{{ $i }}][source_owner_user_id]" value="{{ $sourceOwnerUserId }}">
                                                                     <input type="hidden" name="content[key_meetings][{{ $i }}][is_readonly_for_current_user]" value="{{ $isReadonlyMeeting ? '1' : '0' }}">
+                                                                    <input type="hidden" name="content[key_meetings][{{ $i }}][location]" value="{{ old("content.key_meetings.$i.location", $meetingRow['location'] ?? '') }}">
+                                                                    <input type="hidden" name="content[key_meetings][{{ $i }}][reactions_notes]" value="{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}">
                                                                     <input type="date" class="form-control"
                                                                         name="content[key_meetings][{{ $i }}][date]"
                                                                         value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}"
@@ -317,20 +318,11 @@
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <select class="form-select" name="content[key_meetings][{{ $i }}][location]" @if($isReadonlyMeeting) disabled @endif>
+                                                                    <select class="form-select" name="content[key_meetings][{{ $i }}][status]" @if($isReadonlyMeeting) disabled @endif>
                                                                         <option value="">-- Select --</option>
-                                                                        @foreach(['Office', 'Field', 'Virtual', 'On site'] as $loc)
-                                                                            <option value="{{ $loc }}" {{ old("content.key_meetings.$i.location", $meetingRow['location'] ?? '') === $loc ? 'selected' : '' }}>
-                                                                                {{ $loc }}
-                                                                            </option>
-                                                                        @endforeach
+                                                                        <option value="Done" {{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') === 'Done' ? 'selected' : '' }}>Done</option>
+                                                                        <option value="Not done" {{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') === 'Not done' ? 'selected' : '' }}>Not done</option>
                                                                     </select>
-                                                                </td>
-                                                                <td>
-                                                                    <textarea class="form-control" rows="5"
-                                                                        name="content[key_meetings][{{ $i }}][reactions_notes]"
-                                                                        placeholder="What happened?"
-                                                                        @if($isReadonlyMeeting) disabled @endif>{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}</textarea>
                                                                 </td>
                                                                 <td class="text-center align-middle">
                                                                     @if(!$isReadonlyMeeting)

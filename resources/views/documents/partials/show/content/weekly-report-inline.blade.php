@@ -182,6 +182,7 @@
                                                             <th style="width: 140px;">Date</th>
                                                             <th>Meeting / Engagement</th>
                                                             <th style="width: 220px;">Participant(s)</th>
+                                                            <th style="width: 120px;">Status</th>
                                                             <th style="width: 140px;">Location</th>
                                                             <th>Reactions / Notes</th>
                                                         </tr>
@@ -200,6 +201,7 @@
                                                                         ->all();
                                                                     $meetingEmpty = trim((string) ($meetingRow['date'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['meeting'] ?? '')) === ''
+                                                                        && trim((string) ($meetingRow['status'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['location'] ?? '')) === ''
                                                                         && trim((string) ($meetingRow['reactions_notes'] ?? '')) === ''
                                                                         && count($participantIds) === 0;
@@ -209,6 +211,7 @@
                                                                         <td>{{ $meetingRow['date'] ?? '' }}</td>
                                                                         <td>{{ $meetingRow['meeting'] ?? '' }}</td>
                                                                         <td>{{ implode(', ', $participantNames) }}</td>
+                                                                        <td>{{ $meetingRow['status'] ?? '' }}</td>
                                                                         <td>{{ $meetingRow['location'] ?? '' }}</td>
                                                                         <td>{{ $meetingRow['reactions_notes'] ?? '' }}</td>
                                                                     </tr>
@@ -216,7 +219,7 @@
                                                             @endforeach
                                                         @else
                                                             <tr>
-                                                                <td colspan="5" class="text-center text-muted py-4">No meetings progress recorded for this week.</td>
+                                                                <td colspan="6" class="text-center text-muted py-4">No meetings progress recorded for this week.</td>
                                                             </tr>
                                                         @endif
                                                     </tbody>

@@ -417,6 +417,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -441,6 +442,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -2639,7 +2641,7 @@ class DocumentController extends Controller
 
             $content['key_meetings'] = $this->filterNonEmptyRows(
                 $content['key_meetings'] ?? [],
-                ['date', 'meeting', 'participant_user_ids', 'location', 'reactions_notes']
+                ['date', 'meeting', 'participant_user_ids', 'status', 'location', 'reactions_notes']
             );
             $content['key_meetings'] = array_values(array_map(function ($row) {
                 if (! is_array($row)) {
@@ -2653,6 +2655,7 @@ class DocumentController extends Controller
                     static fn ($id) => trim((string) $id),
                     $participantIds
                 ))));
+                $row['status'] = trim((string) ($row['status'] ?? ''));
 
                 return $row;
             }, $content['key_meetings']));
@@ -3092,6 +3095,7 @@ class DocumentController extends Controller
             'date' => trim((string) ($row['date'] ?? '')),
             'meeting' => trim((string) ($row['meeting'] ?? '')),
             'participant_user_ids' => $participantIds,
+            'status' => trim((string) ($row['status'] ?? '')),
             'location' => trim((string) ($row['location'] ?? '')),
             'reactions_notes' => trim((string) ($row['reactions_notes'] ?? '')),
             'source_type' => trim($sourceType) !== '' ? trim($sourceType) : 'report_manual',

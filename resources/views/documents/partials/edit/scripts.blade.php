@@ -338,6 +338,8 @@
                             <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][source_plan_id]" value="">
                             <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][source_owner_user_id]" value="{{ (string) auth()->id() }}">
                             <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][is_readonly_for_current_user]" value="0">
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][location]" value="">
+                            <input type="hidden" name="content[key_meetings][${reportMeetingIndex}][reactions_notes]" value="">
                             <input type="date" class="form-control" name="content[key_meetings][${reportMeetingIndex}][date]">
                         </td>
                         <td><input class="form-control" name="content[key_meetings][${reportMeetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
@@ -347,15 +349,12 @@
                             </select>
                         </td>
                         <td>
-                            <select class="form-select" name="content[key_meetings][${reportMeetingIndex}][location]">
+                            <select class="form-select" name="content[key_meetings][${reportMeetingIndex}][status]">
                                 <option value="">-- Select --</option>
-                                <option value="Office">Office</option>
-                                <option value="Field">Field</option>
-                                <option value="Virtual">Virtual</option>
-                                <option value="On site">On site</option>
+                                <option value="Done">Done</option>
+                                <option value="Not done">Not done</option>
                             </select>
                         </td>
-                        <td><textarea class="form-control" rows="5" name="content[key_meetings][${reportMeetingIndex}][reactions_notes]" placeholder="What happened?"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button></td>
                     `;
                     reportMeetingsBody.appendChild(row);
