@@ -206,8 +206,8 @@ class ReviewerDocumentViewTest extends TestCase
 
         $this->actingAs($reviewer)->get(route('documents.reviewer-dashboard'))->assertOk()
             ->assertSee('Latest week sixteen report', false)
-            ->assertDontSee('Older week fourteen report', false)
-            ->assertDontSee('Middle week fifteen report', false);
+            ->assertSee('Middle week fifteen report', false)
+            ->assertDontSee('Older week fourteen report', false);
 
         $this->actingAs($reviewer)
             ->get(route('documents.reviewer-dashboard', ['work_period_id' => $week15->id]))

@@ -1436,15 +1436,6 @@ class DocumentController extends Controller
             $selectedWorkPeriodId = '';
         }
 
-        $currentWorkPeriodId = WorkPeriod::getCurrent()?->id;
-        if (($selectedWorkPeriodId === null || $selectedWorkPeriodId === '') && $latestPeriodIds !== []) {
-            if ($currentWorkPeriodId && in_array((string) $currentWorkPeriodId, $latestPeriodIds, true)) {
-                $selectedWorkPeriodId = (string) $currentWorkPeriodId;
-            } else {
-                $selectedWorkPeriodId = (string) $latestPeriods->first()->id;
-            }
-        }
-
         // Filter by user if provided
         if ($request->has('user_id') && $request->user_id) {
             $baseQuery->forUser($request->user_id);
