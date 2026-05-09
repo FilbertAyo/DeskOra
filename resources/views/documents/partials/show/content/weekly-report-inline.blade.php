@@ -1,6 +1,7 @@
                                 @php
                                     $summary = $content['summary'] ?? '';
                                     $activityProgress = $content['activity_progress'] ?? [];
+                                    $reportMeetings = is_array($content['key_meetings'] ?? null) ? $content['key_meetings'] : [];
                                     $keyAchievements = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
                                     $challengesMitigation = $content['challenges_mitigation'] ?? [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
@@ -30,6 +31,24 @@
                                         }
                                         foreach (['challenge', 'action_taken_planned'] as $k) {
                                             if (trim((string) ($row[$k] ?? '')) !== '') {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    });
+
+                                    $hasReportMeetings = collect($reportMeetings ?: [])->contains(function ($row) {
+                                        if (! is_array($row)) {
+                                            return false;
+                                        }
+                                        foreach (['date', 'meeting', 'participant_user_ids', 'location', 'reactions_notes'] as $k) {
+                                            $value = $row[$k] ?? null;
+                                            if (is_array($value)) {
+                                                if (count(array_filter(array_map(static fn ($item) => trim((string) $item), $value))) > 0) {
+                                                    return true;
+                                                }
+                                            } elseif (trim((string) $value) !== '') {
                                                 return true;
                                             }
                                         }
@@ -148,6 +167,61 @@
                                             @else
                                                 <div class="text-muted py-2">No key achievements recorded for this week.</div>
                                             @endif
+                                        </div>
+                                    </div>
+
+                                    <div class="card shadow-none border mb-4">
+                                        <div class="card-header bg-white border-bottom">
+                                            <h6 class="mb-0"><i class="ti ti-users me-2"></i>Meetings Progress</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered">
+                                                    <thead class="thead-light">
+                                                        <tr>
+                                                            <th style="width: 140px;">Date</th>
+                                                            <th>Meeting / Engagement</th>
+                                                            <th style="width: 220px;">Participant(s)</th>
+                                                            <th style="width: 140px;">Location</th>
+                                                            <th>Reactions / Notes</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @if($hasReportMeetings)
+                                                            @foreach(($reportMeetings ?: []) as $meetingRow)
+                                                                @php
+                                                                    $meetingRow = is_array($meetingRow) ? $meetingRow : [];
+                                                                    $participantIds = is_array($meetingRow['participant_user_ids'] ?? null) ? $meetingRow['participant_user_ids'] : [];
+                                                                    $participantIds = array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $participantIds)));
+                                                                    $participantNames = collect(($teamUsers ?? collect()))
+                                                                        ->whereIn('id', $participantIds)
+                                                                        ->pluck('name')
+                                                                        ->values()
+                                                                        ->all();
+                                                                    $meetingEmpty = trim((string) ($meetingRow['date'] ?? '')) === ''
+                                                                        && trim((string) ($meetingRow['meeting'] ?? '')) === ''
+                                                                        && trim((string) ($meetingRow['location'] ?? '')) === ''
+                                                                        && trim((string) ($meetingRow['reactions_notes'] ?? '')) === ''
+                                                                        && count($participantIds) === 0;
+                                                                @endphp
+                                                                @if(!$meetingEmpty)
+                                                                    <tr>
+                                                                        <td>{{ $meetingRow['date'] ?? '' }}</td>
+                                                                        <td>{{ $meetingRow['meeting'] ?? '' }}</td>
+                                                                        <td>{{ implode(', ', $participantNames) }}</td>
+                                                                        <td>{{ $meetingRow['location'] ?? '' }}</td>
+                                                                        <td>{{ $meetingRow['reactions_notes'] ?? '' }}</td>
+                                                                    </tr>
+                                                                @endif
+                                                            @endforeach
+                                                        @else
+                                                            <tr>
+                                                                <td colspan="5" class="text-center text-muted py-4">No meetings progress recorded for this week.</td>
+                                                            </tr>
+                                                        @endif
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                     </div>
 

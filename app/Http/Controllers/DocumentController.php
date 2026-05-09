@@ -429,6 +429,14 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 
+            $validationRules['content.key_meetings'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
+            $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
+
             $validationRules['content.key_achievements'] = ['nullable', 'array'];
             $validationRules['content.key_achievements.*'] = ['nullable', 'string', 'max:2000'];
 
@@ -1070,6 +1078,14 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.key_meetings'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
+            $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
+            $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_achievements'] = ['nullable', 'array'];
             $validationRules['content.key_achievements.*'] = ['nullable', 'string', 'max:2000'];
@@ -2582,6 +2598,26 @@ class DocumentController extends Controller
                 is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [],
                 fn ($item) => is_string($item) && $item !== ''
             ));
+
+            $content['key_meetings'] = $this->filterNonEmptyRows(
+                $content['key_meetings'] ?? [],
+                ['date', 'meeting', 'participant_user_ids', 'location', 'reactions_notes']
+            );
+            $content['key_meetings'] = array_values(array_map(function ($row) {
+                if (! is_array($row)) {
+                    return [];
+                }
+
+                $participantIds = is_array($row['participant_user_ids'] ?? null)
+                    ? $row['participant_user_ids']
+                    : [];
+                $row['participant_user_ids'] = array_values(array_unique(array_filter(array_map(
+                    static fn ($id) => trim((string) $id),
+                    $participantIds
+                ))));
+
+                return $row;
+            }, $content['key_meetings']));
 
             $content['activity_progress'] = $this->filterNonEmptyRows(
                 $content['activity_progress'] ?? [],

@@ -59,6 +59,8 @@
             const budgetBody = document.getElementById('budgetBody');
             const addReportActivityRowBtn = document.getElementById('addReportActivityRowBtn');
             const reportActivityProgressBody = document.getElementById('reportActivityProgressBody');
+            const addReportMeetingRowBtn = document.getElementById('addReportMeetingRowBtn');
+            const reportMeetingsBody = document.getElementById('reportMeetingsBody');
             const addAchievementRowBtn = document.getElementById('addAchievementRowBtn');
             const achievementsBody = document.getElementById('achievementsBody');
             const addChallengeRowBtn = document.getElementById('addChallengeRowBtn');
@@ -158,7 +160,11 @@
                         <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][notes_inclusion]" placeholder="Notes / inclusion"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-activity-row">&times;</button></td>
                     `;
-                    plannedActivitiesBody.appendChild(row);
+                    if (plannedActivitiesBody.firstChild) {
+                        plannedActivitiesBody.insertBefore(row, plannedActivitiesBody.firstChild);
+                    } else {
+                        plannedActivitiesBody.appendChild(row);
+                    }
                     activityIndex++;
                 });
 
@@ -264,7 +270,11 @@
                         <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][next_step]" placeholder="Next step"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-report-activity-row">&times;</button></td>
                     `;
-                    reportActivityProgressBody.appendChild(row);
+                    if (reportActivityProgressBody.firstChild) {
+                        reportActivityProgressBody.insertBefore(row, reportActivityProgressBody.firstChild);
+                    } else {
+                        reportActivityProgressBody.appendChild(row);
+                    }
                     reportActivityIndex++;
                     updateReportActivityRowNumbers();
                     syncOffPlanInputForSelect(row.querySelector('[data-off-plan-select="true"]'));
@@ -312,6 +322,44 @@
                     updateAchievementRowNumbers();
                 });
                 updateAchievementRowNumbers();
+            }
+
+            if (addReportMeetingRowBtn && reportMeetingsBody) {
+                let reportMeetingIndex = reportMeetingsBody.querySelectorAll('tr').length;
+
+                addReportMeetingRowBtn.addEventListener('click', function() {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><input type="date" class="form-control" name="content[key_meetings][${reportMeetingIndex}][date]"></td>
+                        <td><input class="form-control" name="content[key_meetings][${reportMeetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
+                        <td>
+                            <select class="form-select" multiple name="content[key_meetings][${reportMeetingIndex}][participant_user_ids][]">
+                                ${(window.__teamUsersOptionsHtml || '')}
+                            </select>
+                        </td>
+                        <td>
+                            <select class="form-select" name="content[key_meetings][${reportMeetingIndex}][location]">
+                                <option value="">-- Select --</option>
+                                <option value="Office">Office</option>
+                                <option value="Field">Field</option>
+                                <option value="Virtual">Virtual</option>
+                                <option value="On site">On site</option>
+                            </select>
+                        </td>
+                        <td><textarea class="form-control" rows="5" name="content[key_meetings][${reportMeetingIndex}][reactions_notes]" placeholder="What happened?"></textarea></td>
+                        <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button></td>
+                    `;
+                    reportMeetingsBody.appendChild(row);
+                    reportMeetingIndex++;
+                });
+
+                reportMeetingsBody.addEventListener('click', function(event) {
+                    const btn = event.target.closest('.remove-report-meeting-row');
+                    if (!btn) return;
+                    const rows = reportMeetingsBody.querySelectorAll('tr');
+                    if (rows.length <= 1) return;
+                    btn.closest('tr')?.remove();
+                });
             }
 
             if (addChallengeRowBtn && challengesMitigationBody) {

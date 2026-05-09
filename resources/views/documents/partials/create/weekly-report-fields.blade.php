@@ -241,7 +241,93 @@
     <div class="card border-secondary">
         <div class="card-header bg-white border-bottom">
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="ti ti-check-square me-2"></i>3. Key Achievements</h6>
+                <h6 class="mb-0"><i class="ti ti-users me-2"></i>3. Meetings Progress</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="addReportMeetingRowBtn">
+                    <i class="ti ti-plus me-1"></i> Add Meeting
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th style="width: 160px;">Date</th>
+                            <th>Meeting / Engagement</th>
+                            <th style="width: 220px;">Participant(s)</th>
+                            <th style="width: 180px;">Location</th>
+                            <th>Reactions / Notes</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportMeetingsBody">
+                        @php
+                            $reportMeetingRows = old('content.key_meetings', [
+                                ['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => ''],
+                            ]);
+                            if (!is_array($reportMeetingRows) || empty($reportMeetingRows)) {
+                                $reportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '']];
+                            }
+                        @endphp
+                        @foreach($reportMeetingRows as $i => $meetingRow)
+                            @php $meetingRow = is_array($meetingRow) ? $meetingRow : []; @endphp
+                            <tr>
+                                <td>
+                                    <input type="date" class="form-control"
+                                        name="content[key_meetings][{{ $i }}][date]"
+                                        value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}">
+                                </td>
+                                <td>
+                                    <input class="form-control"
+                                        name="content[key_meetings][{{ $i }}][meeting]"
+                                        value="{{ old("content.key_meetings.$i.meeting", $meetingRow['meeting'] ?? '') }}"
+                                        placeholder="Meeting / engagement">
+                                </td>
+                                <td>
+                                    @php
+                                        $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $meetingRow['participant_user_ids'] ?? []);
+                                        if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
+                                    @endphp
+                                    <select class="form-select" multiple name="content[key_meetings][{{ $i }}][participant_user_ids][]">
+                                        @foreach(($teamUsers ?? collect()) as $teamUser)
+                                            <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedParticipantIds), true) ? 'selected' : '' }}>
+                                                {{ $teamUser->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="form-select" name="content[key_meetings][{{ $i }}][location]">
+                                        <option value="">-- Select --</option>
+                                        @foreach(['Office', 'Field', 'Virtual', 'On site'] as $loc)
+                                            <option value="{{ $loc }}" {{ old("content.key_meetings.$i.location", $meetingRow['location'] ?? '') === $loc ? 'selected' : '' }}>
+                                                {{ $loc }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </td>
+                                <td>
+                                    <textarea class="form-control" rows="5"
+                                        name="content[key_meetings][{{ $i }}][reactions_notes]"
+                                        placeholder="What happened?">{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}</textarea>
+                                </td>
+                                <td class="text-center align-middle">
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="col-12 mb-3">
+    <div class="card border-secondary">
+        <div class="card-header bg-white border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="ti ti-check-square me-2"></i>4. Key Achievements</h6>
                 <button type="button" class="btn btn-sm btn-outline-primary" id="addAchievementRowBtn">
                     <i class="ti ti-plus me-1"></i> Add Achievement
                 </button>
@@ -289,7 +375,7 @@
     <div class="card border-warning">
         <div class="card-header bg-white border-bottom">
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="ti ti-alert-triangle me-2"></i>4. Challenges & Mitigation</h6>
+                <h6 class="mb-0"><i class="ti ti-alert-triangle me-2"></i>5. Challenges & Mitigation</h6>
                 <button type="button" class="btn btn-sm btn-outline-primary" id="addChallengeRowBtn">
                     <i class="ti ti-plus me-1"></i> Add Challenge
                 </button>
@@ -342,7 +428,7 @@
 <div class="col-12 mb-3" id="budgetStatusSectionContainer">
     <div class="card border-success">
         <div class="card-header bg-white border-bottom">
-            <h6 class="mb-0"><i class="ti ti-dollar-sign me-2"></i>5. Budget (from weekly plan)</h6>
+            <h6 class="mb-0"><i class="ti ti-dollar-sign me-2"></i>6. Budget (from weekly plan)</h6>
         </div>
         <div class="card-body">
             <div id="budgetStatusContainer">
