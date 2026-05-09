@@ -221,9 +221,6 @@
                                             <td>
                                                 @if($planDoc)
                                                     <strong class="d-block">{{ $planDoc->display_title }}</strong>
-                                                    <span class="badge {{ $planDoc->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
-                                                        {{ ucfirst($planDoc->state) }}
-                                                    </span>
                                                 @else
                                                     <span class="text-muted">Not submitted</span>
                                                 @endif
@@ -231,9 +228,6 @@
                                             <td>
                                                 @if($reportDoc)
                                                     <strong class="d-block">{{ $reportDoc->display_title }}</strong>
-                                                    <span class="badge {{ $reportDoc->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
-                                                        {{ ucfirst($reportDoc->state) }}
-                                                    </span>
                                                 @else
                                                     <span class="text-muted">Not submitted</span>
                                                 @endif

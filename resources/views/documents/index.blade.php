@@ -163,9 +163,7 @@
                                                                 {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
                                                             </span>
                                                         @endif
-                                                        <span class="badge {{ $planDoc->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
-                                                            {{ ucfirst($planDoc->state) }}
-                                                        </span>
+                                                      
                                                         @if(isset($returnedDocumentMap[$planDoc->id]))
                                                             <span class="badge bg-danger mt-1">Returned for Revision</span>
                                                         @endif
@@ -185,9 +183,7 @@
                                                                 {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
                                                             </span>
                                                         @endif
-                                                        <span class="badge {{ $reportDoc->state === 'submitted' ? 'bg-success' : 'bg-warning' }}">
-                                                            {{ ucfirst($reportDoc->state) }}
-                                                        </span>
+                                                     
                                                         @if(isset($returnedDocumentMap[$reportDoc->id]))
                                                             <span class="badge bg-danger mt-1">Returned for Revision</span>
                                                         @endif
