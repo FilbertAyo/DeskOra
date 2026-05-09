@@ -171,7 +171,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered mb-0">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th>Main Target</th>
                                                             <th style="width: 150px;">Status</th>
@@ -197,7 +197,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 90px;">Day</th>
                                                             <th>Activity</th>
@@ -261,7 +261,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 140px;">Date</th>
                                                             <th>Meeting</th>
@@ -326,7 +326,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 360px;">Budget Item / Activity</th>
                                                             <th >Description / Purpose</th>

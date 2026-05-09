@@ -148,7 +148,7 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-bordered align-middle mb-0">
-                    <thead class="thead-light">
+                    <thead class="wh-thead-weekly-report">
                         <tr>
                             <th style="width: 60px;">No.</th>
                             <th style="width: 320px;">Activity (from Weekly Plan)</th>
@@ -250,7 +250,7 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-bordered align-middle mb-0">
-                    <thead class="thead-light">
+                    <thead class="wh-thead-weekly-report">
                         <tr>
                             <th style="width: 160px;">Date</th>
                             <th>Meeting / Engagement</th>
@@ -348,7 +348,7 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-bordered align-middle mb-0">
-                    <thead class="thead-light">
+                    <thead class="wh-thead-weekly-report">
                         <tr>
                             <th style="width: 70px;">No.</th>
                             <th>Achievement</th>
@@ -396,7 +396,7 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-bordered align-middle mb-0">
-                    <thead class="thead-light">
+                    <thead class="wh-thead-weekly-report">
                         <tr>
                             <th>Challenge(s)</th>
                             <th style="width: 320px;">Action Taken/Planned</th>
@@ -446,7 +446,7 @@
             <div id="budgetStatusContainer">
                 <div class="table-responsive" id="budgetStatusTableWrapper" @if(count($planBudgetFiltered) === 0) style="display:none;" @endif>
                     <table class="table table-bordered align-middle mb-0">
-                        <thead class="thead-light">
+                        <thead class="wh-thead-weekly-report">
                             <tr>
                                 <th>Budget Item / Activity</th>
                                 <th style="width: 200px;">Amount</th>

@@ -92,7 +92,7 @@
                                             </div>
                                             <div class="table-responsive">
                                                 <table class="table table-bordered align-middle mb-0">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 100px;">Day</th>
                                                             <th>Activity</th>
@@ -213,7 +213,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered align-middle mb-0">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th style="width: 150px;">Date</th>
                                                             <th>Meeting / Engagement</th>
@@ -334,7 +334,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered align-middle mb-0">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th>Budget Item / Activity</th>
                                                             <th style="width: 600px;">Description / Purpose</th>

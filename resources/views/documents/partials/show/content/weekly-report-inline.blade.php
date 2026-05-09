@@ -76,7 +76,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 70px;">No.</th>
                                                             <th>Activity/Output</th>
@@ -148,7 +148,7 @@
                                             @if(count($achievementRows) > 0)
                                                 <div class="table-responsive">
                                                     <table class="table table-bordered mb-0">
-                                                        <thead class="thead-light">
+                                                        <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th style="width: 70px;">No.</th>
                                                                 <th>Achievement</th>
@@ -177,7 +177,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th style="width: 140px;">Date</th>
                                                             <th>Meeting / Engagement</th>
@@ -238,7 +238,7 @@
                                         <div class="card-body">
                                             <div class="table-responsive">
                                                 <table class="table table-bordered">
-                                                    <thead class="thead-light">
+                                                    <thead class="wh-thead-weekly-report">
                                                         <tr>
                                                             <th>Challenge(s)</th>
                                                             <th style="width: 360px;">Action Taken/Planned</th>
@@ -296,7 +296,7 @@
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
                                                     <table class="table table-bordered">
-                                                        <thead class="thead-light">
+                                                        <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th>Budget Item</th>
                                                                 <th style="width: 150px;">Amount</th>
