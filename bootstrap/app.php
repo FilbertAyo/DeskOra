@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        \App\Console\Commands\BackfillDocumentDomainTables::class,
+        \App\Console\Commands\VerifyDocumentDomainParity::class,
+    ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([ // Use 'alias' for route middleware
             'permission' => PermissionMiddleware::class,

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Document;
+use App\Models\WeeklyPlan;
 use App\Models\WeeklyActivityAssignment;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -21,7 +22,28 @@ class WeeklyActivityAssignmentService
             ? WeeklyActivityAssignment::STATUS_LOCKED
             : WeeklyActivityAssignment::STATUS_PREVIEW;
 
-        $activities = collect(is_array($weeklyPlan->content['planned_activities'] ?? null) ? $weeklyPlan->content['planned_activities'] : [])
+        $domainPlan = WeeklyPlan::query()
+            ->with('activities.assignees:id')
+            ->where('legacy_document_id', $weeklyPlan->id)
+            ->first();
+
+        $sourceRows = [];
+        if ($domainPlan) {
+            $sourceRows = $domainPlan->activities->map(function ($activity) {
+                return [
+                    'activity_uid' => (string) $activity->activity_uid,
+                    'day' => (string) ($activity->day ?? ''),
+                    'activity' => (string) ($activity->activity ?? ''),
+                    'location' => (string) ($activity->location ?? ''),
+                    'notes_inclusion' => (string) ($activity->notes_inclusion ?? ''),
+                    'team_member_ids' => $activity->assignees->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
+                ];
+            })->all();
+        } else {
+            $sourceRows = is_array($weeklyPlan->content['planned_activities'] ?? null) ? $weeklyPlan->content['planned_activities'] : [];
+        }
+
+        $activities = collect($sourceRows)
             ->filter(fn ($row) => is_array($row))
             ->map(function (array $row) {
                 $uid = trim((string) ($row['activity_uid'] ?? ''));

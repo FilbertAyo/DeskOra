@@ -207,74 +207,118 @@ class Document extends Model
             return [];
         }
 
-        $content = is_array($this->content) ? $this->content : [];
-        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-        $periodId = $this->period_id !== null && $this->period_id !== ''
-            ? (string) $this->period_id
-            : null;
+        $actionLog = ActionLog::query()
+            ->with([
+                'tasks.assignees:id,name',
+                'tasks.history',
+            ])
+            ->where('legacy_document_id', $this->id)
+            ->first();
 
-        $currentPeriod = $periodId !== null ? WorkPeriod::query()->find($periodId) : null;
-        $otherActionLogDocs = null;
-        if ($currentPeriod) {
-            $otherActionLogDocs = self::query()
-                ->where('type', self::TYPE_ACTION_LOG)
-                ->where('id', '!=', $this->id)
-                ->whereHas('period', function ($query) use ($currentPeriod): void {
-                    $query->whereDate('week_start_date', '<=', $currentPeriod->week_start_date);
-                })
-                ->with('period')
-                ->get();
-        }
+        if (! $actionLog) {
+            $content = is_array($this->content) ? $this->content : [];
+            $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+            $periodId = $this->period_id !== null && $this->period_id !== ''
+                ? (string) $this->period_id
+                : null;
 
-        $result = [];
-        foreach ($tasks as $task) {
-            if (! is_array($task)) {
-                continue;
+            $currentPeriod = $periodId !== null ? WorkPeriod::query()->find($periodId) : null;
+            $otherActionLogDocs = null;
+            if ($currentPeriod) {
+                $otherActionLogDocs = self::query()
+                    ->where('type', self::TYPE_ACTION_LOG)
+                    ->where('id', '!=', $this->id)
+                    ->whereHas('period', function ($query) use ($currentPeriod): void {
+                        $query->whereDate('week_start_date', '<=', $currentPeriod->week_start_date);
+                    })
+                    ->with('period')
+                    ->get();
             }
 
-            if ($periodId === null || $currentPeriod === null) {
-                $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
-                $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
-                $task['display_history'] = is_array($task['history'] ?? null)
+            $result = [];
+            foreach ($tasks as $task) {
+                if (! is_array($task)) {
+                    continue;
+                }
+
+                if ($periodId === null || $currentPeriod === null) {
+                    $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
+                    $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
+                    $task['display_history'] = is_array($task['history'] ?? null)
+                        ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
+                        : [];
+                    $result[] = $task;
+
+                    continue;
+                }
+
+                $ownHistory = is_array($task['history'] ?? null)
                     ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
                     : [];
+                $taskUid = trim((string) ($task['task_uid'] ?? ''));
+
+                $aggregatedByPeriod = $this->aggregateActionLogTaskHistory(
+                    $taskUid,
+                    $ownHistory,
+                    $otherActionLogDocs ?? collect(),
+                    $periodId
+                );
+
+                $task['display_history'] = $this->buildActionLogDisplayTimeline($aggregatedByPeriod, $currentPeriod);
+
+                $currentEntry = $aggregatedByPeriod[$periodId] ?? null;
+                if (is_array($currentEntry)) {
+                    $task['display_notes_progress'] = trim((string) ($currentEntry['notes_progress'] ?? ''));
+                    $toProgress = trim((string) ($currentEntry['to_progress'] ?? ''));
+                    $task['display_progress'] = $toProgress !== '' ? $toProgress : 'Not Started';
+                } elseif ($ownHistory === [] && $task['display_history'] === []) {
+                    $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
+                    $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
+                } else {
+                    $task['display_notes_progress'] = '';
+                    $task['display_progress'] = null;
+                }
+
                 $result[] = $task;
-
-                continue;
             }
 
-            $ownHistory = is_array($task['history'] ?? null)
-                ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
-                : [];
-            $taskUid = trim((string) ($task['task_uid'] ?? ''));
-
-            $aggregatedByPeriod = $this->aggregateActionLogTaskHistory(
-                $taskUid,
-                $ownHistory,
-                $otherActionLogDocs ?? collect(),
-                $periodId
-            );
-
-            $task['display_history'] = $this->buildActionLogDisplayTimeline($aggregatedByPeriod, $currentPeriod);
-
-            $currentEntry = $aggregatedByPeriod[$periodId] ?? null;
-            if (is_array($currentEntry)) {
-                $task['display_notes_progress'] = trim((string) ($currentEntry['notes_progress'] ?? ''));
-                $toProgress = trim((string) ($currentEntry['to_progress'] ?? ''));
-                $task['display_progress'] = $toProgress !== '' ? $toProgress : 'Not Started';
-            } elseif ($ownHistory === [] && $task['display_history'] === []) {
-                // Legacy/seeded rows with no history at all: keep stored row values.
-                $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
-                $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
-            } else {
-                $task['display_notes_progress'] = '';
-                $task['display_progress'] = null;
-            }
-
-            $result[] = $task;
+            return $result;
         }
 
-        return $result;
+        return $actionLog->tasks->map(function (ActionLogTask $task): array {
+            $history = $task->history
+                ->map(function (ActionLogTaskHistory $entry): array {
+                    return [
+                        'period_id' => $entry->period_id,
+                        'period_label' => $entry->period_label,
+                        'updated_by' => $entry->updated_by,
+                        'from_progress' => $entry->from_progress,
+                        'to_progress' => $entry->to_progress,
+                        'notes_progress' => $entry->notes_progress,
+                        'status_reason' => $entry->status_reason,
+                        'changed_at' => optional($entry->changed_at)->toDateTimeString(),
+                        'source' => $entry->source,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return [
+                'task_uid' => $task->task_uid,
+                'task_no' => $task->task_no,
+                'task' => $task->task,
+                'responsible_user_ids' => $task->assignees->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
+                'progress' => $task->progress,
+                'due_date' => optional($task->due_date)->format('Y-m-d'),
+                'compilation_date' => optional($task->compilation_date)->format('Y-m-d'),
+                'notes_progress' => $task->notes_progress,
+                'status_reason' => $task->status_reason,
+                'history' => $history,
+                'display_notes_progress' => $task->notes_progress,
+                'display_progress' => $task->progress ?: 'Not Started',
+                'display_history' => $history,
+            ];
+        })->values()->all();
     }
 
     /**
@@ -555,6 +599,26 @@ class Document extends Model
         return $this->hasMany(WeeklyActivityAssignment::class, 'source_document_id');
     }
 
+    public function weeklyPlanDomain(): BelongsTo
+    {
+        return $this->belongsTo(WeeklyPlan::class, 'id', 'legacy_document_id');
+    }
+
+    public function weeklyReportDomain(): BelongsTo
+    {
+        return $this->belongsTo(WeeklyReport::class, 'id', 'legacy_document_id');
+    }
+
+    public function monthlyReportDomain(): BelongsTo
+    {
+        return $this->belongsTo(MonthlyReport::class, 'id', 'legacy_document_id');
+    }
+
+    public function actionLogDomain(): BelongsTo
+    {
+        return $this->belongsTo(ActionLog::class, 'id', 'legacy_document_id');
+    }
+
     public function isSharedWith(string $userId): bool
     {
         return $this->sharedUsers()
@@ -751,11 +815,7 @@ class Document extends Model
     {
         return $query
             ->weeklyPlans()
-            ->where(function ($budgetQuery) {
-                $budgetQuery
-                    ->whereNotNull('budget_review_status')
-                    ->orWhereRaw("JSON_LENGTH(JSON_EXTRACT(content, '$.budget')) > 0");
-            });
+            ->whereHas('weeklyPlanDomain.budgetItems');
     }
 
     public function scopeBudgetPending($query)
@@ -969,8 +1029,12 @@ class Document extends Model
             ->submitted()
             ->where(function ($budgetQuery) {
                 $budgetQuery
-                    ->whereNotNull('budget_review_status')
-                    ->orWhere('content', 'like', '%"budget"%');
+                    ->whereHas('weeklyPlanDomain.budgetItems')
+                    ->orWhere(function ($legacyQuery) {
+                        $legacyQuery
+                            ->whereNotNull('budget_review_status')
+                            ->orWhere('content', 'like', '%"budget"%');
+                    });
             })
             ->where(function ($statusQuery) {
                 $statusQuery
@@ -1009,6 +1073,27 @@ class Document extends Model
      */
     public function budgetItems(): array
     {
+        $weeklyPlan = WeeklyPlan::query()
+            ->with('budgetItems')
+            ->where('legacy_document_id', $this->id)
+            ->first();
+
+        if ($weeklyPlan) {
+            return $weeklyPlan->budgetItems
+                ->map(function (WeeklyPlanBudgetItem $item): array {
+                    return [
+                        'budget_uid' => (string) $item->budget_uid,
+                        'item' => (string) ($item->item ?? ''),
+                        'description_purpose' => (string) ($item->description_purpose ?? ''),
+                        'amount' => (string) ($item->amount_raw ?? ''),
+                        'amount_numeric' => (float) ($item->amount_numeric ?? 0),
+                    ];
+                })
+                ->filter(static fn (array $row) => $row['item'] !== '' || $row['description_purpose'] !== '' || $row['amount'] !== '')
+                ->values()
+                ->all();
+        }
+
         if (! is_array($this->content)) {
             return [];
         }
@@ -1053,6 +1138,33 @@ class Document extends Model
      */
     public function budgetReviewItemsByUid(): array
     {
+        $weeklyPlan = WeeklyPlan::query()
+            ->with('budgetItems.review')
+            ->where('legacy_document_id', $this->id)
+            ->first();
+
+        if ($weeklyPlan) {
+            $mapped = [];
+            foreach ($weeklyPlan->budgetItems as $item) {
+                $uid = trim((string) $item->budget_uid);
+                if ($uid === '') {
+                    continue;
+                }
+                $review = $item->review;
+                $decision = $review?->decision ?? self::BUDGET_REVIEW_PENDING;
+                $mapped[$uid] = [
+                    'budget_uid' => $uid,
+                    'decision' => $decision,
+                    'provided_amount' => (float) ($review?->provided_amount ?? 0),
+                    'note' => $review?->note,
+                    'reviewed_by' => $review?->reviewed_by,
+                    'reviewed_at' => optional($review?->reviewed_at)->toIso8601String(),
+                ];
+            }
+
+            return $mapped;
+        }
+
         $rows = is_array($this->budget_review_items) ? $this->budget_review_items : [];
         $mapped = [];
 
@@ -1064,12 +1176,10 @@ class Document extends Model
             if ($uid === '') {
                 continue;
             }
-
             $decision = trim((string) ($row['decision'] ?? ''));
             if (! in_array($decision, [self::BUDGET_REVIEW_PENDING, self::BUDGET_REVIEW_APPROVED, self::BUDGET_REVIEW_REJECTED], true)) {
                 $decision = self::BUDGET_REVIEW_PENDING;
             }
-
             $mapped[$uid] = [
                 'budget_uid' => $uid,
                 'decision' => $decision,

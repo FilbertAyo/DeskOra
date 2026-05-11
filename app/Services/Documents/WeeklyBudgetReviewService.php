@@ -35,8 +35,12 @@ class WeeklyBudgetReviewService
             ->submitted()
             ->where(function ($budgetQuery) {
                 $budgetQuery
-                    ->whereNotNull('budget_review_status')
-                    ->orWhere('content', 'like', '%"budget"%');
+                    ->whereHas('weeklyPlanDomain.budgetItems')
+                    ->orWhere(function ($legacyQuery) {
+                        $legacyQuery
+                            ->whereNotNull('budget_review_status')
+                            ->orWhere('content', 'like', '%"budget"%');
+                    });
             });
 
         if ($request->filled('user_id')) {
@@ -59,11 +63,16 @@ class WeeklyBudgetReviewService
         if ($statusFilter === Document::BUDGET_REVIEW_PENDING) {
             $query->where(function ($statusQuery) {
                 $statusQuery
-                    ->whereNull('budget_review_status')
-                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
+                    ->whereHas('weeklyPlanDomain', function ($planQuery) {
+                        $planQuery
+                            ->whereNull('budget_review_status')
+                            ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
+                    });
             });
         } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED], true)) {
-            $query->where('budget_review_status', $statusFilter);
+            $query->whereHas('weeklyPlanDomain', function ($planQuery) use ($statusFilter) {
+                $planQuery->where('budget_review_status', $statusFilter);
+            });
         }
 
         return $query;

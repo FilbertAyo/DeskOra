@@ -5,8 +5,12 @@ namespace App\Http\Controllers;
 use App\Exports\WeeklyBudgetReviewExport;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyPlan;
+use App\Models\WeeklyPlanBudgetItem;
+use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
 use App\Services\Documents\DocumentListingService;
+use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\MonthlyReportYearPlanActivities;
 use App\Services\WeeklyActivityAssignmentService;
@@ -33,6 +37,7 @@ class DocumentController extends Controller
         private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
         private readonly DocumentListingService $documentListingService,
         private readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
+        private readonly DocumentDomainSyncService $documentDomainSyncService,
     ) {}
 
     /**
@@ -789,6 +794,7 @@ class DocumentController extends Controller
             }
 
             $existingDocument->update($updateData);
+            $this->documentDomainSyncService->syncFromDocument($existingDocument->fresh());
             if (Document::supportsSharedEditing($existingDocument->type)) {
                 $this->syncDocumentShares($existingDocument, $sharedUserIds, $user);
             }
@@ -856,6 +862,7 @@ class DocumentController extends Controller
         }
 
         $document = Document::create($documentData);
+        $this->documentDomainSyncService->syncFromDocument($document->fresh());
         if (Document::supportsSharedEditing($document->type)) {
             $this->syncDocumentShares($document, $sharedUserIds, $user);
         }
@@ -1320,6 +1327,7 @@ class DocumentController extends Controller
         }
 
         $document->update($updateData);
+        $this->documentDomainSyncService->syncFromDocument($document->fresh());
         if (Document::supportsSharedEditing($document->type)) {
             $this->syncDocumentShares($document, $sharedUserIds, $actingUser);
         }
@@ -1370,6 +1378,7 @@ class DocumentController extends Controller
         $this->authorize('submit', $document);
 
         $document->submit();
+        $this->documentDomainSyncService->syncFromDocument($document->fresh());
         $this->syncWeeklyPlanAssignments($document);
         if (! $wasSubmitted) {
             $document->loadMissing('period');
@@ -1398,6 +1407,7 @@ class DocumentController extends Controller
         $reason = trim($validated['reason']);
 
         $document->revertToDraft($reason);
+        $this->documentDomainSyncService->syncFromDocument($document->fresh());
         $this->syncWeeklyPlanAssignments($document);
         $document->loadMissing('user', 'period');
         $this->workflowEmailNotificationService->notifyWeeklyDocumentReturnedToDraft($document, $actingUser, $reason);
@@ -1787,54 +1797,45 @@ class DocumentController extends Controller
         if ($plan) {
             $budgetItems = [];
             $reviewsByUid = $plan->budgetReviewItemsByUid();
-            if (is_array($plan->content) && ! empty($plan->content['budget']) && is_array($plan->content['budget'])) {
-                // Normalize into a simple array for the UI, including review metadata.
-                $budgetItems = array_values(array_map(function ($row) use ($reviewsByUid) {
-                    if (! is_array($row)) {
-                        return null;
-                    }
+            $budgetItems = array_values(array_map(function ($row) use ($reviewsByUid) {
+                if (! is_array($row)) {
+                    return null;
+                }
+                $uid = trim((string) ($row['budget_uid'] ?? ''));
+                $review = $uid !== '' ? ($reviewsByUid[$uid] ?? null) : null;
 
-                    $uid = trim((string) ($row['budget_uid'] ?? ''));
-                    $review = $uid !== '' ? ($reviewsByUid[$uid] ?? null) : null;
-
-                    return [
-                        'item' => $row['item'] ?? null,
-                        'description_purpose' => $row['description_purpose'] ?? null,
-                        'amount' => $row['amount'] ?? null,
-                        'budget_uid' => $uid,
-                        'review_decision' => $review['decision'] ?? null,
-                        'review_provided_amount' => $review['provided_amount'] ?? null,
-                        'review_note' => $review['note'] ?? null,
-                    ];
-                }, $plan->content['budget']));
-                // Remove empty rows (e.g., all fields blank)
-                $budgetItems = array_values(array_filter($budgetItems, function ($row) {
-                    if (! is_array($row)) {
-                        return false;
-                    }
-
-                    return ! empty($row['item']) || ! empty($row['description_purpose']) || ! empty($row['amount']);
-                }));
-            }
+                return [
+                    'item' => $row['item'] ?? null,
+                    'description_purpose' => $row['description_purpose'] ?? null,
+                    'amount' => $row['amount'] ?? null,
+                    'budget_uid' => $uid,
+                    'review_decision' => $review['decision'] ?? null,
+                    'review_provided_amount' => $review['provided_amount'] ?? null,
+                    'review_note' => $review['note'] ?? null,
+                ];
+            }, $plan->budgetItems()));
+            $budgetItems = array_values(array_filter($budgetItems));
 
             $plannedActivities = [];
-            if (is_array($plan->content) && ! empty($plan->content['planned_activities']) && is_array($plan->content['planned_activities'])) {
-                $plannedActivities = array_values(array_filter(array_map(function ($row) {
-                    if (! is_array($row)) {
-                        return null;
-                    }
-                    $activity = trim((string) ($row['activity'] ?? ''));
-                    if ($activity === '') {
-                        return null;
-                    }
-                    $day = trim((string) ($row['day'] ?? ''));
+            $weeklyPlan = $plan->weeklyPlanDomain()->with('activities')->first();
+            if ($weeklyPlan) {
+                $plannedActivities = $weeklyPlan->activities
+                    ->map(function ($row) {
+                        $activity = trim((string) ($row->activity ?? ''));
+                        if ($activity === '') {
+                            return null;
+                        }
+                        $day = trim((string) ($row->day ?? ''));
 
-                    return [
-                        'day' => $day,
-                        'activity' => $activity,
-                        'label' => $day !== '' ? ($day.' - '.$activity) : $activity,
-                    ];
-                }, $plan->content['planned_activities'])));
+                        return [
+                            'day' => $day,
+                            'activity' => $activity,
+                            'label' => $day !== '' ? ($day.' - '.$activity) : $activity,
+                        ];
+                    })
+                    ->filter()
+                    ->values()
+                    ->all();
             }
 
             return response()->json([
@@ -1957,8 +1958,12 @@ class DocumentController extends Controller
                     ->submitted()
                     ->where(function ($budgetQuery) {
                         $budgetQuery
-                            ->whereNotNull('budget_review_status')
-                            ->orWhere('content', 'like', '%"budget"%');
+                            ->whereHas('weeklyPlanDomain.budgetItems')
+                            ->orWhere(function ($legacyQuery) {
+                                $legacyQuery
+                                    ->whereNotNull('budget_review_status')
+                                    ->orWhere('content', 'like', '%"budget"%');
+                            });
                     });
             })
             ->orderBy('name')
@@ -2113,44 +2118,92 @@ class DocumentController extends Controller
             : 0.0;
         $note = isset($validated['note']) && trim($validated['note']) !== '' ? trim($validated['note']) : null;
 
-        // Verify the UID exists in the plan's budget items
-        $budgetItems = $document->budgetItems();
-        $uidExists = collect($budgetItems)->contains(fn ($item) => $item['budget_uid'] === $budgetUid);
-        if (! $uidExists) {
+        $weeklyPlan = WeeklyPlan::query()
+            ->where('legacy_document_id', $document->id)
+            ->first();
+        if (! $weeklyPlan) {
+            // Legacy fallback path (pre-backfill/testing).
+            $uidExists = collect($document->budgetItems())
+                ->contains(fn ($item) => is_array($item) && ($item['budget_uid'] ?? null) === $budgetUid);
+            if (! $uidExists) {
+                return redirect()
+                    ->back()
+                    ->with('error', 'Budget item not found in this plan.');
+            }
+
+            $existingReviews = is_array($document->budget_review_items) ? $document->budget_review_items : [];
+            $found = false;
+            foreach ($existingReviews as &$review) {
+                if (is_array($review) && ($review['budget_uid'] ?? '') === $budgetUid) {
+                    $review['decision'] = $decision;
+                    $review['provided_amount'] = $providedAmount;
+                    $review['note'] = $note;
+                    $review['reviewed_by'] = $user->id;
+                    $review['reviewed_at'] = now()->toIso8601String();
+                    $found = true;
+                    break;
+                }
+            }
+            unset($review);
+            if (! $found) {
+                $existingReviews[] = [
+                    'budget_uid' => $budgetUid,
+                    'decision' => $decision,
+                    'provided_amount' => $providedAmount,
+                    'note' => $note,
+                    'reviewed_by' => $user->id,
+                    'reviewed_at' => now()->toIso8601String(),
+                ];
+            }
+
+            $document->budget_review_items = $existingReviews;
+            $summary = $document->budgetReviewSummary();
+            $planStatus = Document::BUDGET_REVIEW_PENDING;
+            if ($summary['all_approved']) {
+                $planStatus = Document::BUDGET_REVIEW_APPROVED;
+            } elseif ($summary['all_rejected']) {
+                $planStatus = Document::BUDGET_REVIEW_REJECTED;
+            } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
+                $planStatus = Document::BUDGET_REVIEW_APPROVED;
+            }
+
+            $document->update([
+                'budget_review_items' => $existingReviews,
+                'budget_review_status' => $planStatus,
+                'budget_reviewed_by' => $user->id,
+                'budget_reviewed_at' => now(),
+                'budget_provided_amount' => $summary['provided_total'],
+                'budget_review_note' => null,
+            ]);
+
+            return redirect()
+                ->back()
+                ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
+        }
+
+        $budgetItem = WeeklyPlanBudgetItem::query()
+            ->where('weekly_plan_id', $weeklyPlan->id)
+            ->where('budget_uid', $budgetUid)
+            ->first();
+        if (! $budgetItem) {
             return redirect()
                 ->back()
                 ->with('error', 'Budget item not found in this plan.');
         }
 
-        // Update the specific item in budget_review_items
-        $existingReviews = is_array($document->budget_review_items) ? $document->budget_review_items : [];
-        $found = false;
-        foreach ($existingReviews as &$review) {
-            if (is_array($review) && ($review['budget_uid'] ?? '') === $budgetUid) {
-                $review['decision'] = $decision;
-                $review['provided_amount'] = $providedAmount;
-                $review['note'] = $note;
-                $review['reviewed_by'] = $user->id;
-                $review['reviewed_at'] = now()->toIso8601String();
-                $found = true;
-                break;
-            }
-        }
-        unset($review);
-
-        if (! $found) {
-            $existingReviews[] = [
-                'budget_uid' => $budgetUid,
+        WeeklyPlanBudgetReview::query()->updateOrCreate(
+            ['weekly_plan_budget_item_id' => $budgetItem->id],
+            [
                 'decision' => $decision,
                 'provided_amount' => $providedAmount,
                 'note' => $note,
                 'reviewed_by' => $user->id,
-                'reviewed_at' => now()->toIso8601String(),
-            ];
-        }
+                'reviewed_at' => now(),
+            ]
+        );
 
         // Recompute plan-level summary from all item decisions
-        $document->budget_review_items = $existingReviews;
+        $document->unsetRelation('weeklyPlanDomain');
         $summary = $document->budgetReviewSummary();
 
         $planStatus = Document::BUDGET_REVIEW_PENDING;
@@ -2163,8 +2216,14 @@ class DocumentController extends Controller
             $planStatus = Document::BUDGET_REVIEW_APPROVED;
         }
 
+        $weeklyPlan->update([
+            'budget_review_status' => $planStatus,
+            'budget_reviewed_by' => $user->id,
+            'budget_reviewed_at' => now(),
+            'budget_provided_amount' => $summary['provided_total'],
+            'budget_review_note' => null,
+        ]);
         $document->update([
-            'budget_review_items' => $existingReviews,
             'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
             'budget_reviewed_at' => now(),
@@ -2206,31 +2265,80 @@ class DocumentController extends Controller
                 ->with('error', 'No submitted weekly plan found for the selected staff and work period.');
         }
 
-        $content = is_array($targetDocument->content) ? $targetDocument->content : [];
-        $budgetRows = is_array($content['budget'] ?? null) ? $content['budget'] : [];
+        $weeklyPlan = WeeklyPlan::query()
+            ->where('legacy_document_id', $targetDocument->id)
+            ->first();
+        if (! $weeklyPlan) {
+            // Legacy fallback path (pre-backfill/testing).
+            $content = is_array($targetDocument->content) ? $targetDocument->content : [];
+            $budgetRows = is_array($content['budget'] ?? null) ? $content['budget'] : [];
+            $budgetUid = (string) Str::ulid();
+            $amountNumeric = (float) $validated['amount'];
+            $budgetRows[] = [
+                'budget_uid' => $budgetUid,
+                'item' => 'Mid-week Budget',
+                'description_purpose' => trim((string) $validated['reason']),
+                'amount' => number_format($amountNumeric, 2, '.', ''),
+            ];
+            $content['budget'] = $budgetRows;
+            $existingReviews = is_array($targetDocument->budget_review_items) ? $targetDocument->budget_review_items : [];
+            $existingReviews[] = [
+                'budget_uid' => $budgetUid,
+                'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'provided_amount' => $amountNumeric,
+                'note' => null,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => now()->toIso8601String(),
+            ];
+            $targetDocument->content = $content;
+            $targetDocument->budget_review_items = $existingReviews;
+            $summary = $targetDocument->budgetReviewSummary();
+            $planStatus = Document::BUDGET_REVIEW_PENDING;
+            if ($summary['all_approved']) {
+                $planStatus = Document::BUDGET_REVIEW_APPROVED;
+            } elseif ($summary['all_rejected']) {
+                $planStatus = Document::BUDGET_REVIEW_REJECTED;
+            } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
+                $planStatus = Document::BUDGET_REVIEW_APPROVED;
+            }
+            $targetDocument->update([
+                'content' => $content,
+                'budget_review_items' => $existingReviews,
+                'budget_review_status' => $planStatus,
+                'budget_reviewed_by' => $user->id,
+                'budget_reviewed_at' => now(),
+                'budget_provided_amount' => $summary['provided_total'],
+                'budget_review_note' => null,
+            ]);
+
+            return redirect()
+                ->back()
+                ->with('success', 'Mid-week budget entry added successfully.');
+        }
+
         $budgetUid = (string) Str::ulid();
         $amountNumeric = (float) $validated['amount'];
-
-        $budgetRows[] = [
+        $budgetItem = WeeklyPlanBudgetItem::query()->create([
+            'weekly_plan_id' => $weeklyPlan->id,
             'budget_uid' => $budgetUid,
             'item' => 'Mid-week Budget',
             'description_purpose' => trim((string) $validated['reason']),
-            'amount' => number_format($amountNumeric, 2, '.', ''),
-        ];
-        $content['budget'] = $budgetRows;
+            'amount_raw' => number_format($amountNumeric, 2, '.', ''),
+            'amount_numeric' => $amountNumeric,
+            'sort_order' => (int) WeeklyPlanBudgetItem::query()->where('weekly_plan_id', $weeklyPlan->id)->count(),
+        ]);
+        WeeklyPlanBudgetReview::query()->updateOrCreate(
+            ['weekly_plan_budget_item_id' => $budgetItem->id],
+            [
+                'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'provided_amount' => $amountNumeric,
+                'note' => null,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => now(),
+            ]
+        );
 
-        $existingReviews = is_array($targetDocument->budget_review_items) ? $targetDocument->budget_review_items : [];
-        $existingReviews[] = [
-            'budget_uid' => $budgetUid,
-            'decision' => Document::BUDGET_REVIEW_APPROVED,
-            'provided_amount' => $amountNumeric,
-            'note' => null,
-            'reviewed_by' => $user->id,
-            'reviewed_at' => now()->toIso8601String(),
-        ];
-
-        $targetDocument->content = $content;
-        $targetDocument->budget_review_items = $existingReviews;
+        $targetDocument->unsetRelation('weeklyPlanDomain');
         $summary = $targetDocument->budgetReviewSummary();
 
         $planStatus = Document::BUDGET_REVIEW_PENDING;
@@ -2242,9 +2350,14 @@ class DocumentController extends Controller
             $planStatus = Document::BUDGET_REVIEW_APPROVED;
         }
 
+        $weeklyPlan->update([
+            'budget_review_status' => $planStatus,
+            'budget_reviewed_by' => $user->id,
+            'budget_reviewed_at' => now(),
+            'budget_provided_amount' => $summary['provided_total'],
+            'budget_review_note' => null,
+        ]);
         $targetDocument->update([
-            'content' => $content,
-            'budget_review_items' => $existingReviews,
             'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
             'budget_reviewed_at' => now(),
@@ -3305,6 +3418,7 @@ class DocumentController extends Controller
         $nextPlanContent['planned_activities'] = $this->ensureWeeklyPlanActivityUids($existingActivities);
         $nextPlanContent = $this->normalizeTemplateContent($nextPlanContent, Document::TYPE_WEEKLY_PLAN);
         $nextPlan->update(['content' => $nextPlanContent]);
+        $this->documentDomainSyncService->syncFromDocument($nextPlan->fresh());
         $this->syncWeeklyPlanAssignments($nextPlan);
     }
 
