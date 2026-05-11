@@ -1,0 +1,1 @@
+so what i want is i already downloded latest database (adilisha_portal (1).sql) and it has all data so i uploaded to the local database and once i logged in i found everything on dashboards 

@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -24,13 +25,14 @@ class DashboardController extends Controller
     public function redirect()
     {
 
-        // This is very important but later should be moved to Console/Command for automatic update
-        DB::table('requests')
-            ->where('status', 'resubmission')
-            ->where('updated_at', '<', now()->subDay())
-            ->update(['status' => 'rejected']);
+        if (Schema::hasTable('requests')) {
+            DB::table('requests')
+                ->where('status', 'resubmission')
+                ->where('updated_at', '<', now()->subDay())
+                ->update(['status' => 'rejected']);
 
-        Log::info('Dashboard-triggered auto-reject of stale petty cash requests.');
+            Log::info('Dashboard-triggered auto-reject of stale petty cash requests.');
+        }
 
         // End of it
         /** @var \App\Models\User $authUser */

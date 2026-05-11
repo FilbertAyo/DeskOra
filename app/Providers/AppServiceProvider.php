@@ -9,6 +9,7 @@ use App\Models\WorkPeriod;
 use App\Services\WeeklySubmissionReminderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -32,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
             $approvedCount = 0;
             $processingCount = 0;
 
-            if (Auth::check()) {
+            if (Auth::check() && Schema::hasTable('requests')) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
                 $counts = Cache::remember('petty-nav-counts-user-'.$user->id, now()->addSeconds(45), function () use ($user) {
@@ -48,10 +49,11 @@ class AppServiceProvider extends ServiceProvider
                 $approvedCount = (int) ($counts['approved'] ?? 0);
             }
 
-            // This one doesn't depend on user.
-            $processingCount = Cache::remember('petty-nav-count-processing', now()->addSeconds(45), function () {
-                return FinanceRequest::where('status', 'processing')->count();
-            });
+            if (Schema::hasTable('requests')) {
+                $processingCount = Cache::remember('petty-nav-count-processing', now()->addSeconds(45), function () {
+                    return FinanceRequest::where('status', 'processing')->count();
+                });
+            }
 
             $view->with([
                 'pendingPettiesCount' => $pendingCount,

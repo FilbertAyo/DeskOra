@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\CausesActivity;
@@ -67,7 +68,12 @@ class User extends Authenticatable
 
     public function departmentScopeIds(): array
     {
-        $subDepartmentIds = $this->subDepartments()->pluck('departments.id')->all();
+        if (Schema::hasTable('sub_department_user')) {
+            $subDepartmentIds = $this->subDepartments()->pluck('departments.id')->all();
+        } else {
+            $subDepartmentIds = [];
+        }
+
         if (! empty($subDepartmentIds)) {
             $scoped = [];
             $subDepartments = Department::whereIn('id', $subDepartmentIds)->get();
