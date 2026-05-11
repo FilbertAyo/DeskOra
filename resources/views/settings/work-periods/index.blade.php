@@ -20,6 +20,9 @@
                                 <i class="ti ti-refresh"></i>
                             </button>
                             @if(Auth::user()->hasPermissionTo('manage work periods'))
+                                <a href="{{ route('documents.index', ['review_status' => 'draft']) }}" class="btn btn-info btn-sm">
+                                    <i class="ti ti-file-search me-1"></i> Retrieve Converted Docs
+                                </a>
                                 <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#reopenAndResetModal">
                                     <i class="ti ti-rotate-clockwise me-1"></i> Reopen + Reset Docs
                                 </button>

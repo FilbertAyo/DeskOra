@@ -49,10 +49,12 @@ class DocumentController extends Controller
         $user = Auth::user();
         $query = Document::with(['user', 'period', 'sharedUsers:id,name']);
 
+        $reviewStatus = (string) $request->input('review_status', '');
+
         // Submitted documents are listed organization-wide for Monday stand-ups.
-        // Returned-for-revision drafts stay limited to the author/collaborators (reviewers see all).
+        // Draft-focused views stay limited to owner/collaborators unless user can view all.
         $scopedToOwnDocuments = ! $user->hasPermissionTo('view all documents')
-            && $request->input('review_status') === 'returned';
+            && in_array($reviewStatus, ['returned', 'draft'], true);
 
         if ($scopedToOwnDocuments) {
             $query->forOwnerOrSharedUser($user->id);
@@ -106,11 +108,13 @@ class DocumentController extends Controller
         // This page focuses on weekly plan/report rows.
         $query->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]);
 
-        if ($request->input('review_status') === 'returned') {
+        if ($reviewStatus === 'returned') {
             $query->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
                 ->where('state', Document::STATE_DRAFT)
                 ->whereNotNull('review_rejection_reason')
                 ->where('review_rejection_reason', '!=', '');
+        } elseif ($reviewStatus === 'draft') {
+            $query->where('state', Document::STATE_DRAFT);
         } else {
             // Default documents list to submitted items only.
             $query->submitted();
