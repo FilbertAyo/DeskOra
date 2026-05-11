@@ -53,12 +53,6 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
             'budget_reviewed_at' => now(),
             'budget_provided_amount' => 12000,
             'budget_review_note' => 'Approved previously',
-            'budget_review_items' => [
-                [
-                    'budget_uid' => 'line_1',
-                    'decision' => Document::BUDGET_REVIEW_APPROVED,
-                ],
-            ],
             'content' => [],
         ]);
 
@@ -134,7 +128,6 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
             'budget_reviewed_at' => null,
             'budget_provided_amount' => null,
             'budget_review_note' => null,
-            'budget_review_items' => null,
         ]);
 
         $this->assertDatabaseHas('documents', [

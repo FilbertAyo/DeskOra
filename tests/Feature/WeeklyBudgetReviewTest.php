@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyPlan;
+use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
+use App\Services\Documents\DocumentDomainSyncService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -91,20 +94,7 @@ class WeeklyBudgetReviewTest extends TestCase
             'budget' => $budgetRows,
         ];
 
-        // Build initial review items (pending)
-        $reviewItems = [];
-        foreach ($budgetRows as $budgetRow) {
-            $reviewItems[] = [
-                'budget_uid' => $budgetRow['budget_uid'],
-                'decision' => Document::BUDGET_REVIEW_PENDING,
-                'provided_amount' => 0,
-                'note' => null,
-                'reviewed_by' => null,
-                'reviewed_at' => null,
-            ];
-        }
-
-        return Document::create([
+        $document = Document::create([
             'user_id' => $user->id,
             'period_id' => $period->id,
             'type' => Document::TYPE_WEEKLY_PLAN,
@@ -113,8 +103,11 @@ class WeeklyBudgetReviewTest extends TestCase
             'main_target' => 'Test target',
             'content' => $content,
             'budget_review_status' => Document::BUDGET_REVIEW_PENDING,
-            'budget_review_items' => $reviewItems,
         ]);
+
+        app(DocumentDomainSyncService::class)->syncFromDocument($document->fresh());
+
+        return $document->fresh();
     }
 
     // ------------------------------------------------------------------
@@ -726,13 +719,17 @@ class WeeklyBudgetReviewTest extends TestCase
         ]);
 
         $items = $plan->budgetItems();
+        $weeklyPlan = WeeklyPlan::query()->where('legacy_document_id', $plan->id)->firstOrFail();
+        $domainItems = $weeklyPlan->budgetItems()->with('review')->get();
 
-        // Mark one approved, one rejected, leave one pending
-        $reviews = $plan->budget_review_items;
-        $reviews[0]['decision'] = 'approved';
-        $reviews[0]['provided_amount'] = 80;
-        $reviews[1]['decision'] = 'rejected';
-        $plan->update(['budget_review_items' => $reviews]);
+        WeeklyPlanBudgetReview::query()->updateOrCreate(
+            ['weekly_plan_budget_item_id' => $domainItems[0]->id],
+            ['decision' => Document::BUDGET_REVIEW_APPROVED, 'provided_amount' => 80]
+        );
+        WeeklyPlanBudgetReview::query()->updateOrCreate(
+            ['weekly_plan_budget_item_id' => $domainItems[1]->id],
+            ['decision' => Document::BUDGET_REVIEW_REJECTED, 'provided_amount' => 0]
+        );
         $plan->refresh();
 
         $summary = $plan->budgetReviewSummary();
