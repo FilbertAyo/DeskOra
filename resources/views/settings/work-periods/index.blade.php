@@ -23,6 +23,7 @@
                                 <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#reopenAndResetModal">
                                     <i class="ti ti-rotate-clockwise me-1"></i> Reopen + Reset Docs
                                 </button>
+                                <span class="badge bg-light-primary text-primary" id="selectedPeriodsBadge">0 selected</span>
                                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
                                     <i class="ti ti-plus-circle me-1"></i> Add Work Period
                                 </button>
@@ -121,6 +122,9 @@
                             <table class="table table-hover table-bordered table-striped">
                                 <thead class="thead-light">
                                     <tr>
+                                        <th class="text-center" style="width: 45px;">
+                                            <input type="checkbox" id="selectAllPeriods" title="Select all displayed periods">
+                                        </th>
                                         <th class="text-center" style="width: 50px;">No.</th>
                                         <th>Year</th>
                                         <th>Week</th>
@@ -135,6 +139,9 @@
                                 <tbody>
                                     @foreach($periods as $index => $period)
                                         <tr>
+                                            <td class="text-center">
+                                                <input type="checkbox" class="period-checkbox" value="{{ $period->id }}" aria-label="Select period {{ $period->year }} week {{ $period->week_number }}">
+                                            </td>
                                             <td class="text-center">{{ ($periods->currentPage() - 1) * $periods->perPage() + $loop->iteration }}</td>
                                             <td><strong>{{ $period->year }}</strong></td>
                                             <td>Week {{ $period->week_number }}</td>
@@ -236,26 +243,28 @@
             <div class="modal-content">
                 <form method="POST" action="{{ route('work-periods.reopen-and-reset') }}">
                     @csrf
+                    <div id="selectedPeriodIdsContainer"></div>
                     <div class="modal-header">
                         <h5 class="modal-title" id="reopenAndResetModalLabel">
                             <i class="ti ti-alert-triangle me-2 text-warning"></i>
-                            Reopen Closed Periods + Reset Weekly Docs
+                            Reopen Selected Periods + Reset Weekly Docs
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-warning mb-3">
-                            <strong>Important:</strong> This action affects all staff organization-wide.
+                            <strong>Important:</strong> This affects only selected periods but applies organization-wide within those periods.
                         </div>
+                        <p class="mb-2">Selected periods: <strong id="selectedPeriodsCountInModal">0</strong></p>
                         <ul class="mb-0">
-                            <li>All <strong>closed</strong> work periods will be changed to <strong>open</strong>.</li>
-                            <li>All weekly plans and weekly reports will be moved to <strong>draft</strong>.</li>
-                            <li>Staff will be able to update and re-submit their weekly documents.</li>
+                            <li>Only selected <strong>closed</strong> periods will be changed to <strong>open</strong>.</li>
+                            <li>Only weekly plans and weekly reports in selected periods will be moved to <strong>draft</strong>.</li>
+                            <li>Select one or more periods from the table before confirming.</li>
                         </ul>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-warning" onclick="return confirm('Confirm bulk reset for all periods and weekly documents?');">
+                        <button type="submit" class="btn btn-warning" id="confirmReopenResetBtn" onclick="return confirm('Confirm bulk reset for selected periods and their weekly documents?');">
                             <i class="ti ti-rotate-clockwise me-1"></i> Confirm Reopen + Reset
                         </button>
                     </div>
@@ -408,6 +417,14 @@
         const yearInput = document.getElementById('modal_year');
         const weekInput = document.getElementById('modal_week_number');
         const weekStartInput = document.getElementById('modal_week_start_date');
+        const selectAllPeriods = document.getElementById('selectAllPeriods');
+        const periodCheckboxes = Array.from(document.querySelectorAll('.period-checkbox'));
+        const selectedPeriodsBadge = document.getElementById('selectedPeriodsBadge');
+        const selectedPeriodsCountInModal = document.getElementById('selectedPeriodsCountInModal');
+        const selectedPeriodIdsContainer = document.getElementById('selectedPeriodIdsContainer');
+        const reopenAndResetModal = document.getElementById('reopenAndResetModal');
+        const reopenAndResetForm = reopenAndResetModal?.querySelector('form');
+        const confirmReopenResetBtn = document.getElementById('confirmReopenResetBtn');
 
         function enforceNextWeekOnlyValues() {
             if (yearInput && nextWeekYear) {
@@ -423,6 +440,34 @@
             }
         }
 
+        function getSelectedPeriodIds() {
+            return periodCheckboxes
+                .filter((checkbox) => checkbox.checked)
+                .map((checkbox) => checkbox.value);
+        }
+
+        function syncSelectedPeriodsUI() {
+            const selectedIds = getSelectedPeriodIds();
+            const selectedCount = selectedIds.length;
+
+            if (selectedPeriodsBadge) {
+                selectedPeriodsBadge.textContent = `${selectedCount} selected`;
+            }
+
+            if (selectedPeriodsCountInModal) {
+                selectedPeriodsCountInModal.textContent = `${selectedCount}`;
+            }
+
+            if (confirmReopenResetBtn) {
+                confirmReopenResetBtn.disabled = selectedCount === 0;
+            }
+
+            if (selectAllPeriods) {
+                const allChecked = periodCheckboxes.length > 0 && periodCheckboxes.every((checkbox) => checkbox.checked);
+                selectAllPeriods.checked = allChecked;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             enforceNextWeekOnlyValues();
 
@@ -432,6 +477,46 @@
                     enforceNextWeekOnlyValues();
                 });
             }
+
+            if (selectAllPeriods) {
+                selectAllPeriods.addEventListener('change', function () {
+                    periodCheckboxes.forEach((checkbox) => {
+                        checkbox.checked = selectAllPeriods.checked;
+                    });
+                    syncSelectedPeriodsUI();
+                });
+            }
+
+            periodCheckboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', syncSelectedPeriodsUI);
+            });
+
+            if (reopenAndResetModal) {
+                reopenAndResetModal.addEventListener('shown.bs.modal', syncSelectedPeriodsUI);
+            }
+
+            if (reopenAndResetForm) {
+                reopenAndResetForm.addEventListener('submit', function (event) {
+                    const selectedIds = getSelectedPeriodIds();
+                    selectedPeriodIdsContainer.innerHTML = '';
+
+                    if (selectedIds.length === 0) {
+                        event.preventDefault();
+                        window.alert('Please select at least one work period from the table.');
+                        return;
+                    }
+
+                    selectedIds.forEach((periodId) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'period_ids[]';
+                        input.value = periodId;
+                        selectedPeriodIdsContainer.appendChild(input);
+                    });
+                });
+            }
+
+            syncSelectedPeriodsUI();
         });
 
         // Open modal if there are validation errors

@@ -37,6 +37,7 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
         $closedPeriodB = $this->createPeriod(2026, 19, WorkPeriod::STATUS_CLOSED);
         $openPeriod = $this->createPeriod(2026, 20, WorkPeriod::STATUS_OPEN);
         $archivedPeriod = $this->createPeriod(2026, 21, WorkPeriod::STATUS_ARCHIVED);
+        $unselectedClosedPeriod = $this->createPeriod(2026, 22, WorkPeriod::STATUS_CLOSED);
 
         $owner = $this->createActiveUser();
 
@@ -71,6 +72,16 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
             'content' => [],
         ]);
 
+        $unselectedWeeklyPlan = Document::create([
+            'user_id' => $owner->id,
+            'period_id' => $unselectedClosedPeriod->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Unselected period plan',
+            'state' => Document::STATE_SUBMITTED,
+            'review_rejection_reason' => 'Should stay unchanged',
+            'content' => [],
+        ]);
+
         $monthlyReport = Document::create([
             'user_id' => $owner->id,
             'type' => Document::TYPE_MONTHLY_REPORT,
@@ -82,7 +93,14 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
         ]);
 
         $response = $this->actingAs($manager)
-            ->post(route('work-periods.reopen-and-reset'));
+            ->post(route('work-periods.reopen-and-reset'), [
+                'period_ids' => [
+                    $closedPeriodA->id,
+                    $closedPeriodB->id,
+                    $openPeriod->id,
+                    $archivedPeriod->id,
+                ],
+            ]);
 
         $response->assertRedirect(route('work-periods.index'));
 
@@ -101,6 +119,10 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
         $this->assertDatabaseHas('work_periods', [
             'id' => $archivedPeriod->id,
             'status' => WorkPeriod::STATUS_ARCHIVED,
+        ]);
+        $this->assertDatabaseHas('work_periods', [
+            'id' => $unselectedClosedPeriod->id,
+            'status' => WorkPeriod::STATUS_CLOSED,
         ]);
 
         $this->assertDatabaseHas('documents', [
@@ -125,6 +147,12 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
             'id' => $monthlyReport->id,
             'state' => Document::STATE_SUBMITTED,
         ]);
+
+        $this->assertDatabaseHas('documents', [
+            'id' => $unselectedWeeklyPlan->id,
+            'state' => Document::STATE_SUBMITTED,
+            'review_rejection_reason' => 'Should stay unchanged',
+        ]);
     }
 
     public function test_user_without_manage_work_periods_permission_cannot_run_bulk_reset(): void
@@ -132,13 +160,30 @@ class WorkPeriodBulkReopenAndResetTest extends TestCase
         $user = $this->createActiveUser();
         $closedPeriod = $this->createPeriod(2026, 22, WorkPeriod::STATUS_CLOSED);
 
-        $response = $this->actingAs($user)->post(route('work-periods.reopen-and-reset'));
+        $response = $this->actingAs($user)->post(route('work-periods.reopen-and-reset'), [
+            'period_ids' => [$closedPeriod->id],
+        ]);
 
         $response->assertForbidden();
         $this->assertDatabaseHas('work_periods', [
             'id' => $closedPeriod->id,
             'status' => WorkPeriod::STATUS_CLOSED,
         ]);
+    }
+
+    public function test_manager_must_select_at_least_one_period_for_bulk_reset(): void
+    {
+        $manager = $this->createActiveUser();
+        $manager->givePermissionTo('manage work periods');
+
+        $response = $this->from(route('work-periods.index'))
+            ->actingAs($manager)
+            ->post(route('work-periods.reopen-and-reset'), [
+                'period_ids' => [],
+            ]);
+
+        $response->assertRedirect(route('work-periods.index'));
+        $response->assertSessionHasErrors('period_ids');
     }
 
     private function createActiveUser(): User

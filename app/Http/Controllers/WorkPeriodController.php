@@ -293,19 +293,31 @@ class WorkPeriodController extends Controller
     }
 
     /**
-     * Reopen all closed work periods and reset all weekly plans/reports to draft.
+     * Reopen selected closed work periods and reset selected weekly plans/reports to draft.
      */
     public function reopenAndReset(Request $request)
     {
         $this->checkAdmin();
         abort_unless($request->user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
-        $counts = DB::transaction(function (): array {
+        $validated = $request->validate([
+            'period_ids' => ['required', 'array', 'min:1'],
+            'period_ids.*' => ['required', 'string', 'exists:work_periods,id'],
+        ], [
+            'period_ids.required' => 'Please select at least one work period.',
+            'period_ids.min' => 'Please select at least one work period.',
+        ]);
+
+        $selectedPeriodIds = array_values(array_unique($validated['period_ids']));
+
+        $counts = DB::transaction(function () use ($selectedPeriodIds): array {
             $reopenedPeriods = WorkPeriod::query()
+                ->whereIn('id', $selectedPeriodIds)
                 ->where('status', WorkPeriod::STATUS_CLOSED)
                 ->update(['status' => WorkPeriod::STATUS_OPEN]);
 
             $updatedWeeklyPlans = Document::query()
+                ->whereIn('period_id', $selectedPeriodIds)
                 ->where('type', Document::TYPE_WEEKLY_PLAN)
                 ->update([
                     'state' => Document::STATE_DRAFT,
@@ -319,6 +331,7 @@ class WorkPeriodController extends Controller
                 ]);
 
             $updatedWeeklyReports = Document::query()
+                ->whereIn('period_id', $selectedPeriodIds)
                 ->where('type', Document::TYPE_WEEKLY_REPORT)
                 ->update([
                     'state' => Document::STATE_DRAFT,
@@ -326,6 +339,7 @@ class WorkPeriodController extends Controller
                 ]);
 
             return [
+                'selected_periods' => count($selectedPeriodIds),
                 'reopened_periods' => $reopenedPeriods,
                 'updated_weekly_plans' => $updatedWeeklyPlans,
                 'updated_weekly_reports' => $updatedWeeklyReports,
@@ -335,7 +349,7 @@ class WorkPeriodController extends Controller
 
         return redirect()->route('work-periods.index')->with(
             'success',
-            "Bulk reset completed: {$counts['reopened_periods']} closed period(s) reopened, {$counts['updated_documents']} weekly document(s) moved to draft ({$counts['updated_weekly_plans']} plans, {$counts['updated_weekly_reports']} reports)."
+            "Bulk reset completed for {$counts['selected_periods']} selected period(s): {$counts['reopened_periods']} closed period(s) reopened, {$counts['updated_documents']} weekly document(s) moved to draft ({$counts['updated_weekly_plans']} plans, {$counts['updated_weekly_reports']} reports)."
         );
     }
 }
