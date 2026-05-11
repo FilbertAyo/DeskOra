@@ -56,7 +56,6 @@
                     </ul>
                 </li>
 
-        
                 <li
                     class="pc-item {{ Request::routeIs('documents.index') && request('type') === 'monthly_report' ? 'active' : '' }}">
                     <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="pc-link">
@@ -70,6 +69,7 @@
                         <span class="pc-mtext">All Documents</span>
                     </a>
                 </li>
+
                 @php
                     $canReviewSubmissions = Auth::user()->hasPermissionTo('approve documents');
                     $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');

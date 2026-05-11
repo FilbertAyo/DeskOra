@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Document;
 use App\Models\WorkPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class WorkPeriodController extends Controller
 {
@@ -288,5 +290,52 @@ class WorkPeriodController extends Controller
 
         return redirect()->back()
             ->with('success', 'Work period archived successfully.');
+    }
+
+    /**
+     * Reopen all closed work periods and reset all weekly plans/reports to draft.
+     */
+    public function reopenAndReset(Request $request)
+    {
+        $this->checkAdmin();
+        abort_unless($request->user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+
+        $counts = DB::transaction(function (): array {
+            $reopenedPeriods = WorkPeriod::query()
+                ->where('status', WorkPeriod::STATUS_CLOSED)
+                ->update(['status' => WorkPeriod::STATUS_OPEN]);
+
+            $updatedWeeklyPlans = Document::query()
+                ->where('type', Document::TYPE_WEEKLY_PLAN)
+                ->update([
+                    'state' => Document::STATE_DRAFT,
+                    'review_rejection_reason' => null,
+                    'budget_review_status' => null,
+                    'budget_reviewed_by' => null,
+                    'budget_reviewed_at' => null,
+                    'budget_provided_amount' => null,
+                    'budget_review_note' => null,
+                    'budget_review_items' => null,
+                ]);
+
+            $updatedWeeklyReports = Document::query()
+                ->where('type', Document::TYPE_WEEKLY_REPORT)
+                ->update([
+                    'state' => Document::STATE_DRAFT,
+                    'review_rejection_reason' => null,
+                ]);
+
+            return [
+                'reopened_periods' => $reopenedPeriods,
+                'updated_weekly_plans' => $updatedWeeklyPlans,
+                'updated_weekly_reports' => $updatedWeeklyReports,
+                'updated_documents' => $updatedWeeklyPlans + $updatedWeeklyReports,
+            ];
+        });
+
+        return redirect()->route('work-periods.index')->with(
+            'success',
+            "Bulk reset completed: {$counts['reopened_periods']} closed period(s) reopened, {$counts['updated_documents']} weekly document(s) moved to draft ({$counts['updated_weekly_plans']} plans, {$counts['updated_weekly_reports']} reports)."
+        );
     }
 }

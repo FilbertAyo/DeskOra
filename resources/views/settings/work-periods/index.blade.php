@@ -20,6 +20,9 @@
                                 <i class="ti ti-refresh"></i>
                             </button>
                             @if(Auth::user()->hasPermissionTo('manage work periods'))
+                                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#reopenAndResetModal">
+                                    <i class="ti ti-rotate-clockwise me-1"></i> Reopen + Reset Docs
+                                </button>
                                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
                                     <i class="ti ti-plus-circle me-1"></i> Add Work Period
                                 </button>
@@ -225,6 +228,42 @@
             </div>
         </div>
     </div>
+
+    <!-- Reopen + Reset Modal -->
+    @if(Auth::user()->hasPermissionTo('manage work periods'))
+    <div class="modal fade" id="reopenAndResetModal" tabindex="-1" role="dialog" aria-labelledby="reopenAndResetModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('work-periods.reopen-and-reset') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="reopenAndResetModalLabel">
+                            <i class="ti ti-alert-triangle me-2 text-warning"></i>
+                            Reopen Closed Periods + Reset Weekly Docs
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning mb-3">
+                            <strong>Important:</strong> This action affects all staff organization-wide.
+                        </div>
+                        <ul class="mb-0">
+                            <li>All <strong>closed</strong> work periods will be changed to <strong>open</strong>.</li>
+                            <li>All weekly plans and weekly reports will be moved to <strong>draft</strong>.</li>
+                            <li>Staff will be able to update and re-submit their weekly documents.</li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning" onclick="return confirm('Confirm bulk reset for all periods and weekly documents?');">
+                            <i class="ti ti-rotate-clockwise me-1"></i> Confirm Reopen + Reset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Create Work Period Modal -->
     @if(Auth::user()->hasPermissionTo('manage work periods'))

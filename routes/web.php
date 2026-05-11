@@ -253,6 +253,7 @@ Route::middleware(['auth', 'permission:manage work periods'])->group(function ()
     // Additional routes for work periods
     Route::post('/work-periods/{work_period}/close', [WorkPeriodController::class, 'close'])->name('work-periods.close');
     Route::post('/work-periods/{work_period}/archive', [WorkPeriodController::class, 'archive'])->name('work-periods.archive');
+    Route::post('/work-periods/reopen-and-reset', [WorkPeriodController::class, 'reopenAndReset'])->name('work-periods.reopen-and-reset');
 });
 
 // Bonus Petty Cash Routes - View Permission
