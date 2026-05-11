@@ -322,19 +322,26 @@ class DocumentPolicy
 
     private function isUserAssignedToActionLog(User $user, Document $document): bool
     {
+        $actionLog = $document->actionLogDomain()
+            ->with('tasks.assignees:id')
+            ->first();
+
+        if ($actionLog) {
+            return $actionLog->tasks->contains(function ($task) use ($user) {
+                return $task->assignees->contains(fn ($assignee) => (string) $assignee->id === (string) $user->id);
+            });
+        }
+
         $content = is_array($document->content) ? $document->content : [];
         $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-
         foreach ($tasks as $task) {
             if (! is_array($task)) {
                 continue;
             }
-
             $responsibleIds = $task['responsible_user_ids'] ?? [];
             if (! is_array($responsibleIds)) {
                 continue;
             }
-
             $ids = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
             if (in_array((string) $user->id, $ids, true)) {
                 return true;

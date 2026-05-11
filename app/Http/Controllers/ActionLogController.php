@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\ActionLogTask;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\WorkflowEmailNotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -15,6 +17,7 @@ class ActionLogController extends Controller
 {
     public function __construct(
         private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
+        private readonly DocumentDomainSyncService $documentDomainSyncService,
     ) {}
 
     private const PROGRESS_NOT_STARTED = 'Not Started';
@@ -228,6 +231,7 @@ class ActionLogController extends Controller
                 'content' => ['tasks' => $this->renumberTasks($finalTasks)],
                 'state' => $nextState,
             ]);
+            $this->documentDomainSyncService->syncFromDocument($existingDocument->fresh());
 
             $document = $existingDocument;
         } else {
@@ -251,6 +255,7 @@ class ActionLogController extends Controller
                 'content' => ['tasks' => $this->renumberTasks($initialTasks)],
                 'state' => $state,
             ]);
+            $this->documentDomainSyncService->syncFromDocument($document->fresh());
         }
 
         $message = ($action === 'submit')
@@ -466,6 +471,7 @@ class ActionLogController extends Controller
         }
 
         $document->update($updateData);
+        $this->documentDomainSyncService->syncFromDocument($document->fresh());
 
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
@@ -850,19 +856,26 @@ class ActionLogController extends Controller
 
     private function isUserAssignedToActionLog(User $user, Document $document): bool
     {
+        $actionLog = $document->actionLogDomain()
+            ->with('tasks.assignees:id')
+            ->first();
+
+        if ($actionLog) {
+            return $actionLog->tasks->contains(function (ActionLogTask $task) use ($user) {
+                return $task->assignees->contains(fn ($assignee) => (string) $assignee->id === (string) $user->id);
+            });
+        }
+
         $content = is_array($document->content) ? $document->content : [];
         $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-
         foreach ($tasks as $task) {
             if (! is_array($task)) {
                 continue;
             }
-
             $responsibleIds = $task['responsible_user_ids'] ?? [];
             if (! is_array($responsibleIds)) {
                 continue;
             }
-
             $ids = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
             if (in_array((string) $user->id, $ids, true)) {
                 return true;

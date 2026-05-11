@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+CUTOVER_MODE="${CUTOVER_MODE:-0}"
+RUN_DOMAIN_BACKFILL="${RUN_DOMAIN_BACKFILL:-0}"
+
 # Change to script directory (repo root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -30,6 +33,12 @@ else
 fi
 
 echo "==> Using PHP: $("$PHP_BIN" -v | sed -n '1p')"
+
+if [ "$CUTOVER_MODE" = "1" ]; then
+  echo "==> Entering maintenance mode for direct cutover..."
+  "$PHP_BIN" artisan down || true
+fi
+
 echo "==> Pulling latest code..."
 git pull --ff-only
 
@@ -38,6 +47,13 @@ echo "==> Installing production dependencies..."
 
 echo "==> Running database migrations..."
 "$PHP_BIN" artisan migrate --force
+
+if [ "$RUN_DOMAIN_BACKFILL" = "1" ]; then
+  echo "==> Running documents domain backfill..."
+  "$PHP_BIN" artisan documents:backfill-domain-tables --chunk=200
+  echo "==> Running parity verification..."
+  "$PHP_BIN" artisan documents:verify-domain-parity --sample=25
+fi
 
 echo "==> Running database seeders..."
 "$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder --force --no-interaction
@@ -70,5 +86,10 @@ if printf '%s' "$AF_TOKEN" | /usr/bin/env grep -q '[[:space:]]'; then
 fi
 echo "==> Anonymous feedback URL:"
 echo "    $(/usr/bin/env sed -n 's|^APP_URL=||p' .env | head -n 1)/feedback/$AF_TOKEN"
+
+if [ "$CUTOVER_MODE" = "1" ]; then
+  echo "==> Leaving maintenance mode..."
+  "$PHP_BIN" artisan up
+fi
 
 echo "==> Deployment completed successfully."
