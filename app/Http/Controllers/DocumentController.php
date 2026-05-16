@@ -2115,6 +2115,15 @@ class DocumentController extends Controller
             $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
         }
 
+        // Final approvers can complete approval directly from any non-final stage.
+        if (in_array($currentStage, [
+            Document::BUDGET_REVIEW_STAGE_PENDING,
+            Document::BUDGET_REVIEW_STAGE_REVIEWED,
+            Document::BUDGET_REVIEW_STAGE_APPROVED,
+        ], true) && $this->canProcessBudgetStage($user, 'authorize')) {
+            return 'authorize';
+        }
+
         return match ($currentStage) {
             Document::BUDGET_REVIEW_STAGE_PENDING => $this->canProcessBudgetStage($user, 'review')
                 ? 'review'
@@ -2251,6 +2260,13 @@ class DocumentController extends Controller
                         $review['approve_stage_by'] = $user->id;
                         $review['approve_stage_at'] = $now->toIso8601String();
                     } else {
+                        // Final approval can bypass earlier steps and auto-complete them.
+                        if ($decision === Document::BUDGET_REVIEW_APPROVED) {
+                            $review['review_stage_by'] = $review['review_stage_by'] ?? $user->id;
+                            $review['review_stage_at'] = $review['review_stage_at'] ?? $now->toIso8601String();
+                            $review['approve_stage_by'] = $review['approve_stage_by'] ?? $user->id;
+                            $review['approve_stage_at'] = $review['approve_stage_at'] ?? $now->toIso8601String();
+                        }
                         $review['authorize_stage_by'] = $user->id;
                         $review['authorize_stage_at'] = $now->toIso8601String();
                     }
@@ -2275,10 +2291,10 @@ class DocumentController extends Controller
                     'note' => $note,
                     'reviewed_by' => $user->id,
                     'reviewed_at' => $now->toIso8601String(),
-                    'review_stage_by' => $actionStage === 'review' ? $user->id : null,
-                    'review_stage_at' => $actionStage === 'review' ? $now->toIso8601String() : null,
-                    'approve_stage_by' => $actionStage === 'approve' ? $user->id : null,
-                    'approve_stage_at' => $actionStage === 'approve' ? $now->toIso8601String() : null,
+                    'review_stage_by' => ($actionStage === 'review' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $user->id : null,
+                    'review_stage_at' => ($actionStage === 'review' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $now->toIso8601String() : null,
+                    'approve_stage_by' => ($actionStage === 'approve' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $user->id : null,
+                    'approve_stage_at' => ($actionStage === 'approve' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $now->toIso8601String() : null,
                     'authorize_stage_by' => $actionStage === 'authorize' ? $user->id : null,
                     'authorize_stage_at' => $actionStage === 'authorize' ? $now->toIso8601String() : null,
                 ];
@@ -2339,6 +2355,12 @@ class DocumentController extends Controller
             $updatePayload['approved_by'] = $user->id;
             $updatePayload['approved_at'] = $now;
         } else {
+            if ($decision === Document::BUDGET_REVIEW_APPROVED) {
+                $updatePayload['reviewed_by'] = $existingReview?->reviewed_by ?? $user->id;
+                $updatePayload['reviewed_at'] = $existingReview?->reviewed_at ?? $now;
+                $updatePayload['approved_by'] = $existingReview?->approved_by ?? $user->id;
+                $updatePayload['approved_at'] = $existingReview?->approved_at ?? $now;
+            }
             $updatePayload['authorized_by'] = $user->id;
             $updatePayload['authorized_at'] = $now;
         }

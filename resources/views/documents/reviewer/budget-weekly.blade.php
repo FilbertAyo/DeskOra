@@ -70,6 +70,13 @@
                     @endif
                 </div>
                 <div class="col-md-8">
+                    <div class="alert alert-light border mb-2 py-2">
+                        <small class="mb-0 d-block">
+                            <strong>How approval works:</strong>
+                            Reviewer checks first, approver confirms, then final approver authorizes.
+                            <strong>Final approver can authorize directly</strong> and the system auto-completes earlier approvals.
+                        </small>
+                    </div>
                     <form method="GET" action="{{ route('documents.weekly-budget-review') }}" id="budgetFilterForm" class="row g-2">
                         <div class="col-md-3">
                             <select name="user_id" class="form-control" onchange="document.getElementById('budgetFilterForm').submit();">
@@ -166,13 +173,13 @@
                                         <span class="badge bg-light text-dark border me-1">Req: {{ number_format($staffData['requested_total'], 2) }}</span>
                                         <span class="badge bg-light text-dark border me-1">Prov: {{ number_format($staffData['provided_total'], 2) }}</span>
                                         @if($staffSummary['pending'] > 0)
-                                            <span class="badge bg-secondary">{{ $staffSummary['pending'] }} pending</span>
+                                            <span class="badge bg-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
                                         @endif
                                         @if($staffSummary['approved'] > 0)
-                                            <span class="badge bg-secondary">{{ $staffSummary['approved'] }} approved</span>
+                                            <span class="badge bg-success">{{ $staffSummary['approved'] }} approved</span>
                                         @endif
                                         @if($staffSummary['rejected'] > 0)
-                                            <span class="badge bg-dark">{{ $staffSummary['rejected'] }} rejected</span>
+                                            <span class="badge bg-danger">{{ $staffSummary['rejected'] }} rejected</span>
                                         @endif
                                     </div>
                                 </div>
@@ -200,18 +207,25 @@
                                                     $isRejected = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_REJECTED;
                                                     $approvalStage = $item['approval_stage'] ?? \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING;
                                                     $isFinalApproved = $isApproved && $approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
-                                                    $nextStage = match ($approvalStage) {
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING => 'review',
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED => 'approve',
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED => 'authorize',
-                                                        default => null,
-                                                    };
-                                                    $canProcessStage = $nextStage && (
-                                                        auth()->user()?->can('process weekly budgets')
-                                                        || ($nextStage === 'review' && auth()->user()?->can('review weekly budgets'))
-                                                        || ($nextStage === 'approve' && auth()->user()?->can('approve weekly budgets'))
-                                                        || ($nextStage === 'authorize' && auth()->user()?->can('authorize weekly budgets'))
-                                                    );
+                                                    $isTerminal = in_array($approvalStage, [
+                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_REJECTED,
+                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
+                                                    ], true);
+                                                    $canReview = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('review weekly budgets');
+                                                    $canApprove = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('approve weekly budgets');
+                                                    $canAuthorize = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('authorize weekly budgets');
+
+                                                    $nextStage = null;
+                                                    if (! $isTerminal && $canAuthorize) {
+                                                        $nextStage = 'authorize';
+                                                    } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
+                                                        $nextStage = 'review';
+                                                    } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED && $canApprove) {
+                                                        $nextStage = 'approve';
+                                                    } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED && $canAuthorize) {
+                                                        $nextStage = 'authorize';
+                                                    }
+                                                    $canProcessStage = $nextStage !== null;
                                                 @endphp
                                                 <tr>
                                                     <td class="text-center">{{ $idx + 1 }}</td>
@@ -227,15 +241,15 @@
                                                     </td>
                                                     <td>
                                                         @if($isFinalApproved)
-                                                            <span class="badge bg-dark">Approved</span>
+                                                            <span class="badge bg-success">Approved</span>
                                                         @elseif($isRejected)
-                                                            <span class="badge bg-dark">Rejected</span>
+                                                            <span class="badge bg-danger">Rejected</span>
                                                         @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
-                                                            <span class="badge bg-secondary">Pending Authorization</span>
+                                                            <span class="badge bg-primary">Pending Final Approval</span>
                                                         @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED)
-                                                            <span class="badge bg-secondary">Pending Approval</span>
+                                                            <span class="badge bg-info text-dark">Pending Approval</span>
                                                         @else
-                                                            <span class="badge bg-secondary">Pending Review</span>
+                                                            <span class="badge bg-warning text-dark">Pending Review</span>
                                                         @endif
                                                     </td>
                                                     <!-- <td>
@@ -245,10 +259,10 @@
                                                         @if($canProcessStage)
                                                             <button
                                                                 type="button"
-                                                                class="btn btn-sm btn-outline-secondary"
+                                                                class="btn btn-sm {{ $nextStage === 'authorize' ? 'btn-success' : 'btn-outline-primary' }}"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
-                                                                {{ ucfirst($nextStage) }}
+                                                                {{ $nextStage === 'authorize' ? 'Final Approve' : ucfirst($nextStage) }}
                                                             </button>
                                                         @endif
                                                     </td>
@@ -270,18 +284,24 @@
                                 @foreach($staffItems as $item)
                                     @php
                                         $approvalStage = $item['approval_stage'] ?? \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING;
-                                        $nextStage = match ($approvalStage) {
-                                            \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING => 'review',
-                                            \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED => 'approve',
-                                            \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED => 'authorize',
-                                            default => null,
-                                        };
-                                        $canProcessStage = $nextStage && (
-                                            auth()->user()?->can('process weekly budgets')
-                                            || ($nextStage === 'review' && auth()->user()?->can('review weekly budgets'))
-                                            || ($nextStage === 'approve' && auth()->user()?->can('approve weekly budgets'))
-                                            || ($nextStage === 'authorize' && auth()->user()?->can('authorize weekly budgets'))
-                                        );
+                                        $isTerminal = in_array($approvalStage, [
+                                            \App\Models\Document::BUDGET_REVIEW_STAGE_REJECTED,
+                                            \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
+                                        ], true);
+                                        $canReview = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('review weekly budgets');
+                                        $canApprove = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('approve weekly budgets');
+                                        $canAuthorize = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('authorize weekly budgets');
+                                        $nextStage = null;
+                                        if (! $isTerminal && $canAuthorize) {
+                                            $nextStage = 'authorize';
+                                        } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
+                                            $nextStage = 'review';
+                                        } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED && $canApprove) {
+                                            $nextStage = 'approve';
+                                        } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED && $canAuthorize) {
+                                            $nextStage = 'authorize';
+                                        }
+                                        $canProcessStage = $nextStage !== null;
                                     @endphp
                                     @if($canProcessStage)
                                         <div class="modal fade" id="itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}" tabindex="-1" aria-hidden="true">
@@ -290,10 +310,17 @@
                                                     @csrf
                                                     <input type="hidden" name="budget_uid" value="{{ $item['budget_uid'] }}">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">{{ ucfirst($nextStage) }} Budget Item</h5>
+                                                        <h5 class="modal-title">{{ $nextStage === 'authorize' ? 'Final Approval' : ucfirst($nextStage) }} Budget Item</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body">
+                                                        @if($nextStage === 'authorize' && $approvalStage !== \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
+                                                            <div class="alert alert-info py-2">
+                                                                <small>
+                                                                    Final approval will automatically mark review and approval stages as completed.
+                                                                </small>
+                                                            </div>
+                                                        @endif
                                                         <div class="mb-3">
                                                             <label class="form-label text-muted">Item</label>
                                                             <div class="fw-semibold">{{ $item['item'] }}</div>
@@ -328,7 +355,9 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                                        <button type="submit" class="btn btn-secondary">Save {{ ucfirst($nextStage) }} Decision</button>
+                                                        <button type="submit" class="btn {{ $nextStage === 'authorize' ? 'btn-success' : 'btn-primary' }}">
+                                                            {{ $nextStage === 'authorize' ? 'Save Final Decision' : 'Save '.ucfirst($nextStage).' Decision' }}
+                                                        </button>
                                                     </div>
                                                 </form>
                                             </div>
