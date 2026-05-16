@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class WorkflowEmailNotificationTest extends TestCase
@@ -175,6 +176,59 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertSentTo($activeBoth, WeeklyActionLogSubmittedNotification::class);
         Notification::assertNotSentTo($activeSms, WeeklyActionLogSubmittedNotification::class);
         Notification::assertNotSentTo($inactiveEmail, WeeklyActionLogSubmittedNotification::class);
+    }
+
+    public function test_document_approver_role_receives_submission_email_without_direct_permission_grant(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        $owner = $this->createActiveUserWithChannel('email');
+        $owner->givePermissionTo('create weekly report');
+
+        $ceo = $this->createActiveUserWithChannel('email');
+        $ceo->assignRole(Role::findByName('document_approver'));
+
+        $document = Document::create([
+            'user_id' => $owner->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly report draft',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Draft summary'],
+        ]);
+
+        $this->actingAs($owner)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertSentTo($ceo, WeeklyDocumentSubmittedNotification::class);
+    }
+
+    public function test_weekly_plan_without_budget_does_not_notify_budget_processors(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        $owner = $this->createActiveUserWithChannel('email');
+        $owner->givePermissionTo('create weekly plan');
+
+        $finance = $this->createActiveUserWithChannel('email');
+        $finance->givePermissionTo('process weekly budgets');
+
+        $document = Document::create([
+            'user_id' => $owner->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Plan without budget',
+            'state' => Document::STATE_DRAFT,
+            'main_target' => 'Target',
+            'content' => [],
+        ]);
+
+        $this->actingAs($owner)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertNotSentTo($finance, WeeklyBudgetSubmissionNotification::class);
     }
 
     public function test_monthly_report_submission_does_not_trigger_weekly_workflow_notifications(): void

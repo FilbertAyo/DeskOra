@@ -9,12 +9,14 @@ use App\Notifications\WeeklyBudgetSubmissionNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
 use App\Notifications\WeeklyDocumentSubmittedNotification;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 class WorkflowEmailNotificationService
 {
     /**
-     * Notify approvers when a weekly plan/report is submitted.
+     * Notify approvers (e.g. CEO / document_approver role) when a weekly plan/report is submitted.
      */
     public function notifyWeeklyDocumentSubmitted(Document $document, User $submittedBy): void
     {
@@ -22,11 +24,15 @@ class WorkflowEmailNotificationService
             return;
         }
 
-        $recipients = $this->recipientsForPermission('approve documents')
-            ->reject(fn (User $user) => (string) $user->id === (string) $submittedBy->id)
-            ->values();
+        $document->loadMissing('period', 'user');
+        $submittedBy->loadMissing('department');
+
+        $permission = (string) config('workflow_notifications.weekly_document_submitted.permission', 'approve documents');
+        $recipients = $this->recipientsForPermission($permission, $submittedBy);
 
         if ($recipients->isEmpty()) {
+            $this->logMissingRecipients('weekly_document_submitted', $document, $permission);
+
             return;
         }
 
@@ -44,7 +50,7 @@ class WorkflowEmailNotificationService
 
         $document->loadMissing('user', 'period');
         $owner = $document->user;
-        if (! $owner instanceof User || ! $this->userReceivesEmailNotifications($owner)) {
+        if (! $owner instanceof User || ! $owner->receivesEmailNotifications()) {
             return;
         }
 
@@ -52,19 +58,28 @@ class WorkflowEmailNotificationService
     }
 
     /**
-     * Notify budget reviewers when a weekly plan containing budget rows is submitted.
+     * Notify finance processors when a weekly plan containing budget rows is submitted.
      */
     public function notifyWeeklyBudgetSubmitted(Document $document, User $submittedBy): void
     {
-        if ($document->type !== Document::TYPE_WEEKLY_PLAN || ! $document->isSubmitted() || ! $document->hasBudgetItems()) {
+        if ($document->type !== Document::TYPE_WEEKLY_PLAN || ! $document->isSubmitted()) {
             return;
         }
 
-        $recipients = $this->recipientsForPermission('process weekly budgets')
-            ->reject(fn (User $user) => (string) $user->id === (string) $submittedBy->id)
-            ->values();
+        $document->refresh();
+        $document->loadMissing('period', 'user');
+        $submittedBy->loadMissing('department');
+
+        if (! $document->hasBudgetItems()) {
+            return;
+        }
+
+        $permission = (string) config('workflow_notifications.weekly_budget_submitted.permission', 'process weekly budgets');
+        $recipients = $this->recipientsForPermission($permission, $submittedBy);
 
         if ($recipients->isEmpty()) {
+            $this->logMissingRecipients('weekly_budget_submitted', $document, $permission);
+
             return;
         }
 
@@ -101,17 +116,30 @@ class WorkflowEmailNotificationService
             ->whereIn('notification_channel', ['email', 'both']);
     }
 
-    private function userReceivesEmailNotifications(User $user): bool
-    {
-        return $user->status === 'active'
-            && filled(trim((string) $user->email))
-            && in_array((string) $user->notification_channel, ['email', 'both'], true);
-    }
-
-    private function recipientsForPermission(string $permission)
+    /**
+     * @return Collection<int, User>
+     */
+    private function recipientsForPermission(string $permission, User $excludeUser): Collection
     {
         return $this->eligibleEmailRecipients()
             ->permission($permission)
-            ->get();
+            ->get()
+            ->reject(fn (User $user) => (string) $user->id === (string) $excludeUser->id)
+            ->values();
+    }
+
+    private function logMissingRecipients(string $event, Document $document, string $permission): void
+    {
+        if (! config('workflow_notifications.log_missing_recipients', true)) {
+            return;
+        }
+
+        Log::warning('Workflow email notification skipped: no eligible recipients.', [
+            'event' => $event,
+            'document_id' => $document->id,
+            'document_type' => $document->type,
+            'period_id' => $document->period_id,
+            'permission' => $permission,
+        ]);
     }
 }

@@ -95,6 +95,13 @@ class User extends Authenticatable
         return Department::pluck('id')->all();
     }
 
+    public function receivesEmailNotifications(): bool
+    {
+        return $this->status === 'active'
+            && filled(trim((string) $this->email))
+            && in_array((string) $this->notification_channel, ['email', 'both'], true);
+    }
+
     /**
      * Relationship: User has many Documents
      *

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\NotificationMail;
 use App\Models\Department;
 use App\Models\User;
+use App\Services\WorkflowUserNotificationDefaults;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -88,7 +89,9 @@ class AdminController extends Controller
 
         $user->subDepartments()->sync($subDepartmentIds);
 
-        $user->syncRoles($validated['roles'] ?? []);
+        $roleNames = $validated['roles'] ?? [];
+        $user->syncRoles($roleNames);
+        WorkflowUserNotificationDefaults::apply($user->fresh(), $roleNames);
 
         $this->syncDepartmentHeadAssignment(
             $user,
@@ -170,7 +173,9 @@ class AdminController extends Controller
 
         $user->subDepartments()->sync($subDepartmentIds);
 
-        $user->syncRoles($validated['roles'] ?? []);
+        $roleNames = $validated['roles'] ?? [];
+        $user->syncRoles($roleNames);
+        WorkflowUserNotificationDefaults::apply($user->fresh(), $roleNames);
 
         $this->syncDepartmentHeadAssignment(
             $user,

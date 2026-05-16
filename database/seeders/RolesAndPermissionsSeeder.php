@@ -83,6 +83,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
+        $documentApproverRole = Role::firstOrCreate(['name' => 'document_approver']);
         $budgetReviewerRole = Role::firstOrCreate(['name' => 'budget_reviewer']);
         $budgetApproverRole = Role::firstOrCreate(['name' => 'budget_approver']);
         $budgetAuthorizerRole = Role::firstOrCreate(['name' => 'budget_authorizer']);
@@ -104,9 +105,19 @@ class RolesAndPermissionsSeeder extends Seeder
             'view weekly budgets',
             'process weekly budgets',
         ];
+        $documentApproverPermissions = [
+            'approve documents',
+            'view all documents',
+            'view weekly budgets',
+        ];
+        $staffPermissions = [
+            'create weekly plan',
+            'create weekly report',
+        ];
 
         $superadminRole->syncPermissions($allPermissions);
-        $staffRole->syncPermissions($staffRole->permissions()->pluck('name')->all());
+        $staffRole->syncPermissions($staffPermissions);
+        $documentApproverRole->syncPermissions($documentApproverPermissions);
         $budgetReviewerRole->syncPermissions($budgetReviewerPermissions);
         $budgetApproverRole->syncPermissions($budgetApproverPermissions);
         $budgetAuthorizerRole->syncPermissions($budgetAuthorizerPermissions);
