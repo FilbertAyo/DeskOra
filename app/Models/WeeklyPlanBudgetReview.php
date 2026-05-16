@@ -13,10 +13,15 @@ class WeeklyPlanBudgetReview extends Model
     protected $fillable = [
         'weekly_plan_budget_item_id',
         'decision',
+        'approval_stage',
         'provided_amount',
         'note',
         'reviewed_by',
         'reviewed_at',
+        'approved_by',
+        'approved_at',
+        'authorized_by',
+        'authorized_at',
     ];
 
     protected function casts(): array
@@ -24,6 +29,8 @@ class WeeklyPlanBudgetReview extends Model
         return [
             'provided_amount' => 'decimal:2',
             'reviewed_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'authorized_at' => 'datetime',
         ];
     }
 

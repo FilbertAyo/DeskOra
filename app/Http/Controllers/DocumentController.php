@@ -1931,7 +1931,13 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
+        if (! $user->hasAnyPermission([
+            'view weekly budgets',
+            'approve documents',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -1981,6 +1987,9 @@ class DocumentController extends Controller
 
         $currentBudgetEntryPeriod = WorkPeriod::getCurrent();
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
+        $activePeriodId = $request->filled('period_id')
+            ? (string) $request->string('period_id')
+            : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
 
         return view('documents.reviewer.budget-weekly', [
             'documents' => $documents,
@@ -1993,6 +2002,7 @@ class DocumentController extends Controller
             'years' => $years,
             'statusFilter' => $statusFilter,
             'defaultPeriod' => $defaultPeriod,
+            'activePeriodId' => $activePeriodId,
         ]);
     }
 
@@ -2000,7 +2010,13 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
+        if (! $user->hasAnyPermission([
+            'view weekly budgets',
+            'approve documents',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -2028,7 +2044,13 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
+        if (! $user->hasAnyPermission([
+            'view weekly budgets',
+            'approve documents',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -2087,6 +2109,69 @@ class DocumentController extends Controller
         return $this->weeklyBudgetReviewService->computeBudgetStats($documents);
     }
 
+    private function resolveBudgetApprovalActionStage(string $currentStage, User $user): ?string
+    {
+        if (! in_array($currentStage, Document::budgetReviewStages(), true)) {
+            $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
+        }
+
+        return match ($currentStage) {
+            Document::BUDGET_REVIEW_STAGE_PENDING => $this->canProcessBudgetStage($user, 'review')
+                ? 'review'
+                : null,
+            Document::BUDGET_REVIEW_STAGE_REVIEWED => $this->canProcessBudgetStage($user, 'approve')
+                ? 'approve'
+                : null,
+            Document::BUDGET_REVIEW_STAGE_APPROVED => $this->canProcessBudgetStage($user, 'authorize')
+                ? 'authorize'
+                : null,
+            default => null,
+        };
+    }
+
+    private function canProcessBudgetStage(User $user, string $stage): bool
+    {
+        if ($user->hasPermissionTo('process weekly budgets')) {
+            return true;
+        }
+
+        return match ($stage) {
+            'review' => $user->hasPermissionTo('review weekly budgets'),
+            'approve' => $user->hasPermissionTo('approve weekly budgets'),
+            'authorize' => $user->hasPermissionTo('authorize weekly budgets'),
+            default => false,
+        };
+    }
+
+    private function stageAfterAction(string $actionStage, string $decision): string
+    {
+        if ($decision === Document::BUDGET_REVIEW_REJECTED) {
+            return Document::BUDGET_REVIEW_STAGE_REJECTED;
+        }
+
+        return match ($actionStage) {
+            'review' => Document::BUDGET_REVIEW_STAGE_REVIEWED,
+            'approve' => Document::BUDGET_REVIEW_STAGE_APPROVED,
+            'authorize' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
+            default => Document::BUDGET_REVIEW_STAGE_PENDING,
+        };
+    }
+
+    private function determinePlanBudgetReviewStatus(array $summary): string
+    {
+        if ($summary['all_approved']) {
+            return Document::BUDGET_REVIEW_APPROVED;
+        }
+        if ($summary['all_rejected']) {
+            return Document::BUDGET_REVIEW_REJECTED;
+        }
+        if ($summary['pending'] === 0 && $summary['items_total'] > 0) {
+            return Document::BUDGET_REVIEW_APPROVED;
+        }
+
+        return Document::BUDGET_REVIEW_PENDING;
+    }
+
     /**
      * Approve or reject a single weekly plan budget item.
      */
@@ -2094,7 +2179,12 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasPermissionTo('process weekly budgets')) {
+        if (! $user->hasAnyPermission([
+            'process weekly budgets',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -2117,6 +2207,7 @@ class DocumentController extends Controller
             ? (float) $validated['provided_amount']
             : 0.0;
         $note = isset($validated['note']) && trim($validated['note']) !== '' ? trim($validated['note']) : null;
+        $now = now();
 
         $weeklyPlan = WeeklyPlan::query()
             ->where('legacy_document_id', $document->id)
@@ -2135,43 +2226,73 @@ class DocumentController extends Controller
             $found = false;
             foreach ($existingReviews as &$review) {
                 if (is_array($review) && ($review['budget_uid'] ?? '') === $budgetUid) {
+                    $currentStage = (string) ($review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING);
+                    if ($currentStage === '' || ! in_array($currentStage, Document::budgetReviewStages(), true)) {
+                        $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
+                    }
+                    $actionStage = $this->resolveBudgetApprovalActionStage($currentStage, $user);
+                    if (! $actionStage) {
+                        return redirect()
+                            ->back()
+                            ->with('error', 'You are not allowed to process this item at its current approval stage.');
+                    }
+
+                    $newStage = $this->stageAfterAction($actionStage, $decision);
                     $review['decision'] = $decision;
+                    $review['approval_stage'] = $newStage;
                     $review['provided_amount'] = $providedAmount;
                     $review['note'] = $note;
                     $review['reviewed_by'] = $user->id;
-                    $review['reviewed_at'] = now()->toIso8601String();
+                    $review['reviewed_at'] = $now->toIso8601String();
+                    if ($actionStage === 'review') {
+                        $review['review_stage_by'] = $user->id;
+                        $review['review_stage_at'] = $now->toIso8601String();
+                    } elseif ($actionStage === 'approve') {
+                        $review['approve_stage_by'] = $user->id;
+                        $review['approve_stage_at'] = $now->toIso8601String();
+                    } else {
+                        $review['authorize_stage_by'] = $user->id;
+                        $review['authorize_stage_at'] = $now->toIso8601String();
+                    }
                     $found = true;
                     break;
                 }
             }
             unset($review);
             if (! $found) {
+                $actionStage = $this->resolveBudgetApprovalActionStage(Document::BUDGET_REVIEW_STAGE_PENDING, $user);
+                if (! $actionStage) {
+                    return redirect()
+                        ->back()
+                        ->with('error', 'You are not allowed to process this item at its current approval stage.');
+                }
+                $newStage = $this->stageAfterAction($actionStage, $decision);
                 $existingReviews[] = [
                     'budget_uid' => $budgetUid,
                     'decision' => $decision,
+                    'approval_stage' => $newStage,
                     'provided_amount' => $providedAmount,
                     'note' => $note,
                     'reviewed_by' => $user->id,
-                    'reviewed_at' => now()->toIso8601String(),
+                    'reviewed_at' => $now->toIso8601String(),
+                    'review_stage_by' => $actionStage === 'review' ? $user->id : null,
+                    'review_stage_at' => $actionStage === 'review' ? $now->toIso8601String() : null,
+                    'approve_stage_by' => $actionStage === 'approve' ? $user->id : null,
+                    'approve_stage_at' => $actionStage === 'approve' ? $now->toIso8601String() : null,
+                    'authorize_stage_by' => $actionStage === 'authorize' ? $user->id : null,
+                    'authorize_stage_at' => $actionStage === 'authorize' ? $now->toIso8601String() : null,
                 ];
             }
 
             $document->budget_review_items = $existingReviews;
             $summary = $document->budgetReviewSummary();
-            $planStatus = Document::BUDGET_REVIEW_PENDING;
-            if ($summary['all_approved']) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            } elseif ($summary['all_rejected']) {
-                $planStatus = Document::BUDGET_REVIEW_REJECTED;
-            } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            }
+            $planStatus = $this->determinePlanBudgetReviewStatus($summary);
 
             $document->update([
                 'budget_review_items' => $existingReviews,
                 'budget_review_status' => $planStatus,
                 'budget_reviewed_by' => $user->id,
-                'budget_reviewed_at' => now(),
+                'budget_reviewed_at' => $now,
                 'budget_provided_amount' => $summary['provided_total'],
                 'budget_review_note' => null,
             ]);
@@ -2191,49 +2312,67 @@ class DocumentController extends Controller
                 ->with('error', 'Budget item not found in this plan.');
         }
 
+        $existingReview = WeeklyPlanBudgetReview::query()
+            ->where('weekly_plan_budget_item_id', $budgetItem->id)
+            ->first();
+        $currentStage = $existingReview?->approval_stage ?? Document::BUDGET_REVIEW_STAGE_PENDING;
+        $actionStage = $this->resolveBudgetApprovalActionStage((string) $currentStage, $user);
+        if (! $actionStage) {
+            return redirect()
+                ->back()
+                ->with('error', 'You are not allowed to process this item at its current approval stage.');
+        }
+        $newStage = $this->stageAfterAction($actionStage, $decision);
+
+        $updatePayload = [
+            'decision' => $decision,
+            'approval_stage' => $newStage,
+            'provided_amount' => $providedAmount,
+            'note' => $note,
+            'reviewed_by' => $user->id,
+            'reviewed_at' => $now,
+        ];
+        if ($actionStage === 'review') {
+            $updatePayload['reviewed_by'] = $user->id;
+            $updatePayload['reviewed_at'] = $now;
+        } elseif ($actionStage === 'approve') {
+            $updatePayload['approved_by'] = $user->id;
+            $updatePayload['approved_at'] = $now;
+        } else {
+            $updatePayload['authorized_by'] = $user->id;
+            $updatePayload['authorized_at'] = $now;
+        }
+
         WeeklyPlanBudgetReview::query()->updateOrCreate(
             ['weekly_plan_budget_item_id' => $budgetItem->id],
-            [
-                'decision' => $decision,
-                'provided_amount' => $providedAmount,
-                'note' => $note,
-                'reviewed_by' => $user->id,
-                'reviewed_at' => now(),
-            ]
+            $updatePayload
         );
 
         // Recompute plan-level summary from all item decisions
         $document->unsetRelation('weeklyPlanDomain');
         $summary = $document->budgetReviewSummary();
-
-        $planStatus = Document::BUDGET_REVIEW_PENDING;
-        if ($summary['all_approved']) {
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        } elseif ($summary['all_rejected']) {
-            $planStatus = Document::BUDGET_REVIEW_REJECTED;
-        } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-            // All items reviewed but mixed decisions
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        }
+        $planStatus = $this->determinePlanBudgetReviewStatus($summary);
 
         $weeklyPlan->update([
             'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
-            'budget_reviewed_at' => now(),
+            'budget_reviewed_at' => $now,
             'budget_provided_amount' => $summary['provided_total'],
             'budget_review_note' => null,
         ]);
         $document->update([
             'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
-            'budget_reviewed_at' => now(),
+            'budget_reviewed_at' => $now,
             'budget_provided_amount' => $summary['provided_total'],
             'budget_review_note' => null,
         ]);
 
+        $stageLabel = ucfirst($actionStage);
+
         return redirect()
             ->back()
-            ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
+            ->with('success', 'Budget item "'.$budgetUid.'" has passed '.$stageLabel.' stage.');
     }
 
     public function addMidWeekBudgetEntry(Request $request)
@@ -2285,22 +2424,22 @@ class DocumentController extends Controller
             $existingReviews[] = [
                 'budget_uid' => $budgetUid,
                 'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'approval_stage' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
                 'provided_amount' => $amountNumeric,
                 'note' => null,
                 'reviewed_by' => $user->id,
                 'reviewed_at' => now()->toIso8601String(),
+                'review_stage_by' => $user->id,
+                'review_stage_at' => now()->toIso8601String(),
+                'approve_stage_by' => $user->id,
+                'approve_stage_at' => now()->toIso8601String(),
+                'authorize_stage_by' => $user->id,
+                'authorize_stage_at' => now()->toIso8601String(),
             ];
             $targetDocument->content = $content;
             $targetDocument->budget_review_items = $existingReviews;
             $summary = $targetDocument->budgetReviewSummary();
-            $planStatus = Document::BUDGET_REVIEW_PENDING;
-            if ($summary['all_approved']) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            } elseif ($summary['all_rejected']) {
-                $planStatus = Document::BUDGET_REVIEW_REJECTED;
-            } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            }
+            $planStatus = $this->determinePlanBudgetReviewStatus($summary);
             $targetDocument->update([
                 'content' => $content,
                 'budget_review_items' => $existingReviews,
@@ -2331,24 +2470,22 @@ class DocumentController extends Controller
             ['weekly_plan_budget_item_id' => $budgetItem->id],
             [
                 'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'approval_stage' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
                 'provided_amount' => $amountNumeric,
                 'note' => null,
                 'reviewed_by' => $user->id,
                 'reviewed_at' => now(),
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+                'authorized_by' => $user->id,
+                'authorized_at' => now(),
             ]
         );
 
         $targetDocument->unsetRelation('weeklyPlanDomain');
         $summary = $targetDocument->budgetReviewSummary();
 
-        $planStatus = Document::BUDGET_REVIEW_PENDING;
-        if ($summary['all_approved']) {
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        } elseif ($summary['all_rejected']) {
-            $planStatus = Document::BUDGET_REVIEW_REJECTED;
-        } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        }
+        $planStatus = $this->determinePlanBudgetReviewStatus($summary);
 
         $weeklyPlan->update([
             'budget_review_status' => $planStatus,

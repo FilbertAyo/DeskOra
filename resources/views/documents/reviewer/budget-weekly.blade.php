@@ -64,9 +64,9 @@
         <div class="card-header bg-white border-bottom">
             <div class="row align-items-center">
                 <div class="col-md-4">
-                    <h5 class="mb-0"><i class="ti ti-wallet me-2 text-primary"></i>Weekly Budget Submissions</h5>
+                    <h5 class="mb-0"><i class="ti ti-wallet me-2 text-muted"></i>Weekly Budget Submissions</h5>
                     @if(isset($defaultPeriod) && $defaultPeriod && !request()->filled('period_id'))
-                        <small class="text-muted">Showing next week: Week {{ $defaultPeriod->week_number }} &bull; {{ $defaultPeriod->year }}</small>
+                        <small class="text-muted">Showing latest week: Week {{ $defaultPeriod->week_number }} &bull; {{ $defaultPeriod->year }}</small>
                     @endif
                 </div>
                 <div class="col-md-8">
@@ -83,9 +83,8 @@
                         </div>
                         <div class="col-md-3">
                             <select name="period_id" class="form-control" onchange="document.getElementById('budgetFilterForm').submit();">
-                                <option value="">All Weeks</option>
                                 @foreach($periodOptions as $periodOption)
-                                    <option value="{{ $periodOption->id }}" {{ request('period_id') == $periodOption->id ? 'selected' : '' }}>
+                                    <option value="{{ $periodOption->id }}" {{ ($activePeriodId ?? request('period_id')) == $periodOption->id ? 'selected' : '' }}>
                                         Week {{ $periodOption->week_number }} &bull; {{ $periodOption->year }}
                                     </option>
                                 @endforeach
@@ -113,14 +112,14 @@
                     </form>
                     <div class="d-flex flex-wrap gap-2 mt-2">
                         @can('process weekly budgets')
-                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#midWeekBudgetEntryModal">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#midWeekBudgetEntryModal">
                                 <i class="ti ti-plus me-1"></i>Add Mid-Week Budget
                             </button>
                         @endcan
-                        <a href="{{ route('documents.weekly-budget-review.export.pdf', request()->query()) }}" class="btn btn-sm btn-outline-danger">
+                        <a href="{{ route('documents.weekly-budget-review.export.pdf', request()->query()) }}" class="btn btn-sm btn-outline-secondary">
                             <i class="ti ti-file-type-pdf me-1"></i>Download PDF
                         </a>
-                        <a href="{{ route('documents.weekly-budget-review.export.excel', request()->query()) }}" class="btn btn-sm btn-outline-success">
+                        <a href="{{ route('documents.weekly-budget-review.export.excel', request()->query()) }}" class="btn btn-sm btn-outline-secondary">
                             <i class="ti ti-file-spreadsheet me-1"></i>Download Excel
                         </a>
                     </div>
@@ -137,8 +136,8 @@
                                 <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
                             </h6>
                             <div class="text-end">
-                                <span class="badge bg-secondary me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
-                                <span class="badge bg-primary">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
+                                <span class="badge bg-light text-dark border me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
+                                <span class="badge bg-light text-dark border">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -158,22 +157,22 @@
                                                 Week {{ $staffDocument->period->week_number }} &bull; {{ $staffDocument->period->date_range }}
                                             </small>
                                         @endif
-                                        <a href="{{ route('documents.show', $staffDocument->id) }}" class="btn btn-sm btn-outline-info ms-2" title="View plan">
+                                        <a href="{{ route('documents.show', $staffDocument->id) }}" class="btn btn-sm btn-outline-secondary ms-2" title="View plan">
                                             <i class="ti ti-eye"></i>
                                         </a>
                                     </div>
                                     <div class="text-end">
                                         <span class="text-muted me-2">{{ count($staffItems) }} item(s)</span>
-                                        <span class="badge bg-secondary me-1">Req: {{ number_format($staffData['requested_total'], 2) }}</span>
-                                        <span class="badge bg-primary me-1">Prov: {{ number_format($staffData['provided_total'], 2) }}</span>
+                                        <span class="badge bg-light text-dark border me-1">Req: {{ number_format($staffData['requested_total'], 2) }}</span>
+                                        <span class="badge bg-light text-dark border me-1">Prov: {{ number_format($staffData['provided_total'], 2) }}</span>
                                         @if($staffSummary['pending'] > 0)
-                                            <span class="badge bg-warning">{{ $staffSummary['pending'] }} pending</span>
+                                            <span class="badge bg-secondary">{{ $staffSummary['pending'] }} pending</span>
                                         @endif
                                         @if($staffSummary['approved'] > 0)
-                                            <span class="badge bg-success">{{ $staffSummary['approved'] }} approved</span>
+                                            <span class="badge bg-secondary">{{ $staffSummary['approved'] }} approved</span>
                                         @endif
                                         @if($staffSummary['rejected'] > 0)
-                                            <span class="badge bg-danger">{{ $staffSummary['rejected'] }} rejected</span>
+                                            <span class="badge bg-dark">{{ $staffSummary['rejected'] }} rejected</span>
                                         @endif
                                     </div>
                                 </div>
@@ -199,6 +198,20 @@
                                                     $isPending = ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_PENDING;
                                                     $isApproved = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
                                                     $isRejected = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_REJECTED;
+                                                    $approvalStage = $item['approval_stage'] ?? \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING;
+                                                    $isFinalApproved = $isApproved && $approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
+                                                    $nextStage = match ($approvalStage) {
+                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING => 'review',
+                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED => 'approve',
+                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED => 'authorize',
+                                                        default => null,
+                                                    };
+                                                    $canProcessStage = $nextStage && (
+                                                        auth()->user()?->can('process weekly budgets')
+                                                        || ($nextStage === 'review' && auth()->user()?->can('review weekly budgets'))
+                                                        || ($nextStage === 'approve' && auth()->user()?->can('approve weekly budgets'))
+                                                        || ($nextStage === 'authorize' && auth()->user()?->can('authorize weekly budgets'))
+                                                    );
                                                 @endphp
                                                 <tr>
                                                     <td class="text-center">{{ $idx + 1 }}</td>
@@ -206,34 +219,38 @@
                                                     <td>{{ $item['description_purpose'] }}</td>
                                                     <td class="text-end">{{ $item['amount'] }}</td>
                                                     <td class="text-end">
-                                                        @if($isApproved)
+                                                        @if($isFinalApproved)
                                                             {{ number_format($item['provided_amount'], 2) }}
                                                         @else
                                                             -
                                                         @endif
                                                     </td>
                                                     <td>
-                                                        @if($isApproved)
-                                                            <span class="badge bg-success">Approved</span>
+                                                        @if($isFinalApproved)
+                                                            <span class="badge bg-dark">Approved</span>
                                                         @elseif($isRejected)
-                                                            <span class="badge bg-danger">Rejected</span>
+                                                            <span class="badge bg-dark">Rejected</span>
+                                                        @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
+                                                            <span class="badge bg-secondary">Pending Authorization</span>
+                                                        @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED)
+                                                            <span class="badge bg-secondary">Pending Approval</span>
                                                         @else
-                                                            <span class="badge bg-warning">Pending</span>
+                                                            <span class="badge bg-secondary">Pending Review</span>
                                                         @endif
                                                     </td>
                                                     <!-- <td>
                                                         <small>{{ $item['note'] ?? '' }}</small>
                                                     </td> -->
                                                     <td class="text-center">
-                                                        @can('process weekly budgets')
+                                                        @if($canProcessStage)
                                                             <button
                                                                 type="button"
-                                                                class="btn btn-sm {{ $isPending ? 'btn-primary' : 'btn-outline-primary' }}"
+                                                                class="btn btn-sm btn-outline-secondary"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
-                                                                {{ $isPending ? 'Process' : 'Edit' }}
+                                                                {{ ucfirst($nextStage) }}
                                                             </button>
-                                                        @endcan
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @endforeach
@@ -250,15 +267,30 @@
                                 </div>
 
                                 {{-- Per-item review modals --}}
-                                @can('process weekly budgets')
-                                    @foreach($staffItems as $item)
+                                @foreach($staffItems as $item)
+                                    @php
+                                        $approvalStage = $item['approval_stage'] ?? \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING;
+                                        $nextStage = match ($approvalStage) {
+                                            \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING => 'review',
+                                            \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED => 'approve',
+                                            \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED => 'authorize',
+                                            default => null,
+                                        };
+                                        $canProcessStage = $nextStage && (
+                                            auth()->user()?->can('process weekly budgets')
+                                            || ($nextStage === 'review' && auth()->user()?->can('review weekly budgets'))
+                                            || ($nextStage === 'approve' && auth()->user()?->can('approve weekly budgets'))
+                                            || ($nextStage === 'authorize' && auth()->user()?->can('authorize weekly budgets'))
+                                        );
+                                    @endphp
+                                    @if($canProcessStage)
                                         <div class="modal fade" id="itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}" tabindex="-1" aria-hidden="true">
                                             <div class="modal-dialog">
                                                 <form method="POST" action="{{ route('documents.process-weekly-budget-review', $item['document_id']) }}" class="modal-content">
                                                     @csrf
                                                     <input type="hidden" name="budget_uid" value="{{ $item['budget_uid'] }}">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">Review Budget Item</h5>
+                                                        <h5 class="modal-title">{{ ucfirst($nextStage) }} Budget Item</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body">
@@ -296,13 +328,13 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                                        <button type="submit" class="btn btn-primary">Save Decision</button>
+                                                        <button type="submit" class="btn btn-secondary">Save {{ ucfirst($nextStage) }} Decision</button>
                                                     </div>
                                                 </form>
                                             </div>
                                         </div>
-                                    @endforeach
-                                @endcan
+                                    @endif
+                                @endforeach
                             @endforeach
                         </div>
                         {{-- Department total footer --}}

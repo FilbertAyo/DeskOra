@@ -62,6 +62,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'approve documents',
             'view weekly budgets',
             'process weekly budgets',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
 
             // Action logs permissions
             'view action logs',

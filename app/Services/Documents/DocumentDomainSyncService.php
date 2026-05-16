@@ -141,18 +141,35 @@ class DocumentDomainSyncService
             ]);
 
             $review = $reviewRows->get($budgetUid);
+            $decision = in_array(($review['decision'] ?? null), [
+                Document::BUDGET_REVIEW_PENDING,
+                Document::BUDGET_REVIEW_APPROVED,
+                Document::BUDGET_REVIEW_REJECTED,
+            ], true) ? $review['decision'] : Document::BUDGET_REVIEW_PENDING;
+
+            $approvalStage = in_array(($review['approval_stage'] ?? null), Document::budgetReviewStages(), true)
+                ? $review['approval_stage']
+                : ($decision === Document::BUDGET_REVIEW_REJECTED
+                    ? Document::BUDGET_REVIEW_STAGE_REJECTED
+                    : Document::BUDGET_REVIEW_STAGE_PENDING);
+
             WeeklyPlanBudgetReview::query()->create([
                 'weekly_plan_budget_item_id' => (string) $budgetItem->id,
-                'decision' => in_array(($review['decision'] ?? null), [
-                    Document::BUDGET_REVIEW_PENDING,
-                    Document::BUDGET_REVIEW_APPROVED,
-                    Document::BUDGET_REVIEW_REJECTED,
-                ], true) ? $review['decision'] : Document::BUDGET_REVIEW_PENDING,
+                'decision' => $decision,
+                'approval_stage' => $approvalStage,
                 'provided_amount' => (float) ($review['provided_amount'] ?? 0),
                 'note' => isset($review['note']) ? trim((string) $review['note']) : null,
                 'reviewed_by' => $review['reviewed_by'] ?? null,
                 'reviewed_at' => isset($review['reviewed_at']) && trim((string) $review['reviewed_at']) !== ''
                     ? $review['reviewed_at']
+                    : null,
+                'approved_by' => $review['approve_stage_by'] ?? null,
+                'approved_at' => isset($review['approve_stage_at']) && trim((string) $review['approve_stage_at']) !== ''
+                    ? $review['approve_stage_at']
+                    : null,
+                'authorized_by' => $review['authorize_stage_by'] ?? null,
+                'authorized_at' => isset($review['authorize_stage_at']) && trim((string) $review['authorize_stage_at']) !== ''
+                    ? $review['authorize_stage_at']
                     : null,
             ]);
         }

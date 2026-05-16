@@ -72,9 +72,39 @@ class WeeklyBudgetReviewTest extends TestCase
     private function createReviewer(): User
     {
         $user = User::factory()->create(['status' => 'active']);
-        $user->givePermissionTo(['view weekly budgets', 'process weekly budgets', 'view all documents', 'approve documents']);
+        $user->givePermissionTo([
+            'view weekly budgets',
+            'process weekly budgets',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+            'view all documents',
+            'approve documents',
+        ]);
 
         return $user;
+    }
+
+    private function createStageReviewer(string $permission): User
+    {
+        $user = User::factory()->create(['status' => 'active']);
+        $user->givePermissionTo(['view weekly budgets', 'view all documents', $permission]);
+
+        return $user;
+    }
+
+    private function approveBudgetItemThroughAllStages(User $reviewer, Document $plan, string $budgetUid, float $providedAmount): void
+    {
+        foreach (range(1, 3) as $step) {
+            $this->actingAs($reviewer)->post(
+                route('documents.process-weekly-budget-review', $plan->id),
+                [
+                    'budget_uid' => $budgetUid,
+                    'decision' => 'approved',
+                    'provided_amount' => $providedAmount,
+                ]
+            )->assertRedirect();
+        }
     }
 
     private function createPlanWithBudget(User $user, WorkPeriod $period, array $budgetRows): Document
@@ -143,6 +173,7 @@ class WeeklyBudgetReviewTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review'));
         $response->assertOk();
         $response->assertSee('Laptop');
+        $response->assertDontSee('All Weeks');
         // 'Desk' should not appear as a budget item (note: 'DeskOra' appears in branding)
         $response->assertDontSee('>Desk</');
     }
@@ -182,10 +213,7 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertSame(2, Document::countPendingWeeklyBudgetReviewForPeriod(null));
 
         $olderUid = $olderPlan->budgetItems()[0]['budget_uid'];
-        $this->actingAs($reviewer)->post(
-            route('documents.process-weekly-budget-review', $olderPlan->id),
-            ['budget_uid' => $olderUid, 'decision' => 'approved', 'provided_amount' => 250]
-        );
+        $this->approveBudgetItemThroughAllStages($reviewer, $olderPlan, $olderUid, 250);
 
         $this->assertSame(1, Document::countPendingWeeklyBudgetReviewForPeriod(null));
         $this->assertSame(1, Document::countPendingWeeklyBudgetReviewForPeriod($nextPlan->period_id));
@@ -330,6 +358,7 @@ class WeeklyBudgetReviewTest extends TestCase
         $plan->refresh();
         $reviewsByUid = $plan->budgetReviewItemsByUid();
         $this->assertSame('approved', $reviewsByUid[$uidA]['decision']);
+        $this->assertSame(Document::BUDGET_REVIEW_STAGE_REVIEWED, $reviewsByUid[$uidA]['approval_stage']);
         $this->assertEquals(90.0, $reviewsByUid[$uidA]['provided_amount']);
 
         // ItemB should still be pending
@@ -416,14 +445,7 @@ class WeeklyBudgetReviewTest extends TestCase
 
         // Approve both items
         foreach ($items as $item) {
-            $this->actingAs($reviewer)->post(
-                route('documents.process-weekly-budget-review', $plan->id),
-                [
-                    'budget_uid' => $item['budget_uid'],
-                    'decision' => 'approved',
-                    'provided_amount' => $item['amount_numeric'],
-                ]
-            );
+            $this->approveBudgetItemThroughAllStages($reviewer, $plan, $item['budget_uid'], (float) $item['amount_numeric']);
         }
 
         $plan->refresh();
@@ -446,10 +468,7 @@ class WeeklyBudgetReviewTest extends TestCase
         $items = $plan->budgetItems();
 
         // Approve first, reject second
-        $this->actingAs($reviewer)->post(
-            route('documents.process-weekly-budget-review', $plan->id),
-            ['budget_uid' => $items[0]['budget_uid'], 'decision' => 'approved', 'provided_amount' => 100]
-        );
+        $this->approveBudgetItemThroughAllStages($reviewer, $plan, $items[0]['budget_uid'], 100);
         $this->actingAs($reviewer)->post(
             route('documents.process-weekly-budget-review', $plan->id),
             ['budget_uid' => $items[1]['budget_uid'], 'decision' => 'rejected', 'note' => 'Too expensive']
@@ -498,11 +517,8 @@ class WeeklyBudgetReviewTest extends TestCase
 
         $uid = $plan->budgetItems()[0]['budget_uid'];
 
-        // Approve the item
-        $this->actingAs($reviewer)->post(
-            route('documents.process-weekly-budget-review', $plan->id),
-            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 1400]
-        );
+        // Approve the item through all approval levels
+        $this->approveBudgetItemThroughAllStages($reviewer, $plan, $uid, 1400);
 
         // Fetch plan target as staff
         $response = $this->actingAs($staff)->getJson(route('documents.plan-target', [
@@ -667,6 +683,49 @@ class WeeklyBudgetReviewTest extends TestCase
         );
 
         $response->assertForbidden();
+    }
+
+    public function test_budget_item_requires_review_then_approve_then_authorize_permissions(): void
+    {
+        [, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createStageReviewer('review weekly budgets');
+        $approver = $this->createStageReviewer('approve weekly budgets');
+        $authorizer = $this->createStageReviewer('authorize weekly budgets');
+
+        $plan = $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'ItemA', 'description_purpose' => 'A', 'amount' => '100'],
+        ]);
+        $uid = $plan->budgetItems()[0]['budget_uid'];
+
+        $this->actingAs($approver)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect()->assertSessionHas('error');
+
+        $this->actingAs($reviewer)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect()->assertSessionHas('success');
+
+        $this->actingAs($authorizer)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect()->assertSessionHas('error');
+
+        $this->actingAs($approver)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect()->assertSessionHas('success');
+
+        $this->actingAs($authorizer)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect()->assertSessionHas('success');
+
+        $plan->refresh();
+        $this->assertSame(Document::BUDGET_REVIEW_APPROVED, $plan->budget_review_status);
     }
 
     // ------------------------------------------------------------------

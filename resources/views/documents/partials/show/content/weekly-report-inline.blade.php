@@ -283,7 +283,9 @@
                                             @php
                                                 $planBudgetFiltered = is_array($planBudget) ? array_values(array_filter($planBudget, function ($row) {
                                                     if (!is_array($row)) return false;
-                                                    return trim((string)($row['item'] ?? '')) !== '' || trim((string)($row['amount'] ?? '')) !== '';
+                                                    return trim((string)($row['item'] ?? '')) !== ''
+                                                        || trim((string)($row['description_purpose'] ?? '')) !== ''
+                                                        || trim((string)($row['amount'] ?? '')) !== '';
                                                 })) : [];
                                                 $reviewsByUid = $relatedPlan ? $relatedPlan->budgetReviewItemsByUid() : [];
                                                 // Index budget_statuses by budget_uid
@@ -299,6 +301,7 @@
                                                         <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th>Budget Item</th>
+                                                                <th>Description / Purpose</th>
                                                                 <th style="width: 150px;">Amount</th>
                                                                 <th style="width: 130px;">Review</th>
                                                                 <th>Notes</th>
@@ -316,6 +319,7 @@
                                                                 @endphp
                                                                 <tr>
                                                                     <td>{{ $planRow['item'] ?? '' }}</td>
+                                                                    <td>{{ $planRow['description_purpose'] ?? '' }}</td>
                                                                     <td>{{ $planRow['amount'] ?? '' }}</td>
                                                                     <td class="text-center">
                                                                         @if($reviewDecision === 'approved')

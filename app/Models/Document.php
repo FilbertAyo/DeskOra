@@ -69,6 +69,16 @@ class Document extends Model
 
     public const BUDGET_REVIEW_REJECTED = 'rejected';
 
+    public const BUDGET_REVIEW_STAGE_PENDING = 'pending';
+
+    public const BUDGET_REVIEW_STAGE_REVIEWED = 'reviewed';
+
+    public const BUDGET_REVIEW_STAGE_APPROVED = 'approved';
+
+    public const BUDGET_REVIEW_STAGE_AUTHORIZED = 'authorized';
+
+    public const BUDGET_REVIEW_STAGE_REJECTED = 'rejected';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -1152,13 +1162,27 @@ class Document extends Model
                 }
                 $review = $item->review;
                 $decision = $review?->decision ?? self::BUDGET_REVIEW_PENDING;
+                $approvalStage = $review?->approval_stage ?? self::BUDGET_REVIEW_STAGE_PENDING;
+                $latestActor = $review?->authorized_by
+                    ?? $review?->approved_by
+                    ?? $review?->reviewed_by;
+                $latestActionAt = $review?->authorized_at
+                    ?? $review?->approved_at
+                    ?? $review?->reviewed_at;
                 $mapped[$uid] = [
                     'budget_uid' => $uid,
                     'decision' => $decision,
+                    'approval_stage' => $approvalStage,
                     'provided_amount' => (float) ($review?->provided_amount ?? 0),
                     'note' => $review?->note,
-                    'reviewed_by' => $review?->reviewed_by,
-                    'reviewed_at' => optional($review?->reviewed_at)->toIso8601String(),
+                    'reviewed_by' => $latestActor,
+                    'reviewed_at' => optional($latestActionAt)->toIso8601String(),
+                    'review_stage_by' => $review?->reviewed_by,
+                    'review_stage_at' => optional($review?->reviewed_at)->toIso8601String(),
+                    'approve_stage_by' => $review?->approved_by,
+                    'approve_stage_at' => optional($review?->approved_at)->toIso8601String(),
+                    'authorize_stage_by' => $review?->authorized_by,
+                    'authorize_stage_at' => optional($review?->authorized_at)->toIso8601String(),
                 ];
             }
 
@@ -1180,13 +1204,26 @@ class Document extends Model
             if (! in_array($decision, [self::BUDGET_REVIEW_PENDING, self::BUDGET_REVIEW_APPROVED, self::BUDGET_REVIEW_REJECTED], true)) {
                 $decision = self::BUDGET_REVIEW_PENDING;
             }
+            $approvalStage = trim((string) ($row['approval_stage'] ?? ''));
+            if (! in_array($approvalStage, self::budgetReviewStages(), true)) {
+                $approvalStage = $decision === self::BUDGET_REVIEW_REJECTED
+                    ? self::BUDGET_REVIEW_STAGE_REJECTED
+                    : self::BUDGET_REVIEW_STAGE_PENDING;
+            }
             $mapped[$uid] = [
                 'budget_uid' => $uid,
                 'decision' => $decision,
+                'approval_stage' => $approvalStage,
                 'provided_amount' => (float) ($row['provided_amount'] ?? 0),
                 'note' => isset($row['note']) ? trim((string) $row['note']) : null,
                 'reviewed_by' => $row['reviewed_by'] ?? null,
                 'reviewed_at' => isset($row['reviewed_at']) && $row['reviewed_at'] !== '' ? (string) $row['reviewed_at'] : null,
+                'review_stage_by' => $row['review_stage_by'] ?? null,
+                'review_stage_at' => isset($row['review_stage_at']) && $row['review_stage_at'] !== '' ? (string) $row['review_stage_at'] : null,
+                'approve_stage_by' => $row['approve_stage_by'] ?? null,
+                'approve_stage_at' => isset($row['approve_stage_at']) && $row['approve_stage_at'] !== '' ? (string) $row['approve_stage_at'] : null,
+                'authorize_stage_by' => $row['authorize_stage_by'] ?? null,
+                'authorize_stage_at' => isset($row['authorize_stage_at']) && $row['authorize_stage_at'] !== '' ? (string) $row['authorize_stage_at'] : null,
             ];
         }
 
@@ -1212,11 +1249,12 @@ class Document extends Model
             $requestedTotal += (float) ($item['amount_numeric'] ?? 0);
             $review = $reviewsByUid[$uid] ?? null;
             $decision = $review['decision'] ?? self::BUDGET_REVIEW_PENDING;
-            if ($decision === self::BUDGET_REVIEW_APPROVED) {
+            $approvalStage = $review['approval_stage'] ?? self::BUDGET_REVIEW_STAGE_PENDING;
+            if ($decision === self::BUDGET_REVIEW_REJECTED || $approvalStage === self::BUDGET_REVIEW_STAGE_REJECTED) {
+                $rejected++;
+            } elseif ($decision === self::BUDGET_REVIEW_APPROVED && $approvalStage === self::BUDGET_REVIEW_STAGE_AUTHORIZED) {
                 $approved++;
                 $providedTotal += (float) ($review['provided_amount'] ?? 0);
-            } elseif ($decision === self::BUDGET_REVIEW_REJECTED) {
-                $rejected++;
             } else {
                 $pending++;
             }
@@ -1252,5 +1290,16 @@ class Document extends Model
         }
 
         return (float) $normalizedAmount;
+    }
+
+    public static function budgetReviewStages(): array
+    {
+        return [
+            self::BUDGET_REVIEW_STAGE_PENDING,
+            self::BUDGET_REVIEW_STAGE_REVIEWED,
+            self::BUDGET_REVIEW_STAGE_APPROVED,
+            self::BUDGET_REVIEW_STAGE_AUTHORIZED,
+            self::BUDGET_REVIEW_STAGE_REJECTED,
+        ];
     }
 }

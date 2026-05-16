@@ -717,6 +717,7 @@
                                 const rowsHtml = budgetItems.map((item, idx) => {
                                     const amount = item.amount ?? '';
                                     const label = item.item ?? '';
+                                    const description = item.description_purpose ?? '';
                                     const uid = item.budget_uid ?? '';
                                     const reviewDecision = item.review_decision ?? null;
                                     let reviewBadge = '<span class="text-muted">-</span>';
@@ -733,6 +734,9 @@
                                             <td>
                                                 <input class="form-control" type="text" value="${label}" disabled>
                                                 <input type="hidden" name="content[budget_statuses][${idx}][budget_uid]" value="${uid}">
+                                            </td>
+                                            <td>
+                                                <input class="form-control" type="text" value="${description}" disabled>
                                             </td>
                                             <td>
                                                 <input class="form-control" type="text" value="${amount}" disabled>
