@@ -294,6 +294,11 @@
                                                     $sUid = is_array($s) ? trim((string)($s['budget_uid'] ?? '')) : '';
                                                     if ($sUid !== '') $statusByUid[$sUid] = $s;
                                                 }
+                                                $planBudgetTotal = 0.0;
+                                                foreach ($planBudgetFiltered as $planBudgetRow) {
+                                                    $planBudgetRow = is_array($planBudgetRow) ? $planBudgetRow : [];
+                                                    $planBudgetTotal += \App\Models\Document::parseBudgetAmount((string) ($planBudgetRow['amount'] ?? ''));
+                                                }
                                             @endphp
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
@@ -335,6 +340,11 @@
                                                                     <td>{{ $statusRow['notes'] ?? '' }}</td>
                                                                 </tr>
                                                             @endforeach
+                                                            <tr class="fw-bold table-light">
+                                                                <td colspan="2" class="text-end">Total</td>
+                                                                <td class="text-end">{{ number_format($planBudgetTotal, 2) }}</td>
+                                                                <td colspan="2"></td>
+                                                            </tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
