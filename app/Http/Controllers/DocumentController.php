@@ -2115,15 +2115,6 @@ class DocumentController extends Controller
             $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
         }
 
-        // Final approvers can complete approval directly from any non-final stage.
-        if (in_array($currentStage, [
-            Document::BUDGET_REVIEW_STAGE_PENDING,
-            Document::BUDGET_REVIEW_STAGE_REVIEWED,
-            Document::BUDGET_REVIEW_STAGE_APPROVED,
-        ], true) && $this->canProcessBudgetStage($user, 'authorize')) {
-            return 'authorize';
-        }
-
         return match ($currentStage) {
             Document::BUDGET_REVIEW_STAGE_PENDING => $this->canProcessBudgetStage($user, 'review')
                 ? 'review'
@@ -2140,10 +2131,6 @@ class DocumentController extends Controller
 
     private function canProcessBudgetStage(User $user, string $stage): bool
     {
-        if ($user->hasPermissionTo('process weekly budgets')) {
-            return true;
-        }
-
         return match ($stage) {
             'review' => $user->hasPermissionTo('review weekly budgets'),
             'approve' => $user->hasPermissionTo('approve weekly budgets'),
@@ -2189,7 +2176,6 @@ class DocumentController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         if (! $user->hasAnyPermission([
-            'process weekly budgets',
             'review weekly budgets',
             'approve weekly budgets',
             'authorize weekly budgets',

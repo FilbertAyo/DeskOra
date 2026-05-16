@@ -83,9 +83,34 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
+        $budgetReviewerRole = Role::firstOrCreate(['name' => 'budget_reviewer']);
+        $budgetApproverRole = Role::firstOrCreate(['name' => 'budget_approver']);
+        $budgetAuthorizerRole = Role::firstOrCreate(['name' => 'budget_authorizer']);
+        $budgetOperatorRole = Role::firstOrCreate(['name' => 'budget_operator']);
+
+        $budgetReviewerPermissions = [
+            'view weekly budgets',
+            'review weekly budgets',
+        ];
+        $budgetApproverPermissions = [
+            'view weekly budgets',
+            'approve weekly budgets',
+        ];
+        $budgetAuthorizerPermissions = [
+            'view weekly budgets',
+            'authorize weekly budgets',
+        ];
+        $budgetOperatorPermissions = [
+            'view weekly budgets',
+            'process weekly budgets',
+        ];
 
         $superadminRole->syncPermissions($allPermissions);
         $staffRole->syncPermissions($staffRole->permissions()->pluck('name')->all());
+        $budgetReviewerRole->syncPermissions($budgetReviewerPermissions);
+        $budgetApproverRole->syncPermissions($budgetApproverPermissions);
+        $budgetAuthorizerRole->syncPermissions($budgetAuthorizerPermissions);
+        $budgetOperatorRole->syncPermissions($budgetOperatorPermissions);
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.

@@ -211,14 +211,12 @@
                                                         \App\Models\Document::BUDGET_REVIEW_STAGE_REJECTED,
                                                         \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
                                                     ], true);
-                                                    $canReview = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('review weekly budgets');
-                                                    $canApprove = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('approve weekly budgets');
-                                                    $canAuthorize = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('authorize weekly budgets');
+                                                    $canReview = auth()->user()?->can('review weekly budgets');
+                                                    $canApprove = auth()->user()?->can('approve weekly budgets');
+                                                    $canAuthorize = auth()->user()?->can('authorize weekly budgets');
 
                                                     $nextStage = null;
-                                                    if (! $isTerminal && $canAuthorize) {
-                                                        $nextStage = 'authorize';
-                                                    } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
+                                                    if ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
                                                         $nextStage = 'review';
                                                     } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED && $canApprove) {
                                                         $nextStage = 'approve';
@@ -262,7 +260,7 @@
                                                                 class="btn btn-sm {{ $nextStage === 'authorize' ? 'btn-success' : 'btn-outline-primary' }}"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
-                                                                {{ $nextStage === 'authorize' ? 'Final Approve' : ucfirst($nextStage) }}
+                                                                {{ $nextStage === 'authorize' ? 'Final Authorize' : ucfirst($nextStage) }}
                                                             </button>
                                                         @endif
                                                     </td>
@@ -288,13 +286,11 @@
                                             \App\Models\Document::BUDGET_REVIEW_STAGE_REJECTED,
                                             \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
                                         ], true);
-                                        $canReview = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('review weekly budgets');
-                                        $canApprove = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('approve weekly budgets');
-                                        $canAuthorize = auth()->user()?->can('process weekly budgets') || auth()->user()?->can('authorize weekly budgets');
+                                        $canReview = auth()->user()?->can('review weekly budgets');
+                                        $canApprove = auth()->user()?->can('approve weekly budgets');
+                                        $canAuthorize = auth()->user()?->can('authorize weekly budgets');
                                         $nextStage = null;
-                                        if (! $isTerminal && $canAuthorize) {
-                                            $nextStage = 'authorize';
-                                        } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
+                                        if ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
                                             $nextStage = 'review';
                                         } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED && $canApprove) {
                                             $nextStage = 'approve';
@@ -310,7 +306,7 @@
                                                     @csrf
                                                     <input type="hidden" name="budget_uid" value="{{ $item['budget_uid'] }}">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">{{ $nextStage === 'authorize' ? 'Final Approval' : ucfirst($nextStage) }} Budget Item</h5>
+                                                        <h5 class="modal-title">{{ $nextStage === 'authorize' ? 'Final Authorization' : ucfirst($nextStage) }} Budget Item</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body">
@@ -356,7 +352,7 @@
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
                                                         <button type="submit" class="btn {{ $nextStage === 'authorize' ? 'btn-success' : 'btn-primary' }}">
-                                                            {{ $nextStage === 'authorize' ? 'Save Final Decision' : 'Save '.ucfirst($nextStage).' Decision' }}
+                                                            {{ $nextStage === 'authorize' ? 'Save Final Authorization' : 'Save '.ucfirst($nextStage).' Decision' }}
                                                         </button>
                                                     </div>
                                                 </form>

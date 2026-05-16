@@ -180,6 +180,7 @@ class WeeklyBudgetReviewService
                     'amount' => $item['amount'],
                     'amount_numeric' => $amountNumeric,
                     'decision' => $review['decision'] ?? Document::BUDGET_REVIEW_PENDING,
+                    'approval_stage' => $review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING,
                     'provided_amount' => $providedAmount,
                     'note' => $review['note'] ?? null,
                     'reviewed_by' => $review['reviewed_by'] ?? null,
