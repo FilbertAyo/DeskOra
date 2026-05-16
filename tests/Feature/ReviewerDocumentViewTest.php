@@ -24,7 +24,7 @@ class ReviewerDocumentViewTest extends TestCase
         Carbon::setTestNow(Carbon::create(2026, 4, 15, 10, 0, 0));
     }
 
-    public function test_reviewer_show_hides_related_weekly_card_when_report_exists(): void
+    public function test_reviewer_show_shows_related_weekly_card_when_paired_document_exists(): void
     {
         $period = WorkPeriod::create([
             'year' => 2026,
@@ -70,13 +70,23 @@ class ReviewerDocumentViewTest extends TestCase
 
         $reviewerResponse = $this->actingAs($reviewer)->get(route('documents.reviewer-show', $plan->id));
         $reviewerResponse->assertOk();
-        $reviewerResponse->assertDontSee('Related Weekly Report', false);
+        $reviewerResponse->assertSee('Related Weekly Report', false);
         $reviewerResponse->assertSee('Return to Draft', false);
 
         $standardResponse = $this->actingAs($reviewer)->get(route('documents.show', $plan->id));
         $standardResponse->assertOk();
         $standardResponse->assertSee('Related Weekly Report', false);
         $standardResponse->assertDontSee('Return to Draft', false);
+
+        $report = Document::query()
+            ->where('period_id', $period->id)
+            ->where('type', Document::TYPE_WEEKLY_REPORT)
+            ->firstOrFail();
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.reviewer-show', $report->id))
+            ->assertOk()
+            ->assertSee('Related Weekly Plan', false);
     }
 
     public function test_reviewer_show_returns_403_for_monthly_report(): void

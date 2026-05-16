@@ -693,6 +693,78 @@ class Document extends Model
     }
 
     /**
+     * Paired weekly plan/report for the same work period as this document.
+     */
+    public function relatedWeeklyDocument(): ?self
+    {
+        if (! $this->period_id) {
+            return null;
+        }
+
+        $periodId = (string) $this->period_id;
+        $ownerUserId = (string) $this->user_id;
+
+        if ($this->type === self::TYPE_WEEKLY_PLAN) {
+            return self::findWeeklyReportForPeriodOwner($periodId, $ownerUserId);
+        }
+
+        if ($this->type === self::TYPE_WEEKLY_REPORT) {
+            return self::findWeeklyPlanForUserAndPeriod($periodId, $ownerUserId)
+                ?? self::findWeeklyPlanForPeriodOwner($periodId, $ownerUserId);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function relatedWeeklyCreateActionFor(User $user): ?array
+    {
+        if (! $this->period_id || ! $this->period) {
+            return null;
+        }
+
+        if ((string) $this->user_id !== (string) $user->id) {
+            return null;
+        }
+
+        if ($this->relatedWeeklyDocument() !== null) {
+            return null;
+        }
+
+        if ($this->type === self::TYPE_WEEKLY_PLAN
+            && self::canUserCreateType($user, self::TYPE_WEEKLY_REPORT, $this->period)) {
+            return [
+                'type' => self::TYPE_WEEKLY_REPORT,
+                'label' => 'Create Weekly Report for this Week',
+                'route' => route('documents.create', [
+                    'type' => self::TYPE_WEEKLY_REPORT,
+                    'period_id' => $this->period_id,
+                    'return_to' => request()->fullUrl(),
+                ]),
+                'description' => 'Weekly report is due on '.$this->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
+            ];
+        }
+
+        if ($this->type === self::TYPE_WEEKLY_REPORT
+            && self::canUserCreateType($user, self::TYPE_WEEKLY_PLAN, $this->period)) {
+            return [
+                'type' => self::TYPE_WEEKLY_PLAN,
+                'label' => 'Create Weekly Plan for this Week',
+                'route' => route('documents.create', [
+                    'type' => self::TYPE_WEEKLY_PLAN,
+                    'period_id' => $this->period_id,
+                    'return_to' => request()->fullUrl(),
+                ]),
+                'description' => 'Weekly plan should outline goals for this week.',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Scope: Filter by type
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query

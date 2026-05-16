@@ -169,9 +169,7 @@
                                         </a>
                                     </div>
                                     <div class="text-end">
-                                        <span class="text-muted me-2">{{ count($staffItems) }} item(s)</span>
-                                        <span class="badge bg-light text-dark border me-1">Req: {{ number_format($staffData['requested_total'], 2) }}</span>
-                                        <span class="badge bg-light text-dark border me-1">Prov: {{ number_format($staffData['provided_total'], 2) }}</span>
+                
                                         @if($staffSummary['pending'] > 0)
                                             <span class="badge bg-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
                                         @endif

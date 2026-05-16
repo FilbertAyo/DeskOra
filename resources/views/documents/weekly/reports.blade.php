@@ -223,10 +223,7 @@
                                                     @endif
                                                     @if($document->period)
                                                         @php
-                                                            $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
-                                                                $document->period_id,
-                                                                (string) auth()->id()
-                                                            );
+                                                            $relatedPlan = $document->relatedWeeklyDocument();
                                                         @endphp
                                                         @if($relatedPlan)
                                                             <a href="{{ route('documents.show', ['document' => $relatedPlan->id, 'return_to' => request()->fullUrl()]) }}"

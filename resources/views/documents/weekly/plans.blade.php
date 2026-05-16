@@ -199,10 +199,7 @@
                                                     @endif
                                                     @if($document->period)
                                                         @php
-                                                            $relatedReport = \App\Models\Document::findWeeklyReportForPeriodOwner(
-                                                                $document->period_id,
-                                                                (string) $document->user_id
-                                                            );
+                                                            $relatedReport = $document->relatedWeeklyDocument();
                                                         @endphp
                                                         @if($relatedReport)
                                                             <a href="{{ route('documents.show', ['document' => $relatedReport->id, 'return_to' => request()->fullUrl()]) }}"

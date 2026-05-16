@@ -902,55 +902,7 @@ class DocumentController extends Controller
         // Authorize view action
         $this->authorize('view', $document);
 
-        // Get related documents (plan for report, report for plan)
-        $relatedDocument = null;
-        $relatedAction = null;
-        if ($document->period_id) {
-            if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-                $relatedDocument = Document::findWeeklyReportForPeriodOwner(
-                    $document->period_id,
-                    (string) $document->user_id
-                );
-            } elseif ($document->type === Document::TYPE_WEEKLY_REPORT) {
-                $relatedDocument = Document::findWeeklyPlanForUserAndPeriod(
-                    $document->period_id,
-                    (string) Auth::id()
-                );
-            }
-
-            if (! $relatedDocument) {
-                /** @var \App\Models\User $user */
-                $user = Auth::user();
-                $isAuthor = (string) $document->user_id === (string) $user->id;
-                if ($isAuthor &&
-                    $document->type === Document::TYPE_WEEKLY_PLAN &&
-                    Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT, $document->period)) {
-                    $relatedAction = [
-                        'type' => Document::TYPE_WEEKLY_REPORT,
-                        'label' => 'Create Weekly Report for this Week',
-                        'route' => route('documents.create', [
-                            'type' => Document::TYPE_WEEKLY_REPORT,
-                            'period_id' => $document->period_id,
-                            'return_to' => request()->fullUrl(),
-                        ]),
-                        'description' => 'Weekly report is due on '.$document->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
-                    ];
-                } elseif ($isAuthor &&
-                    $document->type === Document::TYPE_WEEKLY_REPORT &&
-                    Document::canUserCreateType($user, Document::TYPE_WEEKLY_PLAN, $document->period)) {
-                    $relatedAction = [
-                        'type' => Document::TYPE_WEEKLY_PLAN,
-                        'label' => 'Create Weekly Plan for this Week',
-                        'route' => route('documents.create', [
-                            'type' => Document::TYPE_WEEKLY_PLAN,
-                            'period_id' => $document->period_id,
-                            'return_to' => request()->fullUrl(),
-                        ]),
-                        'description' => 'Weekly plan should outline goals for this week.',
-                    ];
-                }
-            }
-        }
+        [$relatedDocument, $relatedAction] = $this->resolveWeeklyRelatedDocumentContext($document);
 
         $assignedWeeklyActivities = collect();
         if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
@@ -970,7 +922,7 @@ class DocumentController extends Controller
     }
 
     /**
-     * Reviewer-facing document view: same UI as {@see self::show} without related plan/report chrome.
+     * Reviewer-facing document view: same UI as {@see self::show} with related weekly plan/report panel.
      */
     public function reviewerShow(Document $document)
     {
@@ -986,13 +938,17 @@ class DocumentController extends Controller
 
         $this->authorize('view', $document);
 
-        $document->load(['user', 'period']);
+        $document->load(['user', 'period', 'sharedUsers']);
         $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
         $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
 
-        $relatedDocument = null;
+        [$relatedDocument] = $this->resolveWeeklyRelatedDocumentContext($document, includeCreateAction: false);
         $relatedAction = null;
         $reviewerPresentation = true;
+
+        if ($relatedDocument) {
+            $relatedDocument->loadMissing('user');
+        }
 
         $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
 
@@ -3716,5 +3672,30 @@ class DocumentController extends Controller
         }
 
         return $total;
+    }
+
+    /**
+     * @return array{0: ?Document, 1: ?array<string, mixed>}
+     */
+    private function resolveWeeklyRelatedDocumentContext(Document $document, bool $includeCreateAction = true): array
+    {
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return [null, null];
+        }
+
+        $relatedDocument = $document->relatedWeeklyDocument();
+
+        $relatedAction = null;
+        if ($includeCreateAction && $relatedDocument === null && Auth::check()) {
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+            $relatedAction = $document->relatedWeeklyCreateActionFor($user);
+        }
+
+        if ($relatedDocument) {
+            $relatedDocument->loadMissing('user');
+        }
+
+        return [$relatedDocument, $relatedAction];
     }
 }
