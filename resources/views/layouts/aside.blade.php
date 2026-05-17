@@ -23,12 +23,12 @@
                         </a>
                     </li>
 
-                    <li class="pc-item {{ Request::routeIs('matrix-report.*') ? 'active' : '' }}">
+                    <!-- <li class="pc-item {{ Request::routeIs('matrix-report.*') ? 'active' : '' }}">
                         <a href="{{ route('matrix-report.index') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-chart-line"></i></span>
                             <span class="pc-mtext">Matrix Report</span>
                         </a>
-                    </li>
+                    </li> -->
               
                 <!-- Weekly Plans & Reports -->
                 <li class="pc-item pc-caption">
