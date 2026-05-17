@@ -186,8 +186,8 @@
                                 <thead class="thead-light">
                                     <tr>
                                         <th class="text-center" style="width: 50px;">No.</th>
-                                        <th>Week</th>
-                                        <th>Created By</th>
+                                        <th style="width: 160px;">Week Period</th>
+                                        <th>Staff</th>
                                         <th>Weekly Plan</th>
                                         <th>Weekly Report</th>
                                         <th>Last Updated</th>
@@ -200,6 +200,8 @@
                                             $planDoc = $row['plan'];
                                             $reportDoc = $row['report'];
                                             $period = $row['period'];
+                                            $planSharedUsers = collect($row['plan_shared_users'] ?? []);
+                                            $reportSharedUsers = collect($row['report_shared_users'] ?? []);
                                         @endphp
                                         <tr>
                                             <td class="text-center">{{ $loop->iteration }}</td>
@@ -212,30 +214,47 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @if($row['user'])
-                                                   {{ $row['user']->name }}
+                                                @if(($row['participants'] ?? collect())->isNotEmpty())
+                                                    {{ $row['participants']->pluck('name')->implode(', ') }}
                                                 @else
                                                     <span class="text-muted">-</span>
                                                 @endif
                                             </td>
                                             <td>
                                                 @if($planDoc)
-                                                    <strong class="d-block">{{ $planDoc->display_title }}</strong>
+                                                    <div class="fw-semibold">{{ $planDoc->display_title }}</div>
+
+                                                    @if($planSharedUsers->isNotEmpty())
+                                                        @php
+                                                            $planSharedNames = $planSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
+                                                        @endphp
+                                                        <span class="badge bg-light-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
+                                                            {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
+                                                        </span>
+                                                    @endif
                                                 @else
-                                                    <span class="text-muted">Not submitted</span>
+                                                    <span class="text-muted">Not created</span>
                                                 @endif
                                             </td>
                                             <td>
                                                 @if($reportDoc)
-                                                    <strong class="d-block">{{ $reportDoc->display_title }}</strong>
+                                                    <div class="fw-semibold">{{ $reportDoc->display_title }}</div>
+
+                                                    @if($reportSharedUsers->isNotEmpty())
+                                                        @php
+                                                            $reportSharedNames = $reportSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
+                                                        @endphp
+                                                        <span class="badge bg-light-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
+                                                            {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
+                                                        </span>
+                                                    @endif
                                                 @else
-                                                    <span class="text-muted">Not submitted</span>
+                                                    <span class="text-muted">Not created</span>
                                                 @endif
                                             </td>
                                             <td>
                                                 @if($row['updated_at'])
                                                     <small class="text-muted">
-                                                        {{ $row['updated_at']->format('M d, Y') }}<br>
                                                         {{ $row['updated_at']->diffForHumans() }}
                                                     </small>
                                                 @else

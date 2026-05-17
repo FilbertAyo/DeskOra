@@ -1385,7 +1385,7 @@ class DocumentController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        $baseQuery = Document::with(['user'])
+        $baseQuery = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->submitted();
 
         $latestPeriods = WorkPeriod::query()
@@ -1445,22 +1445,9 @@ class DocumentController extends Controller
 
         $allDocuments = (clone $baseQuery)->latest()->get();
 
-        $mergedWeeklyRows = $allDocuments
-            ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
-            ->groupBy(fn ($doc) => ($doc->period_id ?? 'none').'_'.($doc->user_id ?? 'none'))
-            ->map(function ($items) {
-                $plan = $items->firstWhere('type', Document::TYPE_WEEKLY_PLAN);
-                $report = $items->firstWhere('type', Document::TYPE_WEEKLY_REPORT);
-
-                return [
-                    'plan' => $plan,
-                    'report' => $report,
-                    'period' => $plan?->period ?? $report?->period,
-                    'user' => $plan?->user ?? $report?->user,
-                    'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
-                ];
-            })
-            ->values();
+        $mergedWeeklyRows = $this->buildWeeklyRowsForIndex(
+            $allDocuments->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])->values()
+        );
 
         // Group documents by type
         $groupedDocuments = [
