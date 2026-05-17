@@ -25,7 +25,7 @@
 
                     <li class="pc-item {{ Request::routeIs('matrix-report.index') ? 'active' : '' }}">
                         <a href="{{ route('matrix-report.index') }}" class="pc-link">
-                            <span class="pc-micon"><i class="ti ti-pin2"></i></span>
+                            <span class="pc-micon"><i class="ti ti-layout-kanban"></i></span>
                             <span class="pc-mtext">Matrix Panel</span>
                         </a>
                     </li>

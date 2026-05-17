@@ -40,6 +40,23 @@
                             No year-plan impact options exist for this department and year.
                         </div>
                     @else
+                        @php
+                            $summary = $planSubmissionSummary ?? ['expected_staff' => 0, 'submitted_staff' => 0, 'pending_staff' => 0, 'all_submitted' => false];
+                        @endphp
+                        <div class="alert alert-light border mb-3">
+                            <div class="small mb-1">
+                                Use this page to add activities when more staff submit their weekly plans later. Matrix has no deadline.
+                            </div>
+                            @if(($summary['expected_staff'] ?? 0) > 0)
+                                <div class="small">
+                                    Submitted plans: {{ $summary['submitted_staff'] ?? 0 }} / {{ $summary['expected_staff'] }}
+                                    @if(($summary['pending_staff'] ?? 0) > 0)
+                                        <span class="text-warning">({{ $summary['pending_staff'] }} still pending)</span>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
                         <form method="POST" action="{{ route('matrix-report.update', $matrix) }}">
                             @csrf
                             @method('PUT')

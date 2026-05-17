@@ -50,10 +50,33 @@
                                 <span class="badge bg-light text-dark">Week {{ $matrixPeriod->week_number }} • {{ $matrixPeriod->year }}</span>
                             </div>
                             <div class="card-body">
+                                @php
+                                    $summary = $planSubmissionSummary ?? ['expected_staff' => 0, 'submitted_staff' => 0, 'pending_staff' => 0, 'all_submitted' => false];
+                                @endphp
+                                <div class="alert alert-light border mb-3">
+                                    <div class="fw-semibold mb-1">How department matrix works</div>
+                                    <ul class="mb-2 ps-3 small">
+                                        <li>Matrix has <strong>no submission deadline</strong> (unlike weekly plans).</li>
+                                        <li>Activities are pulled only from <strong>submitted</strong> weekly plans in your department.</li>
+                                        <li>You can start once at least one staff plan is submitted, then use <strong>Edit</strong> later to add activities from delayed submissions.</li>
+                                    </ul>
+                                    @if(($summary['expected_staff'] ?? 0) > 0)
+                                        <div class="small">
+                                            <strong>Weekly plan submissions:</strong>
+                                            {{ $summary['submitted_staff'] ?? 0 }} of {{ $summary['expected_staff'] }} staff submitted
+                                            @if(($summary['pending_staff'] ?? 0) > 0)
+                                                <span class="text-warning">({{ $summary['pending_staff'] }} pending)</span>
+                                            @else
+                                                <span class="text-success">(all submitted)</span>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+
                                 @if($availableActivities->isEmpty())
                                     <div class="alert alert-info mb-0">
                                         <i class="ti ti-info-circle me-1"></i>
-                                        No weekly-plan activities found for your department in this period.
+                                        No submitted weekly-plan activities found for your department this week yet. Check back after staff submit their plans.
                                     </div>
                                 @elseif($impactOptions->isEmpty())
                                     <div class="alert alert-warning mb-0">

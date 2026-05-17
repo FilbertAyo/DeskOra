@@ -24,7 +24,8 @@ class WeeklyObjectiveMatrixController extends Controller
         $currentPeriod = WorkPeriod::getCurrent();
         $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
         $activeDepartmentId = $user->department_id;
-        $matrixPeriod = $this->resolveMatrixPeriod($currentPeriod, $departmentScopeIds);
+        $matrixPeriod = $currentPeriod;
+        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($matrixPeriod, $departmentScopeIds);
 
         $matrixRows = collect();
         if ($currentPeriod) {
@@ -72,6 +73,7 @@ class WeeklyObjectiveMatrixController extends Controller
             'impactOptions' => $impactOptions,
             'activeDepartmentId' => $activeDepartmentId,
             'matrixPeriod' => $matrixPeriod,
+            'planSubmissionSummary' => $planSubmissionSummary,
             'entryDefaults' => old('entries', [['activity_key' => '', 'input' => '', 'output' => '', 'impact_year_plan_activity_id' => '']]),
         ]);
     }
@@ -89,7 +91,6 @@ class WeeklyObjectiveMatrixController extends Controller
 
         $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
         $currentPeriod = WorkPeriod::getCurrent();
-        $fallbackPeriod = $this->resolveMatrixPeriod($currentPeriod, $departmentScopeIds);
 
         $validated = $request->validate([
             'period_id' => ['nullable', 'string', 'ulid', 'exists:work_periods,id'],
@@ -107,13 +108,18 @@ class WeeklyObjectiveMatrixController extends Controller
             $targetPeriod = WorkPeriod::query()->find($validated['period_id']);
         }
         if (! $targetPeriod) {
-            $targetPeriod = $fallbackPeriod;
+            $targetPeriod = $currentPeriod;
         }
         if (! $targetPeriod) {
-            return back()->with('error', 'No work period found for matrix creation.')->withInput();
+            return back()->with('error', 'No active work period found for matrix creation.')->withInput();
         }
 
         $activityMap = $this->collectActivitiesForPeriodAndDepartments($targetPeriod, $departmentScopeIds)->keyBy('key');
+        if ($activityMap->isEmpty()) {
+            return back()
+                ->withErrors(['entries' => 'No submitted weekly-plan activities are available yet. Wait for staff to submit plans, or add late submissions later via Edit.'])
+                ->withInput();
+        }
         $impactMap = $this->impactOptionsForPeriodYearAndDepartments($targetPeriod, $departmentScopeIds)->keyBy('id');
         $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
 
@@ -128,7 +134,7 @@ class WeeklyObjectiveMatrixController extends Controller
 
         $matrix->overall_budget = $validated['overall_budget'] ?? null;
         $matrix->notes = $validated['notes'] ?? null;
-        $matrix->entries = $entries;
+        $matrix->entries = $this->mergeMatrixEntries(is_array($matrix->entries) ? $matrix->entries : [], $entries);
         $matrix->updated_by = $user->id;
         $matrix->save();
 
@@ -167,10 +173,13 @@ class WeeklyObjectiveMatrixController extends Controller
             $entryDefaults = [['activity_key' => '', 'input' => '', 'output' => '', 'impact_year_plan_activity_id' => '']];
         }
 
+        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $departmentIds);
+
         return view('matrix-report.edit', [
             'matrix' => $matrix->load(['department:id,name', 'period:id,year,week_number']),
             'availableActivities' => $availableActivities,
             'impactOptions' => $impactOptions,
+            'planSubmissionSummary' => $planSubmissionSummary,
             'entryDefaults' => $entryDefaults,
         ]);
     }
@@ -282,6 +291,7 @@ class WeeklyObjectiveMatrixController extends Controller
         /** @var EloquentCollection<int, Document> $plans */
         $plans = Document::query()
             ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->where('state', Document::STATE_SUBMITTED)
             ->where('period_id', $period->id)
             ->whereHas('user', function ($query) use ($departmentIds): void {
                 $query->whereIn('department_id', $departmentIds);
@@ -445,37 +455,96 @@ class WeeklyObjectiveMatrixController extends Controller
         return $department->selfAndDescendantIds();
     }
 
-    private function resolveMatrixPeriod(?WorkPeriod $currentPeriod, array $departmentIds): ?WorkPeriod
+    /**
+     * @return array{expected_staff: int, submitted_staff: int, pending_staff: int, all_submitted: bool}
+     */
+    private function departmentPlanSubmissionSummary(?WorkPeriod $period, array $departmentIds): array
     {
-        if (! $currentPeriod) {
-            return null;
+        $empty = [
+            'expected_staff' => 0,
+            'submitted_staff' => 0,
+            'pending_staff' => 0,
+            'all_submitted' => false,
+        ];
+
+        if (! $period || $departmentIds === []) {
+            return $empty;
         }
 
-        $hasCurrentActivities = Document::query()
+        $expectedStaffIds = User::query()
+            ->where('status', 'active')
+            ->whereIn('department_id', $departmentIds)
+            ->permission('create weekly plan')
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if ($expectedStaffIds === []) {
+            $expectedStaffIds = User::query()
+                ->where('status', 'active')
+                ->whereIn('department_id', $departmentIds)
+                ->pluck('id')
+                ->map(fn ($id) => (string) $id)
+                ->all();
+        }
+
+        $expectedCount = count($expectedStaffIds);
+        if ($expectedCount === 0) {
+            return $empty;
+        }
+
+        $submittedStaffIds = Document::query()
             ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('period_id', $currentPeriod->id)
-            ->whereHas('user', function ($query) use ($departmentIds): void {
-                $query->whereIn('department_id', $departmentIds);
-            })
-            ->exists();
+            ->where('state', Document::STATE_SUBMITTED)
+            ->where('period_id', $period->id)
+            ->whereIn('user_id', $expectedStaffIds)
+            ->pluck('user_id')
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
 
-        if ($hasCurrentActivities) {
-            return $currentPeriod;
+        $submittedCount = count($submittedStaffIds);
+
+        return [
+            'expected_staff' => $expectedCount,
+            'submitted_staff' => $submittedCount,
+            'pending_staff' => max(0, $expectedCount - $submittedCount),
+            'all_submitted' => $submittedCount >= $expectedCount,
+        ];
+    }
+
+    /**
+     * Keep existing rows and add/update by activity_key (for late staff submissions).
+     *
+     * @param  list<array<string, mixed>>  $existing
+     * @param  list<array<string, mixed>>  $incoming
+     * @return list<array<string, mixed>>
+     */
+    private function mergeMatrixEntries(array $existing, array $incoming): array
+    {
+        $byKey = [];
+        foreach ($existing as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $key = trim((string) ($row['activity_key'] ?? ''));
+            if ($key !== '') {
+                $byKey[$key] = $row;
+            }
         }
 
-        $nextPeriod = $currentPeriod->getNextPeriod();
-        if (! $nextPeriod) {
-            return $currentPeriod;
+        foreach ($incoming as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $key = trim((string) ($row['activity_key'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+            $byKey[$key] = $row;
         }
 
-        $hasNextActivities = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('period_id', $nextPeriod->id)
-            ->whereHas('user', function ($query) use ($departmentIds): void {
-                $query->whereIn('department_id', $departmentIds);
-            })
-            ->exists();
-
-        return $hasNextActivities ? $nextPeriod : $currentPeriod;
+        return array_values($byKey);
     }
 }
