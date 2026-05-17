@@ -5,7 +5,7 @@
                 <div class="col-md-12">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="page-header-title">
-                            <h5 class="m-b-10">Edit Department Matrix</h5>
+                            <h5 class="m-b-10">Edit Parent Department Matrix</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item"><a href="{{ route('matrix-report.index') }}">Matrix Report</a></li>
@@ -24,39 +24,49 @@
     <div class="row g-3">
         <div class="col-12">
             <div class="card border shadow-none">
-                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 class="mb-0">{{ $matrix->department?->name ?? 'Department' }} • Week {{ $matrix->period?->week_number }} ({{ $matrix->period?->year }})</h6>
-                    <span class="text-muted small">Last update: {{ optional($matrix->updated_at)->diffForHumans() }}</span>
+                <div class="card-header bg-white border-bottom">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <h6 class="mb-0">{{ $matrix->department?->name ?? 'Parent Department' }} • Week {{ $matrix->period?->week_number }} ({{ $matrix->period?->year }})</h6>
+                            <p class="text-muted small mb-0 mt-1">
+                                Activities are compiled from submitted weekly plans across
+                                {{ $subDepartmentCount ?? 0 }} sub-department{{ ($subDepartmentCount ?? 0) === 1 ? '' : 's' }} under this parent department.
+                            </p>
+                        </div>
+                        <span class="text-muted small">Last update: {{ optional($matrix->updated_at)->diffForHumans() }}</span>
+                    </div>
                 </div>
                 <div class="card-body">
+                    @php
+                        $summary = $planSubmissionSummary ?? ['expected_staff' => 0, 'submitted_staff' => 0, 'pending_staff' => 0, 'all_submitted' => false];
+                    @endphp
+
+                    <div class="alert alert-light border mb-3">
+                        <div class="small mb-1">
+                            Add rows for each staff activity with Input, Output (weekly achievement), and Impact (year plan). There is no deadline — you can return when more staff submit their plans.
+                        </div>
+                        @if(($summary['expected_staff'] ?? 0) > 0)
+                            <div class="small">
+                                Staff plans submitted: <strong>{{ $summary['submitted_staff'] ?? 0 }} / {{ $summary['expected_staff'] }}</strong>
+                                @if(($summary['pending_staff'] ?? 0) > 0)
+                                    <span class="text-warning">({{ $summary['pending_staff'] }} still pending)</span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+
                     @if($availableActivities->isEmpty())
                         <div class="alert alert-warning mb-0">
                             <i class="ti ti-alert-triangle me-1"></i>
-                            No eligible weekly-plan activities are available for this department and period.
+                            No submitted weekly-plan activities are available yet for this parent department and week.
+                            Check that staff in sub-departments have submitted their weekly plans.
                         </div>
                     @elseif($impactOptions->isEmpty())
                         <div class="alert alert-warning mb-0">
                             <i class="ti ti-alert-circle me-1"></i>
-                            No year-plan impact options exist for this department and year.
+                            No year-plan impact options exist for sub-departments under this parent for {{ $matrix->period?->year }}.
                         </div>
                     @else
-                        @php
-                            $summary = $planSubmissionSummary ?? ['expected_staff' => 0, 'submitted_staff' => 0, 'pending_staff' => 0, 'all_submitted' => false];
-                        @endphp
-                        <div class="alert alert-light border mb-3">
-                            <div class="small mb-1">
-                                Use this page to add activities when more staff submit their weekly plans later. Matrix has no deadline.
-                            </div>
-                            @if(($summary['expected_staff'] ?? 0) > 0)
-                                <div class="small">
-                                    Submitted plans: {{ $summary['submitted_staff'] ?? 0 }} / {{ $summary['expected_staff'] }}
-                                    @if(($summary['pending_staff'] ?? 0) > 0)
-                                        <span class="text-warning">({{ $summary['pending_staff'] }} still pending)</span>
-                                    @endif
-                                </div>
-                            @endif
-                        </div>
-
                         <form method="POST" action="{{ route('matrix-report.update', $matrix) }}">
                             @csrf
                             @method('PUT')
@@ -66,9 +76,14 @@
                                     <label class="form-label">Overall Budget (TZS)</label>
                                     <input type="number" step="0.01" min="0"
                                            name="overall_budget"
-                                           value="{{ old('overall_budget', $matrix->overall_budget) }}"
+                                           value="{{ old('overall_budget', $matrix->overall_budget ?? $rolledUpBudget) }}"
                                            class="form-control @error('overall_budget') is-invalid @enderror"
-                                           placeholder="e.g. 1500000">
+                                           placeholder="e.g. {{ number_format((float) ($rolledUpBudget ?? 0), 2, '.', '') }}">
+                                    <div class="form-text">
+                                        Rolled up from submitted staff weekly-plan budgets:
+                                        <strong>{{ number_format((float) ($rolledUpBudget ?? 0), 2) }} TZS</strong>.
+                                        You may override this total when saving.
+                                    </div>
                                     @error('overall_budget')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -77,7 +92,7 @@
                                     <label class="form-label">Notes (optional)</label>
                                     <textarea name="notes" rows="2"
                                               class="form-control @error('notes') is-invalid @enderror"
-                                              placeholder="Brief context for this week matrix">{{ old('notes', $matrix->notes) }}</textarea>
+                                              placeholder="Brief context for this week's parent department matrix">{{ old('notes', $matrix->notes) }}</textarea>
                                     @error('notes')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -88,10 +103,10 @@
                                 <table class="table table-bordered align-middle mb-0">
                                     <thead class="table-light">
                                     <tr>
-                                        <th style="width: 26%;">Activity (from staff weekly plans)</th>
+                                        <th style="width: 26%;">Activity (staff weekly plans)</th>
                                         <th>Input</th>
-                                        <th>Output</th>
-                                        <th style="width: 24%;">Impact (Year Plan)</th>
+                                        <th>Output <span class="text-muted fw-normal">(weekly achievement)</span></th>
+                                        <th style="width: 24%;">Impact (year plan)</th>
                                         <th style="width: 48px;"></th>
                                     </tr>
                                     </thead>
@@ -127,7 +142,7 @@
                                                 <textarea rows="2"
                                                           class="form-control @error("entries.$i.output") is-invalid @enderror"
                                                           name="entries[{{ $i }}][output]"
-                                                          placeholder="Output" required>{{ old("entries.$i.output", $entry['output'] ?? '') }}</textarea>
+                                                          placeholder="Weekly achievement / output" required>{{ old("entries.$i.output", $entry['output'] ?? '') }}</textarea>
                                                 @error("entries.$i.output")
                                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                                                 @enderror
@@ -230,7 +245,7 @@
                         <textarea rows="2" class="form-control" name="entries[${index}][input]" placeholder="Input" required></textarea>
                     </td>
                     <td>
-                        <textarea rows="2" class="form-control" name="entries[${index}][output]" placeholder="Output" required></textarea>
+                        <textarea rows="2" class="form-control" name="entries[${index}][output]" placeholder="Weekly achievement / output" required></textarea>
                     </td>
                     <td>
                         <select class="form-select" name="entries[${index}][impact_year_plan_activity_id]" required>

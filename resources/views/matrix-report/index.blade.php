@@ -5,7 +5,7 @@
                 <div class="col-md-12">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="page-header-title">
-                            <h5 class="m-b-10">Department Weekly Matrices</h5>
+                            <h5 class="m-b-10">Parent Department Weekly Matrices</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item"><a href="javascript:void(0)">Matrix Report</a></li>
@@ -30,22 +30,32 @@
         <div class="col-12">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom">
-                    <h6 class="mb-0">All Department Matrices</h6>
+                    <h6 class="mb-0">All Parent Department Matrices</h6>
+                    <p class="text-muted small mb-0 mt-1">
+                        Each matrix rolls up submitted weekly plans from all sub-departments under the parent department.
+                    </p>
                 </div>
                 <div class="card-body">
-                    @if($departmentMatrices->isEmpty())
+                    @if($parentDepartments->isEmpty())
+                        <div class="alert alert-warning mb-0">
+                            <i class="ti ti-alert-triangle me-1"></i>
+                            You do not have access to any parent departments for matrix management.
+                        </div>
+                    @elseif($departmentMatrices->isEmpty())
                         <div class="alert alert-info mb-0">
                             <i class="ti ti-info-circle me-1"></i>
-                            No department matrix created yet. Click <strong>Add Department Matrix</strong> to start.
+                            No parent department matrix created yet. Click <strong>Add Department Matrix</strong>, choose the parent department and week (e.g. Week 21), then add activities.
                         </div>
                     @else
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover align-middle mb-0">
                                 <thead class="table-light">
                                 <tr>
-                                    <th>Department</th>
+                                    <th>Parent Department</th>
                                     <th>Week</th>
-                                    <th>Rows</th>
+                                    <th>Sub-depts</th>
+                                    <th>Plans Submitted</th>
+                                    <th>Matrix Rows</th>
                                     <th>Budget</th>
                                     <th>Updated</th>
                                     <th style="width: 200px;">Actions</th>
@@ -53,10 +63,25 @@
                                 </thead>
                                 <tbody>
                                 @foreach($departmentMatrices as $matrix)
-                                    @php $entryCount = is_array($matrix->entries) ? count($matrix->entries) : 0; @endphp
+                                    @php
+                                        $entryCount = is_array($matrix->entries) ? count($matrix->entries) : 0;
+                                        $meta = $matrixMeta[(string) $matrix->id] ?? ['sub_department_count' => 0, 'submission_summary' => ['expected_staff' => 0, 'submitted_staff' => 0, 'pending_staff' => 0]];
+                                        $summary = $meta['submission_summary'] ?? [];
+                                    @endphp
                                     <tr>
                                         <td class="fw-semibold">{{ $matrix->department?->name ?? 'Unknown Department' }}</td>
                                         <td>Week {{ $matrix->period?->week_number }} • {{ $matrix->period?->year }}</td>
+                                        <td>{{ $meta['sub_department_count'] ?? 0 }}</td>
+                                        <td>
+                                            @if(($summary['expected_staff'] ?? 0) > 0)
+                                                {{ $summary['submitted_staff'] ?? 0 }} / {{ $summary['expected_staff'] }}
+                                                @if(($summary['pending_staff'] ?? 0) > 0)
+                                                    <span class="text-warning">({{ $summary['pending_staff'] }} pending)</span>
+                                                @endif
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
                                         <td>{{ $entryCount }}</td>
                                         <td>{{ $matrix->overall_budget !== null ? number_format((float) $matrix->overall_budget, 2) : 'N/A' }}</td>
                                         <td class="small text-muted">{{ optional($matrix->updated_at)->diffForHumans() }}</td>
@@ -92,15 +117,19 @@
                 <form method="POST" action="{{ route('matrix-report.store') }}">
                     @csrf
                     <div class="modal-header">
-                        <h5 class="modal-title" id="createMatrixModalLabel">Create Department Matrix</h5>
+                        <h5 class="modal-title" id="createMatrixModalLabel">Create Parent Department Matrix</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <p class="text-muted small">
+                            Select the whole parent department and the work week. Activities will be pulled from submitted weekly plans across all sub-departments under that parent.
+                        </p>
+
                         <div class="mb-3">
-                            <label for="department_id" class="form-label">Department</label>
+                            <label for="department_id" class="form-label">Parent Department</label>
                             <select class="form-select @error('department_id') is-invalid @enderror" id="department_id" name="department_id" required>
-                                <option value="">-- Select Department --</option>
-                                @foreach($departments as $department)
+                                <option value="">-- Select Parent Department --</option>
+                                @foreach($parentDepartments as $department)
                                     <option value="{{ $department->id }}" {{ (string) $defaultDepartmentId === (string) $department->id ? 'selected' : '' }}>
                                         {{ $department->name }}
                                     </option>

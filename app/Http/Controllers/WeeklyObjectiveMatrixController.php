@@ -22,13 +22,8 @@ class WeeklyObjectiveMatrixController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
-
-        $departments = Department::query()
-            ->whereIn('id', $departmentScopeIds)
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $parentDepartmentIds = $this->parentDepartmentIdsForUser($user);
+        $parentDepartments = $this->parentDepartmentsForUser($user);
 
         $periods = WorkPeriod::query()
             ->whereIn('status', [WorkPeriod::STATUS_OPEN, WorkPeriod::STATUS_CLOSED])
@@ -38,16 +33,29 @@ class WeeklyObjectiveMatrixController extends Controller
             ->get(['id', 'year', 'week_number', 'status', 'week_start_date', 'week_end_date']);
 
         $departmentMatrices = WeeklyDepartmentMatrix::query()
-            ->with(['department:id,name', 'period:id,week_number,year', 'creator:id,name', 'updater:id,name'])
-            ->whereIn('department_id', $departmentScopeIds)
+            ->with(['department:id,name,parent_id', 'period:id,week_number,year', 'creator:id,name', 'updater:id,name'])
+            ->whereIn('department_id', $parentDepartmentIds)
+            ->whereHas('department', fn ($query) => $query->whereNull('parent_id'))
             ->latest('updated_at')
             ->get();
 
+        $matrixMeta = $departmentMatrices->mapWithKeys(function (WeeklyDepartmentMatrix $matrix): array {
+            $subDepartmentIds = $this->subDepartmentIdsForParent((string) $matrix->department_id);
+
+            return [
+                (string) $matrix->id => [
+                    'sub_department_count' => count($subDepartmentIds),
+                    'submission_summary' => $this->departmentPlanSubmissionSummary($matrix->period, $subDepartmentIds),
+                ],
+            ];
+        });
+
         return view('matrix-report.index', [
             'departmentMatrices' => $departmentMatrices,
-            'departments' => $departments,
+            'matrixMeta' => $matrixMeta,
+            'parentDepartments' => $parentDepartments,
             'periods' => $periods,
-            'defaultDepartmentId' => old('department_id', $user->department_id),
+            'defaultDepartmentId' => old('department_id', $this->defaultParentDepartmentIdForUser($user)),
             'defaultPeriodId' => old('period_id', WorkPeriod::getCurrent()?->id),
         ]);
     }
@@ -56,16 +64,27 @@ class WeeklyObjectiveMatrixController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
+        $parentDepartmentIds = $this->parentDepartmentIdsForUser($user);
 
         $validated = $request->validate([
-            'department_id' => ['required', 'string', 'ulid', Rule::in($departmentScopeIds)],
+            'department_id' => ['required', 'string', 'ulid', Rule::in($parentDepartmentIds)],
             'period_id' => ['required', 'string', 'ulid', 'exists:work_periods,id'],
         ]);
 
+        $parentDepartment = Department::query()
+            ->whereNull('parent_id')
+            ->whereKey($validated['department_id'])
+            ->first();
+
+        if (! $parentDepartment) {
+            return back()
+                ->withErrors(['department_id' => 'Select a valid parent department.'])
+                ->withInput();
+        }
+
         $matrix = WeeklyDepartmentMatrix::query()->firstOrNew([
             'period_id' => $validated['period_id'],
-            'department_id' => $validated['department_id'],
+            'department_id' => $parentDepartment->id,
         ]);
 
         if (! $matrix->exists) {
@@ -77,8 +96,8 @@ class WeeklyObjectiveMatrixController extends Controller
         $matrix->save();
 
         $message = $matrix->wasRecentlyCreated
-            ? 'Department matrix created. You can now add activities.'
-            : 'Department matrix already exists. You can continue editing it.';
+            ? 'Parent department matrix created. You can now add activities from all sub-departments.'
+            : 'Parent department matrix already exists. You can continue editing it.';
 
         return redirect()
             ->route('matrix-report.edit', $matrix)
@@ -92,9 +111,9 @@ class WeeklyObjectiveMatrixController extends Controller
         $this->ensureCanManageMatrix($user, $matrix);
 
         $period = $matrix->period()->first();
-        $departmentIds = $this->resolveDepartmentIdsFromDepartmentId($matrix->department_id);
-        $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, $departmentIds);
-        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, $departmentIds);
+        $subDepartmentIds = $this->subDepartmentIdsForParent((string) $matrix->department_id);
+        $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds);
+        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, $subDepartmentIds);
 
         $entryDefaults = old('entries');
         if (! is_array($entryDefaults)) {
@@ -115,13 +134,16 @@ class WeeklyObjectiveMatrixController extends Controller
             $entryDefaults = [['activity_key' => '', 'input' => '', 'output' => '', 'impact_year_plan_activity_id' => '']];
         }
 
-        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $departmentIds);
+        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $subDepartmentIds);
+        $rolledUpBudget = $this->calculateDepartmentBudgetTotal($period, $subDepartmentIds);
 
         return view('matrix-report.edit', [
-            'matrix' => $matrix->load(['department:id,name', 'period:id,year,week_number']),
+            'matrix' => $matrix->load(['department:id,name,parent_id', 'period:id,year,week_number']),
             'availableActivities' => $availableActivities,
             'impactOptions' => $impactOptions,
             'planSubmissionSummary' => $planSubmissionSummary,
+            'rolledUpBudget' => $rolledUpBudget,
+            'subDepartmentCount' => count($subDepartmentIds),
             'entryDefaults' => $entryDefaults,
         ]);
     }
@@ -147,9 +169,9 @@ class WeeklyObjectiveMatrixController extends Controller
             'entries.*.impact_year_plan_activity_id' => ['required', 'string', 'ulid'],
         ]);
 
-        $departmentIds = $this->resolveDepartmentIdsFromDepartmentId($matrix->department_id);
-        $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, $departmentIds)->keyBy('key');
-        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, $departmentIds)->keyBy('id');
+        $subDepartmentIds = $this->subDepartmentIdsForParent((string) $matrix->department_id);
+        $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds)->keyBy('key');
+        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, $subDepartmentIds)->keyBy('id');
         $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
 
         $matrix->update([
@@ -161,7 +183,7 @@ class WeeklyObjectiveMatrixController extends Controller
 
         return redirect()
             ->route('matrix-report.index')
-            ->with('success', 'Department matrix updated successfully.');
+            ->with('success', 'Parent department matrix updated successfully.');
     }
 
     public function destroy(Request $request, WeeklyDepartmentMatrix $matrix)
@@ -174,7 +196,7 @@ class WeeklyObjectiveMatrixController extends Controller
 
         return redirect()
             ->route('matrix-report.index')
-            ->with('success', 'Department matrix deleted successfully.');
+            ->with('success', 'Parent department matrix deleted successfully.');
     }
 
     public function download(Request $request)
@@ -221,7 +243,87 @@ class WeeklyObjectiveMatrixController extends Controller
 
     private function ensureCanManageMatrix(User $user, WeeklyDepartmentMatrix $matrix): void
     {
-        abort_unless(in_array($matrix->department_id, $user->departmentScopeIds(), true), 403);
+        abort_unless(
+            in_array((string) $matrix->department_id, $this->parentDepartmentIdsForUser($user), true),
+            403
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parentDepartmentIdsForUser(User $user): array
+    {
+        $scopeIds = $user->departmentScopeIds();
+
+        return Department::query()
+            ->whereNull('parent_id')
+            ->where('status', 'active')
+            ->where(function ($query) use ($scopeIds): void {
+                $query->whereIn('id', $scopeIds)
+                    ->orWhereHas('children', function ($children) use ($scopeIds): void {
+                        $children->whereIn('id', $scopeIds);
+                    });
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return EloquentCollection<int, Department>
+     */
+    private function parentDepartmentsForUser(User $user): EloquentCollection
+    {
+        $parentIds = $this->parentDepartmentIdsForUser($user);
+        if ($parentIds === []) {
+            return new EloquentCollection;
+        }
+
+        return Department::query()
+            ->whereIn('id', $parentIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    private function defaultParentDepartmentIdForUser(User $user): ?string
+    {
+        if (! $user->department_id) {
+            return null;
+        }
+
+        $department = Department::query()->find($user->department_id);
+        if (! $department) {
+            return null;
+        }
+
+        if ($department->parent_id === null) {
+            return (string) $department->id;
+        }
+
+        return (string) $department->parent_id;
+    }
+
+    /**
+     * Staff and year-plan data live on sub-departments under a parent department.
+     *
+     * @return list<string>
+     */
+    private function subDepartmentIdsForParent(string $parentDepartmentId): array
+    {
+        $parent = Department::query()->find($parentDepartmentId);
+        if (! $parent) {
+            return [$parentDepartmentId];
+        }
+
+        $childIds = $parent->children()
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        return $childIds !== [] ? $childIds : [(string) $parent->id];
     }
 
     private function collectActivitiesForPeriodAndDepartments(?WorkPeriod $period, array $departmentIds): Collection
@@ -265,15 +367,18 @@ class WeeklyObjectiveMatrixController extends Controller
                     $activityUid = 'row_'.$index;
                 }
 
+                $staffName = $plan->user?->name ?? 'Unknown Staff';
+                $subDepartmentName = $plan->user?->department?->name ?? 'Unknown Sub-department';
+
                 $key = $plan->id.'::'.$activityUid;
                 $rows->push([
                     'key' => $key,
                     'source_document_id' => (string) $plan->id,
                     'activity_uid' => $activityUid,
                     'activity' => $activityText,
-                    'staff_name' => $plan->user?->name ?? 'Unknown Staff',
-                    'department_name' => $plan->user?->department?->name ?? 'Unknown Department',
-                    'label' => ($plan->user?->name ?? 'Unknown Staff').' - '.$activityText,
+                    'staff_name' => $staffName,
+                    'department_name' => $subDepartmentName,
+                    'label' => sprintf('%s (%s) - %s', $staffName, $subDepartmentName, $activityText),
                 ]);
             }
         }
@@ -305,12 +410,39 @@ class WeeklyObjectiveMatrixController extends Controller
             ->get();
 
         return $activities->map(function (YearPlanActivity $activity): array {
+            $deptName = $activity->department?->name;
+
             return [
                 'id' => (string) $activity->id,
-                'label' => $activity->displayCode().' '.$activity->description,
-                'department_name' => $activity->department?->name,
+                'label' => trim($activity->displayCode().' '.$activity->description.($deptName ? ' ['.$deptName.']' : '')),
+                'department_name' => $deptName,
             ];
         })->values();
+    }
+
+    private function calculateDepartmentBudgetTotal(?WorkPeriod $period, array $subDepartmentIds): float
+    {
+        if (! $period || $subDepartmentIds === []) {
+            return 0.0;
+        }
+
+        $plans = Document::query()
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->where('state', Document::STATE_SUBMITTED)
+            ->where('period_id', $period->id)
+            ->whereHas('user', function ($query) use ($subDepartmentIds): void {
+                $query->whereIn('department_id', $subDepartmentIds);
+            })
+            ->get();
+
+        $total = 0.0;
+        foreach ($plans as $plan) {
+            foreach ($plan->budgetItems() as $item) {
+                $total += (float) ($item['amount_numeric'] ?? 0);
+            }
+        }
+
+        return round($total, 2);
     }
 
     private function hydrateValidatedEntries(array $entries, Collection $activityMap, Collection $impactMap): array
@@ -341,7 +473,7 @@ class WeeklyObjectiveMatrixController extends Controller
             $impact = $impactMap->get($impactId);
             if (! is_array($impact)) {
                 throw ValidationException::withMessages([
-                    'entries.'.$index.'.impact_year_plan_activity_id' => 'Selected impact is invalid for your department plan.',
+                    'entries.'.$index.'.impact_year_plan_activity_id' => 'Selected impact is invalid for this department year plan.',
                 ]);
             }
 
@@ -365,36 +497,6 @@ class WeeklyObjectiveMatrixController extends Controller
         }
 
         return array_values($result);
-    }
-
-    private function resolveDepartmentIdsForMatrix(User $user): array
-    {
-        $scopeIds = $user->departmentScopeIds();
-        if (! $user->department_id) {
-            return $scopeIds;
-        }
-
-        $ownDepartment = Department::query()->find($user->department_id);
-        if (! $ownDepartment) {
-            return [$user->department_id];
-        }
-
-        $departmentIds = $ownDepartment->selfAndDescendantIds();
-        if ($scopeIds !== []) {
-            $departmentIds = array_values(array_intersect($departmentIds, $scopeIds));
-        }
-
-        return $departmentIds !== [] ? $departmentIds : [$user->department_id];
-    }
-
-    private function resolveDepartmentIdsFromDepartmentId(string $departmentId): array
-    {
-        $department = Department::query()->find($departmentId);
-        if (! $department) {
-            return [$departmentId];
-        }
-
-        return $department->selfAndDescendantIds();
     }
 
     /**
@@ -455,5 +557,4 @@ class WeeklyObjectiveMatrixController extends Controller
             'all_submitted' => $submittedCount >= $expectedCount,
         ];
     }
-
 }
