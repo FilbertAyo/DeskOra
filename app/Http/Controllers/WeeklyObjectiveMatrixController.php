@@ -13,6 +13,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class WeeklyObjectiveMatrixController extends Controller
@@ -21,60 +22,33 @@ class WeeklyObjectiveMatrixController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $currentPeriod = WorkPeriod::getCurrent();
         $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
-        $activeDepartmentId = $user->department_id;
-        $matrixPeriod = $currentPeriod;
-        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($matrixPeriod, $departmentScopeIds);
 
-        $matrixRows = collect();
-        if ($currentPeriod) {
-            $matrixRows = Document::query()
-                ->where('type', Document::TYPE_WEEKLY_PLAN)
-                ->where('state', Document::STATE_SUBMITTED)
-                ->where('period_id', $currentPeriod->id)
-                ->whereNotNull('main_target')
-                ->where('main_target', '!=', '')
-                ->with(['user:id,name,department_id', 'user.department:id,name'])
-                ->latest('updated_at')
-                ->get(['user_id', 'main_target', 'content', 'updated_at'])
-                ->groupBy('user_id')
-                ->map(fn ($plans) => $plans->first())
-                ->values()
-                ->sortBy(fn ($plan) => strtolower($plan->user?->name ?? ''))
-                ->values();
-        }
+        $departments = Department::query()
+            ->whereIn('id', $departmentScopeIds)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $periods = WorkPeriod::query()
+            ->whereIn('status', [WorkPeriod::STATUS_OPEN, WorkPeriod::STATUS_CLOSED])
+            ->orderByDesc('year')
+            ->orderByDesc('week_number')
+            ->limit(24)
+            ->get(['id', 'year', 'week_number', 'status', 'week_start_date', 'week_end_date']);
 
         $departmentMatrices = WeeklyDepartmentMatrix::query()
             ->with(['department:id,name', 'period:id,week_number,year', 'creator:id,name', 'updater:id,name'])
             ->whereIn('department_id', $departmentScopeIds)
-            ->when(
-                $matrixPeriod,
-                fn ($query) => $query->where('period_id', $matrixPeriod->id),
-                fn ($query) => $query->whereRaw('1 = 0')
-            )
             ->latest('updated_at')
             ->get();
 
-        $availableActivities = $this->collectActivitiesForPeriodAndDepartments(
-            $matrixPeriod,
-            $departmentScopeIds
-        );
-        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments(
-            $matrixPeriod,
-            $departmentScopeIds
-        );
-
         return view('matrix-report.index', [
-            'currentPeriod' => $currentPeriod,
-            'matrixRows' => $matrixRows,
             'departmentMatrices' => $departmentMatrices,
-            'availableActivities' => $availableActivities,
-            'impactOptions' => $impactOptions,
-            'activeDepartmentId' => $activeDepartmentId,
-            'matrixPeriod' => $matrixPeriod,
-            'planSubmissionSummary' => $planSubmissionSummary,
-            'entryDefaults' => old('entries', [['activity_key' => '', 'input' => '', 'output' => '', 'impact_year_plan_activity_id' => '']]),
+            'departments' => $departments,
+            'periods' => $periods,
+            'defaultDepartmentId' => old('department_id', $user->department_id),
+            'defaultPeriodId' => old('period_id', WorkPeriod::getCurrent()?->id),
         ]);
     }
 
@@ -82,65 +56,33 @@ class WeeklyObjectiveMatrixController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $departmentId = $user->department_id;
-        if (! $departmentId) {
-            return back()->withErrors([
-                'entries' => 'Your account is not assigned to a department.',
-            ])->withInput();
-        }
-
         $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
-        $currentPeriod = WorkPeriod::getCurrent();
 
         $validated = $request->validate([
-            'period_id' => ['nullable', 'string', 'ulid', 'exists:work_periods,id'],
-            'overall_budget' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string', 'max:4000'],
-            'entries' => ['required', 'array', 'min:1'],
-            'entries.*.activity_key' => ['required', 'string'],
-            'entries.*.input' => ['required', 'string', 'max:2000'],
-            'entries.*.output' => ['required', 'string', 'max:2000'],
-            'entries.*.impact_year_plan_activity_id' => ['required', 'string', 'ulid'],
+            'department_id' => ['required', 'string', 'ulid', Rule::in($departmentScopeIds)],
+            'period_id' => ['required', 'string', 'ulid', 'exists:work_periods,id'],
         ]);
 
-        $targetPeriod = null;
-        if (! empty($validated['period_id'])) {
-            $targetPeriod = WorkPeriod::query()->find($validated['period_id']);
-        }
-        if (! $targetPeriod) {
-            $targetPeriod = $currentPeriod;
-        }
-        if (! $targetPeriod) {
-            return back()->with('error', 'No active work period found for matrix creation.')->withInput();
-        }
-
-        $activityMap = $this->collectActivitiesForPeriodAndDepartments($targetPeriod, $departmentScopeIds)->keyBy('key');
-        if ($activityMap->isEmpty()) {
-            return back()
-                ->withErrors(['entries' => 'No submitted weekly-plan activities are available yet. Wait for staff to submit plans, or add late submissions later via Edit.'])
-                ->withInput();
-        }
-        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($targetPeriod, $departmentScopeIds)->keyBy('id');
-        $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
-
         $matrix = WeeklyDepartmentMatrix::query()->firstOrNew([
-            'period_id' => $targetPeriod->id,
-            'department_id' => $departmentId,
+            'period_id' => $validated['period_id'],
+            'department_id' => $validated['department_id'],
         ]);
 
         if (! $matrix->exists) {
             $matrix->created_by = $user->id;
+            $matrix->entries = [];
         }
 
-        $matrix->overall_budget = $validated['overall_budget'] ?? null;
-        $matrix->notes = $validated['notes'] ?? null;
-        $matrix->entries = $this->mergeMatrixEntries(is_array($matrix->entries) ? $matrix->entries : [], $entries);
         $matrix->updated_by = $user->id;
         $matrix->save();
 
+        $message = $matrix->wasRecentlyCreated
+            ? 'Department matrix created. You can now add activities.'
+            : 'Department matrix already exists. You can continue editing it.';
+
         return redirect()
-            ->route('matrix-report.index')
-            ->with('success', 'Department matrix saved successfully.');
+            ->route('matrix-report.edit', $matrix)
+            ->with('success', $message);
     }
 
     public function edit(Request $request, WeeklyDepartmentMatrix $matrix)
@@ -514,37 +456,4 @@ class WeeklyObjectiveMatrixController extends Controller
         ];
     }
 
-    /**
-     * Keep existing rows and add/update by activity_key (for late staff submissions).
-     *
-     * @param  list<array<string, mixed>>  $existing
-     * @param  list<array<string, mixed>>  $incoming
-     * @return list<array<string, mixed>>
-     */
-    private function mergeMatrixEntries(array $existing, array $incoming): array
-    {
-        $byKey = [];
-        foreach ($existing as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $key = trim((string) ($row['activity_key'] ?? ''));
-            if ($key !== '') {
-                $byKey[$key] = $row;
-            }
-        }
-
-        foreach ($incoming as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $key = trim((string) ($row['activity_key'] ?? ''));
-            if ($key === '') {
-                continue;
-            }
-            $byKey[$key] = $row;
-        }
-
-        return array_values($byKey);
-    }
 }
