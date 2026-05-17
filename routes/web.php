@@ -43,6 +43,12 @@ Route::get('/documents/employee/dashboard', function () {
 })->middleware(['auth', 'verified']);
 
 Route::middleware('auth')->group(function () {
+    Route::get('/matrix-report', [WeeklyObjectiveMatrixController::class, 'index'])->name('matrix-report.index');
+    Route::post('/matrix-report', [WeeklyObjectiveMatrixController::class, 'store'])->name('matrix-report.store');
+    Route::get('/matrix-report/{matrix}/edit', [WeeklyObjectiveMatrixController::class, 'edit'])->name('matrix-report.edit');
+    Route::put('/matrix-report/{matrix}', [WeeklyObjectiveMatrixController::class, 'update'])->name('matrix-report.update');
+    Route::delete('/matrix-report/{matrix}', [WeeklyObjectiveMatrixController::class, 'destroy'])->name('matrix-report.destroy');
+
     Route::get('/profile/settings', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile/settings', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
