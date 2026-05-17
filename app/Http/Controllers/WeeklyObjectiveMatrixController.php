@@ -112,26 +112,23 @@ class WeeklyObjectiveMatrixController extends Controller
 
         $period = $matrix->period()->first();
         $subDepartmentIds = $this->subDepartmentIdsForParent((string) $matrix->department_id);
+        $impactDepartmentIds = array_values(array_unique([
+            ...$subDepartmentIds,
+            (string) $matrix->department_id,
+        ]));
         $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds);
-        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, $subDepartmentIds);
+        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, $impactDepartmentIds);
 
         $entryDefaults = old('entries');
         if (! is_array($entryDefaults)) {
             $entryDefaults = collect($matrix->entries ?? [])
-                ->map(function (array $entry): array {
-                    return [
-                        'activity_key' => (string) ($entry['activity_key'] ?? ''),
-                        'input' => (string) ($entry['input'] ?? ''),
-                        'output' => (string) ($entry['output'] ?? ''),
-                        'impact_year_plan_activity_id' => (string) ($entry['impact_year_plan_activity_id'] ?? ''),
-                    ];
-                })
+                ->map(fn (array $entry): array => $this->normalizeMatrixEntryForForm($entry))
                 ->values()
                 ->all();
         }
 
         if ($entryDefaults === []) {
-            $entryDefaults = [['activity_key' => '', 'input' => '', 'output' => '', 'impact_year_plan_activity_id' => '']];
+            $entryDefaults = [['activity_key' => '', 'input' => '', 'impact_year_plan_activity_ids' => []]];
         }
 
         $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $subDepartmentIds);
@@ -165,13 +162,17 @@ class WeeklyObjectiveMatrixController extends Controller
             'entries' => ['required', 'array', 'min:1'],
             'entries.*.activity_key' => ['required', 'string'],
             'entries.*.input' => ['required', 'string', 'max:2000'],
-            'entries.*.output' => ['required', 'string', 'max:2000'],
-            'entries.*.impact_year_plan_activity_id' => ['required', 'string', 'ulid'],
+            'entries.*.impact_year_plan_activity_ids' => ['required', 'array', 'min:1'],
+            'entries.*.impact_year_plan_activity_ids.*' => ['required', 'string', 'ulid'],
         ]);
 
         $subDepartmentIds = $this->subDepartmentIdsForParent((string) $matrix->department_id);
+        $impactDepartmentIds = array_values(array_unique([
+            ...$subDepartmentIds,
+            (string) $matrix->department_id,
+        ]));
         $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds)->keyBy('key');
-        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, $subDepartmentIds)->keyBy('id');
+        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, $impactDepartmentIds)->keyBy('id');
         $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
 
         $matrix->update([
@@ -445,6 +446,24 @@ class WeeklyObjectiveMatrixController extends Controller
         return round($total, 2);
     }
 
+    private function normalizeMatrixEntryForForm(array $entry): array
+    {
+        $impactIds = $entry['impact_year_plan_activity_ids'] ?? null;
+        if (! is_array($impactIds) || $impactIds === []) {
+            $legacyImpactId = trim((string) ($entry['impact_year_plan_activity_id'] ?? ''));
+            $impactIds = $legacyImpactId !== '' ? [$legacyImpactId] : [];
+        }
+
+        return [
+            'activity_key' => (string) ($entry['activity_key'] ?? ''),
+            'input' => (string) ($entry['input'] ?? ''),
+            'impact_year_plan_activity_ids' => array_values(array_map(
+                fn ($id) => (string) $id,
+                $impactIds
+            )),
+        ];
+    }
+
     private function hydrateValidatedEntries(array $entries, Collection $activityMap, Collection $impactMap): array
     {
         $result = [];
@@ -455,11 +474,15 @@ class WeeklyObjectiveMatrixController extends Controller
             }
 
             $activityKey = trim((string) ($entry['activity_key'] ?? ''));
-            $impactId = trim((string) ($entry['impact_year_plan_activity_id'] ?? ''));
             $input = trim((string) ($entry['input'] ?? ''));
-            $output = trim((string) ($entry['output'] ?? ''));
+            $impactIds = collect($entry['impact_year_plan_activity_ids'] ?? [])
+                ->map(fn ($id) => trim((string) $id))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
 
-            if ($activityKey === '' || $input === '' || $output === '' || $impactId === '') {
+            if ($activityKey === '' || $input === '' || $impactIds === []) {
                 continue;
             }
 
@@ -470,11 +493,15 @@ class WeeklyObjectiveMatrixController extends Controller
                 ]);
             }
 
-            $impact = $impactMap->get($impactId);
-            if (! is_array($impact)) {
-                throw ValidationException::withMessages([
-                    'entries.'.$index.'.impact_year_plan_activity_id' => 'Selected impact is invalid for this department year plan.',
-                ]);
+            $impactLabels = [];
+            foreach ($impactIds as $impactIndex => $impactId) {
+                $impact = $impactMap->get($impactId);
+                if (! is_array($impact)) {
+                    throw ValidationException::withMessages([
+                        'entries.'.$index.'.impact_year_plan_activity_ids.'.$impactIndex => 'One or more selected impacts are invalid for this department year plan.',
+                    ]);
+                }
+                $impactLabels[] = $impact['label'];
             }
 
             $result[] = [
@@ -484,9 +511,8 @@ class WeeklyObjectiveMatrixController extends Controller
                 'activity' => $activity['activity'],
                 'activity_label' => $activity['label'],
                 'input' => $input,
-                'output' => $output,
-                'impact_year_plan_activity_id' => $impactId,
-                'impact_label' => $impact['label'],
+                'impact_year_plan_activity_ids' => $impactIds,
+                'impact_labels' => $impactLabels,
             ];
         }
 

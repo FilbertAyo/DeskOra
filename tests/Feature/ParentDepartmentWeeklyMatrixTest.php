@@ -61,6 +61,7 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
         $editResponse->assertSee('Prepare payroll files');
         $editResponse->assertSee('Reconcile accounts');
         $editResponse->assertSee('1,500.00 TZS');
+        $editResponse->assertSee('Add Row');
 
         $activityKey = $fixture['planA']->id.'::'.$fixture['activityUidA'];
 
@@ -71,8 +72,7 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
                 [
                     'activity_key' => $activityKey,
                     'input' => 'Ledger review',
-                    'output' => 'Accounts reconciled',
-                    'impact_year_plan_activity_id' => $fixture['impactA']->id,
+                    'impact_year_plan_activity_ids' => [$fixture['impactA']->id],
                 ],
             ],
         ]);
@@ -83,8 +83,27 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
         $this->assertSame(1500.0, (float) $matrix->overall_budget);
         $this->assertCount(1, $matrix->entries);
         $this->assertSame('Ledger review', $matrix->entries[0]['input']);
-        $this->assertSame('Accounts reconciled', $matrix->entries[0]['output']);
-        $this->assertSame((string) $fixture['impactA']->id, $matrix->entries[0]['impact_year_plan_activity_id']);
+        $this->assertSame([(string) $fixture['impactA']->id], $matrix->entries[0]['impact_year_plan_activity_ids']);
+    }
+
+    public function test_edit_page_always_shows_add_row_even_without_year_plan(): void
+    {
+        $fixture = $this->createParentDepartmentFixture();
+        YearPlan::query()->where('year', 2026)->delete();
+
+        $matrix = WeeklyDepartmentMatrix::query()->create([
+            'period_id' => $fixture['period']->id,
+            'department_id' => $fixture['parentDepartment']->id,
+            'entries' => [],
+            'created_by' => $fixture['manager']->id,
+            'updated_by' => $fixture['manager']->id,
+        ]);
+
+        $response = $this->actingAs($fixture['manager'])->get(route('matrix-report.edit', $matrix));
+
+        $response->assertOk();
+        $response->assertSee('Add Row');
+        $response->assertSee('No year-plan activities found');
     }
 
     public function test_index_lists_parent_matrices_with_submission_summary(): void
