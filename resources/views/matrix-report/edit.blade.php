@@ -90,8 +90,9 @@
                                        class="form-control @error('overall_budget') is-invalid @enderror"
                                        placeholder="e.g. {{ number_format((float) ($rolledUpBudget ?? 0), 2, '.', '') }}">
                                 <div class="form-text">
-                                    Rolled up from submitted staff weekly-plan budgets:
+                                    Auto-total from all submitted staff weekly-plan budget lines in this parent department:
                                     <strong>{{ number_format((float) ($rolledUpBudget ?? 0), 2) }} TZS</strong>.
+                                    Saving uses this total when the field is left empty.
                                 </div>
                                 @error('overall_budget')
                                 <div class="invalid-feedback">{{ $message }}</div>

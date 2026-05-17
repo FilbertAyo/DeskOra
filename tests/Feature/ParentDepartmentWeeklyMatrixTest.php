@@ -6,9 +6,13 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WeeklyDepartmentMatrix;
+use App\Models\WeeklyPlan;
+use App\Models\WeeklyPlanActivity;
+use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
+use App\Services\Documents\DocumentDomainSyncService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -84,6 +88,54 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
         $this->assertCount(1, $matrix->entries);
         $this->assertSame('Ledger review', $matrix->entries[0]['input']);
         $this->assertSame([(string) $fixture['impactA']->id], $matrix->entries[0]['impact_year_plan_activity_ids']);
+    }
+
+    public function test_activities_load_from_weekly_plans_table_when_document_json_empty(): void
+    {
+        $fixture = $this->createParentDepartmentFixture();
+        $fixture['planA']->update(['content' => ['planned_activities' => [], 'budget' => []]]);
+
+        $weeklyPlan = WeeklyPlan::query()->updateOrCreate(
+            ['legacy_document_id' => (string) $fixture['planA']->id],
+            [
+                'user_id' => $fixture['staffA']->id,
+                'period_id' => $fixture['period']->id,
+                'title' => 'Plan A',
+                'state' => WeeklyPlan::STATE_SUBMITTED,
+                'main_target' => 'Accounting target',
+            ]
+        );
+
+        $weeklyPlan->activities()->delete();
+        $weeklyPlan->budgetItems()->delete();
+        WeeklyPlanActivity::query()->create([
+            'weekly_plan_id' => $weeklyPlan->id,
+            'activity_uid' => (string) Str::ulid(),
+            'activity' => 'Reconcile accounts from domain table',
+            'sort_order' => 0,
+        ]);
+        WeeklyPlanBudgetItem::query()->create([
+            'weekly_plan_id' => $weeklyPlan->id,
+            'budget_uid' => (string) Str::ulid(),
+            'item' => 'Supplies',
+            'amount_raw' => '2500',
+            'amount_numeric' => 2500,
+            'sort_order' => 0,
+        ]);
+
+        $matrix = WeeklyDepartmentMatrix::query()->create([
+            'period_id' => $fixture['period']->id,
+            'department_id' => $fixture['parentDepartment']->id,
+            'entries' => [],
+            'created_by' => $fixture['manager']->id,
+            'updated_by' => $fixture['manager']->id,
+        ]);
+
+        $response = $this->actingAs($fixture['manager'])->get(route('matrix-report.edit', $matrix));
+
+        $response->assertOk();
+        $response->assertSee('Reconcile accounts from domain table');
+        $response->assertSee('2500');
     }
 
     public function test_edit_page_always_shows_add_row_even_without_year_plan(): void
@@ -195,7 +247,7 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
 
         $activityUidA = (string) Str::ulid();
 
-        $planA = Document::create([
+        $planA =         $planA = Document::create([
             'type' => Document::TYPE_WEEKLY_PLAN,
             'period_id' => $period->id,
             'user_id' => $staffA->id,
@@ -219,6 +271,7 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
                 ],
             ],
         ]);
+        app(DocumentDomainSyncService::class)->syncFromDocument($planA->fresh());
 
         Document::create([
             'type' => Document::TYPE_WEEKLY_PLAN,

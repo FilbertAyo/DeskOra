@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\Department;
 use App\Models\User;
 use App\Models\WeeklyDepartmentMatrix;
+use App\Models\WeeklyPlan;
 use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
@@ -13,6 +14,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -45,7 +47,7 @@ class WeeklyObjectiveMatrixController extends Controller
             return [
                 (string) $matrix->id => [
                     'sub_department_count' => count($subDepartmentIds),
-                    'submission_summary' => $this->departmentPlanSubmissionSummary($matrix->period, $subDepartmentIds),
+                    'submission_summary' => $this->departmentPlanSubmissionSummary($matrix->period, $subDepartmentIds, (string) $matrix->department_id),
                 ],
             ];
         });
@@ -116,7 +118,7 @@ class WeeklyObjectiveMatrixController extends Controller
             ...$subDepartmentIds,
             (string) $matrix->department_id,
         ]));
-        $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds);
+        $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds, (string) $matrix->department_id);
         $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, $impactDepartmentIds);
 
         $entryDefaults = old('entries');
@@ -131,8 +133,8 @@ class WeeklyObjectiveMatrixController extends Controller
             $entryDefaults = [['activity_key' => '', 'input' => '', 'impact_year_plan_activity_ids' => []]];
         }
 
-        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $subDepartmentIds);
-        $rolledUpBudget = $this->calculateDepartmentBudgetTotal($period, $subDepartmentIds);
+        $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $subDepartmentIds, (string) $matrix->department_id);
+        $rolledUpBudget = $this->calculateDepartmentBudgetTotal($period, $subDepartmentIds, (string) $matrix->department_id);
 
         return view('matrix-report.edit', [
             'matrix' => $matrix->load(['department:id,name,parent_id', 'period:id,year,week_number']),
@@ -171,12 +173,13 @@ class WeeklyObjectiveMatrixController extends Controller
             ...$subDepartmentIds,
             (string) $matrix->department_id,
         ]));
-        $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds)->keyBy('key');
+        $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, $subDepartmentIds, (string) $matrix->department_id)->keyBy('key');
         $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, $impactDepartmentIds)->keyBy('id');
         $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
+        $rolledUpBudget = $this->calculateDepartmentBudgetTotal($period, $subDepartmentIds, (string) $matrix->department_id);
 
         $matrix->update([
-            'overall_budget' => $validated['overall_budget'] ?? null,
+            'overall_budget' => $validated['overall_budget'] ?? $rolledUpBudget,
             'notes' => $validated['notes'] ?? null,
             'entries' => $entries,
             'updated_by' => $user->id,
@@ -327,29 +330,149 @@ class WeeklyObjectiveMatrixController extends Controller
         return $childIds !== [] ? $childIds : [(string) $parent->id];
     }
 
-    private function collectActivitiesForPeriodAndDepartments(?WorkPeriod $period, array $departmentIds): Collection
+    /**
+     * @return list<string>
+     */
+    private function rollupDepartmentIds(array $subDepartmentIds, string $parentDepartmentId): array
     {
-        if (! $period || $departmentIds === []) {
+        return array_values(array_unique([
+            ...$subDepartmentIds,
+            $parentDepartmentId,
+        ]));
+    }
+
+    /**
+     * Active staff who belong to sub-departments (directly or via sub_department_user).
+     *
+     * @return list<string>
+     */
+    private function activeStaffIdsForDepartments(array $subDepartmentIds, string $parentDepartmentId): array
+    {
+        $departmentIds = $this->rollupDepartmentIds($subDepartmentIds, $parentDepartmentId);
+        if ($departmentIds === []) {
+            return [];
+        }
+
+        $baseQuery = User::query()
+            ->where('status', 'active')
+            ->where(function ($query) use ($departmentIds, $subDepartmentIds): void {
+                $query->whereIn('department_id', $departmentIds);
+
+                if (Schema::hasTable('sub_department_user') && $subDepartmentIds !== []) {
+                    $query->orWhereHas('subDepartments', function ($subQuery) use ($subDepartmentIds): void {
+                        $subQuery->whereIn('departments.id', $subDepartmentIds);
+                    });
+                }
+            });
+
+        $staffIds = (clone $baseQuery)
+            ->permission('create weekly plan')
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if ($staffIds !== []) {
+            return $staffIds;
+        }
+
+        return $baseQuery
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    /**
+     * Submitted weekly plans for staff in scope — primary source is weekly_plans (+ weekly_plan_activities),
+     * with a legacy fallback to documents.content JSON.
+     *
+     * @param  list<string>  $staffIds
+     * @return Collection<int, WeeklyPlan|Document>
+     */
+    private function submittedPlansForPeriodAndStaff(WorkPeriod $period, array $staffIds): Collection
+    {
+        if ($staffIds === []) {
             return collect();
         }
 
-        /** @var EloquentCollection<int, Document> $plans */
-        $plans = Document::query()
+        /** @var EloquentCollection<int, WeeklyPlan> $domainPlans */
+        $domainPlans = WeeklyPlan::query()
+            ->where('period_id', $period->id)
+            ->where('state', WeeklyPlan::STATE_SUBMITTED)
+            ->whereIn('user_id', $staffIds)
+            ->with([
+                'activities' => fn ($query) => $query->orderBy('sort_order'),
+                'budgetItems' => fn ($query) => $query->orderBy('sort_order'),
+                'user:id,name,department_id',
+                'user.department:id,name',
+                'legacyDocument:id,user_id,content',
+            ])
+            ->latest('updated_at')
+            ->get()
+            ->unique('user_id')
+            ->values();
+
+        $coveredUserIds = $domainPlans->pluck('user_id')->map(fn ($id) => (string) $id)->all();
+
+        $legacyPlans = Document::query()
             ->where('type', Document::TYPE_WEEKLY_PLAN)
             ->where('state', Document::STATE_SUBMITTED)
             ->where('period_id', $period->id)
-            ->whereHas('user', function ($query) use ($departmentIds): void {
-                $query->whereIn('department_id', $departmentIds);
-            })
+            ->whereIn('user_id', $staffIds)
+            ->when($coveredUserIds !== [], fn ($query) => $query->whereNotIn('user_id', $coveredUserIds))
             ->with(['user:id,name,department_id', 'user.department:id,name'])
             ->latest('updated_at')
             ->get(['id', 'user_id', 'state', 'content', 'updated_at'])
-            ->groupBy('user_id')
-            ->map(fn ($userPlans) => $userPlans->first())
+            ->unique('user_id')
             ->values();
 
+        return $domainPlans->concat($legacyPlans);
+    }
+
+    private function collectActivitiesForPeriodAndDepartments(?WorkPeriod $period, array $subDepartmentIds, string $parentDepartmentId): Collection
+    {
+        if (! $period) {
+            return collect();
+        }
+
+        $staffIds = $this->activeStaffIdsForDepartments($subDepartmentIds, $parentDepartmentId);
+        if ($staffIds === []) {
+            return collect();
+        }
+
         $rows = collect();
-        foreach ($plans as $plan) {
+
+        foreach ($this->submittedPlansForPeriodAndStaff($period, $staffIds) as $plan) {
+            if ($plan instanceof WeeklyPlan) {
+                $sourceDocumentId = (string) ($plan->legacy_document_id ?? $plan->id);
+                $staffName = $plan->user?->name ?? 'Unknown Staff';
+                $subDepartmentName = $plan->user?->department?->name ?? 'Unknown Sub-department';
+
+                foreach ($plan->activities as $index => $activity) {
+                    $activityText = trim((string) ($activity->activity ?? ''));
+                    if ($activityText === '') {
+                        continue;
+                    }
+
+                    $activityUid = trim((string) ($activity->activity_uid ?? ''));
+                    if ($activityUid === '') {
+                        $activityUid = 'row_'.$index;
+                    }
+
+                    $key = $sourceDocumentId.'::'.$activityUid;
+                    $rows->push([
+                        'key' => $key,
+                        'source_document_id' => $sourceDocumentId,
+                        'activity_uid' => $activityUid,
+                        'activity' => $activityText,
+                        'staff_name' => $staffName,
+                        'department_name' => $subDepartmentName,
+                        'label' => sprintf('%s (%s) - %s', $staffName, $subDepartmentName, $activityText),
+                    ]);
+                }
+
+                continue;
+            }
+
             $planContent = is_array($plan->content) ? $plan->content : [];
             $activities = is_array($planContent['planned_activities'] ?? null) ? $planContent['planned_activities'] : [];
 
@@ -421,23 +544,34 @@ class WeeklyObjectiveMatrixController extends Controller
         })->values();
     }
 
-    private function calculateDepartmentBudgetTotal(?WorkPeriod $period, array $subDepartmentIds): float
+    private function calculateDepartmentBudgetTotal(?WorkPeriod $period, array $subDepartmentIds, string $parentDepartmentId): float
     {
-        if (! $period || $subDepartmentIds === []) {
+        if (! $period) {
             return 0.0;
         }
 
-        $plans = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('state', Document::STATE_SUBMITTED)
-            ->where('period_id', $period->id)
-            ->whereHas('user', function ($query) use ($subDepartmentIds): void {
-                $query->whereIn('department_id', $subDepartmentIds);
-            })
-            ->get();
+        $staffIds = $this->activeStaffIdsForDepartments($subDepartmentIds, $parentDepartmentId);
+        if ($staffIds === []) {
+            return 0.0;
+        }
 
         $total = 0.0;
-        foreach ($plans as $plan) {
+
+        foreach ($this->submittedPlansForPeriodAndStaff($period, $staffIds) as $plan) {
+            if ($plan instanceof WeeklyPlan) {
+                foreach ($plan->budgetItems as $item) {
+                    $total += (float) ($item->amount_numeric ?? 0);
+                }
+
+                if ($plan->budgetItems->isEmpty() && $plan->legacyDocument) {
+                    foreach ($plan->legacyDocument->budgetItems() as $item) {
+                        $total += (float) ($item['amount_numeric'] ?? 0);
+                    }
+                }
+
+                continue;
+            }
+
             foreach ($plan->budgetItems() as $item) {
                 $total += (float) ($item['amount_numeric'] ?? 0);
             }
@@ -528,7 +662,7 @@ class WeeklyObjectiveMatrixController extends Controller
     /**
      * @return array{expected_staff: int, submitted_staff: int, pending_staff: int, all_submitted: bool}
      */
-    private function departmentPlanSubmissionSummary(?WorkPeriod $period, array $departmentIds): array
+    private function departmentPlanSubmissionSummary(?WorkPeriod $period, array $subDepartmentIds, string $parentDepartmentId): array
     {
         $empty = [
             'expected_staff' => 0,
@@ -537,39 +671,20 @@ class WeeklyObjectiveMatrixController extends Controller
             'all_submitted' => false,
         ];
 
-        if (! $period || $departmentIds === []) {
+        if (! $period) {
             return $empty;
         }
 
-        $expectedStaffIds = User::query()
-            ->where('status', 'active')
-            ->whereIn('department_id', $departmentIds)
-            ->permission('create weekly plan')
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        if ($expectedStaffIds === []) {
-            $expectedStaffIds = User::query()
-                ->where('status', 'active')
-                ->whereIn('department_id', $departmentIds)
-                ->pluck('id')
-                ->map(fn ($id) => (string) $id)
-                ->all();
-        }
-
+        $expectedStaffIds = $this->activeStaffIdsForDepartments($subDepartmentIds, $parentDepartmentId);
         $expectedCount = count($expectedStaffIds);
         if ($expectedCount === 0) {
             return $empty;
         }
 
-        $submittedStaffIds = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('state', Document::STATE_SUBMITTED)
-            ->where('period_id', $period->id)
-            ->whereIn('user_id', $expectedStaffIds)
-            ->pluck('user_id')
-            ->map(fn ($id) => (string) $id)
+        $submittedStaffIds = $this->submittedPlansForPeriodAndStaff($period, $expectedStaffIds)
+            ->map(function (WeeklyPlan|Document $plan): string {
+                return (string) ($plan instanceof WeeklyPlan ? $plan->user_id : $plan->user_id);
+            })
             ->unique()
             ->values()
             ->all();
