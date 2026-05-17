@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\Department;
 use App\Models\User;
 use App\Models\WeeklyDepartmentMatrix;
 use App\Models\WorkPeriod;
@@ -21,8 +22,9 @@ class WeeklyObjectiveMatrixController extends Controller
         /** @var User $user */
         $user = $request->user();
         $currentPeriod = WorkPeriod::getCurrent();
-        $departmentScopeIds = $user->departmentScopeIds();
+        $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
         $activeDepartmentId = $user->department_id;
+        $matrixPeriod = $this->resolveMatrixPeriod($currentPeriod, $departmentScopeIds);
 
         $matrixRows = collect();
         if ($currentPeriod) {
@@ -46,20 +48,20 @@ class WeeklyObjectiveMatrixController extends Controller
             ->with(['department:id,name', 'period:id,week_number,year', 'creator:id,name', 'updater:id,name'])
             ->whereIn('department_id', $departmentScopeIds)
             ->when(
-                $currentPeriod,
-                fn ($query) => $query->where('period_id', $currentPeriod->id),
+                $matrixPeriod,
+                fn ($query) => $query->where('period_id', $matrixPeriod->id),
                 fn ($query) => $query->whereRaw('1 = 0')
             )
             ->latest('updated_at')
             ->get();
 
         $availableActivities = $this->collectActivitiesForPeriodAndDepartments(
-            $currentPeriod,
-            $activeDepartmentId ? [$activeDepartmentId] : []
+            $matrixPeriod,
+            $departmentScopeIds
         );
         $impactOptions = $this->impactOptionsForPeriodYearAndDepartments(
-            $currentPeriod,
-            $activeDepartmentId ? [$activeDepartmentId] : []
+            $matrixPeriod,
+            $departmentScopeIds
         );
 
         return view('matrix-report.index', [
@@ -69,6 +71,7 @@ class WeeklyObjectiveMatrixController extends Controller
             'availableActivities' => $availableActivities,
             'impactOptions' => $impactOptions,
             'activeDepartmentId' => $activeDepartmentId,
+            'matrixPeriod' => $matrixPeriod,
             'entryDefaults' => old('entries', [['activity_key' => '', 'input' => '', 'output' => '', 'impact_year_plan_activity_id' => '']]),
         ]);
     }
@@ -77,11 +80,6 @@ class WeeklyObjectiveMatrixController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $currentPeriod = WorkPeriod::getCurrent();
-        if (! $currentPeriod) {
-            return back()->with('error', 'No active work period found for matrix creation.');
-        }
-
         $departmentId = $user->department_id;
         if (! $departmentId) {
             return back()->withErrors([
@@ -89,7 +87,12 @@ class WeeklyObjectiveMatrixController extends Controller
             ])->withInput();
         }
 
+        $departmentScopeIds = $this->resolveDepartmentIdsForMatrix($user);
+        $currentPeriod = WorkPeriod::getCurrent();
+        $fallbackPeriod = $this->resolveMatrixPeriod($currentPeriod, $departmentScopeIds);
+
         $validated = $request->validate([
+            'period_id' => ['nullable', 'string', 'ulid', 'exists:work_periods,id'],
             'overall_budget' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:4000'],
             'entries' => ['required', 'array', 'min:1'],
@@ -99,12 +102,23 @@ class WeeklyObjectiveMatrixController extends Controller
             'entries.*.impact_year_plan_activity_id' => ['required', 'string', 'ulid'],
         ]);
 
-        $activityMap = $this->collectActivitiesForPeriodAndDepartments($currentPeriod, [$departmentId])->keyBy('key');
-        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($currentPeriod, [$departmentId])->keyBy('id');
+        $targetPeriod = null;
+        if (! empty($validated['period_id'])) {
+            $targetPeriod = WorkPeriod::query()->find($validated['period_id']);
+        }
+        if (! $targetPeriod) {
+            $targetPeriod = $fallbackPeriod;
+        }
+        if (! $targetPeriod) {
+            return back()->with('error', 'No work period found for matrix creation.')->withInput();
+        }
+
+        $activityMap = $this->collectActivitiesForPeriodAndDepartments($targetPeriod, $departmentScopeIds)->keyBy('key');
+        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($targetPeriod, $departmentScopeIds)->keyBy('id');
         $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
 
         $matrix = WeeklyDepartmentMatrix::query()->firstOrNew([
-            'period_id' => $currentPeriod->id,
+            'period_id' => $targetPeriod->id,
             'department_id' => $departmentId,
         ]);
 
@@ -130,8 +144,9 @@ class WeeklyObjectiveMatrixController extends Controller
         $this->ensureCanManageMatrix($user, $matrix);
 
         $period = $matrix->period()->first();
-        $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, [$matrix->department_id]);
-        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, [$matrix->department_id]);
+        $departmentIds = $this->resolveDepartmentIdsFromDepartmentId($matrix->department_id);
+        $availableActivities = $this->collectActivitiesForPeriodAndDepartments($period, $departmentIds);
+        $impactOptions = $this->impactOptionsForPeriodYearAndDepartments($period, $departmentIds);
 
         $entryDefaults = old('entries');
         if (! is_array($entryDefaults)) {
@@ -181,8 +196,9 @@ class WeeklyObjectiveMatrixController extends Controller
             'entries.*.impact_year_plan_activity_id' => ['required', 'string', 'ulid'],
         ]);
 
-        $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, [$matrix->department_id])->keyBy('key');
-        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, [$matrix->department_id])->keyBy('id');
+        $departmentIds = $this->resolveDepartmentIdsFromDepartmentId($matrix->department_id);
+        $activityMap = $this->collectActivitiesForPeriodAndDepartments($period, $departmentIds)->keyBy('key');
+        $impactMap = $this->impactOptionsForPeriodYearAndDepartments($period, $departmentIds)->keyBy('id');
         $entries = $this->hydrateValidatedEntries($validated['entries'], $activityMap, $impactMap);
 
         $matrix->update([
@@ -266,14 +282,16 @@ class WeeklyObjectiveMatrixController extends Controller
         /** @var EloquentCollection<int, Document> $plans */
         $plans = Document::query()
             ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('state', Document::STATE_SUBMITTED)
             ->where('period_id', $period->id)
             ->whereHas('user', function ($query) use ($departmentIds): void {
                 $query->whereIn('department_id', $departmentIds);
             })
             ->with(['user:id,name,department_id', 'user.department:id,name'])
             ->latest('updated_at')
-            ->get(['id', 'user_id', 'content', 'updated_at']);
+            ->get(['id', 'user_id', 'state', 'content', 'updated_at'])
+            ->groupBy('user_id')
+            ->map(fn ($userPlans) => $userPlans->first())
+            ->values();
 
         $rows = collect();
         foreach ($plans as $plan) {
@@ -395,5 +413,69 @@ class WeeklyObjectiveMatrixController extends Controller
         }
 
         return array_values($result);
+    }
+
+    private function resolveDepartmentIdsForMatrix(User $user): array
+    {
+        $scopeIds = $user->departmentScopeIds();
+        if (! $user->department_id) {
+            return $scopeIds;
+        }
+
+        $ownDepartment = Department::query()->find($user->department_id);
+        if (! $ownDepartment) {
+            return [$user->department_id];
+        }
+
+        $departmentIds = $ownDepartment->selfAndDescendantIds();
+        if ($scopeIds !== []) {
+            $departmentIds = array_values(array_intersect($departmentIds, $scopeIds));
+        }
+
+        return $departmentIds !== [] ? $departmentIds : [$user->department_id];
+    }
+
+    private function resolveDepartmentIdsFromDepartmentId(string $departmentId): array
+    {
+        $department = Department::query()->find($departmentId);
+        if (! $department) {
+            return [$departmentId];
+        }
+
+        return $department->selfAndDescendantIds();
+    }
+
+    private function resolveMatrixPeriod(?WorkPeriod $currentPeriod, array $departmentIds): ?WorkPeriod
+    {
+        if (! $currentPeriod) {
+            return null;
+        }
+
+        $hasCurrentActivities = Document::query()
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->where('period_id', $currentPeriod->id)
+            ->whereHas('user', function ($query) use ($departmentIds): void {
+                $query->whereIn('department_id', $departmentIds);
+            })
+            ->exists();
+
+        if ($hasCurrentActivities) {
+            return $currentPeriod;
+        }
+
+        $nextPeriod = $currentPeriod->getNextPeriod();
+        if (! $nextPeriod) {
+            return $currentPeriod;
+        }
+
+        $hasNextActivities = Document::query()
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->where('period_id', $nextPeriod->id)
+            ->whereHas('user', function ($query) use ($departmentIds): void {
+                $query->whereIn('department_id', $departmentIds);
+            })
+            ->exists();
+
+        return $hasNextActivities ? $nextPeriod : $currentPeriod;
     }
 }

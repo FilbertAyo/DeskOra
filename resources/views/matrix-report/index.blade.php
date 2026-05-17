@@ -38,31 +38,32 @@
                             <i class="ti ti-alert-triangle me-1"></i>
                             Your account is not assigned to any department, so you cannot create a department matrix yet.
                         </div>
-                    @elseif(!$currentPeriod)
+                    @elseif(!$matrixPeriod)
                         <div class="alert alert-warning mb-0">
                             <i class="ti ti-alert-triangle me-1"></i>
-                            There is no active work period yet.
+                            There is no available work period for matrix creation yet.
                         </div>
                     @else
                         <div id="matrix-create-card" class="card border-primary shadow-none mb-0">
                             <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">Create / Update Department Weekly Matrix</h6>
-                                <span class="badge bg-light text-dark">Week {{ $currentPeriod->week_number }} • {{ $currentPeriod->year }}</span>
+                                <span class="badge bg-light text-dark">Week {{ $matrixPeriod->week_number }} • {{ $matrixPeriod->year }}</span>
                             </div>
                             <div class="card-body">
                                 @if($availableActivities->isEmpty())
                                     <div class="alert alert-info mb-0">
                                         <i class="ti ti-info-circle me-1"></i>
-                                        No submitted weekly-plan activities found for your department in this period.
+                                        No weekly-plan activities found for your department in this period.
                                     </div>
                                 @elseif($impactOptions->isEmpty())
                                     <div class="alert alert-warning mb-0">
                                         <i class="ti ti-alert-circle me-1"></i>
-                                        No department year-plan activities found for {{ $currentPeriod->year }}. Add year-plan activities first to use Impact mapping.
+                                        No department year-plan activities found for {{ $matrixPeriod->year }}.
                                     </div>
                                 @else
                                     <form method="POST" action="{{ route('matrix-report.store') }}">
                                         @csrf
+                                        <input type="hidden" name="period_id" value="{{ $matrixPeriod->id }}">
                                         <div class="row g-3">
                                             <div class="col-md-4">
                                                 <label class="form-label">Overall Budget (TZS)</label>
@@ -181,13 +182,13 @@
         <div class="col-12">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom">
-                    <h6 class="mb-0">Department Matrix Entries (Current Week)</h6>
+                    <h6 class="mb-0">Department Matrix Entries (Selected Matrix Week)</h6>
                 </div>
                 <div class="card-body">
                     @if($departmentMatrices->isEmpty())
                         <div class="alert alert-info mb-0">
                             <i class="ti ti-info-circle me-1"></i>
-                            No department matrix has been created for this week yet.
+                            No department matrix has been created for the selected matrix week yet.
                         </div>
                     @else
                         <div class="row g-3">
