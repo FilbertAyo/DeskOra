@@ -138,6 +138,45 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
         $response->assertSee('2500');
     }
 
+    public function test_store_recreates_matrix_after_delete_without_unique_violation(): void
+    {
+        $fixture = $this->createParentDepartmentFixture();
+
+        $matrix = WeeklyDepartmentMatrix::query()->create([
+            'period_id' => $fixture['period']->id,
+            'department_id' => $fixture['parentDepartment']->id,
+            'entries' => [['activity_key' => 'x', 'input' => 'old']],
+            'overall_budget' => 99,
+            'notes' => 'old note',
+            'created_by' => $fixture['manager']->id,
+            'updated_by' => $fixture['manager']->id,
+        ]);
+
+        $this->actingAs($fixture['manager'])
+            ->delete(route('matrix-report.destroy', $matrix))
+            ->assertRedirect(route('matrix-report.index'));
+
+        $this->assertDatabaseMissing('weekly_department_matrices', [
+            'id' => $matrix->id,
+        ]);
+
+        $response = $this->actingAs($fixture['manager'])->post(route('matrix-report.store'), [
+            'department_id' => $fixture['parentDepartment']->id,
+            'period_id' => $fixture['period']->id,
+        ]);
+
+        $recreated = WeeklyDepartmentMatrix::query()
+            ->where('period_id', $fixture['period']->id)
+            ->where('department_id', $fixture['parentDepartment']->id)
+            ->first();
+
+        $response->assertRedirect(route('matrix-report.edit', $recreated));
+        $this->assertNotNull($recreated);
+        $this->assertSame([], $recreated->entries);
+        $this->assertNull($recreated->overall_budget);
+        $this->assertNull($recreated->notes);
+    }
+
     public function test_edit_page_always_shows_add_row_even_without_year_plan(): void
     {
         $fixture = $this->createParentDepartmentFixture();

@@ -84,22 +84,35 @@ class WeeklyObjectiveMatrixController extends Controller
                 ->withInput();
         }
 
-        $matrix = WeeklyDepartmentMatrix::query()->firstOrNew([
+        $matrix = WeeklyDepartmentMatrix::withTrashed()->firstOrNew([
             'period_id' => $validated['period_id'],
             'department_id' => $parentDepartment->id,
         ]);
 
-        if (! $matrix->exists) {
-            $matrix->created_by = $user->id;
+        $wasRestored = false;
+        if ($matrix->trashed()) {
+            $matrix->restore();
             $matrix->entries = [];
+            $matrix->overall_budget = null;
+            $matrix->notes = null;
+            $wasRestored = true;
+        }
+
+        if (! $matrix->exists || $wasRestored) {
+            $matrix->created_by = $user->id;
+            if (! $wasRestored) {
+                $matrix->entries = [];
+            }
         }
 
         $matrix->updated_by = $user->id;
         $matrix->save();
 
-        $message = $matrix->wasRecentlyCreated
-            ? 'Parent department matrix created. You can now add activities from all sub-departments.'
-            : 'Parent department matrix already exists. You can continue editing it.';
+        $message = $wasRestored
+            ? 'Parent department matrix recreated. You can now add activities from all sub-departments.'
+            : ($matrix->wasRecentlyCreated
+                ? 'Parent department matrix created. You can now add activities from all sub-departments.'
+                : 'Parent department matrix already exists. You can continue editing it.');
 
         return redirect()
             ->route('matrix-report.edit', $matrix)
@@ -196,7 +209,7 @@ class WeeklyObjectiveMatrixController extends Controller
         $user = $request->user();
         $this->ensureCanManageMatrix($user, $matrix);
 
-        $matrix->delete();
+        $matrix->forceDelete();
 
         return redirect()
             ->route('matrix-report.index')
