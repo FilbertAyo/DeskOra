@@ -460,7 +460,7 @@ class DashboardController extends Controller
     {
         $isActionLogManager = $user->hasAnyPermission(['create action logs', 'manage action logs']);
         $documentsQuery = Document::with('period')
-            ->where('type', Document::TYPE_ACTION_LOG)
+            ->actionLogs()
             ->whereNotNull('period_id');
 
         $documents = $isActionLogManager

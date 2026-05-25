@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Builders\DocumentBuilder;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Services\Documents\DocumentDomainSyncService;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -18,6 +19,11 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Document extends Model
 {
     use HasFactory, HasUlids, LogsActivity, SoftDeletes;
+
+    public function newEloquentBuilder($query): DocumentBuilder
+    {
+        return new DocumentBuilder($query);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
