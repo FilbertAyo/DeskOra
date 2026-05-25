@@ -17,7 +17,6 @@ class WeeklyPlan extends Model
     public const STATE_SUBMITTED = 'submitted';
 
     protected $fillable = [
-        'legacy_document_id',
         'user_id',
         'period_id',
         'title',
@@ -42,9 +41,9 @@ class WeeklyPlan extends Model
         ];
     }
 
-    public function legacyDocument(): BelongsTo
+    public function document(): BelongsTo
     {
-        return $this->belongsTo(Document::class, 'legacy_document_id');
+        return $this->belongsTo(Document::class, 'id', 'id');
     }
 
     public function user(): BelongsTo

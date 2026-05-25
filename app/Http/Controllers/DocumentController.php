@@ -2135,7 +2135,7 @@ class DocumentController extends Controller
         $now = now();
 
         $weeklyPlan = WeeklyPlan::query()
-            ->where('legacy_document_id', $document->id)
+            ->where('id', $document->id)
             ->first();
         if (! $weeklyPlan) {
             // Legacy fallback path (pre-backfill/testing).
@@ -2343,7 +2343,7 @@ class DocumentController extends Controller
         }
 
         $weeklyPlan = WeeklyPlan::query()
-            ->where('legacy_document_id', $targetDocument->id)
+            ->where('id', $targetDocument->id)
             ->first();
         if (! $weeklyPlan) {
             // Legacy fallback path (pre-backfill/testing).
@@ -2678,6 +2678,14 @@ class DocumentController extends Controller
      */
     private function syncDocumentShares(Document $document, array $sharedUserIds, User $actor): void
     {
+        $weeklyPlanId = null;
+        $weeklyReportId = null;
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $weeklyPlanId = (string) $document->id;
+        } elseif ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $weeklyReportId = (string) $document->id;
+        }
+
         $desiredIds = array_values(array_unique(array_filter(
             array_map(static fn ($id) => trim((string) $id), $sharedUserIds),
             static fn ($id) => $id !== '' && $id !== (string) $document->user_id
@@ -2700,7 +2708,8 @@ class DocumentController extends Controller
         $events = [];
         foreach ($addedIds as $targetUserId) {
             $events[] = [
-                'document_id' => $document->id,
+                'weekly_plan_id' => $weeklyPlanId,
+                'weekly_report_id' => $weeklyReportId,
                 'actor_user_id' => $actor->id,
                 'target_user_id' => $targetUserId,
                 'event_type' => Document::SHARE_EVENT_ADDED,
@@ -2710,7 +2719,8 @@ class DocumentController extends Controller
         }
         foreach ($removedIds as $targetUserId) {
             $events[] = [
-                'document_id' => $document->id,
+                'weekly_plan_id' => $weeklyPlanId,
+                'weekly_report_id' => $weeklyReportId,
                 'actor_user_id' => $actor->id,
                 'target_user_id' => $targetUserId,
                 'event_type' => Document::SHARE_EVENT_REMOVED,
@@ -3071,7 +3081,8 @@ class DocumentController extends Controller
                 'location' => $location,
                 'team_member_ids' => $teamMemberIds,
                 'notes_inclusion' => $this->clipString($notes, 4000),
-                'carry_over_source_report_id' => (string) $weeklyReport->id,
+                'carry_over_source_report_id' => null,
+                'carry_over_source_weekly_report_id' => optional($weeklyReport->weeklyReportDomain)->id,
             ];
         }
 
@@ -3463,14 +3474,18 @@ class DocumentController extends Controller
             return;
         }
 
+        $domainWeeklyReportId = optional($weeklyReport->weeklyReportDomain)->id;
         $nextPlanContent = is_array($nextPlan->content) ? $nextPlan->content : [];
         $existingActivities = is_array($nextPlanContent['planned_activities'] ?? null) ? $nextPlanContent['planned_activities'] : [];
-        $existingActivities = array_values(array_filter($existingActivities, function ($row) use ($weeklyReport) {
+        $existingActivities = array_values(array_filter($existingActivities, function ($row) use ($weeklyReport, $domainWeeklyReportId) {
             if (! is_array($row)) {
                 return false;
             }
 
-            return trim((string) ($row['carry_over_source_report_id'] ?? '')) !== (string) $weeklyReport->id;
+            $domainMatch = $domainWeeklyReportId !== null
+                && trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) === (string) $domainWeeklyReportId;
+
+            return ! $domainMatch;
         }));
 
         $carriedRows = $this->buildCarriedActivitiesFromWeeklyReport($weeklyReport);

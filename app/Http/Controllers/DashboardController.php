@@ -286,18 +286,22 @@ class DashboardController extends Controller
             ->count();
 
         $collaborationEvents = DB::table('document_share_events as dse')
-            ->join('documents as d', 'd.id', '=', 'dse.document_id')
+            ->leftJoin('weekly_plans as wp', 'wp.id', '=', 'dse.weekly_plan_id')
+            ->leftJoin('weekly_reports as wr', 'wr.id', '=', 'dse.weekly_report_id')
             ->leftJoin('users as actor', 'actor.id', '=', 'dse.actor_user_id')
             ->where('dse.target_user_id', $user->id)
-            ->whereIn('d.type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+            ->where(function ($query) {
+                $query->whereNotNull('dse.weekly_plan_id')
+                    ->orWhereNotNull('dse.weekly_report_id');
+            })
             ->orderByDesc('dse.created_at')
             ->limit(5)
             ->get([
-                'dse.document_id',
                 'dse.event_type',
                 'dse.created_at',
-                'd.type as document_type',
-                'd.title as document_title',
+                DB::raw('COALESCE(wp.id, wr.id) as document_id'),
+                DB::raw("CASE WHEN dse.weekly_plan_id IS NOT NULL THEN 'weekly_plan' WHEN dse.weekly_report_id IS NOT NULL THEN 'weekly_report' END as document_type"),
+                DB::raw('COALESCE(wp.title, wr.title) as document_title'),
                 'actor.name as actor_name',
             ])
             ->map(function ($event) {
@@ -321,7 +325,10 @@ class DashboardController extends Controller
 
         $actionLogProgress = $this->buildActionLogProgressForUser($user);
         $assignedWeeklyActivities = WeeklyActivityAssignment::query()
-            ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id'])
+            ->with([
+                'sourceUser:id,name',
+                'sourceWeeklyPlan:id,title,user_id,period_id,state',
+            ])
             ->where('assignee_user_id', $user->id)
             ->whereColumn('source_user_id', '!=', 'assignee_user_id')
             ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [WeeklyActivityAssignment::STATUS_PREVIEW])

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Document;
 use App\Models\Department;
 use App\Models\User;
 use App\Models\WeeklyDepartmentMatrix;
@@ -228,15 +227,14 @@ class WeeklyObjectiveMatrixController extends Controller
             $orientation = 'portrait';
         }
 
-        $matrixRows = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('state', Document::STATE_SUBMITTED)
+        $matrixRows = WeeklyPlan::query()
+            ->where('state', WeeklyPlan::STATE_SUBMITTED)
             ->where('period_id', $currentPeriod->id)
             ->whereNotNull('main_target')
             ->where('main_target', '!=', '')
             ->with(['user:id,name,department_id', 'user.department:id,name'])
             ->latest('updated_at')
-            ->get(['user_id', 'main_target', 'content', 'updated_at'])
+            ->get(['id', 'user_id', 'main_target', 'updated_at'])
             ->groupBy('user_id')
             ->map(fn ($plans) => $plans->first())
             ->values()
@@ -395,11 +393,10 @@ class WeeklyObjectiveMatrixController extends Controller
     }
 
     /**
-     * Submitted weekly plans for staff in scope — primary source is weekly_plans (+ weekly_plan_activities),
-     * with a legacy fallback to documents.content JSON.
+     * Submitted weekly plans for staff in scope (domain tables only).
      *
      * @param  list<string>  $staffIds
-     * @return Collection<int, WeeklyPlan|Document>
+     * @return Collection<int, WeeklyPlan>
      */
     private function submittedPlansForPeriodAndStaff(WorkPeriod $period, array $staffIds): Collection
     {
@@ -417,28 +414,13 @@ class WeeklyObjectiveMatrixController extends Controller
                 'budgetItems' => fn ($query) => $query->orderBy('sort_order'),
                 'user:id,name,department_id',
                 'user.department:id,name',
-                'legacyDocument:id,user_id,content',
             ])
             ->latest('updated_at')
             ->get()
             ->unique('user_id')
             ->values();
 
-        $coveredUserIds = $domainPlans->pluck('user_id')->map(fn ($id) => (string) $id)->all();
-
-        $legacyPlans = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('state', Document::STATE_SUBMITTED)
-            ->where('period_id', $period->id)
-            ->whereIn('user_id', $staffIds)
-            ->when($coveredUserIds !== [], fn ($query) => $query->whereNotIn('user_id', $coveredUserIds))
-            ->with(['user:id,name,department_id', 'user.department:id,name'])
-            ->latest('updated_at')
-            ->get(['id', 'user_id', 'state', 'content', 'updated_at'])
-            ->unique('user_id')
-            ->values();
-
-        return $domainPlans->concat($legacyPlans);
+        return $domainPlans;
     }
 
     private function collectActivitiesForPeriodAndDepartments(?WorkPeriod $period, array $subDepartmentIds, string $parentDepartmentId): Collection
@@ -455,62 +437,27 @@ class WeeklyObjectiveMatrixController extends Controller
         $rows = collect();
 
         foreach ($this->submittedPlansForPeriodAndStaff($period, $staffIds) as $plan) {
-            if ($plan instanceof WeeklyPlan) {
-                $sourceDocumentId = (string) ($plan->legacy_document_id ?? $plan->id);
-                $staffName = $plan->user?->name ?? 'Unknown Staff';
-                $subDepartmentName = $plan->user?->department?->name ?? 'Unknown Sub-department';
+            $sourceDocumentId = (string) $plan->id;
+            $sourceWeeklyPlanId = (string) $plan->id;
+            $staffName = $plan->user?->name ?? 'Unknown Staff';
+            $subDepartmentName = $plan->user?->department?->name ?? 'Unknown Sub-department';
 
-                foreach ($plan->activities as $index => $activity) {
-                    $activityText = trim((string) ($activity->activity ?? ''));
-                    if ($activityText === '') {
-                        continue;
-                    }
-
-                    $activityUid = trim((string) ($activity->activity_uid ?? ''));
-                    if ($activityUid === '') {
-                        $activityUid = 'row_'.$index;
-                    }
-
-                    $key = $sourceDocumentId.'::'.$activityUid;
-                    $rows->push([
-                        'key' => $key,
-                        'source_document_id' => $sourceDocumentId,
-                        'activity_uid' => $activityUid,
-                        'activity' => $activityText,
-                        'staff_name' => $staffName,
-                        'department_name' => $subDepartmentName,
-                        'label' => sprintf('%s (%s) - %s', $staffName, $subDepartmentName, $activityText),
-                    ]);
-                }
-
-                continue;
-            }
-
-            $planContent = is_array($plan->content) ? $plan->content : [];
-            $activities = is_array($planContent['planned_activities'] ?? null) ? $planContent['planned_activities'] : [];
-
-            foreach ($activities as $index => $activity) {
-                if (! is_array($activity)) {
-                    continue;
-                }
-
-                $activityText = trim((string) ($activity['activity'] ?? ''));
+            foreach ($plan->activities as $index => $activity) {
+                $activityText = trim((string) ($activity->activity ?? ''));
                 if ($activityText === '') {
                     continue;
                 }
 
-                $activityUid = trim((string) ($activity['activity_uid'] ?? ''));
+                $activityUid = trim((string) ($activity->activity_uid ?? ''));
                 if ($activityUid === '') {
                     $activityUid = 'row_'.$index;
                 }
 
-                $staffName = $plan->user?->name ?? 'Unknown Staff';
-                $subDepartmentName = $plan->user?->department?->name ?? 'Unknown Sub-department';
-
-                $key = $plan->id.'::'.$activityUid;
+                $key = $sourceDocumentId.'::'.$activityUid;
                 $rows->push([
                     'key' => $key,
-                    'source_document_id' => (string) $plan->id,
+                    'source_document_id' => $sourceDocumentId,
+                    'source_weekly_plan_id' => $sourceWeeklyPlanId,
                     'activity_uid' => $activityUid,
                     'activity' => $activityText,
                     'staff_name' => $staffName,
@@ -571,22 +518,8 @@ class WeeklyObjectiveMatrixController extends Controller
         $total = 0.0;
 
         foreach ($this->submittedPlansForPeriodAndStaff($period, $staffIds) as $plan) {
-            if ($plan instanceof WeeklyPlan) {
-                foreach ($plan->budgetItems as $item) {
-                    $total += (float) ($item->amount_numeric ?? 0);
-                }
-
-                if ($plan->budgetItems->isEmpty() && $plan->legacyDocument) {
-                    foreach ($plan->legacyDocument->budgetItems() as $item) {
-                        $total += (float) ($item['amount_numeric'] ?? 0);
-                    }
-                }
-
-                continue;
-            }
-
-            foreach ($plan->budgetItems() as $item) {
-                $total += (float) ($item['amount_numeric'] ?? 0);
+            foreach ($plan->budgetItems as $item) {
+                $total += (float) ($item->amount_numeric ?? 0);
             }
         }
 
@@ -654,6 +587,7 @@ class WeeklyObjectiveMatrixController extends Controller
             $result[] = [
                 'activity_key' => $activityKey,
                 'source_document_id' => $activity['source_document_id'],
+                'source_weekly_plan_id' => $activity['source_weekly_plan_id'] ?? null,
                 'activity_uid' => $activity['activity_uid'],
                 'activity' => $activity['activity'],
                 'activity_label' => $activity['label'],
@@ -695,8 +629,8 @@ class WeeklyObjectiveMatrixController extends Controller
         }
 
         $submittedStaffIds = $this->submittedPlansForPeriodAndStaff($period, $expectedStaffIds)
-            ->map(function (WeeklyPlan|Document $plan): string {
-                return (string) ($plan instanceof WeeklyPlan ? $plan->user_id : $plan->user_id);
+            ->map(function (WeeklyPlan $plan): string {
+                return (string) $plan->user_id;
             })
             ->unique()
             ->values()

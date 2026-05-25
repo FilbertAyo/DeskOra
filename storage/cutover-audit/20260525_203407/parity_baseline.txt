@@ -1,0 +1,14 @@
++----------------+--------------+--------------+-------+
+| type           | legacy_count | domain_count | match |
++----------------+--------------+--------------+-------+
+| weekly_plan    | 40           | 40           | yes   |
+| weekly_report  | 30           | 30           | yes   |
+| monthly_report | 0            | 0            | yes   |
+| action_log     | 6            | 6            | yes   |
++----------------+--------------+--------------+-------+
+
+Sample checks:
+weekly_plan: sampled 20 / no misses
+weekly_report: sampled 20 / no misses
+monthly_report: sampled 20 / no misses
+action_log: sampled 20 / no misses

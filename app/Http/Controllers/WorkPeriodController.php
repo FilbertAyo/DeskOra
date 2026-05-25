@@ -358,7 +358,7 @@ class WorkPeriodController extends Controller
                 ]);
 
             WeeklyPlan::query()
-                ->whereIn('legacy_document_id', $weeklyPlanDocumentIds)
+                ->whereIn('id', $weeklyPlanDocumentIds)
                 ->update([
                     'state' => Document::STATE_DRAFT,
                     'review_rejection_reason' => null,
