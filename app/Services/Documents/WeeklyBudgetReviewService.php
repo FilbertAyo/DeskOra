@@ -18,13 +18,14 @@ class WeeklyBudgetReviewService
 
     public function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
     {
-        $hasExplicitFilter = $request->filled('period_id') || $request->filled('year') || $request->filled('user_id') || $request->filled('status');
-
-        if ($hasExplicitFilter) {
+        if ($request->filled('period_id')) {
             return null;
         }
 
-        return $this->workPeriodService->periodForWeeklyPlanSubmission();
+        return WorkPeriod::query()
+            ->orderBy('year', 'desc')
+            ->orderBy('week_number', 'desc')
+            ->first();
     }
 
     public function buildWeeklyBudgetReviewQuery(Request $request, ?WorkPeriod $defaultPeriod, ?string $statusFilter)
@@ -87,8 +88,8 @@ class WeeklyBudgetReviewService
             ? (string) $request->string('period_id')
             : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
 
-        $periodLabel = 'All Weeks';
-        $periodDateRange = 'All Work Periods';
+        $periodLabel = 'Selected Week';
+        $periodDateRange = 'Selected Work Period';
         if ($resolvedPeriodId) {
             $period = WorkPeriod::query()->find($resolvedPeriodId);
             if ($period) {
@@ -121,7 +122,7 @@ class WeeklyBudgetReviewService
      */
     public function weeklyBudgetReviewExportFilename(string $extension, array $filterSummary): string
     {
-        $periodSlug = Str::slug((string) ($filterSummary['period'] ?? 'all-weeks'));
+        $periodSlug = Str::slug((string) ($filterSummary['period'] ?? 'selected-week'));
         $statusSlug = Str::slug((string) ($filterSummary['status'] ?? 'all-statuses'));
         $dateStamp = now()->format('Ymd_His');
 
@@ -179,6 +180,7 @@ class WeeklyBudgetReviewService
                     'amount' => $item['amount'],
                     'amount_numeric' => $amountNumeric,
                     'decision' => $review['decision'] ?? Document::BUDGET_REVIEW_PENDING,
+                    'approval_stage' => $review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING,
                     'provided_amount' => $providedAmount,
                     'note' => $review['note'] ?? null,
                     'reviewed_by' => $review['reviewed_by'] ?? null,

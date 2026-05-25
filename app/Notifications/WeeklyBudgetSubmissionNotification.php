@@ -27,16 +27,26 @@ class WeeklyBudgetSubmissionNotification extends Notification
         $periodLabel = $this->document->period
             ? 'Week '.$this->document->period->week_number.', '.$this->document->period->year
             : 'Current reporting window';
+        $departmentName = $this->submittedBy->department?->name;
+        $submitterLabel = $departmentName
+            ? $this->submittedBy->name.' ('.$departmentName.')'
+            : $this->submittedBy->name;
+        $budgetCount = count($this->document->budgetItems());
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject('Weekly Plan Budget Submitted')
             ->greeting('Hello '.$notifiable->name.',')
-            ->line($this->submittedBy->name.' submitted a weekly plan with budget items requiring review.')
-            ->line('Period: '.$periodLabel)
-            ->line('Budget items: '.count($this->document->budgetItems()))
+            ->line($submitterLabel.' submitted a weekly plan with '.$budgetCount.' budget item(s) requiring finance review.')
+            ->line('Period: '.$periodLabel);
+
+        if (filled($this->document->title)) {
+            $message->line('Plan title: '.$this->document->title);
+        }
+
+        return $message
             ->action('Open Weekly Budget Review', route('documents.weekly-budget-review', [
                 'period_id' => $this->document->period_id,
             ]))
-            ->line('You are receiving this because you can process weekly budgets.');
+            ->line('You are receiving this because you process weekly plan budgets.');
     }
 }

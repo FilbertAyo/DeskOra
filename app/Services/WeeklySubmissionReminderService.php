@@ -47,24 +47,20 @@ class WeeklySubmissionReminderService
     }
 
     /**
-     * Block creating any new weekly plan/report row when the relevant deadline has passed,
-     * except when updating an existing draft via the store→update path (handled separately).
+     * Block creating any new weekly plan/report row when the work period is not open.
      */
     public function blocksNewWeeklyDocument(string $type, WorkPeriod $period): bool
     {
-        if ($type === Document::TYPE_WEEKLY_PLAN) {
-            return $period->isPlanDeadlinePassed();
+        if (! in_array($type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return false;
         }
 
-        if ($type === Document::TYPE_WEEKLY_REPORT) {
-            return $period->isReportDeadlinePassed();
-        }
-
-        return false;
+        return ! $period->isOpen();
     }
 
     /**
      * Whether submitting (draft → submitted) is allowed for this weekly document.
+     * Submission is allowed while the document's work period is open (calendar deadlines are informational only).
      */
     public function allowsSubmitWeeklyDocument(Document $document): bool
     {
@@ -77,15 +73,7 @@ class WeeklySubmissionReminderService
             return true;
         }
 
-        $deadlinePassed = $document->type === Document::TYPE_WEEKLY_PLAN
-            ? $period->isPlanDeadlinePassed()
-            : $period->isReportDeadlinePassed();
-
-        if (! $deadlinePassed) {
-            return true;
-        }
-
-        return $document->isDraft() && $document->isReturnedForRevision();
+        return $period->isOpen();
     }
 
     private function findWeeklyDocument(User $user, WorkPeriod $period, string $type): ?Document
@@ -119,22 +107,14 @@ class WeeklySubmissionReminderService
             return null;
         }
 
-        $deadlinePassed = $next->isPlanDeadlinePassed();
-        $returned = $doc && $doc->isReturnedForRevision();
-
-        if (! $deadlinePassed) {
-            return new WeeklyReminderSegment($next, $doc, false, true);
-        }
-
-        if ($returned) {
+        if ($next->isOpen()) {
             return new WeeklyReminderSegment($next, $doc, false, true);
         }
 
         $missedMessages[] = sprintf(
-            'Weekly plan for Week %d, %d was not submitted before the plan deadline (%s).',
+            'Weekly plan for Week %d, %d was not submitted before this work period closed.',
             $next->week_number,
-            $next->year,
-            $next->getPlanDeadlineCutoff()->format('M d, Y \a\t H:i')
+            $next->year
         );
 
         return new WeeklyReminderSegment($next, $doc, true, false);
@@ -149,22 +129,14 @@ class WeeklySubmissionReminderService
             return null;
         }
 
-        $deadlinePassed = $current->isReportDeadlinePassed();
-        $returned = $doc && $doc->isReturnedForRevision();
-
-        if (! $deadlinePassed) {
-            return new WeeklyReminderSegment($current, $doc, false, true);
-        }
-
-        if ($returned) {
+        if ($current->isOpen()) {
             return new WeeklyReminderSegment($current, $doc, false, true);
         }
 
         $missedMessages[] = sprintf(
-            'Weekly report for Week %d, %d was not submitted before the report deadline (%s).',
+            'Weekly report for Week %d, %d was not submitted before this work period closed.',
             $current->week_number,
-            $current->year,
-            $current->getReportDeadlineCutoff()->format('M d, Y \a\t H:i')
+            $current->year
         );
 
         return new WeeklyReminderSegment($current, $doc, true, false);

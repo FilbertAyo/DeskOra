@@ -161,6 +161,22 @@
 
                                         return false;
                                     });
+                                    $budgetTotal = 0.0;
+                                    foreach ($budget ?: [] as $budgetRow) {
+                                        if (! is_array($budgetRow)) {
+                                            continue;
+                                        }
+                                        $rowHasContent = false;
+                                        foreach (['item', 'description_purpose', 'amount'] as $budgetKey) {
+                                            if (trim((string) ($budgetRow[$budgetKey] ?? '')) !== '') {
+                                                $rowHasContent = true;
+                                                break;
+                                            }
+                                        }
+                                        if ($rowHasContent) {
+                                            $budgetTotal += \App\Models\Document::parseBudgetAmount((string) ($budgetRow['amount'] ?? ''));
+                                        }
+                                    }
                                 @endphp
 
                                 <div class="p-4">
@@ -354,6 +370,10 @@
                                                                     </tr>
                                                                 @endif
                                                             @endforeach
+                                                            <tr class="fw-bold table-light">
+                                                                <td colspan="2" class="text-end">Total</td>
+                                                                <td class="text-end">{{ number_format($budgetTotal, 2) }}</td>
+                                                            </tr>
                                                         @else
                                                             <tr>
                                                                 <td colspan="3" class="text-center text-muted py-4">No budget items for this week.</td>

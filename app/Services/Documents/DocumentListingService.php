@@ -14,6 +14,8 @@ class DocumentListingService
      */
     public function buildWeeklyRowsForIndex(Collection $weeklyDocs): Collection
     {
+        $weeklyDocs = $this->appendLinkedWeeklyDocumentsForIndex($weeklyDocs);
+
         $pickPreferred = function (Collection $rows, string $type): ?Document {
             $typedRows = $rows
                 ->where('type', $type)
@@ -27,26 +29,30 @@ class DocumentListingService
         };
 
         return $weeklyDocs
-            ->groupBy(function (Document $doc) use ($weeklyDocs) {
-                $effectiveSharedUsers = $this->resolveWeeklyDocSharedUsersForIndex($doc, $weeklyDocs);
-                $participantIds = collect([$doc->user_id])
-                    ->merge($effectiveSharedUsers->pluck('id'))
-                    ->filter()
-                    ->map(fn ($id) => (string) $id)
-                    ->unique()
-                    ->sort()
-                    ->values();
-
-                return ($doc->period_id ?? 'none').'_'.$participantIds->implode('_');
-            })
+            ->groupBy(fn (Document $doc) => $this->weeklyIndexRowKey($doc, $weeklyDocs))
             ->map(function (Collection $items) use ($weeklyDocs, $pickPreferred) {
                 $plan = $pickPreferred($items, Document::TYPE_WEEKLY_PLAN);
                 $report = $pickPreferred($items, Document::TYPE_WEEKLY_REPORT);
+
+                if ($plan === null && $report !== null) {
+                    $plan = $this->findLinkedWeeklyPlanInCollection($report, $weeklyDocs)
+                        ?? $this->findSubmittedWeeklyPlanForReport($report);
+                }
+
+                if ($report === null && $plan !== null) {
+                    $report = $this->findLinkedWeeklyReportInCollection($plan, $weeklyDocs)
+                        ?? $this->findSubmittedWeeklyReportForPlan($plan);
+                }
+
                 $participants = $items
                     ->flatMap(fn (Document $row) => collect([$row->user])->merge($this->resolveWeeklyDocSharedUsersForIndex($row, $weeklyDocs)))
                     ->filter()
                     ->unique('id')
                     ->values();
+
+                if ($plan?->user) {
+                    $participants = $participants->push($plan->user)->unique('id')->values();
+                }
 
                 return [
                     'plan' => $plan,
@@ -70,6 +76,152 @@ class DocumentListingService
     }
 
     /**
+     * Ensure submitted plans paired to visible reports are present before row grouping.
+     *
+     * @param  Collection<int, Document>  $weeklyDocs
+     * @return Collection<int, Document>
+     */
+    public function appendLinkedWeeklyDocumentsForIndex(Collection $weeklyDocs): Collection
+    {
+        $extras = collect();
+
+        foreach ($weeklyDocs->where('type', Document::TYPE_WEEKLY_REPORT) as $report) {
+            if (! $report->period_id) {
+                continue;
+            }
+
+            if ($this->findLinkedWeeklyPlanInCollection($report, $weeklyDocs)) {
+                continue;
+            }
+
+            $plan = $this->findSubmittedWeeklyPlanForReport($report);
+            if ($plan && ! $weeklyDocs->contains(fn (Document $doc) => (string) $doc->id === (string) $plan->id)) {
+                $plan->loadMissing(['user', 'period', 'sharedUsers:id,name']);
+                $extras->push($plan);
+            }
+        }
+
+        if ($extras->isEmpty()) {
+            return $weeklyDocs;
+        }
+
+        return $weeklyDocs->merge($extras)->unique('id')->values();
+    }
+
+    /**
+     * Group by work period and weekly plan owner so plan/report pairs stay on one row.
+     *
+     * @param  Collection<int, Document>  $weeklyDocs
+     */
+    public function weeklyIndexRowKey(Document $doc, Collection $weeklyDocs): string
+    {
+        $periodId = (string) ($doc->period_id ?? 'none');
+
+        return $periodId.'_'.$this->weeklyIndexAnchorUserId($doc, $weeklyDocs);
+    }
+
+    /**
+     * @param  Collection<int, Document>  $weeklyDocs
+     */
+    public function weeklyIndexAnchorUserId(Document $doc, Collection $weeklyDocs): string
+    {
+        if ($doc->type === Document::TYPE_WEEKLY_PLAN) {
+            return (string) $doc->user_id;
+        }
+
+        $linkedPlan = $this->findLinkedWeeklyPlanInCollection($doc, $weeklyDocs);
+
+        return $linkedPlan ? (string) $linkedPlan->user_id : (string) $doc->user_id;
+    }
+
+    /**
+     * @param  Collection<int, Document>  $weeklyDocs
+     */
+    public function findLinkedWeeklyPlanInCollection(Document $report, Collection $weeklyDocs): ?Document
+    {
+        if ($report->type !== Document::TYPE_WEEKLY_REPORT || ! $report->period_id) {
+            return null;
+        }
+
+        return $weeklyDocs
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->first(function (Document $plan) use ($report) {
+                if ((string) $plan->period_id !== (string) $report->period_id) {
+                    return false;
+                }
+
+                if ((string) $plan->user_id === (string) $report->user_id) {
+                    return true;
+                }
+
+                return $plan->sharedUsers->contains(
+                    fn ($sharedUser) => (string) $sharedUser->id === (string) $report->user_id
+                );
+            });
+    }
+
+    /**
+     * @param  Collection<int, Document>  $weeklyDocs
+     */
+    public function findLinkedWeeklyReportInCollection(Document $plan, Collection $weeklyDocs): ?Document
+    {
+        if ($plan->type !== Document::TYPE_WEEKLY_PLAN || ! $plan->period_id) {
+            return null;
+        }
+
+        $editableUserIds = $plan->allEditableUserIds();
+
+        return $weeklyDocs
+            ->where('type', Document::TYPE_WEEKLY_REPORT)
+            ->first(function (Document $report) use ($plan, $editableUserIds) {
+                if ((string) $report->period_id !== (string) $plan->period_id) {
+                    return false;
+                }
+
+                return in_array((string) $report->user_id, $editableUserIds, true);
+            });
+    }
+
+    public function findSubmittedWeeklyPlanForReport(Document $report): ?Document
+    {
+        if ($report->type !== Document::TYPE_WEEKLY_REPORT || ! $report->period_id) {
+            return null;
+        }
+
+        $plan = Document::findWeeklyPlanForUserAndPeriod(
+            (string) $report->period_id,
+            (string) $report->user_id
+        );
+
+        if ($plan?->isSubmitted()) {
+            return $plan;
+        }
+
+        $plan = Document::findWeeklyPlanForPeriodOwner(
+            (string) $report->period_id,
+            (string) $report->user_id
+        );
+
+        return $plan?->isSubmitted() ? $plan : null;
+    }
+
+    public function findSubmittedWeeklyReportForPlan(Document $plan): ?Document
+    {
+        if ($plan->type !== Document::TYPE_WEEKLY_PLAN || ! $plan->period_id) {
+            return null;
+        }
+
+        foreach ($plan->allEditableUserIds() as $userId) {
+            $report = Document::findWeeklyReportForPeriodOwner((string) $plan->period_id, $userId);
+            if ($report?->isSubmitted()) {
+                return $report;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param  Collection<int, Document>  $weeklyDocs
      * @return Collection<int, User>
      */
@@ -90,22 +242,7 @@ class DocumentListingService
             return $directSharedUsers;
         }
 
-        /** @var Document|null $fallbackPlan */
-        $fallbackPlan = $weeklyDocs
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->first(function (Document $plan) use ($doc) {
-                if ((string) $plan->period_id !== (string) $doc->period_id) {
-                    return false;
-                }
-
-                if ((string) $plan->user_id === (string) $doc->user_id) {
-                    return true;
-                }
-
-                return $plan->sharedUsers->contains(function ($sharedUser) use ($doc) {
-                    return (string) $sharedUser->id === (string) $doc->user_id;
-                });
-            });
+        $fallbackPlan = $this->findLinkedWeeklyPlanInCollection($doc, $weeklyDocs);
 
         if (! $fallbackPlan) {
             return $directSharedUsers;

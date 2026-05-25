@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -16,7 +17,7 @@ class WeeklyActivityAssignment extends Model
     public const STATUS_LOCKED = 'locked';
 
     protected $fillable = [
-        'source_document_id',
+        'source_weekly_plan_id',
         'source_user_id',
         'assignee_user_id',
         'period_id',
@@ -36,7 +37,17 @@ class WeeklyActivityAssignment extends Model
 
     public function sourceDocument(): BelongsTo
     {
-        return $this->belongsTo(Document::class, 'source_document_id');
+        return $this->belongsTo(Document::class, 'source_weekly_plan_id', 'id');
+    }
+
+    public function sourceWeeklyPlan(): BelongsTo
+    {
+        return $this->belongsTo(WeeklyPlan::class, 'source_weekly_plan_id');
+    }
+
+    public function scopeForSourceWeeklyPlan(Builder $query, string $sourceWeeklyPlanId): Builder
+    {
+        return $query->where('source_weekly_plan_id', $sourceWeeklyPlanId);
     }
 
     public function sourceUser(): BelongsTo

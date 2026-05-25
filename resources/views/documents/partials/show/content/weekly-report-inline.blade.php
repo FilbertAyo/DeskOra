@@ -283,7 +283,9 @@
                                             @php
                                                 $planBudgetFiltered = is_array($planBudget) ? array_values(array_filter($planBudget, function ($row) {
                                                     if (!is_array($row)) return false;
-                                                    return trim((string)($row['item'] ?? '')) !== '' || trim((string)($row['amount'] ?? '')) !== '';
+                                                    return trim((string)($row['item'] ?? '')) !== ''
+                                                        || trim((string)($row['description_purpose'] ?? '')) !== ''
+                                                        || trim((string)($row['amount'] ?? '')) !== '';
                                                 })) : [];
                                                 $reviewsByUid = $relatedPlan ? $relatedPlan->budgetReviewItemsByUid() : [];
                                                 // Index budget_statuses by budget_uid
@@ -292,6 +294,11 @@
                                                     $sUid = is_array($s) ? trim((string)($s['budget_uid'] ?? '')) : '';
                                                     if ($sUid !== '') $statusByUid[$sUid] = $s;
                                                 }
+                                                $planBudgetTotal = 0.0;
+                                                foreach ($planBudgetFiltered as $planBudgetRow) {
+                                                    $planBudgetRow = is_array($planBudgetRow) ? $planBudgetRow : [];
+                                                    $planBudgetTotal += \App\Models\Document::parseBudgetAmount((string) ($planBudgetRow['amount'] ?? ''));
+                                                }
                                             @endphp
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
@@ -299,6 +306,7 @@
                                                         <thead class="wh-thead-weekly-report">
                                                             <tr>
                                                                 <th>Budget Item</th>
+                                                                <th>Description / Purpose</th>
                                                                 <th style="width: 150px;">Amount</th>
                                                                 <th style="width: 130px;">Review</th>
                                                                 <th>Notes</th>
@@ -316,6 +324,7 @@
                                                                 @endphp
                                                                 <tr>
                                                                     <td>{{ $planRow['item'] ?? '' }}</td>
+                                                                    <td>{{ $planRow['description_purpose'] ?? '' }}</td>
                                                                     <td>{{ $planRow['amount'] ?? '' }}</td>
                                                                     <td class="text-center">
                                                                         @if($reviewDecision === 'approved')
@@ -331,6 +340,11 @@
                                                                     <td>{{ $statusRow['notes'] ?? '' }}</td>
                                                                 </tr>
                                                             @endforeach
+                                                            <tr class="fw-bold table-light">
+                                                                <td colspan="2" class="text-end">Total</td>
+                                                                <td class="text-end">{{ number_format($planBudgetTotal, 2) }}</td>
+                                                                <td colspan="2"></td>
+                                                            </tr>
                                                         </tbody>
                                                     </table>
                                                 </div>

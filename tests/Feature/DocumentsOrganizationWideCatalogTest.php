@@ -159,6 +159,94 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
             ->assertRedirect(route('action-logs.show', $log));
     }
 
+    public function test_documents_index_pairs_submitted_plan_and_report_on_one_row_for_same_staff(): void
+    {
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-13',
+            'week_end_date' => '2026-04-19',
+            'plan_deadline' => '2026-04-17',
+            'report_deadline' => '2026-04-18',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'Programs', 'status' => 'active']);
+        $staff = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $staff->givePermissionTo(['create weekly plan', 'create weekly report', 'view all documents']);
+
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Staff Week 16 Plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Deliver training',
+            'content' => [],
+        ]);
+
+        Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Staff Week 16 Report',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => ['summary' => 'Completed'],
+        ]);
+
+        $this->actingAs($staff)
+            ->get(route('documents.index'))
+            ->assertOk()
+            ->assertSee('Staff Week 16 Plan', false)
+            ->assertSee('Staff Week 16 Report', false);
+    }
+
+    public function test_documents_index_pairs_collaborator_report_with_plan_owner_plan(): void
+    {
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-13',
+            'week_end_date' => '2026-04-19',
+            'plan_deadline' => '2026-04-17',
+            'report_deadline' => '2026-04-18',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'Programs', 'status' => 'active']);
+        $planOwner = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $planOwner->givePermissionTo(['create weekly plan', 'create weekly report', 'view all documents']);
+        $collaborator = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $collaborator->givePermissionTo(['create weekly report']);
+
+        $plan = Document::create([
+            'user_id' => $planOwner->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Team Week 16 Plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Joint delivery',
+            'content' => [],
+        ]);
+        $plan->sharedUsers()->sync([$collaborator->id]);
+
+        Document::create([
+            'user_id' => $collaborator->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Collaborator Week 16 Report',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => ['summary' => 'Done'],
+        ]);
+
+        $response = $this->actingAs($planOwner)->get(route('documents.index'));
+        $response->assertOk();
+        $response->assertSee('Team Week 16 Plan', false);
+        $response->assertSee('Collaborator Week 16 Report', false);
+        $response->assertSee(e($planOwner->name), false);
+        $response->assertSee(e($collaborator->name), false);
+    }
+
     public function test_staff_cannot_view_another_users_draft_weekly_plan(): void
     {
         $period = WorkPeriod::create([

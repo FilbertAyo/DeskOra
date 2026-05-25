@@ -256,7 +256,7 @@ class DocumentController extends Controller
             if ($selectedType === Document::TYPE_WEEKLY_PLAN) {
                 // For weekly plan, default to explicit period when its submission window is open; otherwise next week.
                 $targetPlanPeriod = $nextPeriod;
-                if ($requestedPeriod && $requestedPeriod->isOpen() && ! $requestedPeriod->isPlanDeadlinePassed()) {
+                if ($requestedPeriod && $requestedPeriod->isOpen()) {
                     $targetPlanPeriod = $requestedPeriod;
                 }
                 $defaultPeriodId = $targetPlanPeriod?->id;
@@ -269,7 +269,7 @@ class DocumentController extends Controller
             } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT) {
                 // For weekly report, default to explicit period when its submission window is open; otherwise current week.
                 $targetReportPeriod = $currentPeriod;
-                if ($requestedPeriod && $requestedPeriod->isOpen() && ! $requestedPeriod->isReportDeadlinePassed()) {
+                if ($requestedPeriod && $requestedPeriod->isOpen()) {
                     $targetReportPeriod = $requestedPeriod;
                 }
                 $defaultPeriodId = $targetReportPeriod?->id;
@@ -578,20 +578,14 @@ class DocumentController extends Controller
                 : $this->workPeriodService->periodForWeeklyReportSubmission();
 
             $isExpectedPeriod = $expectedPeriod && $period->id === $expectedPeriod->id;
-            if (! $isExpectedPeriod) {
-                $isWindowOpen = $request->type === Document::TYPE_WEEKLY_PLAN
-                    ? ! $period->isPlanDeadlinePassed()
-                    : ! $period->isReportDeadlinePassed();
+            if (! $isExpectedPeriod && ! $period->isOpen()) {
+                $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
+                    ? 'The selected weekly plan work period is closed.'
+                    : 'The selected weekly report work period is closed.';
 
-                if (! $isWindowOpen) {
-                    $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
-                        ? 'The selected weekly plan window is closed.'
-                        : 'The selected weekly report window is closed.';
-
-                    return redirect()->back()
-                        ->withInput()
-                        ->with('error', $errorMessage);
-                }
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', $errorMessage);
             }
         }
 
@@ -648,7 +642,7 @@ class DocumentController extends Controller
             if ($existingDocument && $action === 'submit' && ! $this->weeklySubmissionReminderService->allowsSubmitWeeklyDocument($existingDocument)) {
                 return redirect()->back()
                     ->withInput()
-                    ->with('error', 'The submission deadline has passed. You can no longer submit this document.');
+                    ->with('error', 'This work period is closed. You can no longer submit this document.');
             }
         }
 
@@ -902,55 +896,7 @@ class DocumentController extends Controller
         // Authorize view action
         $this->authorize('view', $document);
 
-        // Get related documents (plan for report, report for plan)
-        $relatedDocument = null;
-        $relatedAction = null;
-        if ($document->period_id) {
-            if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-                $relatedDocument = Document::findWeeklyReportForPeriodOwner(
-                    $document->period_id,
-                    (string) $document->user_id
-                );
-            } elseif ($document->type === Document::TYPE_WEEKLY_REPORT) {
-                $relatedDocument = Document::findWeeklyPlanForUserAndPeriod(
-                    $document->period_id,
-                    (string) Auth::id()
-                );
-            }
-
-            if (! $relatedDocument) {
-                /** @var \App\Models\User $user */
-                $user = Auth::user();
-                $isAuthor = (string) $document->user_id === (string) $user->id;
-                if ($isAuthor &&
-                    $document->type === Document::TYPE_WEEKLY_PLAN &&
-                    Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT, $document->period)) {
-                    $relatedAction = [
-                        'type' => Document::TYPE_WEEKLY_REPORT,
-                        'label' => 'Create Weekly Report for this Week',
-                        'route' => route('documents.create', [
-                            'type' => Document::TYPE_WEEKLY_REPORT,
-                            'period_id' => $document->period_id,
-                            'return_to' => request()->fullUrl(),
-                        ]),
-                        'description' => 'Weekly report is due on '.$document->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
-                    ];
-                } elseif ($isAuthor &&
-                    $document->type === Document::TYPE_WEEKLY_REPORT &&
-                    Document::canUserCreateType($user, Document::TYPE_WEEKLY_PLAN, $document->period)) {
-                    $relatedAction = [
-                        'type' => Document::TYPE_WEEKLY_PLAN,
-                        'label' => 'Create Weekly Plan for this Week',
-                        'route' => route('documents.create', [
-                            'type' => Document::TYPE_WEEKLY_PLAN,
-                            'period_id' => $document->period_id,
-                            'return_to' => request()->fullUrl(),
-                        ]),
-                        'description' => 'Weekly plan should outline goals for this week.',
-                    ];
-                }
-            }
-        }
+        [$relatedDocument, $relatedAction] = $this->resolveWeeklyRelatedDocumentContext($document);
 
         $assignedWeeklyActivities = collect();
         if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
@@ -970,7 +916,7 @@ class DocumentController extends Controller
     }
 
     /**
-     * Reviewer-facing document view: same UI as {@see self::show} without related plan/report chrome.
+     * Reviewer-facing document view: same UI as {@see self::show} with related weekly plan/report panel.
      */
     public function reviewerShow(Document $document)
     {
@@ -986,13 +932,17 @@ class DocumentController extends Controller
 
         $this->authorize('view', $document);
 
-        $document->load(['user', 'period']);
+        $document->load(['user', 'period', 'sharedUsers']);
         $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
         $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
 
-        $relatedDocument = null;
+        [$relatedDocument] = $this->resolveWeeklyRelatedDocumentContext($document, includeCreateAction: false);
         $relatedAction = null;
         $reviewerPresentation = true;
+
+        if ($relatedDocument) {
+            $relatedDocument->loadMissing('user');
+        }
 
         $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
 
@@ -1193,7 +1143,7 @@ class DocumentController extends Controller
             && ! $this->weeklySubmissionReminderService->allowsSubmitWeeklyDocument($document)) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'The submission deadline has passed. You can no longer submit this document.');
+                ->with('error', 'This work period is closed. You can no longer submit this document.');
         }
 
         $document->loadMissing('user');
@@ -1429,7 +1379,7 @@ class DocumentController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        $baseQuery = Document::with(['user'])
+        $baseQuery = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->submitted();
 
         $latestPeriods = WorkPeriod::query()
@@ -1489,22 +1439,9 @@ class DocumentController extends Controller
 
         $allDocuments = (clone $baseQuery)->latest()->get();
 
-        $mergedWeeklyRows = $allDocuments
-            ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
-            ->groupBy(fn ($doc) => ($doc->period_id ?? 'none').'_'.($doc->user_id ?? 'none'))
-            ->map(function ($items) {
-                $plan = $items->firstWhere('type', Document::TYPE_WEEKLY_PLAN);
-                $report = $items->firstWhere('type', Document::TYPE_WEEKLY_REPORT);
-
-                return [
-                    'plan' => $plan,
-                    'report' => $report,
-                    'period' => $plan?->period ?? $report?->period,
-                    'user' => $plan?->user ?? $report?->user,
-                    'updated_at' => collect([$plan?->updated_at, $report?->updated_at])->filter()->max(),
-                ];
-            })
-            ->values();
+        $mergedWeeklyRows = $this->buildWeeklyRowsForIndex(
+            $allDocuments->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])->values()
+        );
 
         // Group documents by type
         $groupedDocuments = [
@@ -1735,11 +1672,7 @@ class DocumentController extends Controller
         $availableTypes = Document::getAvailableTypesForUser($user);
 
         /*
-         * New Weekly Plan button: offer creating a plan for the earliest open target week where
-         * (1) plan_deadline for that week is not passed (supports admin-extended deadlines into the target week),
-         * (2) the user does not already own a plan for that period (draft or submitted).
-         * Check both current and next periods so a late Week N plan still appears while calendar is in Week N
-         * after the deadline was extended past the usual pre-week window.
+         * New Weekly Plan button: earliest open target week where the user has no plan yet (draft or submitted).
          */
         $planCreatePeriod = null;
         if (isset($availableTypes['weekly_plan']) && $currentPeriod) {
@@ -1750,9 +1683,6 @@ class DocumentController extends Controller
 
             foreach ($candidatePeriods as $period) {
                 if (! $period->isOpen()) {
-                    continue;
-                }
-                if ($period->isPlanDeadlinePassed()) {
                     continue;
                 }
                 if (Document::findWeeklyPlanForPeriodOwner((string) $period->id, (string) $user->id)) {
@@ -1931,7 +1861,13 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
+        if (! $user->hasAnyPermission([
+            'view weekly budgets',
+            'approve documents',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -1981,6 +1917,9 @@ class DocumentController extends Controller
 
         $currentBudgetEntryPeriod = WorkPeriod::getCurrent();
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
+        $activePeriodId = $request->filled('period_id')
+            ? (string) $request->string('period_id')
+            : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
 
         return view('documents.reviewer.budget-weekly', [
             'documents' => $documents,
@@ -1993,6 +1932,7 @@ class DocumentController extends Controller
             'years' => $years,
             'statusFilter' => $statusFilter,
             'defaultPeriod' => $defaultPeriod,
+            'activePeriodId' => $activePeriodId,
         ]);
     }
 
@@ -2000,7 +1940,13 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
+        if (! $user->hasAnyPermission([
+            'view weekly budgets',
+            'approve documents',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -2028,7 +1974,13 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasAnyPermission(['view weekly budgets', 'approve documents'])) {
+        if (! $user->hasAnyPermission([
+            'view weekly budgets',
+            'approve documents',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -2087,6 +2039,65 @@ class DocumentController extends Controller
         return $this->weeklyBudgetReviewService->computeBudgetStats($documents);
     }
 
+    private function resolveBudgetApprovalActionStage(string $currentStage, User $user): ?string
+    {
+        if (! in_array($currentStage, Document::budgetReviewStages(), true)) {
+            $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
+        }
+
+        return match ($currentStage) {
+            Document::BUDGET_REVIEW_STAGE_PENDING => $this->canProcessBudgetStage($user, 'review')
+                ? 'review'
+                : null,
+            Document::BUDGET_REVIEW_STAGE_REVIEWED => $this->canProcessBudgetStage($user, 'approve')
+                ? 'approve'
+                : null,
+            Document::BUDGET_REVIEW_STAGE_APPROVED => $this->canProcessBudgetStage($user, 'authorize')
+                ? 'authorize'
+                : null,
+            default => null,
+        };
+    }
+
+    private function canProcessBudgetStage(User $user, string $stage): bool
+    {
+        return match ($stage) {
+            'review' => $user->hasPermissionTo('review weekly budgets'),
+            'approve' => $user->hasPermissionTo('approve weekly budgets'),
+            'authorize' => $user->hasPermissionTo('authorize weekly budgets'),
+            default => false,
+        };
+    }
+
+    private function stageAfterAction(string $actionStage, string $decision): string
+    {
+        if ($decision === Document::BUDGET_REVIEW_REJECTED) {
+            return Document::BUDGET_REVIEW_STAGE_REJECTED;
+        }
+
+        return match ($actionStage) {
+            'review' => Document::BUDGET_REVIEW_STAGE_REVIEWED,
+            'approve' => Document::BUDGET_REVIEW_STAGE_APPROVED,
+            'authorize' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
+            default => Document::BUDGET_REVIEW_STAGE_PENDING,
+        };
+    }
+
+    private function determinePlanBudgetReviewStatus(array $summary): string
+    {
+        if ($summary['all_approved']) {
+            return Document::BUDGET_REVIEW_APPROVED;
+        }
+        if ($summary['all_rejected']) {
+            return Document::BUDGET_REVIEW_REJECTED;
+        }
+        if ($summary['pending'] === 0 && $summary['items_total'] > 0) {
+            return Document::BUDGET_REVIEW_APPROVED;
+        }
+
+        return Document::BUDGET_REVIEW_PENDING;
+    }
+
     /**
      * Approve or reject a single weekly plan budget item.
      */
@@ -2094,7 +2105,11 @@ class DocumentController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (! $user->hasPermissionTo('process weekly budgets')) {
+        if (! $user->hasAnyPermission([
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -2117,9 +2132,10 @@ class DocumentController extends Controller
             ? (float) $validated['provided_amount']
             : 0.0;
         $note = isset($validated['note']) && trim($validated['note']) !== '' ? trim($validated['note']) : null;
+        $now = now();
 
         $weeklyPlan = WeeklyPlan::query()
-            ->where('legacy_document_id', $document->id)
+            ->where('id', $document->id)
             ->first();
         if (! $weeklyPlan) {
             // Legacy fallback path (pre-backfill/testing).
@@ -2135,43 +2151,80 @@ class DocumentController extends Controller
             $found = false;
             foreach ($existingReviews as &$review) {
                 if (is_array($review) && ($review['budget_uid'] ?? '') === $budgetUid) {
+                    $currentStage = (string) ($review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING);
+                    if ($currentStage === '' || ! in_array($currentStage, Document::budgetReviewStages(), true)) {
+                        $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
+                    }
+                    $actionStage = $this->resolveBudgetApprovalActionStage($currentStage, $user);
+                    if (! $actionStage) {
+                        return redirect()
+                            ->back()
+                            ->with('error', 'You are not allowed to process this item at its current approval stage.');
+                    }
+
+                    $newStage = $this->stageAfterAction($actionStage, $decision);
                     $review['decision'] = $decision;
+                    $review['approval_stage'] = $newStage;
                     $review['provided_amount'] = $providedAmount;
                     $review['note'] = $note;
                     $review['reviewed_by'] = $user->id;
-                    $review['reviewed_at'] = now()->toIso8601String();
+                    $review['reviewed_at'] = $now->toIso8601String();
+                    if ($actionStage === 'review') {
+                        $review['review_stage_by'] = $user->id;
+                        $review['review_stage_at'] = $now->toIso8601String();
+                    } elseif ($actionStage === 'approve') {
+                        $review['approve_stage_by'] = $user->id;
+                        $review['approve_stage_at'] = $now->toIso8601String();
+                    } else {
+                        // Final approval can bypass earlier steps and auto-complete them.
+                        if ($decision === Document::BUDGET_REVIEW_APPROVED) {
+                            $review['review_stage_by'] = $review['review_stage_by'] ?? $user->id;
+                            $review['review_stage_at'] = $review['review_stage_at'] ?? $now->toIso8601String();
+                            $review['approve_stage_by'] = $review['approve_stage_by'] ?? $user->id;
+                            $review['approve_stage_at'] = $review['approve_stage_at'] ?? $now->toIso8601String();
+                        }
+                        $review['authorize_stage_by'] = $user->id;
+                        $review['authorize_stage_at'] = $now->toIso8601String();
+                    }
                     $found = true;
                     break;
                 }
             }
             unset($review);
             if (! $found) {
+                $actionStage = $this->resolveBudgetApprovalActionStage(Document::BUDGET_REVIEW_STAGE_PENDING, $user);
+                if (! $actionStage) {
+                    return redirect()
+                        ->back()
+                        ->with('error', 'You are not allowed to process this item at its current approval stage.');
+                }
+                $newStage = $this->stageAfterAction($actionStage, $decision);
                 $existingReviews[] = [
                     'budget_uid' => $budgetUid,
                     'decision' => $decision,
+                    'approval_stage' => $newStage,
                     'provided_amount' => $providedAmount,
                     'note' => $note,
                     'reviewed_by' => $user->id,
-                    'reviewed_at' => now()->toIso8601String(),
+                    'reviewed_at' => $now->toIso8601String(),
+                    'review_stage_by' => ($actionStage === 'review' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $user->id : null,
+                    'review_stage_at' => ($actionStage === 'review' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $now->toIso8601String() : null,
+                    'approve_stage_by' => ($actionStage === 'approve' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $user->id : null,
+                    'approve_stage_at' => ($actionStage === 'approve' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $now->toIso8601String() : null,
+                    'authorize_stage_by' => $actionStage === 'authorize' ? $user->id : null,
+                    'authorize_stage_at' => $actionStage === 'authorize' ? $now->toIso8601String() : null,
                 ];
             }
 
             $document->budget_review_items = $existingReviews;
             $summary = $document->budgetReviewSummary();
-            $planStatus = Document::BUDGET_REVIEW_PENDING;
-            if ($summary['all_approved']) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            } elseif ($summary['all_rejected']) {
-                $planStatus = Document::BUDGET_REVIEW_REJECTED;
-            } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            }
+            $planStatus = $this->determinePlanBudgetReviewStatus($summary);
 
             $document->update([
                 'budget_review_items' => $existingReviews,
                 'budget_review_status' => $planStatus,
                 'budget_reviewed_by' => $user->id,
-                'budget_reviewed_at' => now(),
+                'budget_reviewed_at' => $now,
                 'budget_provided_amount' => $summary['provided_total'],
                 'budget_review_note' => null,
             ]);
@@ -2191,49 +2244,73 @@ class DocumentController extends Controller
                 ->with('error', 'Budget item not found in this plan.');
         }
 
+        $existingReview = WeeklyPlanBudgetReview::query()
+            ->where('weekly_plan_budget_item_id', $budgetItem->id)
+            ->first();
+        $currentStage = $existingReview?->approval_stage ?? Document::BUDGET_REVIEW_STAGE_PENDING;
+        $actionStage = $this->resolveBudgetApprovalActionStage((string) $currentStage, $user);
+        if (! $actionStage) {
+            return redirect()
+                ->back()
+                ->with('error', 'You are not allowed to process this item at its current approval stage.');
+        }
+        $newStage = $this->stageAfterAction($actionStage, $decision);
+
+        $updatePayload = [
+            'decision' => $decision,
+            'approval_stage' => $newStage,
+            'provided_amount' => $providedAmount,
+            'note' => $note,
+            'reviewed_by' => $user->id,
+            'reviewed_at' => $now,
+        ];
+        if ($actionStage === 'review') {
+            $updatePayload['reviewed_by'] = $user->id;
+            $updatePayload['reviewed_at'] = $now;
+        } elseif ($actionStage === 'approve') {
+            $updatePayload['approved_by'] = $user->id;
+            $updatePayload['approved_at'] = $now;
+        } else {
+            if ($decision === Document::BUDGET_REVIEW_APPROVED) {
+                $updatePayload['reviewed_by'] = $existingReview?->reviewed_by ?? $user->id;
+                $updatePayload['reviewed_at'] = $existingReview?->reviewed_at ?? $now;
+                $updatePayload['approved_by'] = $existingReview?->approved_by ?? $user->id;
+                $updatePayload['approved_at'] = $existingReview?->approved_at ?? $now;
+            }
+            $updatePayload['authorized_by'] = $user->id;
+            $updatePayload['authorized_at'] = $now;
+        }
+
         WeeklyPlanBudgetReview::query()->updateOrCreate(
             ['weekly_plan_budget_item_id' => $budgetItem->id],
-            [
-                'decision' => $decision,
-                'provided_amount' => $providedAmount,
-                'note' => $note,
-                'reviewed_by' => $user->id,
-                'reviewed_at' => now(),
-            ]
+            $updatePayload
         );
 
         // Recompute plan-level summary from all item decisions
         $document->unsetRelation('weeklyPlanDomain');
         $summary = $document->budgetReviewSummary();
-
-        $planStatus = Document::BUDGET_REVIEW_PENDING;
-        if ($summary['all_approved']) {
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        } elseif ($summary['all_rejected']) {
-            $planStatus = Document::BUDGET_REVIEW_REJECTED;
-        } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-            // All items reviewed but mixed decisions
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        }
+        $planStatus = $this->determinePlanBudgetReviewStatus($summary);
 
         $weeklyPlan->update([
             'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
-            'budget_reviewed_at' => now(),
+            'budget_reviewed_at' => $now,
             'budget_provided_amount' => $summary['provided_total'],
             'budget_review_note' => null,
         ]);
         $document->update([
             'budget_review_status' => $planStatus,
             'budget_reviewed_by' => $user->id,
-            'budget_reviewed_at' => now(),
+            'budget_reviewed_at' => $now,
             'budget_provided_amount' => $summary['provided_total'],
             'budget_review_note' => null,
         ]);
 
+        $stageLabel = ucfirst($actionStage);
+
         return redirect()
             ->back()
-            ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
+            ->with('success', 'Budget item "'.$budgetUid.'" has passed '.$stageLabel.' stage.');
     }
 
     public function addMidWeekBudgetEntry(Request $request)
@@ -2266,7 +2343,7 @@ class DocumentController extends Controller
         }
 
         $weeklyPlan = WeeklyPlan::query()
-            ->where('legacy_document_id', $targetDocument->id)
+            ->where('id', $targetDocument->id)
             ->first();
         if (! $weeklyPlan) {
             // Legacy fallback path (pre-backfill/testing).
@@ -2285,22 +2362,22 @@ class DocumentController extends Controller
             $existingReviews[] = [
                 'budget_uid' => $budgetUid,
                 'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'approval_stage' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
                 'provided_amount' => $amountNumeric,
                 'note' => null,
                 'reviewed_by' => $user->id,
                 'reviewed_at' => now()->toIso8601String(),
+                'review_stage_by' => $user->id,
+                'review_stage_at' => now()->toIso8601String(),
+                'approve_stage_by' => $user->id,
+                'approve_stage_at' => now()->toIso8601String(),
+                'authorize_stage_by' => $user->id,
+                'authorize_stage_at' => now()->toIso8601String(),
             ];
             $targetDocument->content = $content;
             $targetDocument->budget_review_items = $existingReviews;
             $summary = $targetDocument->budgetReviewSummary();
-            $planStatus = Document::BUDGET_REVIEW_PENDING;
-            if ($summary['all_approved']) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            } elseif ($summary['all_rejected']) {
-                $planStatus = Document::BUDGET_REVIEW_REJECTED;
-            } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-                $planStatus = Document::BUDGET_REVIEW_APPROVED;
-            }
+            $planStatus = $this->determinePlanBudgetReviewStatus($summary);
             $targetDocument->update([
                 'content' => $content,
                 'budget_review_items' => $existingReviews,
@@ -2331,24 +2408,22 @@ class DocumentController extends Controller
             ['weekly_plan_budget_item_id' => $budgetItem->id],
             [
                 'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'approval_stage' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
                 'provided_amount' => $amountNumeric,
                 'note' => null,
                 'reviewed_by' => $user->id,
                 'reviewed_at' => now(),
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+                'authorized_by' => $user->id,
+                'authorized_at' => now(),
             ]
         );
 
         $targetDocument->unsetRelation('weeklyPlanDomain');
         $summary = $targetDocument->budgetReviewSummary();
 
-        $planStatus = Document::BUDGET_REVIEW_PENDING;
-        if ($summary['all_approved']) {
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        } elseif ($summary['all_rejected']) {
-            $planStatus = Document::BUDGET_REVIEW_REJECTED;
-        } elseif ($summary['pending'] === 0 && $summary['items_total'] > 0) {
-            $planStatus = Document::BUDGET_REVIEW_APPROVED;
-        }
+        $planStatus = $this->determinePlanBudgetReviewStatus($summary);
 
         $weeklyPlan->update([
             'budget_review_status' => $planStatus,
@@ -2603,6 +2678,14 @@ class DocumentController extends Controller
      */
     private function syncDocumentShares(Document $document, array $sharedUserIds, User $actor): void
     {
+        $weeklyPlanId = null;
+        $weeklyReportId = null;
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $weeklyPlanId = (string) $document->id;
+        } elseif ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $weeklyReportId = (string) $document->id;
+        }
+
         $desiredIds = array_values(array_unique(array_filter(
             array_map(static fn ($id) => trim((string) $id), $sharedUserIds),
             static fn ($id) => $id !== '' && $id !== (string) $document->user_id
@@ -2625,7 +2708,8 @@ class DocumentController extends Controller
         $events = [];
         foreach ($addedIds as $targetUserId) {
             $events[] = [
-                'document_id' => $document->id,
+                'weekly_plan_id' => $weeklyPlanId,
+                'weekly_report_id' => $weeklyReportId,
                 'actor_user_id' => $actor->id,
                 'target_user_id' => $targetUserId,
                 'event_type' => Document::SHARE_EVENT_ADDED,
@@ -2635,7 +2719,8 @@ class DocumentController extends Controller
         }
         foreach ($removedIds as $targetUserId) {
             $events[] = [
-                'document_id' => $document->id,
+                'weekly_plan_id' => $weeklyPlanId,
+                'weekly_report_id' => $weeklyReportId,
                 'actor_user_id' => $actor->id,
                 'target_user_id' => $targetUserId,
                 'event_type' => Document::SHARE_EVENT_REMOVED,
@@ -2996,7 +3081,8 @@ class DocumentController extends Controller
                 'location' => $location,
                 'team_member_ids' => $teamMemberIds,
                 'notes_inclusion' => $this->clipString($notes, 4000),
-                'carry_over_source_report_id' => (string) $weeklyReport->id,
+                'carry_over_source_report_id' => null,
+                'carry_over_source_weekly_report_id' => optional($weeklyReport->weeklyReportDomain)->id,
             ];
         }
 
@@ -3388,14 +3474,18 @@ class DocumentController extends Controller
             return;
         }
 
+        $domainWeeklyReportId = optional($weeklyReport->weeklyReportDomain)->id;
         $nextPlanContent = is_array($nextPlan->content) ? $nextPlan->content : [];
         $existingActivities = is_array($nextPlanContent['planned_activities'] ?? null) ? $nextPlanContent['planned_activities'] : [];
-        $existingActivities = array_values(array_filter($existingActivities, function ($row) use ($weeklyReport) {
+        $existingActivities = array_values(array_filter($existingActivities, function ($row) use ($weeklyReport, $domainWeeklyReportId) {
             if (! is_array($row)) {
                 return false;
             }
 
-            return trim((string) ($row['carry_over_source_report_id'] ?? '')) !== (string) $weeklyReport->id;
+            $domainMatch = $domainWeeklyReportId !== null
+                && trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) === (string) $domainWeeklyReportId;
+
+            return ! $domainMatch;
         }));
 
         $carriedRows = $this->buildCarriedActivitiesFromWeeklyReport($weeklyReport);
@@ -3571,5 +3661,30 @@ class DocumentController extends Controller
         }
 
         return $total;
+    }
+
+    /**
+     * @return array{0: ?Document, 1: ?array<string, mixed>}
+     */
+    private function resolveWeeklyRelatedDocumentContext(Document $document, bool $includeCreateAction = true): array
+    {
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return [null, null];
+        }
+
+        $relatedDocument = $document->relatedWeeklyDocument();
+
+        $relatedAction = null;
+        if ($includeCreateAction && $relatedDocument === null && Auth::check()) {
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+            $relatedAction = $document->relatedWeeklyCreateActionFor($user);
+        }
+
+        if ($relatedDocument) {
+            $relatedDocument->loadMissing('user');
+        }
+
+        return [$relatedDocument, $relatedAction];
     }
 }

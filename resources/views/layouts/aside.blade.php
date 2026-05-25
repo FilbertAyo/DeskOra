@@ -22,6 +22,13 @@
                             <span class="pc-mtext">Year Plan</span>
                         </a>
                     </li>
+
+                    <li class="pc-item {{ Request::routeIs('matrix-report.index') ? 'active' : '' }}">
+                        <a href="{{ route('matrix-report.index') }}" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-layout-kanban"></i></span>
+                            <span class="pc-mtext">Matrix Panel</span>
+                        </a>
+                    </li>
               
                 <!-- Weekly Plans & Reports -->
                 <li class="pc-item pc-caption">
@@ -81,18 +88,16 @@
                         $reviewActivitiesSubmittedCount = 0;
                         if ($canReviewSubmissions) {
                             if ($currentPeriod) {
-                                $reviewActivitiesSubmittedCount += \App\Models\Document::query()
-                                    ->submitted()
-                                    ->where('type', \App\Models\Document::TYPE_WEEKLY_REPORT)
-                                    ->forPeriod((string) $currentPeriod->id)
+                                $reviewActivitiesSubmittedCount += \App\Models\WeeklyReport::query()
+                                    ->where('state', 'submitted')
+                                    ->where('period_id', (string) $currentPeriod->id)
                                     ->count();
                             }
 
                             if ($nextPeriod) {
-                                $reviewActivitiesSubmittedCount += \App\Models\Document::query()
-                                    ->submitted()
-                                    ->where('type', \App\Models\Document::TYPE_WEEKLY_PLAN)
-                                    ->forPeriod((string) $nextPeriod->id)
+                                $reviewActivitiesSubmittedCount += \App\Models\WeeklyPlan::query()
+                                    ->where('state', \App\Models\WeeklyPlan::STATE_SUBMITTED)
+                                    ->where('period_id', (string) $nextPeriod->id)
                                     ->count();
                             }
                         }

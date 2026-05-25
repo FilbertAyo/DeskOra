@@ -22,10 +22,10 @@ class WeeklyActivityAssignmentService
             ? WeeklyActivityAssignment::STATUS_LOCKED
             : WeeklyActivityAssignment::STATUS_PREVIEW;
 
+        $sourceWeeklyPlanId = (string) $weeklyPlan->id;
         $domainPlan = WeeklyPlan::query()
-            ->with('activities.assignees:id')
-            ->where('legacy_document_id', $weeklyPlan->id)
-            ->first();
+            ->with(['activities.assignees'])
+            ->find($sourceWeeklyPlanId);
 
         $sourceRows = [];
         if ($domainPlan) {
@@ -81,7 +81,7 @@ class WeeklyActivityAssignmentService
 
             foreach ($assigneeIds as $assigneeId) {
                 $desiredRows[] = [
-                    'source_document_id' => $weeklyPlan->id,
+                    'source_weekly_plan_id' => $sourceWeeklyPlanId,
                     'source_user_id' => $weeklyPlan->user_id,
                     'assignee_user_id' => (string) $assigneeId,
                     'period_id' => $weeklyPlan->period_id,
@@ -97,8 +97,8 @@ class WeeklyActivityAssignmentService
         if ($desiredRows !== []) {
             WeeklyActivityAssignment::query()->upsert(
                 $desiredRows,
-                ['source_document_id', 'assignee_user_id', 'activity_uid'],
-                ['source_user_id', 'period_id', 'status', 'activity_payload', 'updated_at']
+                ['source_weekly_plan_id', 'assignee_user_id', 'activity_uid'],
+                ['source_weekly_plan_id', 'source_user_id', 'period_id', 'status', 'activity_payload', 'updated_at']
             );
         }
 
@@ -108,7 +108,7 @@ class WeeklyActivityAssignmentService
             ->all();
 
         $existingRows = WeeklyActivityAssignment::query()
-            ->where('source_document_id', $weeklyPlan->id)
+            ->where('source_weekly_plan_id', $sourceWeeklyPlanId)
             ->get(['id', 'assignee_user_id', 'activity_uid']);
 
         $staleIds = $existingRows
@@ -127,8 +127,12 @@ class WeeklyActivityAssignmentService
 
     public function clearForSourceDocument(Document $sourceDocument): void
     {
+        if ($sourceDocument->type !== Document::TYPE_WEEKLY_PLAN) {
+            return;
+        }
+
         WeeklyActivityAssignment::query()
-            ->where('source_document_id', $sourceDocument->id)
+            ->where('source_weekly_plan_id', (string) $sourceDocument->id)
             ->delete();
     }
 
@@ -157,7 +161,11 @@ class WeeklyActivityAssignmentService
         }
 
         $query = WeeklyActivityAssignment::query()
-            ->with(['sourceUser:id,name', 'sourceDocument:id,title,user_id,type,state,period_id', 'assignee:id,name'])
+            ->with([
+                'sourceUser:id,name',
+                'sourceWeeklyPlan:id,title,user_id,period_id,state',
+                'assignee:id,name',
+            ])
             ->whereIn('assignee_user_id', $normalizedUserIds->all())
             ->whereColumn('source_user_id', '!=', 'assignee_user_id')
             ->orderByDesc('updated_at');
@@ -167,5 +175,21 @@ class WeeklyActivityAssignmentService
         }
 
         return $query->get();
+    }
+
+    private function resolveSourceWeeklyPlan(Document $weeklyPlan, bool $withActivities = false): ?WeeklyPlan
+    {
+        if ($weeklyPlan->type !== Document::TYPE_WEEKLY_PLAN) {
+            return null;
+        }
+
+        $query = WeeklyPlan::query()
+            ->where('id', $weeklyPlan->id);
+
+        if ($withActivities) {
+            $query->with('activities.assignees:id');
+        }
+
+        return $query->first();
     }
 }

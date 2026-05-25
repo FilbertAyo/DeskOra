@@ -62,6 +62,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'approve documents',
             'view weekly budgets',
             'process weekly budgets',
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
 
             // Action logs permissions
             'view action logs',
@@ -80,9 +83,45 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
+        $documentApproverRole = Role::firstOrCreate(['name' => 'document_approver']);
+        $budgetReviewerRole = Role::firstOrCreate(['name' => 'budget_reviewer']);
+        $budgetApproverRole = Role::firstOrCreate(['name' => 'budget_approver']);
+        $budgetAuthorizerRole = Role::firstOrCreate(['name' => 'budget_authorizer']);
+        $budgetOperatorRole = Role::firstOrCreate(['name' => 'budget_operator']);
+
+        $budgetReviewerPermissions = [
+            'view weekly budgets',
+            'review weekly budgets',
+        ];
+        $budgetApproverPermissions = [
+            'view weekly budgets',
+            'approve weekly budgets',
+        ];
+        $budgetAuthorizerPermissions = [
+            'view weekly budgets',
+            'authorize weekly budgets',
+        ];
+        $budgetOperatorPermissions = [
+            'view weekly budgets',
+            'process weekly budgets',
+        ];
+        $documentApproverPermissions = [
+            'approve documents',
+            'view all documents',
+            'view weekly budgets',
+        ];
+        $staffPermissions = [
+            'create weekly plan',
+            'create weekly report',
+        ];
 
         $superadminRole->syncPermissions($allPermissions);
-        $staffRole->syncPermissions($staffRole->permissions()->pluck('name')->all());
+        $staffRole->syncPermissions($staffPermissions);
+        $documentApproverRole->syncPermissions($documentApproverPermissions);
+        $budgetReviewerRole->syncPermissions($budgetReviewerPermissions);
+        $budgetApproverRole->syncPermissions($budgetApproverPermissions);
+        $budgetAuthorizerRole->syncPermissions($budgetAuthorizerPermissions);
+        $budgetOperatorRole->syncPermissions($budgetOperatorPermissions);
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.

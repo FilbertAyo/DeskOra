@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\Documents\DocumentContentAssembler;
+use App\Services\Documents\DocumentDomainSyncService;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -68,6 +71,16 @@ class Document extends Model
     public const BUDGET_REVIEW_APPROVED = 'approved';
 
     public const BUDGET_REVIEW_REJECTED = 'rejected';
+
+    public const BUDGET_REVIEW_STAGE_PENDING = 'pending';
+
+    public const BUDGET_REVIEW_STAGE_REVIEWED = 'reviewed';
+
+    public const BUDGET_REVIEW_STAGE_APPROVED = 'approved';
+
+    public const BUDGET_REVIEW_STAGE_AUTHORIZED = 'authorized';
+
+    public const BUDGET_REVIEW_STAGE_REJECTED = 'rejected';
 
     /**
      * The attributes that are mass assignable.
@@ -212,7 +225,7 @@ class Document extends Model
                 'tasks.assignees:id,name',
                 'tasks.history',
             ])
-            ->where('legacy_document_id', $this->id)
+            ->where('id', $this->id)
             ->first();
 
         if (! $actionLog) {
@@ -590,33 +603,37 @@ class Document extends Model
      */
     public function sharedUsers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'document_user_shares', 'document_id', 'user_id')
+        $foreignKey = $this->type === self::TYPE_WEEKLY_REPORT
+            ? 'weekly_report_id'
+            : 'weekly_plan_id';
+
+        return $this->belongsToMany(User::class, 'document_user_shares', $foreignKey, 'user_id')
             ->withTimestamps();
     }
 
     public function weeklyActivityAssignments(): HasMany
     {
-        return $this->hasMany(WeeklyActivityAssignment::class, 'source_document_id');
+        return $this->hasMany(WeeklyActivityAssignment::class, 'source_weekly_plan_id');
     }
 
     public function weeklyPlanDomain(): BelongsTo
     {
-        return $this->belongsTo(WeeklyPlan::class, 'id', 'legacy_document_id');
+        return $this->belongsTo(WeeklyPlan::class, 'id', 'id');
     }
 
     public function weeklyReportDomain(): BelongsTo
     {
-        return $this->belongsTo(WeeklyReport::class, 'id', 'legacy_document_id');
+        return $this->belongsTo(WeeklyReport::class, 'id', 'id');
     }
 
     public function monthlyReportDomain(): BelongsTo
     {
-        return $this->belongsTo(MonthlyReport::class, 'id', 'legacy_document_id');
+        return $this->belongsTo(MonthlyReport::class, 'id', 'id');
     }
 
     public function actionLogDomain(): BelongsTo
     {
-        return $this->belongsTo(ActionLog::class, 'id', 'legacy_document_id');
+        return $this->belongsTo(ActionLog::class, 'id', 'id');
     }
 
     public function isSharedWith(string $userId): bool
@@ -683,6 +700,83 @@ class Document extends Model
     }
 
     /**
+     * Paired weekly plan/report for the same work period as this document.
+     */
+    public function relatedWeeklyDocument(): ?self
+    {
+        if (! $this->period_id) {
+            return null;
+        }
+
+        $periodId = (string) $this->period_id;
+        $ownerUserId = (string) $this->user_id;
+
+        if ($this->type === self::TYPE_WEEKLY_PLAN) {
+            return self::findWeeklyReportForPeriodOwner($periodId, $ownerUserId);
+        }
+
+        if ($this->type === self::TYPE_WEEKLY_REPORT) {
+            return self::findWeeklyPlanForUserAndPeriod($periodId, $ownerUserId)
+                ?? self::findWeeklyPlanForPeriodOwner($periodId, $ownerUserId);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function relatedWeeklyCreateActionFor(User $user): ?array
+    {
+        if (! $this->period_id || ! $this->period) {
+            return null;
+        }
+
+        if ((string) $this->user_id !== (string) $user->id) {
+            return null;
+        }
+
+        if ($this->relatedWeeklyDocument() !== null) {
+            return null;
+        }
+
+        $request = app('request');
+        $returnTo = $request instanceof \Illuminate\Http\Request
+            ? $request->fullUrl()
+            : route('documents.index');
+
+        if ($this->type === self::TYPE_WEEKLY_PLAN
+            && self::canUserCreateType($user, self::TYPE_WEEKLY_REPORT, $this->period)) {
+            return [
+                'type' => self::TYPE_WEEKLY_REPORT,
+                'label' => 'Create Weekly Report for this Week',
+                'route' => route('documents.create', [
+                    'type' => self::TYPE_WEEKLY_REPORT,
+                    'period_id' => $this->period_id,
+                    'return_to' => $returnTo,
+                ]),
+                'description' => 'Weekly report is due on '.$this->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
+            ];
+        }
+
+        if ($this->type === self::TYPE_WEEKLY_REPORT
+            && self::canUserCreateType($user, self::TYPE_WEEKLY_PLAN, $this->period)) {
+            return [
+                'type' => self::TYPE_WEEKLY_PLAN,
+                'label' => 'Create Weekly Plan for this Week',
+                'route' => route('documents.create', [
+                    'type' => self::TYPE_WEEKLY_PLAN,
+                    'period_id' => $this->period_id,
+                    'return_to' => $returnTo,
+                ]),
+                'description' => 'Weekly plan should outline goals for this week.',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Scope: Filter by type
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
@@ -736,32 +830,33 @@ class Document extends Model
                 ->orWhere(function ($weeklyReportAccess) use ($userId) {
                     $weeklyReportAccess
                         ->where('type', self::TYPE_WEEKLY_REPORT)
-                        ->whereExists(function ($planQuery) use ($userId) {
-                            $planQuery->selectRaw('1')
-                                ->from('documents as weekly_plans')
-                                ->whereColumn('weekly_plans.period_id', 'documents.period_id')
-                                ->where('weekly_plans.type', self::TYPE_WEEKLY_PLAN)
-                                ->where(function ($planAccess) use ($userId) {
-                                    $planAccess->where('weekly_plans.user_id', $userId)
-                                        ->orWhereExists(function ($planShares) use ($userId) {
-                                            $planShares->selectRaw('1')
-                                                ->from('document_user_shares as weekly_plan_shares')
-                                                ->whereColumn('weekly_plan_shares.document_id', 'weekly_plans.id')
-                                                ->where('weekly_plan_shares.user_id', $userId);
-                                        });
-                                })
-                                // Prevent cross-team leaks: a weekly report is reachable via plan
-                                // collaboration only when the report author belongs to that same
-                                // plan collaboration group (owner or shared member).
-                                ->where(function ($authorAccess) {
-                                    $authorAccess->whereColumn('weekly_plans.user_id', 'documents.user_id')
-                                        ->orWhereExists(function ($authorShares) {
-                                            $authorShares->selectRaw('1')
-                                                ->from('document_user_shares as weekly_plan_member_shares')
-                                                ->whereColumn('weekly_plan_member_shares.document_id', 'weekly_plans.id')
-                                                ->whereColumn('weekly_plan_member_shares.user_id', 'documents.user_id');
-                                        });
-                                });
+                        ->where(function ($planScope) use ($userId) {
+                            $planScope->whereExists(function ($planQuery) use ($userId) {
+                                $planQuery->selectRaw('1')
+                                    ->from('weekly_plans as wp')
+                                    ->whereColumn('wp.period_id', 'documents.period_id')
+                                    ->where(function ($planAccess) use ($userId) {
+                                        $planAccess->where('wp.user_id', $userId)
+                                            ->orWhereExists(function ($planShares) use ($userId) {
+                                                $planShares->selectRaw('1')
+                                                    ->from('document_user_shares as weekly_plan_shares')
+                                                    ->whereColumn('weekly_plan_shares.weekly_plan_id', 'wp.id')
+                                                    ->where('weekly_plan_shares.user_id', $userId);
+                                            });
+                                    })
+                                    // Prevent cross-team leaks: a weekly report is reachable via plan
+                                    // collaboration only when the report author belongs to that same
+                                    // plan collaboration group (owner or shared member).
+                                    ->where(function ($authorAccess) {
+                                        $authorAccess->whereColumn('wp.user_id', 'documents.user_id')
+                                            ->orWhereExists(function ($authorShares) {
+                                                $authorShares->selectRaw('1')
+                                                    ->from('document_user_shares as weekly_plan_member_shares')
+                                                    ->whereColumn('weekly_plan_member_shares.weekly_plan_id', 'wp.id')
+                                                    ->whereColumn('weekly_plan_member_shares.user_id', 'documents.user_id');
+                                            });
+                                    });
+                            });
                         });
                 });
         });
@@ -1075,7 +1170,7 @@ class Document extends Model
     {
         $weeklyPlan = WeeklyPlan::query()
             ->with('budgetItems')
-            ->where('legacy_document_id', $this->id)
+            ->where('id', $this->id)
             ->first();
 
         if ($weeklyPlan) {
@@ -1140,7 +1235,7 @@ class Document extends Model
     {
         $weeklyPlan = WeeklyPlan::query()
             ->with('budgetItems.review')
-            ->where('legacy_document_id', $this->id)
+            ->where('id', $this->id)
             ->first();
 
         if ($weeklyPlan) {
@@ -1152,13 +1247,27 @@ class Document extends Model
                 }
                 $review = $item->review;
                 $decision = $review?->decision ?? self::BUDGET_REVIEW_PENDING;
+                $approvalStage = $review?->approval_stage ?? self::BUDGET_REVIEW_STAGE_PENDING;
+                $latestActor = $review?->authorized_by
+                    ?? $review?->approved_by
+                    ?? $review?->reviewed_by;
+                $latestActionAt = $review?->authorized_at
+                    ?? $review?->approved_at
+                    ?? $review?->reviewed_at;
                 $mapped[$uid] = [
                     'budget_uid' => $uid,
                     'decision' => $decision,
+                    'approval_stage' => $approvalStage,
                     'provided_amount' => (float) ($review?->provided_amount ?? 0),
                     'note' => $review?->note,
-                    'reviewed_by' => $review?->reviewed_by,
-                    'reviewed_at' => optional($review?->reviewed_at)->toIso8601String(),
+                    'reviewed_by' => $latestActor,
+                    'reviewed_at' => optional($latestActionAt)->toIso8601String(),
+                    'review_stage_by' => $review?->reviewed_by,
+                    'review_stage_at' => optional($review?->reviewed_at)->toIso8601String(),
+                    'approve_stage_by' => $review?->approved_by,
+                    'approve_stage_at' => optional($review?->approved_at)->toIso8601String(),
+                    'authorize_stage_by' => $review?->authorized_by,
+                    'authorize_stage_at' => optional($review?->authorized_at)->toIso8601String(),
                 ];
             }
 
@@ -1180,13 +1289,26 @@ class Document extends Model
             if (! in_array($decision, [self::BUDGET_REVIEW_PENDING, self::BUDGET_REVIEW_APPROVED, self::BUDGET_REVIEW_REJECTED], true)) {
                 $decision = self::BUDGET_REVIEW_PENDING;
             }
+            $approvalStage = trim((string) ($row['approval_stage'] ?? ''));
+            if (! in_array($approvalStage, self::budgetReviewStages(), true)) {
+                $approvalStage = $decision === self::BUDGET_REVIEW_REJECTED
+                    ? self::BUDGET_REVIEW_STAGE_REJECTED
+                    : self::BUDGET_REVIEW_STAGE_PENDING;
+            }
             $mapped[$uid] = [
                 'budget_uid' => $uid,
                 'decision' => $decision,
+                'approval_stage' => $approvalStage,
                 'provided_amount' => (float) ($row['provided_amount'] ?? 0),
                 'note' => isset($row['note']) ? trim((string) $row['note']) : null,
                 'reviewed_by' => $row['reviewed_by'] ?? null,
                 'reviewed_at' => isset($row['reviewed_at']) && $row['reviewed_at'] !== '' ? (string) $row['reviewed_at'] : null,
+                'review_stage_by' => $row['review_stage_by'] ?? null,
+                'review_stage_at' => isset($row['review_stage_at']) && $row['review_stage_at'] !== '' ? (string) $row['review_stage_at'] : null,
+                'approve_stage_by' => $row['approve_stage_by'] ?? null,
+                'approve_stage_at' => isset($row['approve_stage_at']) && $row['approve_stage_at'] !== '' ? (string) $row['approve_stage_at'] : null,
+                'authorize_stage_by' => $row['authorize_stage_by'] ?? null,
+                'authorize_stage_at' => isset($row['authorize_stage_at']) && $row['authorize_stage_at'] !== '' ? (string) $row['authorize_stage_at'] : null,
             ];
         }
 
@@ -1212,11 +1334,12 @@ class Document extends Model
             $requestedTotal += (float) ($item['amount_numeric'] ?? 0);
             $review = $reviewsByUid[$uid] ?? null;
             $decision = $review['decision'] ?? self::BUDGET_REVIEW_PENDING;
-            if ($decision === self::BUDGET_REVIEW_APPROVED) {
+            $approvalStage = $review['approval_stage'] ?? self::BUDGET_REVIEW_STAGE_PENDING;
+            if ($decision === self::BUDGET_REVIEW_REJECTED || $approvalStage === self::BUDGET_REVIEW_STAGE_REJECTED) {
+                $rejected++;
+            } elseif ($decision === self::BUDGET_REVIEW_APPROVED && $approvalStage === self::BUDGET_REVIEW_STAGE_AUTHORIZED) {
                 $approved++;
                 $providedTotal += (float) ($review['provided_amount'] ?? 0);
-            } elseif ($decision === self::BUDGET_REVIEW_REJECTED) {
-                $rejected++;
             } else {
                 $pending++;
             }
@@ -1252,5 +1375,113 @@ class Document extends Model
         }
 
         return (float) $normalizedAmount;
+    }
+
+    public static function budgetReviewStages(): array
+    {
+        return [
+            self::BUDGET_REVIEW_STAGE_PENDING,
+            self::BUDGET_REVIEW_STAGE_REVIEWED,
+            self::BUDGET_REVIEW_STAGE_APPROVED,
+            self::BUDGET_REVIEW_STAGE_AUTHORIZED,
+            self::BUDGET_REVIEW_STAGE_REJECTED,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getContentAttribute(mixed $value): ?array
+    {
+        if (array_key_exists('content', $this->attributes) && $this->attributes['content'] !== null) {
+            $raw = $this->attributes['content'];
+            if (is_array($raw)) {
+                return $raw;
+            }
+            if (is_string($raw) && $raw !== '') {
+                $decoded = json_decode($raw, true);
+
+                return is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        if (! $this->id || ! $this->type) {
+            return null;
+        }
+
+        return app(DocumentContentAssembler::class)->assembleForDocument($this);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function getBudgetReviewItemsAttribute(mixed $value): ?array
+    {
+        if (array_key_exists('budget_review_items', $this->attributes) && $this->attributes['budget_review_items'] !== null) {
+            $raw = $this->attributes['budget_review_items'];
+            if (is_array($raw)) {
+                return $raw;
+            }
+            if (is_string($raw) && $raw !== '') {
+                $decoded = json_decode($raw, true);
+
+                return is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        if ($this->type !== self::TYPE_WEEKLY_PLAN || ! $this->id) {
+            return null;
+        }
+
+        return array_values($this->budgetReviewItemsByUid());
+    }
+
+    public function save(array $options = []): bool
+    {
+        if (! $this->type) {
+            return false;
+        }
+
+        if (! $this->id) {
+            $this->id = (string) Str::ulid();
+        }
+
+        if ($this->fireModelEvent('saving') === false) {
+            return false;
+        }
+
+        app(DocumentDomainSyncService::class)->syncFromDocument($this);
+
+        $this->exists = true;
+        $this->syncOriginal();
+        $this->fireModelEvent('saved', false);
+
+        return true;
+    }
+
+    public function delete(): ?bool
+    {
+        if ($this->fireModelEvent('deleting') === false) {
+            return false;
+        }
+
+        $deleted = match ($this->type) {
+            self::TYPE_WEEKLY_PLAN => (bool) WeeklyPlan::query()->whereKey($this->id)->first()?->delete(),
+            self::TYPE_WEEKLY_REPORT => (bool) WeeklyReport::query()->whereKey($this->id)->first()?->delete(),
+            self::TYPE_MONTHLY_REPORT => (bool) MonthlyReport::query()->whereKey($this->id)->first()?->delete(),
+            self::TYPE_ACTION_LOG => (bool) ActionLog::query()->whereKey($this->id)->first()?->delete(),
+            default => false,
+        };
+
+        if ($deleted) {
+            $this->fireModelEvent('deleted', false);
+        }
+
+        return $deleted;
+    }
+
+    public function forceDelete(): ?bool
+    {
+        return $this->delete();
     }
 }

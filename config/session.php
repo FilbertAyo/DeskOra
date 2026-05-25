@@ -157,6 +157,7 @@ return [
     |
     */
 
+    // Leave unset in .env (do not use the literal string "null") — AppServiceProvider normalizes invalid values.
     'domain' => env('SESSION_DOMAIN'),
 
     /*
@@ -170,6 +171,7 @@ return [
     |
     */
 
+    // When null, AppServiceProvider sets true if APP_URL uses https.
     'secure' => env('SESSION_SECURE_COOKIE'),
 
     /*

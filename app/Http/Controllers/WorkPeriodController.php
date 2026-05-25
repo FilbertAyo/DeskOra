@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\User;
+use App\Models\WeeklyPlan;
 use App\Models\WorkPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -11,12 +13,34 @@ use Illuminate\Support\Facades\DB;
 
 class WorkPeriodController extends Controller
 {
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            abort(403, 'Unauthorized access. Only users with work period permissions can manage work periods.');
+        }
+
+        return $user;
+    }
+
+    private function requestUser(Request $request): User
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            abort(403, 'Unauthorized.');
+        }
+
+        return $user;
+    }
+
     /**
      * Check if user has admin permissions (for create/edit/delete operations)
      */
-    private function checkAdmin()
+    private function checkAdmin(): void
     {
-        if (! Auth::user()->hasPermissionTo('manage work periods')) {
+        if (! $this->authenticatedUser()->hasPermissionTo('manage work periods')) {
             abort(403, 'Unauthorized access. Only users with work period permissions can manage work periods.');
         }
     }
@@ -27,7 +51,7 @@ class WorkPeriodController extends Controller
      */
     public function index(Request $request)
     {
-        if (! $request->user()->hasPermissionTo('manage work periods')) {
+        if (! $this->requestUser($request)->hasPermissionTo('manage work periods')) {
             abort(403, 'Unauthorized access.');
         }
 
@@ -106,7 +130,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+        abort_unless($this->authenticatedUser()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $request->validate([
             'year' => ['required', 'integer', 'min:2020', 'max:2100'],
@@ -175,7 +199,7 @@ class WorkPeriodController extends Controller
      */
     public function show(WorkPeriod $work_period)
     {
-        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+        abort_unless($this->authenticatedUser()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period->load(['documents.user', 'weeklyPlans.user', 'weeklyReports.user']);
 
@@ -198,7 +222,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+        abort_unless($this->authenticatedUser()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period;
 
@@ -213,7 +237,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+        abort_unless($this->authenticatedUser()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period;
 
@@ -248,7 +272,7 @@ class WorkPeriodController extends Controller
     {
         $this->checkAdmin();
 
-        abort_unless(Auth::user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+        abort_unless($this->authenticatedUser()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $period = $work_period;
 
@@ -298,7 +322,7 @@ class WorkPeriodController extends Controller
     public function reopenAndReset(Request $request)
     {
         $this->checkAdmin();
-        abort_unless($request->user()->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
+        abort_unless($this->requestUser($request)->hasPermissionTo('manage work periods'), 403, 'Unauthorized.');
 
         $validated = $request->validate([
             'period_ids' => ['required', 'array', 'min:1'],
@@ -316,9 +340,13 @@ class WorkPeriodController extends Controller
                 ->where('status', WorkPeriod::STATUS_CLOSED)
                 ->update(['status' => WorkPeriod::STATUS_OPEN]);
 
-            $updatedWeeklyPlans = Document::query()
+            $weeklyPlanDocumentIds = Document::query()
                 ->whereIn('period_id', $selectedPeriodIds)
                 ->where('type', Document::TYPE_WEEKLY_PLAN)
+                ->pluck('id');
+
+            $updatedWeeklyPlans = Document::query()
+                ->whereIn('id', $weeklyPlanDocumentIds)
                 ->update([
                     'state' => Document::STATE_DRAFT,
                     'review_rejection_reason' => null,
@@ -327,7 +355,18 @@ class WorkPeriodController extends Controller
                     'budget_reviewed_at' => null,
                     'budget_provided_amount' => null,
                     'budget_review_note' => null,
-                    'budget_review_items' => null,
+                ]);
+
+            WeeklyPlan::query()
+                ->whereIn('id', $weeklyPlanDocumentIds)
+                ->update([
+                    'state' => Document::STATE_DRAFT,
+                    'review_rejection_reason' => null,
+                    'budget_review_status' => null,
+                    'budget_reviewed_by' => null,
+                    'budget_reviewed_at' => null,
+                    'budget_provided_amount' => null,
+                    'budget_review_note' => null,
                 ]);
 
             $updatedWeeklyReports = Document::query()

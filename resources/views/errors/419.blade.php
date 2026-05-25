@@ -11,12 +11,8 @@
 @endsection
 
 @section('actions')
-    <a href="{{ url()->current() }}" class="btn btn-outline-secondary">
-        <i class="ti ti-refresh me-1"></i>
-        Refresh
-    </a>
-    <a href="{{ url('/') }}" class="btn btn-primary">
-        <i class="ti ti-home me-1"></i>
-        Back Home
+    <a href="{{ route('login') }}" class="btn btn-primary">
+        <i class="ti ti-login me-1"></i>
+        Back to login
     </a>
 @endsection

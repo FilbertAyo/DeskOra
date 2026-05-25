@@ -291,9 +291,13 @@
                                 <div class="d-flex align-items-start gap-2 mb-2">
                                     <span class="badge {{ $event['badge_class'] ?? 'bg-light' }} align-self-center">{{ $event['badge_label'] ?? '' }}</span>
                                     <div class="flex-grow-1 min-w-0">
-                                        <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
-                                            {{ $event['message'] }}
-                                        </a>
+                                        @if(!empty($event['document_id']))
+                                            <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
+                                                {{ $event['message'] }}
+                                            </a>
+                                        @else
+                                            <span class="small d-block">{{ $event['message'] }}</span>
+                                        @endif
                                     </div>
                                     <small class="text-muted text-nowrap">{{ $event['created_at']->diffForHumans() }}</small>
                                 </div>
@@ -429,7 +433,23 @@
                                             {{ $isLockedAssignment ? 'Locked' : 'Preview' }}
                                         </span>
                                     </div>
-                                    <a href="{{ route('documents.show', $assignment->source_document_id) }}" class="btn btn-sm btn-outline-secondary">Open Plan</a>
+                                    @php
+                                        $sourceWeeklyPlan = $assignment->sourceWeeklyPlan;
+                                        $sourcePlanUrl = null;
+
+                                        if ($sourceWeeklyPlan) {
+                                            if (\Illuminate\Support\Facades\Route::has('weekly-plans.show')) {
+                                                $sourcePlanUrl = route('weekly-plans.show', $sourceWeeklyPlan->id);
+                                            } elseif (\Illuminate\Support\Facades\Route::has('documents.weekly-plans.show')) {
+                                                $sourcePlanUrl = route('documents.weekly-plans.show', $sourceWeeklyPlan->id);
+                                            } elseif (!empty($sourceWeeklyPlan->id)) {
+                                                $sourcePlanUrl = route('documents.show', $sourceWeeklyPlan->id);
+                                            }
+                                        }
+                                    @endphp
+                                    @if($sourcePlanUrl)
+                                        <a href="{{ $sourcePlanUrl }}" class="btn btn-sm btn-outline-secondary">Open Plan</a>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>

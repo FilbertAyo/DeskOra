@@ -151,6 +151,7 @@ class BackfillDocumentDomainTables extends Command
                 'location' => trim((string) ($row['location'] ?? '')) ?: null,
                 'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')) ?: null,
                 'carry_over_source_report_id' => trim((string) ($row['carry_over_source_report_id'] ?? '')) ?: null,
+                'carry_over_source_weekly_report_id' => $this->resolveCarryOverSourceWeeklyReportId($row),
                 'sort_order' => $index,
             ]);
 
@@ -465,5 +466,25 @@ class BackfillDocumentDomainTables extends Command
                 ]);
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function resolveCarryOverSourceWeeklyReportId(array $row): ?string
+    {
+        $explicitId = trim((string) ($row['carry_over_source_weekly_report_id'] ?? ''));
+        if ($explicitId !== '') {
+            return $explicitId;
+        }
+
+        $legacyDocumentId = trim((string) ($row['carry_over_source_report_id'] ?? ''));
+        if ($legacyDocumentId === '') {
+            return null;
+        }
+
+        return WeeklyReport::query()
+            ->where('legacy_document_id', $legacyDocumentId)
+            ->value('id');
     }
 }

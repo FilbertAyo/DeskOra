@@ -10,6 +10,7 @@ use App\Services\WeeklySubmissionReminderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configureSessionAndUrl();
+
         View::composer('*', function ($view) {
             $pendingCount = 0;
             $approvedCount = 0;
@@ -117,5 +120,27 @@ class AppServiceProvider extends ServiceProvider
                 app(WeeklySubmissionReminderService::class)->forUser($user)
             );
         });
+    }
+
+    /**
+     * Fix common production misconfigurations that cause 419 CSRF / session errors.
+     */
+    protected function configureSessionAndUrl(): void
+    {
+        $domain = env('SESSION_DOMAIN');
+        if ($domain === null || $domain === '' || strtolower((string) $domain) === 'null') {
+            config(['session.domain' => null]);
+        }
+
+        $appUrl = (string) config('app.url', '');
+        $useHttps = str_starts_with($appUrl, 'https://') && ! $this->app->environment('local');
+
+        if (env('SESSION_SECURE_COOKIE') === null && $useHttps) {
+            config(['session.secure' => true]);
+        }
+
+        if ($useHttps) {
+            URL::forceScheme('https');
+        }
     }
 }

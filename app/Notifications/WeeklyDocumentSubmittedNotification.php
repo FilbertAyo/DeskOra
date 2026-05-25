@@ -28,13 +28,23 @@ class WeeklyDocumentSubmittedNotification extends Notification
         $periodLabel = $this->document->period
             ? 'Week '.$this->document->period->week_number.', '.$this->document->period->year
             : 'Current reporting window';
+        $departmentName = $this->submittedBy->department?->name;
+        $submitterLabel = $departmentName
+            ? $this->submittedBy->name.' ('.$departmentName.')'
+            : $this->submittedBy->name;
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject($documentType.' Submitted for Review')
             ->greeting('Hello '.$notifiable->name.',')
-            ->line($this->submittedBy->name.' submitted a '.$documentType.'.')
-            ->line('Period: '.$periodLabel)
+            ->line($submitterLabel.' submitted a '.$documentType.' for your review.')
+            ->line('Period: '.$periodLabel);
+
+        if (filled($this->document->title)) {
+            $message->line('Title: '.$this->document->title);
+        }
+
+        return $message
             ->action('Review Document', route('documents.show', $this->document))
-            ->line('You are receiving this because you can approve documents.');
+            ->line('You are receiving this because you can approve weekly plans and reports.');
     }
 }

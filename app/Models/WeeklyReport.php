@@ -13,7 +13,6 @@ class WeeklyReport extends Model
     use HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'legacy_document_id',
         'user_id',
         'period_id',
         'title',
@@ -35,9 +34,9 @@ class WeeklyReport extends Model
         ];
     }
 
-    public function legacyDocument(): BelongsTo
+    public function document(): BelongsTo
     {
-        return $this->belongsTo(Document::class, 'legacy_document_id');
+        return $this->belongsTo(Document::class, 'id', 'id');
     }
 
     public function user(): BelongsTo

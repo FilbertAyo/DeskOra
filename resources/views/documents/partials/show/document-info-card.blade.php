@@ -1,4 +1,11 @@
-        <div class="{{ ($reviewerPresentation ?? false) ? 'col-12' : 'col-md-6' }}">
+        @php
+            $hasRelatedWeeklyPanel = ($relatedDocument ?? null) || ($relatedAction ?? null);
+            $infoColumnClass = $hasRelatedWeeklyPanel
+                && in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true)
+                ? 'col-md-6'
+                : 'col-12';
+        @endphp
+        <div class="{{ $infoColumnClass }}">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">

@@ -44,7 +44,9 @@
                         return false;
                     }
 
-                    return trim((string) ($row['item'] ?? '')) !== '' || trim((string) ($row['amount'] ?? '')) !== '';
+                    return trim((string) ($row['item'] ?? '')) !== ''
+                        || trim((string) ($row['description_purpose'] ?? '')) !== ''
+                        || trim((string) ($row['amount'] ?? '')) !== '';
                 })) : [];
                 $relatedPlanReviewsByUid = $effectiveRelatedPlan ? $effectiveRelatedPlan->budgetReviewItemsByUid() : [];
                 $budgetStatuses = old('content.budget_statuses', []);
@@ -449,6 +451,7 @@
                         <thead class="wh-thead-weekly-report">
                             <tr>
                                 <th>Budget Item / Activity</th>
+                                <th>Description / Purpose</th>
                                 <th style="width: 200px;">Amount</th>
                                 <th style="width: 140px;">Review</th>
                                 <th>Notes</th>
@@ -472,6 +475,9 @@
                                     <td>
                                         <input class="form-control" type="text" value="{{ $planRow['item'] ?? '' }}" disabled>
                                         <input type="hidden" name="content[budget_statuses][{{ $i }}][budget_uid]" value="{{ $uid }}">
+                                    </td>
+                                    <td>
+                                        <input class="form-control" type="text" value="{{ $planRow['description_purpose'] ?? '' }}" disabled>
                                     </td>
                                     <td>
                                         <input class="form-control" type="text" value="{{ $planRow['amount'] ?? '' }}" disabled>

@@ -461,7 +461,7 @@ class WorkPeriod extends Model
     }
 
     /**
-     * Whether an open plan for the next work period can still be submitted (next period's plan_deadline not passed).
+     * Whether an open plan for the next work period can still be submitted.
      */
     public function canSubmitPlanForNextWeek(): bool
     {
@@ -470,26 +470,16 @@ class WorkPeriod extends Model
         }
 
         $next = $this->getNextPeriod();
-        if (! $next || ! $next->isOpen()) {
-            return false;
-        }
 
-        // Plan for the next week is due on that period's plan_deadline (Saturday before that week).
-        return ! $next->isPlanDeadlinePassed();
+        return $next !== null && $next->isOpen();
     }
 
     /**
-     * Check if report deadline is for submitting report FOR this week
-     * Report deadline is Saturday of current week, to submit report for current week
+     * Whether a report for this work period can still be submitted.
      */
     public function canSubmitReportForThisWeek(): bool
     {
-        if (! $this->isOpen()) {
-            return false;
-        }
-
-        // Check if report deadline hasn't passed
-        return ! $this->isReportDeadlinePassed();
+        return $this->isOpen();
     }
 
     /**

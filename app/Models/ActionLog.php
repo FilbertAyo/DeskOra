@@ -13,16 +13,15 @@ class ActionLog extends Model
     use HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'legacy_document_id',
         'user_id',
         'period_id',
         'title',
         'state',
     ];
 
-    public function legacyDocument(): BelongsTo
+    public function document(): BelongsTo
     {
-        return $this->belongsTo(Document::class, 'legacy_document_id');
+        return $this->belongsTo(Document::class, 'id', 'id');
     }
 
     public function user(): BelongsTo
