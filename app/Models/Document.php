@@ -239,7 +239,7 @@ class Document extends Model
             $otherActionLogDocs = null;
             if ($currentPeriod) {
                 $otherActionLogDocs = self::query()
-                    ->where('type', self::TYPE_ACTION_LOG)
+                    ->ofType(self::TYPE_ACTION_LOG)
                     ->where('id', '!=', $this->id)
                     ->whereHas('period', function ($query) use ($currentPeriod): void {
                         $query->whereDate('week_start_date', '<=', $currentPeriod->week_start_date);
@@ -639,7 +639,7 @@ class Document extends Model
     public function isSharedWith(string $userId): bool
     {
         return $this->sharedUsers()
-            ->where('users.id', $userId)
+            ->whereRaw('BINARY users.id = BINARY ?', [$userId])
             ->exists();
     }
 
@@ -664,9 +664,9 @@ class Document extends Model
     {
         return static::query()
             ->where('period_id', $periodId)
-            ->where('type', self::TYPE_WEEKLY_PLAN)
-            ->where('user_id', $ownerUserId)
-            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->ofType(self::TYPE_WEEKLY_PLAN)
+            ->forUser($ownerUserId)
+            ->orderByRaw('CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
     }
@@ -679,8 +679,8 @@ class Document extends Model
         return static::query()
             ->forOwnerOrSharedUser($userId)
             ->where('period_id', $periodId)
-            ->where('type', self::TYPE_WEEKLY_PLAN)
-            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->ofType(self::TYPE_WEEKLY_PLAN)
+            ->orderByRaw('CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
     }
@@ -692,9 +692,9 @@ class Document extends Model
     {
         return static::query()
             ->where('period_id', $periodId)
-            ->where('type', self::TYPE_WEEKLY_REPORT)
-            ->where('user_id', $ownerUserId)
-            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->ofType(self::TYPE_WEEKLY_REPORT)
+            ->forUser($ownerUserId)
+            ->orderByRaw('CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
     }
@@ -784,7 +784,7 @@ class Document extends Model
      */
     public function scopeOfType($query, string $type)
     {
-        return $query->where('type', $type);
+        return $query->whereRaw('BINARY type = BINARY ?', [$type]);
     }
 
     /**
@@ -795,7 +795,7 @@ class Document extends Model
      */
     public function scopeOfState($query, string $state)
     {
-        return $query->where('state', $state);
+        return $query->whereRaw('BINARY state = BINARY ?', [$state]);
     }
 
     /**
@@ -806,15 +806,15 @@ class Document extends Model
      */
     public function scopeForUser($query, string $userId)
     {
-        return $query->where('user_id', $userId);
+        return $query->whereRaw('BINARY user_id = BINARY ?', [$userId]);
     }
 
     public function scopeForOwnerOrSharedUser($query, string $userId)
     {
         return $query->where(function ($nested) use ($userId) {
-            $nested->where('user_id', $userId)
+            $nested->forUser($userId)
                 ->orWhereHas('sharedUsers', function ($sharedUsers) use ($userId) {
-                    $sharedUsers->where('users.id', $userId);
+                    $sharedUsers->whereRaw('BINARY users.id = BINARY ?', [$userId]);
                 });
         });
     }
@@ -829,31 +829,31 @@ class Document extends Model
             $nested->forOwnerOrSharedUser($userId)
                 ->orWhere(function ($weeklyReportAccess) use ($userId) {
                     $weeklyReportAccess
-                        ->where('type', self::TYPE_WEEKLY_REPORT)
+                        ->ofType(self::TYPE_WEEKLY_REPORT)
                         ->where(function ($planScope) use ($userId) {
                             $planScope->whereExists(function ($planQuery) use ($userId) {
                                 $planQuery->selectRaw('1')
                                     ->from('weekly_plans as wp')
-                                    ->whereColumn('wp.period_id', 'documents.period_id')
+                                    ->whereRaw('BINARY wp.period_id = BINARY documents.period_id')
                                     ->where(function ($planAccess) use ($userId) {
-                                        $planAccess->where('wp.user_id', $userId)
+                                        $planAccess->whereRaw('BINARY wp.user_id = BINARY ?', [$userId])
                                             ->orWhereExists(function ($planShares) use ($userId) {
                                                 $planShares->selectRaw('1')
                                                     ->from('document_user_shares as weekly_plan_shares')
-                                                    ->whereColumn('weekly_plan_shares.weekly_plan_id', 'wp.id')
-                                                    ->where('weekly_plan_shares.user_id', $userId);
+                                                    ->whereRaw('BINARY weekly_plan_shares.weekly_plan_id = BINARY wp.id')
+                                                    ->whereRaw('BINARY weekly_plan_shares.user_id = BINARY ?', [$userId]);
                                             });
                                     })
                                     // Prevent cross-team leaks: a weekly report is reachable via plan
                                     // collaboration only when the report author belongs to that same
                                     // plan collaboration group (owner or shared member).
                                     ->where(function ($authorAccess) {
-                                        $authorAccess->whereColumn('wp.user_id', 'documents.user_id')
+                                        $authorAccess->whereRaw('BINARY wp.user_id = BINARY documents.user_id')
                                             ->orWhereExists(function ($authorShares) {
                                                 $authorShares->selectRaw('1')
                                                     ->from('document_user_shares as weekly_plan_member_shares')
-                                                    ->whereColumn('weekly_plan_member_shares.weekly_plan_id', 'wp.id')
-                                                    ->whereColumn('weekly_plan_member_shares.user_id', 'documents.user_id');
+                                                    ->whereRaw('BINARY weekly_plan_member_shares.weekly_plan_id = BINARY wp.id')
+                                                    ->whereRaw('BINARY weekly_plan_member_shares.user_id = BINARY documents.user_id');
                                             });
                                     });
                             });
@@ -870,7 +870,7 @@ class Document extends Model
      */
     public function scopeDrafts($query)
     {
-        return $query->where('state', self::STATE_DRAFT);
+        return $query->ofState(self::STATE_DRAFT);
     }
 
     /**
@@ -881,7 +881,7 @@ class Document extends Model
      */
     public function scopeSubmitted($query)
     {
-        return $query->where('state', self::STATE_SUBMITTED);
+        return $query->ofState(self::STATE_SUBMITTED);
     }
 
     /**
@@ -892,7 +892,7 @@ class Document extends Model
      */
     public function scopeWeeklyPlans($query)
     {
-        return $query->where('type', self::TYPE_WEEKLY_PLAN);
+        return $query->ofType(self::TYPE_WEEKLY_PLAN);
     }
 
     /**
@@ -903,7 +903,7 @@ class Document extends Model
      */
     public function scopeWeeklyReports($query)
     {
-        return $query->where('type', self::TYPE_WEEKLY_REPORT);
+        return $query->ofType(self::TYPE_WEEKLY_REPORT);
     }
 
     public function scopeWeeklyPlansWithBudget($query)
@@ -936,7 +936,7 @@ class Document extends Model
      */
     public function scopeMonthlyReports($query)
     {
-        return $query->where('type', self::TYPE_MONTHLY_REPORT);
+        return $query->ofType(self::TYPE_MONTHLY_REPORT);
     }
 
     /**
@@ -947,7 +947,7 @@ class Document extends Model
      */
     public function scopeActionLogs($query)
     {
-        return $query->where('type', self::TYPE_ACTION_LOG);
+        return $query->ofType(self::TYPE_ACTION_LOG);
     }
 
     /**
