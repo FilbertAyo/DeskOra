@@ -19,9 +19,9 @@
                                     ? collect($periods)->firstWhere('id', request('period_id'))
                                     : null;
                                 $reportCreatePeriod = null;
-                                if ($selectedCreatePeriod && $selectedCreatePeriod->isOpen() && ! $selectedCreatePeriod->isReportDeadlinePassed()) {
+                                if ($selectedCreatePeriod && $selectedCreatePeriod->isOpen()) {
                                     $reportCreatePeriod = $selectedCreatePeriod;
-                                } elseif (isset($currentPeriod) && $currentPeriod && $currentPeriod->isOpen() && ! $currentPeriod->isReportDeadlinePassed()) {
+                                } elseif (isset($currentPeriod) && $currentPeriod && $currentPeriod->isOpen()) {
                                     $reportCreatePeriod = $currentPeriod;
                                 }
                                 $canCreateWeeklyReport = isset($availableTypes['weekly_report']) && $reportCreatePeriod !== null;
@@ -31,7 +31,7 @@
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Report
                                 </a>
                             @elseif(isset($availableTypes['weekly_report']))
-                                <button type="button" class="btn btn-light btn-sm" disabled title="Report deadline has passed for the current window">
+                                <button type="button" class="btn btn-light btn-sm" disabled title="No open work period for a new weekly report">
                                     <i class="ti ti-file-minus me-1"></i> Weekly report window closed
                                 </button>
                             @endif

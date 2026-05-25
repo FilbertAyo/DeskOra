@@ -41,7 +41,7 @@ class WeeklySubmissionReminderTest extends TestCase
         $this->assertSame($current->id, $r->report->period->id);
     }
 
-    public function test_plan_is_missed_after_deadline_without_cta(): void
+    public function test_plan_still_has_cta_after_deadline_when_period_is_open(): void
     {
         Carbon::setTestNow(Carbon::create(2025, 4, 6, 10, 0, 0));
         [, $next] = $this->createCurrentAndNextPeriods();
@@ -51,10 +51,26 @@ class WeeklySubmissionReminderTest extends TestCase
         $r = $svc->forUser($user);
 
         $this->assertNotNull($r->plan);
+        $this->assertFalse($r->plan->isMissed);
+        $this->assertTrue($r->plan->showCta);
+        $this->assertEmpty($r->missedMessages);
+        $this->assertTrue($r->showToast);
+    }
+
+    public function test_plan_is_missed_when_work_period_is_closed(): void
+    {
+        Carbon::setTestNow(Carbon::create(2025, 4, 6, 10, 0, 0));
+        [, $next] = $this->createCurrentAndNextPeriods();
+        $next->update(['status' => WorkPeriod::STATUS_CLOSED]);
+        $user = $this->makeUserWithWeeklyPermissions();
+        $svc = app(WeeklySubmissionReminderService::class);
+
+        $r = $svc->forUser($user);
+
+        $this->assertNotNull($r->plan);
         $this->assertTrue($r->plan->isMissed);
         $this->assertFalse($r->plan->showCta);
         $this->assertNotEmpty($r->missedMessages);
-        $this->assertFalse($r->showToast);
     }
 
     public function test_plan_is_still_open_on_saturday_before_2359_cutoff(): void
@@ -147,16 +163,37 @@ class WeeklySubmissionReminderTest extends TestCase
         $this->assertTrue($r->showToast);
     }
 
-    public function test_store_blocks_new_weekly_plan_after_deadline(): void
+    public function test_allows_submit_weekly_plan_after_deadline_when_period_is_open(): void
     {
         Carbon::setTestNow(Carbon::create(2025, 4, 6, 10, 0, 0));
         [, $next] = $this->createCurrentAndNextPeriods();
+        $user = $this->makeUserWithWeeklyPermissions();
+
+        $draft = Document::create([
+            'user_id' => $user->id,
+            'period_id' => $next->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Old draft',
+            'state' => Document::STATE_DRAFT,
+            'main_target' => 'Target',
+        ]);
+
+        $svc = app(WeeklySubmissionReminderService::class);
+
+        $this->assertFalse($svc->blocksNewWeeklyDocument(Document::TYPE_WEEKLY_PLAN, $next->fresh()));
+        $this->assertTrue($svc->allowsSubmitWeeklyDocument($draft->fresh()));
+    }
+
+    public function test_store_blocks_new_weekly_plan_when_work_period_is_closed(): void
+    {
+        Carbon::setTestNow(Carbon::create(2025, 4, 6, 10, 0, 0));
+        [, $next] = $this->createCurrentAndNextPeriods();
+        $next->update(['status' => WorkPeriod::STATUS_CLOSED]);
         $user = User::factory()->create();
         $user->givePermissionTo('create weekly plan');
 
         $this->assertTrue(
             app(WeeklySubmissionReminderService::class)->blocksNewWeeklyDocument(Document::TYPE_WEEKLY_PLAN, $next->fresh()),
-            'Plan deadline should be treated as passed on 2025-04-06 for period '.$next->id
         );
 
         $this->withoutMiddleware(ValidateCsrfToken::class);
@@ -164,11 +201,11 @@ class WeeklySubmissionReminderTest extends TestCase
         $response = $this->actingAs($user)->post(route('documents.store'), [
             'type' => Document::TYPE_WEEKLY_PLAN,
             'period_id' => (string) $next->id,
-            'main_target' => 'Too late',
+            'main_target' => 'Closed period',
         ]);
 
         $response->assertRedirect();
-        $response->assertSessionHas('error', 'The submission window for this weekly document has closed.');
+        $response->assertSessionHas('error', 'This work period is closed. Please contact your administrator.');
         $this->assertDatabaseMissing('documents', [
             'user_id' => $user->id,
             'type' => Document::TYPE_WEEKLY_PLAN,

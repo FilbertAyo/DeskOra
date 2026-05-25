@@ -12,11 +12,11 @@
         $isWeeklyPlanWindowClosed = isset($selectedType)
             && $selectedType === 'weekly_plan'
             && $resolvedWeeklyPeriod
-            && $resolvedWeeklyPeriod->isPlanDeadlinePassed();
+            && ! $resolvedWeeklyPeriod->isOpen();
         $isWeeklyReportWindowClosed = isset($selectedType)
             && $selectedType === 'weekly_report'
             && $resolvedWeeklyPeriod
-            && $resolvedWeeklyPeriod->isReportDeadlinePassed();
+            && ! $resolvedWeeklyPeriod->isOpen();
         $isWeeklyWindowClosed = $isWeeklyPlanWindowClosed || $isWeeklyReportWindowClosed;
     @endphp
     <div class="page-header">
@@ -51,9 +51,9 @@
                 <div class="alert alert-warning border mb-3" role="alert">
                     <i class="ti ti-lock me-1"></i>
                     @if($isWeeklyPlanWindowClosed)
-                        Weekly plan submission window is currently closed for this period.
+                        This work period is closed. Weekly plans cannot be saved or submitted for it.
                     @elseif($isWeeklyReportWindowClosed)
-                        Weekly report submission window is currently closed for this period.
+                        This work period is closed. Weekly reports cannot be saved or submitted for it.
                     @endif
                 </div>
             @endif

@@ -256,7 +256,7 @@ class DocumentController extends Controller
             if ($selectedType === Document::TYPE_WEEKLY_PLAN) {
                 // For weekly plan, default to explicit period when its submission window is open; otherwise next week.
                 $targetPlanPeriod = $nextPeriod;
-                if ($requestedPeriod && $requestedPeriod->isOpen() && ! $requestedPeriod->isPlanDeadlinePassed()) {
+                if ($requestedPeriod && $requestedPeriod->isOpen()) {
                     $targetPlanPeriod = $requestedPeriod;
                 }
                 $defaultPeriodId = $targetPlanPeriod?->id;
@@ -269,7 +269,7 @@ class DocumentController extends Controller
             } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT) {
                 // For weekly report, default to explicit period when its submission window is open; otherwise current week.
                 $targetReportPeriod = $currentPeriod;
-                if ($requestedPeriod && $requestedPeriod->isOpen() && ! $requestedPeriod->isReportDeadlinePassed()) {
+                if ($requestedPeriod && $requestedPeriod->isOpen()) {
                     $targetReportPeriod = $requestedPeriod;
                 }
                 $defaultPeriodId = $targetReportPeriod?->id;
@@ -578,20 +578,14 @@ class DocumentController extends Controller
                 : $this->workPeriodService->periodForWeeklyReportSubmission();
 
             $isExpectedPeriod = $expectedPeriod && $period->id === $expectedPeriod->id;
-            if (! $isExpectedPeriod) {
-                $isWindowOpen = $request->type === Document::TYPE_WEEKLY_PLAN
-                    ? ! $period->isPlanDeadlinePassed()
-                    : ! $period->isReportDeadlinePassed();
+            if (! $isExpectedPeriod && ! $period->isOpen()) {
+                $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
+                    ? 'The selected weekly plan work period is closed.'
+                    : 'The selected weekly report work period is closed.';
 
-                if (! $isWindowOpen) {
-                    $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
-                        ? 'The selected weekly plan window is closed.'
-                        : 'The selected weekly report window is closed.';
-
-                    return redirect()->back()
-                        ->withInput()
-                        ->with('error', $errorMessage);
-                }
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', $errorMessage);
             }
         }
 
@@ -648,7 +642,7 @@ class DocumentController extends Controller
             if ($existingDocument && $action === 'submit' && ! $this->weeklySubmissionReminderService->allowsSubmitWeeklyDocument($existingDocument)) {
                 return redirect()->back()
                     ->withInput()
-                    ->with('error', 'The submission deadline has passed. You can no longer submit this document.');
+                    ->with('error', 'This work period is closed. You can no longer submit this document.');
             }
         }
 
@@ -1149,7 +1143,7 @@ class DocumentController extends Controller
             && ! $this->weeklySubmissionReminderService->allowsSubmitWeeklyDocument($document)) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'The submission deadline has passed. You can no longer submit this document.');
+                ->with('error', 'This work period is closed. You can no longer submit this document.');
         }
 
         $document->loadMissing('user');
@@ -1678,11 +1672,7 @@ class DocumentController extends Controller
         $availableTypes = Document::getAvailableTypesForUser($user);
 
         /*
-         * New Weekly Plan button: offer creating a plan for the earliest open target week where
-         * (1) plan_deadline for that week is not passed (supports admin-extended deadlines into the target week),
-         * (2) the user does not already own a plan for that period (draft or submitted).
-         * Check both current and next periods so a late Week N plan still appears while calendar is in Week N
-         * after the deadline was extended past the usual pre-week window.
+         * New Weekly Plan button: earliest open target week where the user has no plan yet (draft or submitted).
          */
         $planCreatePeriod = null;
         if (isset($availableTypes['weekly_plan']) && $currentPeriod) {
@@ -1693,9 +1683,6 @@ class DocumentController extends Controller
 
             foreach ($candidatePeriods as $period) {
                 if (! $period->isOpen()) {
-                    continue;
-                }
-                if ($period->isPlanDeadlinePassed()) {
                     continue;
                 }
                 if (Document::findWeeklyPlanForPeriodOwner((string) $period->id, (string) $user->id)) {

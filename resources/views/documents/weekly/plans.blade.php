@@ -19,7 +19,7 @@
                                     <i class="ti ti-circle-plus me-1"></i> New Weekly Plan
                                 </a>
                             @elseif(isset($availableTypes['weekly_plan']))
-                                <button type="button" class="btn btn-light btn-sm" disabled title="No open plan slot (deadline passed or you already have a draft/submitted plan for the upcoming week)">
+                                <button type="button" class="btn btn-light btn-sm" disabled title="No open work period slot (or you already have a plan for the available weeks)">
                                     <i class="ti ti-calendar-off me-1"></i> Weekly plan window closed
                                 </button>
                             @endif
