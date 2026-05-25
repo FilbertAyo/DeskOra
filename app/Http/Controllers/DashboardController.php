@@ -232,11 +232,23 @@ class DashboardController extends Controller
                 ->orderBy('week_number', 'desc')
                 ->take(6)
                 ->get();
+            $timelinePeriodIds = $timelinePeriods->pluck('id')->map(static fn ($id) => (string) $id)->all();
+            $timelineDocumentTypes = [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT];
             $timelineDocs = Document::query()
                 ->with(['sharedUsers:id,name'])
                 ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
-                ->whereIn('period_id', $timelinePeriods->pluck('id'))
-                ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+                ->when(
+                    $timelinePeriodIds === [],
+                    fn ($query) => $query->whereRaw('1 = 0'),
+                    fn ($query) => $query->whereRaw(
+                        'BINARY period_id IN ('.implode(', ', array_fill(0, count($timelinePeriodIds), 'BINARY ?')).')',
+                        $timelinePeriodIds
+                    )
+                )
+                ->whereRaw(
+                    'BINARY type IN ('.implode(', ', array_fill(0, count($timelineDocumentTypes), 'BINARY ?')).')',
+                    $timelineDocumentTypes
+                )
                 ->get()
                 ->groupBy(fn ($doc) => $doc->period_id.'-'.$doc->type);
 
@@ -280,9 +292,9 @@ class DashboardController extends Controller
         }
 
         $sharedWithMeCount = Document::query()
-            ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+            ->whereRaw('BINARY type IN (BINARY ?, BINARY ?)', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
             ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
-            ->where('user_id', '!=', $user->id)
+            ->whereRaw('BINARY user_id <> BINARY ?', [(string) $user->id])
             ->count();
 
         $collaborationEvents = DB::table('document_share_events as dse')
