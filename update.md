@@ -1,3 +1,0 @@
-New update here:
-
-Our boss vision is always apart from plan and report of each staff but he want each departments to have a matrix with it overall budget which is pulled from everyone plan so ideally is one staff on the department can click add weekly matrix of that plan he want and then pull activities from each staffs on that department hence he select the activity and then he write input , output ,impact (dropdown of year plan of that departments plans)

@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->string('name');
+            $table->string('title')->nullable();
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->foreignUlid('department_id')->nullable()->constrained('departments')->nullOnDelete();
@@ -25,6 +26,8 @@ return new class extends Migration
             $table->string('avatar')->default('image/prof.jpeg');
             $table->boolean('dark_mode')->default(false);
             $table->string('messenger_color')->nullable();
+           
+        
             $table->rememberToken();
             $table->timestamps();
         });
