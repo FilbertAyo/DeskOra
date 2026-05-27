@@ -48,6 +48,9 @@ echo "==> Installing production dependencies..."
 echo "==> Running database migrations..."
 "$PHP_BIN" artisan migrate --force
 
+echo "==> Ensuring documents union view exists..."
+"$PHP_BIN" artisan documents:ensure-union-view
+
 if [ "$RUN_DOMAIN_BACKFILL" = "1" ]; then
   echo "==> Running documents domain backfill..."
   "$PHP_BIN" artisan documents:backfill-domain-tables --chunk=200

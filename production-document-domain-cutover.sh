@@ -114,6 +114,9 @@ echo "==> Installing production dependencies..."
 echo "==> Running database migrations..."
 "$PHP_BIN" artisan migrate --force
 
+echo "==> Ensuring documents union view exists..."
+"$PHP_BIN" artisan documents:ensure-union-view
+
 echo "==> Backfilling documents domain tables..."
 "$PHP_BIN" artisan documents:backfill-domain-tables --chunk="$BACKFILL_CHUNK"
 

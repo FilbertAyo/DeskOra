@@ -1124,6 +1124,10 @@ class Document extends Model
      */
     public static function countPendingWeeklyBudgetReviewForPeriod(?string $periodId = null): int
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('documents')) {
+            return 0;
+        }
+
         $query = static::query()
             ->select(['id', 'content', 'budget_review_status', 'type', 'state', 'period_id'])
             ->weeklyPlans()
