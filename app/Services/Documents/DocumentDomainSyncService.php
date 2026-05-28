@@ -19,6 +19,7 @@ use App\Models\WeeklyReportActivityProgress;
 use App\Models\WeeklyReportBudgetStatus;
 use App\Models\WeeklyReportChallenge;
 use App\Models\WeeklyReportMeeting;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -67,6 +68,11 @@ class DocumentDomainSyncService
             if (! is_array($row)) {
                 continue;
             }
+
+            $carryOverSourceWeeklyReportId = $this->resolveCarryOverSourceWeeklyReportId($row);
+            // Defensive guard: stale clients may still send the retired legacy key.
+            $row = Arr::except($row, ['carry_over_source_report_id']);
+
             $activity = WeeklyPlanActivity::query()->create([
                 'weekly_plan_id' => (string) $weeklyPlan->id,
                 'activity_uid' => trim((string) ($row['activity_uid'] ?? '')) ?: (string) Str::ulid(),
@@ -74,7 +80,7 @@ class DocumentDomainSyncService
                 'activity' => trim((string) ($row['activity'] ?? '')) ?: null,
                 'location' => trim((string) ($row['location'] ?? '')) ?: null,
                 'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')) ?: null,
-                'carry_over_source_weekly_report_id' => $this->resolveCarryOverSourceWeeklyReportId($row),
+                'carry_over_source_weekly_report_id' => $carryOverSourceWeeklyReportId,
                 'sort_order' => $index,
             ]);
             $assignees = collect(is_array($row['team_member_ids'] ?? null) ? $row['team_member_ids'] : [])
