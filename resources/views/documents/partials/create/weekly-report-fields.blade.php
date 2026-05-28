@@ -371,20 +371,18 @@
                             }
                         @endphp
                         @foreach($achievementRows as $i => $achievement)
+                            @php
+                                $achievementText = is_string($achievement)
+                                    ? $achievement
+                                    : (is_array($achievement) ? (string) ($achievement['achievement'] ?? '') : '');
+                            @endphp
                             <tr>
                                 <td class="text-center align-middle js-achievement-row-no">{{ $i + 1 }}</td>
                                 <td>
                                     <textarea class="form-control @error("content.key_achievements.$i") is-invalid @enderror"
                                         name="content[key_achievements][{{ $i }}]"
                                         rows="5"
-                                        placeholder="Achievement">@php
-                                            $achievementText = '';
-                                            if (is_string($achievement)) {
-                                                $achievementText = $achievement;
-                                            } elseif (is_array($achievement)) {
-                                                $achievementText = (string) ($achievement['achievement'] ?? '');
-                                            }
-                                        @endphp{{ old("content.key_achievements.$i", $achievementText) }}</textarea>
+                                        placeholder="Achievement">{{ old("content.key_achievements.$i", $achievementText) }}</textarea>
                                 </td>
                                 <td class="text-center align-middle">
                                     <button type="button" class="btn btn-sm btn-outline-danger remove-achievement-row">&times;</button>
