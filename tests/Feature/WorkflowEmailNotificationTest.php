@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Notifications\WorkPeriodOpenedNotification;
 use App\Notifications\WeeklyActionLogSubmittedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
@@ -255,6 +256,49 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertNotSentTo($owner, WeeklyBudgetSubmissionNotification::class);
         Notification::assertNotSentTo($owner, WeeklyActionLogSubmittedNotification::class);
         Notification::assertNotSentTo($owner, WeeklyDocumentReturnedToDraftNotification::class);
+    }
+
+    public function test_creating_work_period_notifies_all_eligible_staff_by_email_channel(): void
+    {
+        Notification::fake();
+
+        $admin = $this->createActiveUserWithChannel('email');
+        $admin->givePermissionTo('manage work periods');
+
+        $eligibleEmail = $this->createActiveUserWithChannel('email');
+        $eligibleBoth = $this->createActiveUserWithChannel('both');
+        $smsOnly = $this->createActiveUserWithChannel('sms');
+
+        $inactiveEmail = User::factory()->create([
+            'status' => 'inactive',
+            'notification_channel' => 'email',
+            'email' => 'inactive-work-period@example.com',
+        ]);
+
+        $missingEmail = $this->createActiveUserWithChannel('email');
+        $missingEmail->update(['email' => null]);
+
+        $response = $this->actingAs($admin)->post(route('work-periods.store'), [
+            'year' => 2026,
+            'week_number' => 17,
+            'week_start_date' => '2026-04-20',
+        ]);
+
+        $response->assertRedirect(route('work-periods.index'));
+        $this->assertDatabaseHas('work_periods', [
+            'year' => 2026,
+            'week_number' => 17,
+            'week_start_date' => '2026-04-20',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        Notification::assertSentTo($admin, WorkPeriodOpenedNotification::class);
+        Notification::assertSentTo($eligibleEmail, WorkPeriodOpenedNotification::class);
+        Notification::assertSentTo($eligibleBoth, WorkPeriodOpenedNotification::class);
+
+        Notification::assertNotSentTo($smsOnly, WorkPeriodOpenedNotification::class);
+        Notification::assertNotSentTo($inactiveEmail, WorkPeriodOpenedNotification::class);
+        Notification::assertNotSentTo($missingEmail, WorkPeriodOpenedNotification::class);
     }
 
     private function createOpenPeriod(): WorkPeriod

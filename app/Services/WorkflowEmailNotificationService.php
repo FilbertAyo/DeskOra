@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WorkPeriod;
+use App\Notifications\WorkPeriodOpenedNotification;
 use App\Notifications\WeeklyActionLogSubmittedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
@@ -15,6 +17,20 @@ use Illuminate\Support\Facades\Notification;
 
 class WorkflowEmailNotificationService
 {
+    /**
+     * Notify all eligible staff users when a new work period is opened.
+     */
+    public function notifyWorkPeriodOpened(WorkPeriod $period): void
+    {
+        $recipients = $this->eligibleEmailRecipients()->get();
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        Notification::send($recipients, new WorkPeriodOpenedNotification($period));
+    }
+
     /**
      * Notify approvers (e.g. CEO / document_approver role) when a weekly plan/report is submitted.
      */
