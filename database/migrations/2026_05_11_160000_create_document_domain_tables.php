@@ -40,11 +40,16 @@ return new class extends Migration
             $table->string('location')->nullable();
             $table->text('notes_inclusion')->nullable();
             $table->foreignUlid('carry_over_source_report_id')->nullable()->constrained('documents')->nullOnDelete();
+            $table->foreignUlid('carry_over_source_weekly_report_id')->nullable()->constrained('weekly_reports')->nullOnDelete();
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 
             $table->unique(['weekly_plan_id', 'activity_uid'], 'weekly_plan_activities_uid_unique');
             $table->index(['weekly_plan_id', 'sort_order']);
+            $table->index(
+                'carry_over_source_weekly_report_id',
+                'weekly_plan_activities_carry_over_weekly_report_index'
+            );
         });
 
         Schema::create('weekly_plan_activity_assignees', function (Blueprint $table) {
@@ -122,13 +127,19 @@ return new class extends Migration
             $table->ulid('id')->primary();
             $table->foreignUlid('weekly_plan_budget_item_id')->unique()->constrained('weekly_plan_budget_items')->cascadeOnDelete();
             $table->enum('decision', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->enum('approval_stage', ['pending', 'reviewed', 'approved', 'authorized', 'rejected'])->default('pending');
             $table->decimal('provided_amount', 14, 2)->default(0);
             $table->text('note')->nullable();
             $table->foreignUlid('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
+            $table->foreignUlid('approved_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('approved_at')->nullable();
+            $table->foreignUlid('authorized_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('authorized_at')->nullable();
             $table->timestamps();
 
             $table->index('decision');
+            $table->index('approval_stage');
             $table->index('reviewed_by');
         });
 

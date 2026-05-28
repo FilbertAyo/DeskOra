@@ -147,6 +147,7 @@ class WeeklyObjectiveMatrixController extends Controller
 
         $planSubmissionSummary = $this->departmentPlanSubmissionSummary($period, $subDepartmentIds, (string) $matrix->department_id);
         $rolledUpBudget = $this->calculateDepartmentBudgetTotal($period, $subDepartmentIds, (string) $matrix->department_id);
+        $budgetBreakdown = $this->departmentBudgetBreakdown($period, $subDepartmentIds, (string) $matrix->department_id);
 
         return view('matrix-report.edit', [
             'matrix' => $matrix->load(['department:id,name,parent_id', 'period:id,year,week_number']),
@@ -154,6 +155,7 @@ class WeeklyObjectiveMatrixController extends Controller
             'impactOptions' => $impactOptions,
             'planSubmissionSummary' => $planSubmissionSummary,
             'rolledUpBudget' => $rolledUpBudget,
+            'budgetBreakdown' => $budgetBreakdown,
             'subDepartmentCount' => count($subDepartmentIds),
             'entryDefaults' => $entryDefaults,
         ]);
@@ -524,6 +526,85 @@ class WeeklyObjectiveMatrixController extends Controller
         }
 
         return round($total, 2);
+    }
+
+    /**
+     * @return array{
+     *   departments: array<int, array{
+     *      name: string,
+     *      total: float,
+     *      members: array<int, array{name: string, total: float}>
+     *   }>,
+     *   overall_total: float
+     * }
+     */
+    private function departmentBudgetBreakdown(?WorkPeriod $period, array $subDepartmentIds, string $parentDepartmentId): array
+    {
+        $empty = [
+            'departments' => [],
+            'overall_total' => 0.0,
+        ];
+
+        if (! $period) {
+            return $empty;
+        }
+
+        $staffIds = $this->activeStaffIdsForDepartments($subDepartmentIds, $parentDepartmentId);
+        if ($staffIds === []) {
+            return $empty;
+        }
+
+        $plans = $this->submittedPlansForPeriodAndStaff($period, $staffIds);
+        $departments = [];
+        $overallTotal = 0.0;
+
+        foreach ($plans as $plan) {
+            $departmentName = (string) ($plan->user?->department?->name ?? 'Unknown Sub-department');
+            $staffName = (string) ($plan->user?->name ?? 'Unknown Staff');
+            $staffTotal = 0.0;
+
+            foreach ($plan->budgetItems as $item) {
+                $staffTotal += (float) ($item->amount_numeric ?? 0);
+            }
+            $staffTotal = round($staffTotal, 2);
+
+            if (! isset($departments[$departmentName])) {
+                $departments[$departmentName] = [
+                    'name' => $departmentName,
+                    'total' => 0.0,
+                    'members' => [],
+                ];
+            }
+
+            $departments[$departmentName]['members'][] = [
+                'name' => $staffName,
+                'total' => $staffTotal,
+            ];
+            $departments[$departmentName]['total'] += $staffTotal;
+            $overallTotal += $staffTotal;
+        }
+
+        $departmentRows = collect($departments)
+            ->map(function (array $department): array {
+                $members = collect($department['members'])
+                    ->sortBy(fn (array $member) => strtolower($member['name']))
+                    ->values()
+                    ->all();
+
+                return [
+                    'name' => $department['name'],
+                    'total' => round((float) $department['total'], 2),
+                    'members' => $members,
+                ];
+            })
+            ->sortBy(fn (array $department) => strtolower($department['name']))
+            ->values()
+            ->all();
+
+        return [
+            'departments' => $departmentRows,
+            'overall_total' => round($overallTotal, 2),
+        ];
     }
 
     private function normalizeMatrixEntryForForm(array $entry): array

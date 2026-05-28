@@ -65,6 +65,11 @@ class ParentDepartmentWeeklyMatrixTest extends TestCase
         $editResponse->assertSee('Prepare payroll files');
         $editResponse->assertSee('Reconcile accounts');
         $editResponse->assertSee('1,500.00 TZS');
+        $editResponse->assertSee('Budget by Department and Member');
+        $editResponse->assertSee('Accounting subtotal');
+        $editResponse->assertSee($fixture['staffA']->name);
+        $editResponse->assertSee($fixture['staffB']->name);
+        $editResponse->assertSee('Overall total');
         $editResponse->assertSee('Add Row');
 
         $activityKey = $fixture['planA']->id.'::'.$fixture['activityUidA'];

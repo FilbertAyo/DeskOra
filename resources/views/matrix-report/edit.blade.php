@@ -183,6 +183,53 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="mt-3">
+                            <h6 class="mb-2">Budget by Department and Member</h6>
+                            @php
+                                $budgetDepartments = collect($budgetBreakdown['departments'] ?? []);
+                                $budgetOverall = (float) ($budgetBreakdown['overall_total'] ?? 0);
+                            @endphp
+                            @if($budgetDepartments->isEmpty())
+                                <div class="alert alert-light border mb-0">
+                                    No submitted staff budget lines are available for this parent department in the selected week.
+                                </div>
+                            @else
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 32%;">Department</th>
+                                            <th>Member</th>
+                                            <th class="text-end" style="width: 22%;">Budget (TZS)</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        @foreach($budgetDepartments as $departmentRow)
+                                            @foreach(($departmentRow['members'] ?? []) as $memberIndex => $memberRow)
+                                                <tr>
+                                                    <td>
+                                                        @if($memberIndex === 0)
+                                                            {{ $departmentRow['name'] ?? 'Unknown Sub-department' }}
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ $memberRow['name'] ?? 'Unknown Staff' }}</td>
+                                                    <td class="text-end">{{ number_format((float) ($memberRow['total'] ?? 0), 2) }}</td>
+                                                </tr>
+                                            @endforeach
+                                            <tr class="table-secondary">
+                                                <td colspan="2"><strong>{{ $departmentRow['name'] ?? 'Department' }} subtotal</strong></td>
+                                                <td class="text-end"><strong>{{ number_format((float) ($departmentRow['total'] ?? 0), 2) }}</strong></td>
+                                            </tr>
+                                        @endforeach
+                                        <tr class="table-primary">
+                                            <td colspan="2"><strong>Overall total</strong></td>
+                                            <td class="text-end"><strong>{{ number_format($budgetOverall, 2) }}</strong></td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
                         @error('entries')
                         <div class="text-danger small mt-2">{{ $message }}</div>
                         @enderror
