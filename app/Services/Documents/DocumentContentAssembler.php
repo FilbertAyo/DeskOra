@@ -193,7 +193,7 @@ class DocumentContentAssembler
         if (is_array($rawAchievements)) {
             foreach ($rawAchievements as $item) {
                 if (is_string($item)) {
-                    $text = trim($item);
+                    $text = $this->sanitizeWeeklyReportText($item);
                     if ($text !== '') {
                         $keyAchievements[] = $text;
                     }
@@ -202,7 +202,7 @@ class DocumentContentAssembler
                 }
 
                 if (is_array($item)) {
-                    $text = trim((string) ($item['achievement'] ?? ''));
+                    $text = $this->sanitizeWeeklyReportText((string) ($item['achievement'] ?? ''));
                     if ($text !== '') {
                         $keyAchievements[] = $text;
                     }
@@ -220,8 +220,8 @@ class DocumentContentAssembler
                     continue;
                 }
 
-                $challenge = trim((string) ($row['challenge'] ?? ''));
-                $actionTakenPlanned = trim((string) ($row['action_taken_planned'] ?? ''));
+                $challenge = $this->sanitizeWeeklyReportText((string) ($row['challenge'] ?? ''));
+                $actionTakenPlanned = $this->sanitizeWeeklyReportText((string) ($row['action_taken_planned'] ?? ''));
                 if ($challenge !== '' || $actionTakenPlanned !== '') {
                     $challengesMitigation[] = [
                         'challenge' => $challenge,
@@ -238,6 +238,22 @@ class DocumentContentAssembler
         unset($content['budget_status']);
 
         return $content;
+    }
+
+    private function sanitizeWeeklyReportText(string $value): string
+    {
+        $trimmed = trim($value);
+
+        if ($trimmed === '') {
+            return '';
+        }
+
+        // Strip accidental Blade placeholder artifacts rendered as literal text.
+        if (str_starts_with($trimmed, '@__raw_block_') && str_contains($trimmed, '{{ old(')) {
+            return '';
+        }
+
+        return $trimmed;
     }
 
     /**
