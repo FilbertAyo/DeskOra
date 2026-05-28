@@ -55,6 +55,7 @@
                                                 'location' => $location,
                                                 'notes_inclusion' => $notes,
                                                 'team_member_ids' => $teamIds,
+                                                'carry_over_source_weekly_report_id' => trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')),
                                                 'carry_over_source_report_id' => trim((string) ($row['carry_over_source_report_id'] ?? '')),
                                             ];
                                         })
@@ -71,6 +72,7 @@
                                                 'location' => trim((string) ($row['location'] ?? '')),
                                                 'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')),
                                                 'team_member_ids' => is_array($row['team_member_ids'] ?? null) ? $row['team_member_ids'] : [],
+                                                'carry_over_source_weekly_report_id' => trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')),
                                                 'carry_over_source_report_id' => trim((string) ($row['carry_over_source_report_id'] ?? '')),
                                             ];
                                         })
@@ -247,7 +249,10 @@
                                                                         </td>
                                                                         <td>
                                                                             {{ $row['notes_inclusion'] ?? '' }}
-                                                                            @if(trim((string) ($row['carry_over_source_report_id'] ?? '')) !== '')
+                                                                            @if(
+                                                                                trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) !== ''
+                                                                                || trim((string) ($row['carry_over_source_report_id'] ?? '')) !== ''
+                                                                            )
                                                                                 <div><small class="badge bg-light-info text-info mt-1">Carried from previous week</small></div>
                                                                             @endif
                                                                         </td>

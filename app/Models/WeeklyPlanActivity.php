@@ -18,7 +18,6 @@ class WeeklyPlanActivity extends Model
         'activity',
         'location',
         'notes_inclusion',
-        'carry_over_source_report_id',
         'carry_over_source_weekly_report_id',
         'sort_order',
     ];
@@ -26,11 +25,6 @@ class WeeklyPlanActivity extends Model
     public function weeklyPlan(): BelongsTo
     {
         return $this->belongsTo(WeeklyPlan::class);
-    }
-
-    public function carryOverSourceReport(): BelongsTo
-    {
-        return $this->belongsTo(Document::class, 'carry_over_source_report_id');
     }
 
     public function carryOverSourceWeeklyReport(): BelongsTo

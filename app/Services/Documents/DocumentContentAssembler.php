@@ -60,7 +60,6 @@ class DocumentContentAssembler
                 'activity' => (string) ($activity->activity ?? ''),
                 'location' => (string) ($activity->location ?? ''),
                 'notes_inclusion' => (string) ($activity->notes_inclusion ?? ''),
-                'carry_over_source_report_id' => null,
                 'carry_over_source_weekly_report_id' => $activity->carry_over_source_weekly_report_id,
                 'team_member_ids' => $activity->assignees->pluck('id')->map(fn ($id) => (string) $id)->all(),
             ];

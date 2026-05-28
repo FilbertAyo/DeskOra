@@ -150,7 +150,6 @@ class BackfillDocumentDomainTables extends Command
                 'activity' => trim((string) ($row['activity'] ?? '')) ?: null,
                 'location' => trim((string) ($row['location'] ?? '')) ?: null,
                 'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')) ?: null,
-                'carry_over_source_report_id' => trim((string) ($row['carry_over_source_report_id'] ?? '')) ?: null,
                 'carry_over_source_weekly_report_id' => $this->resolveCarryOverSourceWeeklyReportId($row),
                 'sort_order' => $index,
             ]);

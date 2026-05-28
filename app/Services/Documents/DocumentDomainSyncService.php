@@ -74,8 +74,6 @@ class DocumentDomainSyncService
                 'activity' => trim((string) ($row['activity'] ?? '')) ?: null,
                 'location' => trim((string) ($row['location'] ?? '')) ?: null,
                 'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')) ?: null,
-                // Legacy document foreign key is retired during cutover.
-                'carry_over_source_report_id' => null,
                 'carry_over_source_weekly_report_id' => $this->resolveCarryOverSourceWeeklyReportId($row),
                 'sort_order' => $index,
             ]);

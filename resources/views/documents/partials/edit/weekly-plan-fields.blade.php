@@ -153,7 +153,10 @@
                                                                     <textarea class="form-control" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][activity]"
                                                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $row['activity'] ?? '') }}</textarea>
-                                                                    @if(trim((string) ($row['carry_over_source_report_id'] ?? '')) !== '')
+                                                                    @if(
+                                                                        trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) !== ''
+                                                                        || trim((string) ($row['carry_over_source_report_id'] ?? '')) !== ''
+                                                                    )
                                                                         <small class="badge bg-light-info text-info mt-1">Carried</small>
                                                                     @endif
                                                                 </td>
