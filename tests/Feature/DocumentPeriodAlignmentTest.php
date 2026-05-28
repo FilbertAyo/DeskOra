@@ -132,6 +132,55 @@ class DocumentPeriodAlignmentTest extends TestCase
         ]);
     }
 
+    public function test_weekly_plan_draft_update_with_planned_activities_saves_without_legacy_carry_over_column(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $user = $this->createPlannerUser();
+
+        $document = Document::create([
+            'user_id' => $user->id,
+            'period_id' => $nextPeriod->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'state' => Document::STATE_DRAFT,
+            'main_target' => 'Initial target',
+            'content' => [
+                'planned_activities' => [],
+                'key_meetings' => [],
+                'budget' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->put(route('documents.update', $document), [
+            'action' => 'draft',
+            'main_target' => 'Updated target',
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'day' => 'Saturday',
+                        'activity' => 'Follow-up activity after extension',
+                        'location' => 'On site',
+                        'notes_inclusion' => 'Carry forward note',
+                        'carry_over_source_weekly_report_id' => null,
+                        'team_member_ids' => [],
+                    ],
+                ],
+                'key_meetings' => [],
+                'budget' => [],
+            ],
+        ]);
+
+        $response->assertRedirect(route('documents.show', $document));
+        $response->assertSessionHas('success', 'Document updated successfully.');
+
+        $this->assertDatabaseHas('weekly_plan_activities', [
+            'weekly_plan_id' => $document->id,
+            'day' => 'Saturday',
+            'activity' => 'Follow-up activity after extension',
+            'location' => 'On site',
+        ]);
+    }
+
     public function test_weekly_report_targets_current_week_when_valid_period_selected(): void
     {
         [$currentPeriod] = $this->createCurrentAndNextPeriods();
