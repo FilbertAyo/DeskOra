@@ -3081,7 +3081,6 @@ class DocumentController extends Controller
                 'location' => $location,
                 'team_member_ids' => $teamMemberIds,
                 'notes_inclusion' => $this->clipString($notes, 4000),
-                'carry_over_source_report_id' => null,
                 'carry_over_source_weekly_report_id' => optional($weeklyReport->weeklyReportDomain)->id,
             ];
         }
