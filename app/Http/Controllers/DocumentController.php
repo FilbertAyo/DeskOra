@@ -410,7 +410,6 @@ class DocumentController extends Controller
 
         if ($request->type === Document::TYPE_WEEKLY_PLAN) {
             $validationRules['content.objective.description'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.objective.status'] = ['nullable', 'string', 'in:Not started,Completed,Carried,In Progress'];
             $validationRules['content.objective.reflection_progress'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.planned_activities'] = ['nullable', 'array'];
@@ -1034,7 +1033,6 @@ class DocumentController extends Controller
             $validationRules['main_target'] = ['nullable', 'string', 'max:2000'];
 
             $validationRules['content.objective.description'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.objective.status'] = ['nullable', 'string', 'in:Not started,Completed,Carried,In Progress'];
             $validationRules['content.objective.reflection_progress'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.planned_activities'] = ['nullable', 'array'];
@@ -2847,6 +2845,14 @@ class DocumentController extends Controller
         $content = $this->trimDeep($content);
 
         if ($type === Document::TYPE_WEEKLY_PLAN) {
+            $objective = is_array($content['objective'] ?? null) ? $content['objective'] : [];
+            $reflectionProgress = $this->clipString(trim((string) ($objective['reflection_progress'] ?? '')), 4000);
+            $description = $this->clipString(trim((string) ($objective['description'] ?? '')), 2000);
+            $content['objective'] = array_filter([
+                'description' => $description,
+                'reflection_progress' => $reflectionProgress,
+            ], static fn ($value) => is_string($value) ? $value !== '' : $value !== null);
+
             $content['planned_activities'] = $this->filterNonEmptyRows(
                 $content['planned_activities'] ?? [],
                 ['day', 'activity', 'location', 'team_member_ids', 'notes_inclusion']

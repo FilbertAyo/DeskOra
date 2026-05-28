@@ -22,6 +22,7 @@ class WeeklyPlan extends Model
         'title',
         'state',
         'main_target',
+        'objective_reflection_progress',
         'review_rejection_reason',
         'budget_review_status',
         'budget_reviewed_by',

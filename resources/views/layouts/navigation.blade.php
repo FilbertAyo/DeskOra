@@ -271,7 +271,7 @@
                                 @php
                                     $planContent = is_array($plan->content ?? null) ? $plan->content : [];
                                     $objective = is_array($planContent['objective'] ?? null) ? $planContent['objective'] : [];
-                                    $reflectionProgress = trim((string) ($objective['reflection_progress'] ?? ''));
+                                        $reflectionProgress = trim((string) ($objective['reflection_progress'] ?? ($plan->objective_reflection_progress ?? '')));
                                 @endphp
                                 <tr>
                                     <td class="fw-semibold">{{ $plan->user?->name ?? 'Unknown Staff' }}</td>

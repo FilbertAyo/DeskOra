@@ -92,6 +92,9 @@ class DocumentContentAssembler
         }
 
         return [
+            'objective' => [
+                'reflection_progress' => (string) ($weeklyPlan->objective_reflection_progress ?? ''),
+            ],
             'planned_activities' => $plannedActivities,
             'key_meetings' => $keyMeetings,
             'budget' => $budget,

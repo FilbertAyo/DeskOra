@@ -1,5 +1,6 @@
                                 @php
                                     $objective = $content['objective'] ?? [];
+                                    $objectiveReflection = trim((string) ($objective['reflection_progress'] ?? ($document->weeklyPlanDomain?->objective_reflection_progress ?? '')));
                                     $plannedActivities = $content['planned_activities'] ?? [];
                                     $keyMeetings = $content['key_meetings'] ?? [];
                                     $incomingMeetings = is_array($incomingMeetings ?? null) ? $incomingMeetings : [];
@@ -192,15 +193,13 @@
                                                     <thead class="wh-thead-weekly-plan">
                                                         <tr>
                                                             <th>Main Target</th>
-                                                            <th style="width: 150px;">Status</th>
                                                             <th>Reflection / Progress</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         <tr>
                                                             <td>{{ $document->main_target ?: '-' }}</td>
-                                                            <td>{{ $objective['status'] ?? '-' }}</td>
-                                                            <td>{{ $objective['reflection_progress'] ?? '-' }}</td>
+                                                            <td>{{ $objectiveReflection !== '' ? $objectiveReflection : '-' }}</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>

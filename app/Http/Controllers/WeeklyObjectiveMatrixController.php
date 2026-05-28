@@ -236,7 +236,7 @@ class WeeklyObjectiveMatrixController extends Controller
             ->where('main_target', '!=', '')
             ->with(['user:id,name,department_id', 'user.department:id,name'])
             ->latest('updated_at')
-            ->get(['id', 'user_id', 'main_target', 'updated_at'])
+            ->get(['id', 'user_id', 'main_target', 'objective_reflection_progress', 'updated_at'])
             ->groupBy('user_id')
             ->map(fn ($plans) => $plans->first())
             ->values()

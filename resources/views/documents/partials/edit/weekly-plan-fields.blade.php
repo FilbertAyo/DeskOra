@@ -56,21 +56,10 @@
                                                 </small>
                                             </div>
 
-                                            <div class="row">
-                                                <div class="col-md-4 mb-3">
-                                                    <label class="form-label">Status</label>
-                                                    <select class="form-select" name="content[objective][status]">
-                                                        <option value="" {{ old('content.objective.status', $objective['status'] ?? '') ? '' : 'selected' }}>-- Select Status --</option>
-                                                        @foreach(['Not started', 'Completed', 'Carried', 'In Progress'] as $opt)
-                                                            <option value="{{ $opt }}" {{ old('content.objective.status', $objective['status'] ?? '') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-8 mb-3">
-                                                    <label class="form-label">Reflection / Progress</label>
-                                                    <textarea class="form-control" name="content[objective][reflection_progress]" rows="5"
-                                                        placeholder="What progress/reflection did you have?">{{ old('content.objective.reflection_progress', $objective['reflection_progress'] ?? '') }}</textarea>
-                                                </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Reflection / Progress</label>
+                                                <textarea class="form-control" name="content[objective][reflection_progress]" rows="5"
+                                                    placeholder="What progress/reflection did you have?">{{ old('content.objective.reflection_progress', $objective['reflection_progress'] ?? '') }}</textarea>
                                             </div>
                                         </div>
                                     </div>

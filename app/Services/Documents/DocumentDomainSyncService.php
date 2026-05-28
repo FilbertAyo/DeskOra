@@ -41,6 +41,7 @@ class DocumentDomainSyncService
     private function syncWeeklyPlan(Document $document): void
     {
         $content = is_array($document->content) ? $document->content : [];
+        $objective = is_array($content['objective'] ?? null) ? $content['objective'] : [];
 
         $weeklyPlan = WeeklyPlan::query()->updateOrCreate(
             ['id' => (string) $document->id],
@@ -50,6 +51,7 @@ class DocumentDomainSyncService
                 'title' => $document->title,
                 'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
                 'main_target' => $document->main_target,
+                'objective_reflection_progress' => trim((string) ($objective['reflection_progress'] ?? '')) ?: null,
                 'review_rejection_reason' => $document->review_rejection_reason,
                 'budget_review_status' => $document->budget_review_status,
                 'budget_reviewed_by' => $document->budget_reviewed_by,
