@@ -186,6 +186,7 @@ class DocumentDomainSyncService
     private function syncWeeklyReport(Document $document): void
     {
         $content = is_array($document->content) ? $document->content : [];
+        $content = app(DocumentContentAssembler::class)->normalizeWeeklyReportContent($content);
 
         $weeklyReport = WeeklyReport::query()->updateOrCreate(
             ['id' => (string) $document->id],
@@ -258,7 +259,11 @@ class DocumentDomainSyncService
 
         $achievementRows = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
         foreach (array_values($achievementRows) as $index => $row) {
-            $achievement = trim((string) $row);
+            if (is_array($row)) {
+                $achievement = trim((string) ($row['achievement'] ?? ''));
+            } else {
+                $achievement = trim((string) $row);
+            }
             if ($achievement === '') {
                 continue;
             }

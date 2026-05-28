@@ -142,7 +142,14 @@
                                         <div class="card-body">
                                             @php
                                                 $achievementRows = array_values(array_filter(array_map(function ($item) {
-                                                    return is_string($item) ? trim($item) : '';
+                                                    if (is_string($item)) {
+                                                        return trim($item);
+                                                    }
+                                                    if (is_array($item)) {
+                                                        return trim((string) ($item['achievement'] ?? ''));
+                                                    }
+
+                                                    return '';
                                                 }, $keyAchievements)));
                                             @endphp
                                             @if(count($achievementRows) > 0)

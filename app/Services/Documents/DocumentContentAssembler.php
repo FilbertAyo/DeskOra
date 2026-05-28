@@ -141,37 +141,103 @@ class DocumentContentAssembler
             ];
         }
 
-        $achievements = [];
+        $keyAchievements = [];
         foreach ($weeklyReport->achievements as $row) {
-            $achievements[] = [
-                'achievement' => (string) ($row->achievement ?? ''),
-            ];
+            $achievement = trim((string) ($row->achievement ?? ''));
+            if ($achievement !== '') {
+                $keyAchievements[] = $achievement;
+            }
         }
 
-        $challenges = [];
+        $challengesMitigation = [];
         foreach ($weeklyReport->challenges as $row) {
-            $challenges[] = [
-                'challenge' => (string) ($row->challenge ?? ''),
-            ];
+            $challenge = trim((string) ($row->challenge ?? ''));
+            $actionTakenPlanned = trim((string) ($row->action_taken_planned ?? ''));
+            if ($challenge !== '' || $actionTakenPlanned !== '') {
+                $challengesMitigation[] = [
+                    'challenge' => $challenge,
+                    'action_taken_planned' => $actionTakenPlanned,
+                ];
+            }
         }
 
-        $budgetStatus = [];
+        $budgetStatuses = [];
         foreach ($weeklyReport->budgetStatuses as $row) {
-            $budgetStatus[] = [
+            $budgetStatuses[] = [
                 'status' => (string) ($row->status ?? ''),
                 'notes' => (string) ($row->notes ?? ''),
             ];
         }
 
-        return [
+        return $this->normalizeWeeklyReportContent([
             'summary' => (string) ($weeklyReport->summary ?? ''),
             'target_accomplished_status' => (string) ($weeklyReport->target_accomplished_status ?? ''),
             'activity_progress' => $activityProgress,
             'key_meetings' => $keyMeetings,
-            'achievements' => $achievements,
-            'challenges' => $challenges,
-            'budget_status' => $budgetStatus,
-        ];
+            'key_achievements' => $keyAchievements,
+            'challenges_mitigation' => $challengesMitigation,
+            'budget_statuses' => $budgetStatuses,
+        ]);
+    }
+
+    /**
+     * Align weekly report content keys/shapes used by forms, show, and sync.
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    public function normalizeWeeklyReportContent(array $content): array
+    {
+        $keyAchievements = [];
+        $rawAchievements = $content['key_achievements'] ?? $content['achievements'] ?? [];
+        if (is_array($rawAchievements)) {
+            foreach ($rawAchievements as $item) {
+                if (is_string($item)) {
+                    $text = trim($item);
+                    if ($text !== '') {
+                        $keyAchievements[] = $text;
+                    }
+
+                    continue;
+                }
+
+                if (is_array($item)) {
+                    $text = trim((string) ($item['achievement'] ?? ''));
+                    if ($text !== '') {
+                        $keyAchievements[] = $text;
+                    }
+                }
+            }
+        }
+        $content['key_achievements'] = array_values($keyAchievements);
+        unset($content['achievements']);
+
+        $challengesMitigation = [];
+        $rawChallenges = $content['challenges_mitigation'] ?? $content['challenges'] ?? [];
+        if (is_array($rawChallenges)) {
+            foreach ($rawChallenges as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $challenge = trim((string) ($row['challenge'] ?? ''));
+                $actionTakenPlanned = trim((string) ($row['action_taken_planned'] ?? ''));
+                if ($challenge !== '' || $actionTakenPlanned !== '') {
+                    $challengesMitigation[] = [
+                        'challenge' => $challenge,
+                        'action_taken_planned' => $actionTakenPlanned,
+                    ];
+                }
+            }
+        }
+        $content['challenges_mitigation'] = array_values($challengesMitigation);
+        unset($content['challenges']);
+
+        $rawBudgetStatuses = $content['budget_statuses'] ?? $content['budget_status'] ?? [];
+        $content['budget_statuses'] = is_array($rawBudgetStatuses) ? array_values($rawBudgetStatuses) : [];
+        unset($content['budget_status']);
+
+        return $content;
     }
 
     /**

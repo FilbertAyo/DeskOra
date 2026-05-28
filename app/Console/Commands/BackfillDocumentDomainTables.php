@@ -311,7 +311,11 @@ class BackfillDocumentDomainTables extends Command
 
         $achievementRows = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
         foreach (array_values($achievementRows) as $index => $row) {
-            $achievement = trim((string) $row);
+            if (is_array($row)) {
+                $achievement = trim((string) ($row['achievement'] ?? ''));
+            } else {
+                $achievement = trim((string) $row);
+            }
             if ($achievement === '') {
                 continue;
             }

@@ -10,6 +10,7 @@ use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
 use App\Services\Documents\DocumentListingService;
+use App\Services\Documents\DocumentContentAssembler;
 use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\MonthlyReportYearPlanActivities;
@@ -2896,10 +2897,23 @@ class DocumentController extends Controller
         }
 
         if ($type === Document::TYPE_WEEKLY_REPORT) {
-            $content['key_achievements'] = array_values(array_filter(
-                is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [],
-                fn ($item) => is_string($item) && $item !== ''
-            ));
+            $content = app(DocumentContentAssembler::class)->normalizeWeeklyReportContent($content);
+
+            $content['key_achievements'] = array_values(array_filter(array_map(function ($item) {
+                if (is_string($item)) {
+                    $text = trim($item);
+
+                    return $text !== '' ? $text : null;
+                }
+
+                if (is_array($item)) {
+                    $text = trim((string) ($item['achievement'] ?? ''));
+
+                    return $text !== '' ? $text : null;
+                }
+
+                return null;
+            }, is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [])));
 
             $content['key_meetings'] = $this->filterNonEmptyRows(
                 $content['key_meetings'] ?? [],

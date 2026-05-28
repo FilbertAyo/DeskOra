@@ -1412,23 +1412,27 @@ class Document extends Model
      */
     public function getContentAttribute(mixed $value): ?array
     {
+        $content = null;
+
         if (array_key_exists('content', $this->attributes) && $this->attributes['content'] !== null) {
             $raw = $this->attributes['content'];
             if (is_array($raw)) {
-                return $raw;
-            }
-            if (is_string($raw) && $raw !== '') {
+                $content = $raw;
+            } elseif (is_string($raw) && $raw !== '') {
                 $decoded = json_decode($raw, true);
-
-                return is_array($decoded) ? $decoded : null;
+                $content = is_array($decoded) ? $decoded : null;
             }
         }
 
-        if (! $this->id || ! $this->type) {
-            return null;
+        if ($content === null && $this->id && $this->type) {
+            $content = app(DocumentContentAssembler::class)->assembleForDocument($this);
         }
 
-        return app(DocumentContentAssembler::class)->assembleForDocument($this);
+        if ($content !== null && $this->type === self::TYPE_WEEKLY_REPORT) {
+            $content = app(DocumentContentAssembler::class)->normalizeWeeklyReportContent($content);
+        }
+
+        return $content;
     }
 
     /**
