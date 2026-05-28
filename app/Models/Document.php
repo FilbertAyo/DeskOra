@@ -1284,7 +1284,16 @@ class Document extends Model
             return $mapped;
         }
 
-        $rows = is_array($this->budget_review_items) ? $this->budget_review_items : [];
+        $rows = [];
+        if (array_key_exists('budget_review_items', $this->attributes) && $this->attributes['budget_review_items'] !== null) {
+            $raw = $this->attributes['budget_review_items'];
+            if (is_array($raw)) {
+                $rows = $raw;
+            } elseif (is_string($raw) && $raw !== '') {
+                $decoded = json_decode($raw, true);
+                $rows = is_array($decoded) ? $decoded : [];
+            }
+        }
         $mapped = [];
 
         foreach ($rows as $row) {

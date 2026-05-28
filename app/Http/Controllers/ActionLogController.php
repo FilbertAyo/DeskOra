@@ -231,7 +231,7 @@ class ActionLogController extends Controller
                 'content' => ['tasks' => $this->renumberTasks($finalTasks)],
                 'state' => $nextState,
             ]);
-            $this->documentDomainSyncService->syncFromDocument($existingDocument->fresh());
+            $this->documentDomainSyncService->syncFromDocument($existingDocument);
 
             $document = $existingDocument;
         } else {
@@ -255,7 +255,7 @@ class ActionLogController extends Controller
                 'content' => ['tasks' => $this->renumberTasks($initialTasks)],
                 'state' => $state,
             ]);
-            $this->documentDomainSyncService->syncFromDocument($document->fresh());
+            $this->documentDomainSyncService->syncFromDocument($document);
         }
 
         $message = ($action === 'submit')
@@ -471,7 +471,7 @@ class ActionLogController extends Controller
         }
 
         $document->update($updateData);
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
+        $this->documentDomainSyncService->syncFromDocument($document);
 
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'

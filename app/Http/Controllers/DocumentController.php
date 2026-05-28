@@ -788,7 +788,7 @@ class DocumentController extends Controller
             }
 
             $existingDocument->update($updateData);
-            $this->documentDomainSyncService->syncFromDocument($existingDocument->fresh());
+            $this->documentDomainSyncService->syncFromDocument($existingDocument);
             if (Document::supportsSharedEditing($existingDocument->type)) {
                 $this->syncDocumentShares($existingDocument, $sharedUserIds, $user);
             }
@@ -856,7 +856,7 @@ class DocumentController extends Controller
         }
 
         $document = Document::create($documentData);
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
+        $this->documentDomainSyncService->syncFromDocument($document);
         if (Document::supportsSharedEditing($document->type)) {
             $this->syncDocumentShares($document, $sharedUserIds, $user);
         }
@@ -1277,7 +1277,7 @@ class DocumentController extends Controller
         }
 
         $document->update($updateData);
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
+        $this->documentDomainSyncService->syncFromDocument($document);
         if (Document::supportsSharedEditing($document->type)) {
             $this->syncDocumentShares($document, $sharedUserIds, $actingUser);
         }
@@ -1328,7 +1328,7 @@ class DocumentController extends Controller
         $this->authorize('submit', $document);
 
         $document->submit();
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
+        $this->documentDomainSyncService->syncFromDocument($document);
         $this->syncWeeklyPlanAssignments($document);
         if (! $wasSubmitted) {
             $document->loadMissing('period');
@@ -1357,7 +1357,7 @@ class DocumentController extends Controller
         $reason = trim($validated['reason']);
 
         $document->revertToDraft($reason);
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
+        $this->documentDomainSyncService->syncFromDocument($document);
         $this->syncWeeklyPlanAssignments($document);
         $document->loadMissing('user', 'period');
         $this->workflowEmailNotificationService->notifyWeeklyDocumentReturnedToDraft($document, $actingUser, $reason);
@@ -3508,7 +3508,7 @@ class DocumentController extends Controller
         $nextPlanContent['planned_activities'] = $this->ensureWeeklyPlanActivityUids($existingActivities);
         $nextPlanContent = $this->normalizeTemplateContent($nextPlanContent, Document::TYPE_WEEKLY_PLAN);
         $nextPlan->update(['content' => $nextPlanContent]);
-        $this->documentDomainSyncService->syncFromDocument($nextPlan->fresh());
+        $this->documentDomainSyncService->syncFromDocument($nextPlan);
         $this->syncWeeklyPlanAssignments($nextPlan);
     }
 
