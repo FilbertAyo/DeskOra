@@ -589,7 +589,8 @@
                             <input type="hidden" name="content[key_meetings][${idx}][is_readonly_for_current_user]" value="${isReadonly ? '1' : '0'}">
                             <input type="hidden" name="content[key_meetings][${idx}][location]" value="${escapeHtml(row.location || '')}">
                             <input type="hidden" name="content[key_meetings][${idx}][reactions_notes]" value="${escapeHtml(row.reactions_notes || '')}">
-                            <input type="date" class="form-control" name="content[key_meetings][${idx}][date]" value="${escapeHtml(row.date || '')}" ${isReadonly ? 'disabled' : ''}>
+                            ${isReadonly ? `<input type="hidden" name="content[key_meetings][${idx}][date]" value="${escapeHtml(row.date || '')}">` : ''}
+                            <input type="date" class="form-control" ${isReadonly ? '' : `name="content[key_meetings][${idx}][date]"`} value="${escapeHtml(row.date || '')}" ${isReadonly ? 'disabled' : ''}>
                         </td>
                         <td>
                             <input class="form-control" name="content[key_meetings][${idx}][meeting]" value="${escapeHtml(row.meeting || '')}" placeholder="Meeting / engagement" ${isReadonly ? 'disabled' : ''}>
@@ -601,7 +602,8 @@
                             </select>
                         </td>
                         <td>
-                            <select class="form-select" name="content[key_meetings][${idx}][status]" ${isReadonly ? 'disabled' : ''}>
+                            ${isReadonly ? `<input type="hidden" name="content[key_meetings][${idx}][status]" value="${escapeHtml(row.status || '')}">` : ''}
+                            <select class="form-select" ${isReadonly ? '' : `name="content[key_meetings][${idx}][status]"`} ${isReadonly ? 'disabled' : ''}>
                                 <option value="" ${(row.status || '') === '' ? 'selected' : ''}>-- Select --</option>
                                 <option value="Done" ${(row.status || '') === 'Done' ? 'selected' : ''}>Done</option>
                                 <option value="Not done" ${(row.status || '') === 'Not done' ? 'selected' : ''}>Not done</option>
@@ -742,9 +744,6 @@
                                                 <input class="form-control" type="text" value="${amount}" disabled>
                                             </td>
                                             <td class="text-center">${reviewBadge}</td>
-                                            <td>
-                                                <textarea class="form-control" name="content[budget_statuses][${idx}][notes]" rows="2" ${canProcessWeeklyBudgets ? '' : 'readonly'}></textarea>
-                                            </td>
                                         </tr>
                                     `;
                                 }).join('');

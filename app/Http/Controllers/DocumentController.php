@@ -1076,6 +1076,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -1179,6 +1180,10 @@ class DocumentController extends Controller
                     is_array($rawTemplateContent) ? $rawTemplateContent : [],
                     $actingUser,
                     $document->period_id
+                );
+                $rawTemplateContent = $this->preserveWeeklyReportBudgetNotes(
+                    is_array($rawTemplateContent) ? $rawTemplateContent : [],
+                    $document
                 );
             }
             $templateContent = $this->normalizeTemplateContent(is_array($rawTemplateContent) ? $rawTemplateContent : [], $document->type);
@@ -2913,6 +2918,7 @@ class DocumentController extends Controller
                     $participantIds
                 ))));
                 $row['status'] = trim((string) ($row['status'] ?? ''));
+                $row['date'] = $this->formatMeetingDateField($row['date'] ?? '');
 
                 return $row;
             }, $content['key_meetings']));
@@ -2949,9 +2955,83 @@ class DocumentController extends Controller
 
             $content['budget_statuses'] = $this->filterNonEmptyRows(
                 $content['budget_statuses'] ?? [],
-                ['status', 'notes']
+                ['budget_uid', 'status', 'notes']
             );
         }
+
+        return $content;
+    }
+
+    /**
+     * @param  array<string, mixed>  $existingRow
+     * @param  array<string, mixed>  $defaults
+     */
+    private function preferWeeklyReportMeetingField(array $existingRow, array $defaults, string $field): string
+    {
+        $existingValue = trim((string) ($existingRow[$field] ?? ''));
+        if ($existingValue !== '') {
+            return $field === 'date' ? $this->formatMeetingDateField($existingValue) : $existingValue;
+        }
+
+        $defaultValue = trim((string) ($defaults[$field] ?? ''));
+
+        return $field === 'date' ? $this->formatMeetingDateField($defaultValue) : $defaultValue;
+    }
+
+    private function formatMeetingDateField(mixed $date): string
+    {
+        if ($date === null || $date === '') {
+            return '';
+        }
+
+        if ($date instanceof \Carbon\CarbonInterface) {
+            return $date->toDateString();
+        }
+
+        $trimmed = trim((string) $date);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($trimmed)->toDateString();
+        } catch (\Throwable) {
+            return $trimmed;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    private function preserveWeeklyReportBudgetNotes(array $content, Document $document): array
+    {
+        $existingStatuses = is_array($document->content) ? ($document->content['budget_statuses'] ?? []) : [];
+        $notesByUid = [];
+        foreach ($existingStatuses as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $uid = trim((string) ($row['budget_uid'] ?? ''));
+            $notes = trim((string) ($row['notes'] ?? ''));
+            if ($uid !== '' && $notes !== '') {
+                $notesByUid[$uid] = $notes;
+            }
+        }
+
+        $incomingStatuses = is_array($content['budget_statuses'] ?? null) ? $content['budget_statuses'] : [];
+        foreach ($incomingStatuses as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $uid = trim((string) ($row['budget_uid'] ?? ''));
+            $incomingNotes = trim((string) ($row['notes'] ?? ''));
+            if ($incomingNotes === '' && $uid !== '' && isset($notesByUid[$uid])) {
+                $incomingStatuses[$index]['notes'] = $notesByUid[$uid];
+            }
+        }
+
+        $content['budget_statuses'] = $incomingStatuses;
 
         return $content;
     }
@@ -3234,13 +3314,15 @@ class DocumentController extends Controller
                 $rowKey = $this->weeklyReportMeetingRowKey($normalizedOwnRow);
                 if (isset($existingByKey[$rowKey])) {
                     $existingRow = $existingByKey[$rowKey];
-                    $normalizedOwnRow['date'] = (string) ($existingRow['date'] ?? $normalizedOwnRow['date']);
-                    $normalizedOwnRow['meeting'] = (string) ($existingRow['meeting'] ?? $normalizedOwnRow['meeting']);
+                    $normalizedOwnRow['date'] = $this->preferWeeklyReportMeetingField($existingRow, $normalizedOwnRow, 'date');
+                    $normalizedOwnRow['meeting'] = $this->preferWeeklyReportMeetingField($existingRow, $normalizedOwnRow, 'meeting');
+                    $normalizedOwnRow['status'] = $this->preferWeeklyReportMeetingField($existingRow, $normalizedOwnRow, 'status');
                     $normalizedOwnRow['participant_user_ids'] = is_array($existingRow['participant_user_ids'] ?? null)
+                        && $existingRow['participant_user_ids'] !== []
                         ? $existingRow['participant_user_ids']
                         : $normalizedOwnRow['participant_user_ids'];
-                    $normalizedOwnRow['location'] = (string) ($existingRow['location'] ?? $normalizedOwnRow['location']);
-                    $normalizedOwnRow['reactions_notes'] = (string) ($existingRow['reactions_notes'] ?? $normalizedOwnRow['reactions_notes']);
+                    $normalizedOwnRow['location'] = $this->preferWeeklyReportMeetingField($existingRow, $normalizedOwnRow, 'location');
+                    $normalizedOwnRow['reactions_notes'] = $this->preferWeeklyReportMeetingField($existingRow, $normalizedOwnRow, 'reactions_notes');
                 }
                 if (isset($seen[$rowKey])) {
                     continue;
@@ -3349,7 +3431,7 @@ class DocumentController extends Controller
 
         return [
             'meeting_uid' => $meetingUid,
-            'date' => trim((string) ($row['date'] ?? '')),
+            'date' => $this->formatMeetingDateField($row['date'] ?? ''),
             'meeting' => trim((string) ($row['meeting'] ?? '')),
             'participant_user_ids' => $participantIds,
             'status' => trim((string) ($row['status'] ?? '')),

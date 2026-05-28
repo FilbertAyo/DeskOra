@@ -288,8 +288,11 @@
                                     <input type="hidden" name="content[key_meetings][{{ $i }}][is_readonly_for_current_user]" value="{{ $isReadonlyMeeting ? '1' : '0' }}">
                                     <input type="hidden" name="content[key_meetings][{{ $i }}][location]" value="{{ old("content.key_meetings.$i.location", $meetingRow['location'] ?? '') }}">
                                     <input type="hidden" name="content[key_meetings][{{ $i }}][reactions_notes]" value="{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}">
+                                    @if($isReadonlyMeeting)
+                                        <input type="hidden" name="content[key_meetings][{{ $i }}][date]" value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}">
+                                    @endif
                                     <input type="date" class="form-control"
-                                        name="content[key_meetings][{{ $i }}][date]"
+                                        @unless($isReadonlyMeeting) name="content[key_meetings][{{ $i }}][date]" @endunless
                                         value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}"
                                         @if($isReadonlyMeeting) disabled @endif>
                                 </td>
@@ -317,7 +320,10 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <select class="form-select" name="content[key_meetings][{{ $i }}][status]" @if($isReadonlyMeeting) disabled @endif>
+                                    @if($isReadonlyMeeting)
+                                        <input type="hidden" name="content[key_meetings][{{ $i }}][status]" value="{{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') }}">
+                                    @endif
+                                    <select class="form-select" @unless($isReadonlyMeeting) name="content[key_meetings][{{ $i }}][status]" @endunless @if($isReadonlyMeeting) disabled @endif>
                                         <option value="">-- Select --</option>
                                         <option value="Done" {{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') === 'Done' ? 'selected' : '' }}>Done</option>
                                         <option value="Not done" {{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') === 'Not done' ? 'selected' : '' }}>Not done</option>
@@ -454,7 +460,6 @@
                                 <th>Description / Purpose</th>
                                 <th style="width: 200px;">Amount</th>
                                 <th style="width: 140px;">Review</th>
-                                <th>Notes</th>
                             </tr>
                         </thead>
                         <tbody id="budgetStatusTableBody">
@@ -469,7 +474,6 @@
                                     $currentStatus = old("content.budget_statuses.$i.status", $statusRow['status'] ?? '');
                                     if ($currentStatus === '' && $reviewDecision === 'approved') $currentStatus = 'Received';
                                     elseif ($currentStatus === '' && $reviewDecision === 'pending') $currentStatus = 'Pending';
-                                    $currentNotes = old("content.budget_statuses.$i.notes", $statusRow['notes'] ?? '');
                                 @endphp
                                 <tr>
                                     <td>
@@ -492,9 +496,6 @@
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
-                                    </td>
-                                    <td>
-                                        <textarea class="form-control" rows="2" name="content[budget_statuses][{{ $i }}][notes]" @if(!$canProcessWeeklyBudgets) readonly @endif>{{ $currentNotes }}</textarea>
                                     </td>
                                 </tr>
                             @endforeach

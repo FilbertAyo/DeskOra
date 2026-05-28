@@ -7,6 +7,8 @@ use App\Models\Document;
 use App\Models\MonthlyReport;
 use App\Models\WeeklyPlan;
 use App\Models\WeeklyReport;
+use Carbon\CarbonInterface;
+use Throwable;
 
 class DocumentContentAssembler
 {
@@ -69,7 +71,7 @@ class DocumentContentAssembler
         foreach ($weeklyPlan->meetings as $meeting) {
             $keyMeetings[] = [
                 'meeting_uid' => (string) $meeting->meeting_uid,
-                'date' => (string) ($meeting->date ?? ''),
+                'date' => $this->formatMeetingDate($meeting->date),
                 'meeting' => (string) ($meeting->meeting ?? ''),
                 'status' => (string) ($meeting->status ?? ''),
                 'location' => (string) ($meeting->location ?? ''),
@@ -127,7 +129,7 @@ class DocumentContentAssembler
         foreach ($weeklyReport->meetings as $meeting) {
             $keyMeetings[] = [
                 'meeting_uid' => (string) ($meeting->meeting_uid ?? ''),
-                'date' => (string) ($meeting->date ?? ''),
+                'date' => $this->formatMeetingDate($meeting->date),
                 'meeting' => (string) ($meeting->meeting ?? ''),
                 'status' => (string) ($meeting->status ?? ''),
                 'location' => (string) ($meeting->location ?? ''),
@@ -250,5 +252,27 @@ class DocumentContentAssembler
         }
 
         return ['tasks' => $tasks];
+    }
+
+    private function formatMeetingDate(mixed $date): string
+    {
+        if ($date === null || $date === '') {
+            return '';
+        }
+
+        if ($date instanceof CarbonInterface) {
+            return $date->toDateString();
+        }
+
+        $trimmed = trim((string) $date);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($trimmed)->toDateString();
+        } catch (Throwable) {
+            return $trimmed;
+        }
     }
 }
