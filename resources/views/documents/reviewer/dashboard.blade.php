@@ -88,17 +88,8 @@
             <div class="card shadow-none border">
                 <div class="card-body">
                     <form method="GET" action="{{ route('documents.reviewer-dashboard') }}" id="filterForm">
-                        <div class="row">
-                            <div class="col-md-2">
-                                <label class="form-label small text-muted">Document Type</label>
-                                <select class="form-control form-control-sm" name="type" id="typeFilter">
-                                    <option value="">All Types</option>
-                                    <option value="weekly_plan" {{ request('type') == 'weekly_plan' ? 'selected' : '' }}>Weekly Plans</option>
-                                    <option value="weekly_report" {{ request('type') == 'weekly_report' ? 'selected' : '' }}>Weekly Reports</option>
-                                    <option value="action_log" {{ request('type') == 'action_log' ? 'selected' : '' }}>Action Logs</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
                                 <label class="form-label small text-muted">User</label>
                                 <select class="form-control form-control-sm" name="user_id" id="userFilter">
                                     <option value="">All Users</option>
@@ -109,45 +100,23 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-muted">Period</label>
-                                <select class="form-control form-control-sm" name="period" id="periodFilter">
-                                    <option value="">All Time</option>
-                                    <option value="this_week" {{ request('period') == 'this_week' ? 'selected' : '' }}>This Week</option>
-                                    <option value="last_week" {{ request('period') == 'last_week' ? 'selected' : '' }}>Last Week</option>
-                                    <option value="this_month" {{ request('period') == 'this_month' ? 'selected' : '' }}>This Month</option>
-                                    <option value="last_month" {{ request('period') == 'last_month' ? 'selected' : '' }}>Last Month</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-muted">Specific Week</label>
-                                <select class="form-control form-control-sm" name="work_period_id">
-                                    <option value="">Any Week</option>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Work Period</label>
+                                <select class="form-control form-control-sm" name="work_period_id" id="workPeriodFilter">
                                     @foreach($periodOptions as $periodOption)
-                                        <option value="{{ $periodOption->id }}" {{ (($selectedWorkPeriodId ?? request('work_period_id')) == $periodOption->id) ? 'selected' : '' }}>
-                                            Week {{ $periodOption->week_number }} • {{ $periodOption->date_range }}
+                                        <option value="{{ $periodOption->id }}" {{ (string) ($selectedWorkPeriodId ?? $defaultWorkPeriodId) === (string) $periodOption->id ? 'selected' : '' }}>
+                                            Week {{ $periodOption->week_number }}, {{ $periodOption->year }} ({{ $periodOption->date_range }})
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
-                                <div class="col-md-2">
-                                <label class="form-label small text-muted">Year</label>
-                                <select class="form-control form-control-sm" name="year">
-                                    <option value="">Any Year</option>
-                                    @foreach($years as $year)
-                                        <option value="{{ $year }}" {{ request('year') == $year ? 'selected' : '' }}>
-                                            {{ $year }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
+                            <div class="col-md-4">
                                 <button type="submit" class="btn btn-primary btn-sm w-100">
-                                    <i class="ti ti-filter me-1"></i> Apply Filters
+                                    <i class="ti ti-filter me-1"></i> Filter
                                 </button>
                             </div>
                         </div>
-                        @if(request()->hasAny(['type', 'user_id', 'period']))
+                        @if(request()->filled('user_id') || (request()->has('work_period_id') && (string) request('work_period_id') !== (string) ($defaultWorkPeriodId ?? '')))
                             <div class="row mt-2">
                                 <div class="col-md-12">
                                     <a href="{{ route('documents.reviewer-dashboard') }}" class="btn btn-sm btn-light">
@@ -293,7 +262,7 @@
         </div>
 
         @foreach($groupedDocuments as $type => $documents)
-            @if($documents->count() > 0 || !$selectedType)
+            @if($documents->count() > 0)
                 <div class="col-md-12 mb-4">
                     <div class="card shadow-none border">
                         <div class="card-header bg-white border-bottom">

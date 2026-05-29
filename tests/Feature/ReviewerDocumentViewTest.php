@@ -238,7 +238,7 @@ class ReviewerDocumentViewTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_reviewer_dashboard_only_includes_documents_from_two_latest_periods(): void
+    public function test_reviewer_dashboard_defaults_to_current_work_period(): void
     {
         $week14 = WorkPeriod::create([
             'year' => 2026,
@@ -309,13 +309,14 @@ class ReviewerDocumentViewTest extends TestCase
 
         $this->actingAs($reviewer)->get(route('documents.reviewer-dashboard'))->assertOk()
             ->assertSee('Latest week sixteen report', false)
-            ->assertSee('Middle week fifteen report', false)
+            ->assertDontSee('Middle week fifteen report', false)
             ->assertDontSee('Older week fourteen report', false);
 
         $this->actingAs($reviewer)
             ->get(route('documents.reviewer-dashboard', ['work_period_id' => $week15->id]))
             ->assertOk()
             ->assertSee('Middle week fifteen report', false)
+            ->assertDontSee('Latest week sixteen report', false)
             ->assertDontSee('Older week fourteen report', false);
 
         $this->actingAs($reviewer)
@@ -323,7 +324,8 @@ class ReviewerDocumentViewTest extends TestCase
                 'work_period_id' => $week14->id,
             ]))
             ->assertOk()
-            ->assertDontSee('Older week fourteen report', false);
+            ->assertSee('Older week fourteen report', false)
+            ->assertDontSee('Middle week fifteen report', false);
     }
 
     protected function tearDown(): void

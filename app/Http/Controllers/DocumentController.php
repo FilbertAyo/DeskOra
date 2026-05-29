@@ -1390,62 +1390,35 @@ class DocumentController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        $baseQuery = Document::with(['user', 'period', 'sharedUsers:id,name'])
-            ->submitted();
-
-        $latestPeriods = WorkPeriod::query()
+        $periodOptions = WorkPeriod::query()
             ->orderBy('year', 'desc')
             ->orderBy('week_number', 'desc')
-            ->limit(2)
+            ->limit(26)
             ->get();
 
-        $latestPeriodIds = $latestPeriods->pluck('id')->map(fn ($id): string => (string) $id)->all();
+        $periodOptionIds = $periodOptions->pluck('id')->map(fn ($id): string => (string) $id)->all();
 
-        if ($latestPeriodIds !== []) {
-            $baseQuery->whereIn('period_id', $latestPeriodIds);
-        }
+        $defaultWorkPeriod = $this->workPeriodService->periodForWeeklyReportSubmission()
+            ?? $periodOptions->first();
+
+        $defaultWorkPeriodId = $defaultWorkPeriod?->id;
 
         $selectedWorkPeriodId = $request->input('work_period_id');
-        if (($selectedWorkPeriodId !== null && $selectedWorkPeriodId !== '')
-            && ! in_array((string) $selectedWorkPeriodId, $latestPeriodIds, true)) {
-            $selectedWorkPeriodId = '';
+        if ($selectedWorkPeriodId === null || $selectedWorkPeriodId === '') {
+            $selectedWorkPeriodId = $defaultWorkPeriodId;
+        } elseif (! in_array((string) $selectedWorkPeriodId, $periodOptionIds, true)) {
+            $selectedWorkPeriodId = $defaultWorkPeriodId;
         }
 
-        // Filter by user if provided
-        if ($request->has('user_id') && $request->user_id) {
-            $baseQuery->forUser($request->user_id);
-        }
-
-        // Filter by week/month if provided
-        if ($request->has('period') && $request->period) {
-            $period = $request->period;
-            if ($period === 'this_week') {
-                $baseQuery->whereBetween('updated_at', [
-                    now()->startOfWeek(),
-                    now()->endOfWeek(),
-                ]);
-            } elseif ($period === 'last_week') {
-                $baseQuery->whereBetween('updated_at', [
-                    now()->subWeek()->startOfWeek(),
-                    now()->subWeek()->endOfWeek(),
-                ]);
-            } elseif ($period === 'this_month') {
-                $baseQuery->whereMonth('updated_at', now()->month)
-                    ->whereYear('updated_at', now()->year);
-            } elseif ($period === 'last_month') {
-                $baseQuery->whereMonth('updated_at', now()->subMonth()->month)
-                    ->whereYear('updated_at', now()->subMonth()->year);
-            }
-        }
+        $baseQuery = Document::with(['user', 'period', 'sharedUsers:id,name'])
+            ->submitted();
 
         if ($selectedWorkPeriodId) {
             $baseQuery->where('period_id', $selectedWorkPeriodId);
         }
 
-        if ($request->has('year') && $request->year) {
-            $baseQuery->whereHas('period', function ($q) use ($request) {
-                $q->where('year', $request->year);
-            });
+        if ($request->filled('user_id')) {
+            $baseQuery->forUser($request->user_id);
         }
 
         $allDocuments = (clone $baseQuery)->latest()->get();
@@ -1454,18 +1427,10 @@ class DocumentController extends Controller
             $allDocuments->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])->values()
         );
 
-        // Group documents by type
         $groupedDocuments = [
             'action_log' => $allDocuments->where('type', Document::TYPE_ACTION_LOG),
         ];
 
-        // Filter by type if provided (for single type view)
-        $selectedType = $request->has('type') && $request->type ? $request->type : null;
-        if ($selectedType && isset($groupedDocuments[$selectedType])) {
-            $groupedDocuments = [$selectedType => $groupedDocuments[$selectedType]];
-        }
-
-        // Get statistics (apply same filters)
         $statsQuery = (clone $baseQuery);
         $stats = [
             'total_submitted' => $statsQuery->count(),
@@ -1474,26 +1439,21 @@ class DocumentController extends Controller
             'action_logs' => (clone $statsQuery)->actionLogs()->count(),
         ];
 
-        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) use ($latestPeriodIds) {
+        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) use ($selectedWorkPeriodId) {
             $q->submitted();
-            if ($latestPeriodIds !== []) {
-                $q->whereIn('period_id', $latestPeriodIds);
+            if ($selectedWorkPeriodId) {
+                $q->where('period_id', $selectedWorkPeriodId);
             }
         })->orderBy('name')->get();
-
-        $periodOptions = $latestPeriods;
-
-        $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
 
         return view('documents.reviewer.dashboard', compact(
             'mergedWeeklyRows',
             'groupedDocuments',
             'stats',
             'usersWithDocuments',
-            'selectedType',
             'selectedWorkPeriodId',
-            'periodOptions',
-            'years'
+            'defaultWorkPeriodId',
+            'periodOptions'
         ));
     }
 
