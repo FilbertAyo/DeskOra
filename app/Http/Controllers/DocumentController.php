@@ -898,17 +898,7 @@ class DocumentController extends Controller
 
         [$relatedDocument, $relatedAction] = $this->resolveWeeklyRelatedDocumentContext($document);
 
-        $assignedWeeklyActivities = collect();
-        if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
-            $document->loadMissing('sharedUsers:id');
-            $planParticipantIds = collect($document->allEditableUserIds())
-                ->map(static fn ($id) => (string) $id)
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
-        }
+        $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
 
         $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
 
@@ -944,9 +934,34 @@ class DocumentController extends Controller
             $relatedDocument->loadMissing('user');
         }
 
+        $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
+
         $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
+    }
+
+    /**
+     * @return Collection<int, mixed>
+     */
+    private function assignedWeeklyActivitiesForWeeklyPlanDocument(Document $document): Collection
+    {
+        if ($document->type !== Document::TYPE_WEEKLY_PLAN || ! $document->period_id) {
+            return collect();
+        }
+
+        $document->loadMissing('sharedUsers:id');
+        $planParticipantIds = collect($document->allEditableUserIds())
+            ->map(static fn ($id) => (string) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->weeklyActivityAssignmentService->assignmentsForUsers(
+            $planParticipantIds,
+            (string) $document->period_id
+        );
     }
 
     /**
@@ -985,17 +1000,7 @@ class DocumentController extends Controller
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
         $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
-        $assignedWeeklyActivities = collect();
-        if ($document->type === Document::TYPE_WEEKLY_PLAN && $document->period_id) {
-            $document->loadMissing('sharedUsers:id');
-            $planParticipantIds = collect($document->allEditableUserIds())
-                ->map(static fn ($id) => (string) $id)
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUsers($planParticipantIds, (string) $document->period_id);
-        }
+        $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
         $reportMeetingRows = [];
         if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->period_id) {
             $existingMeetingRows = is_array($document->content) ? ($document->content['key_meetings'] ?? []) : [];

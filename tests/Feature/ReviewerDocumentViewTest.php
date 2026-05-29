@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyActivityAssignment;
 use App\Models\WorkPeriod;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -87,6 +88,62 @@ class ReviewerDocumentViewTest extends TestCase
             ->get(route('documents.reviewer-show', $report->id))
             ->assertOk()
             ->assertSee('Related Weekly Plan', false);
+    }
+
+    public function test_reviewer_show_includes_assigned_activities_for_weekly_plan(): void
+    {
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-13',
+            'week_end_date' => '2026-04-19',
+            'plan_deadline' => '2026-04-17',
+            'report_deadline' => '2026-04-18',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'Programs', 'status' => 'active']);
+        $owner = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $owner->givePermissionTo('create weekly plan');
+        $assignee = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $assignee->givePermissionTo('create weekly plan');
+
+        $plan = Document::create([
+            'user_id' => $assignee->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Assignee plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Target',
+            'content' => [],
+        ]);
+
+        WeeklyActivityAssignment::create([
+            'source_document_id' => $plan->id,
+            'source_user_id' => $owner->id,
+            'assignee_user_id' => $assignee->id,
+            'period_id' => $period->id,
+            'activity_uid' => (string) \Illuminate\Support\Str::ulid(),
+            'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
+            'activity_payload' => [
+                'day' => 'Tuesday',
+                'activity' => 'Reviewer-visible assigned task',
+                'location' => 'Field',
+            ],
+        ]);
+
+        $reviewer = User::factory()->create(['status' => 'active']);
+        $reviewer->givePermissionTo('view all documents');
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.reviewer-show', $plan->id))
+            ->assertOk()
+            ->assertSee('Reviewer-visible assigned task', false);
+
+        $this->actingAs($assignee)
+            ->get(route('documents.show', $plan->id))
+            ->assertOk()
+            ->assertSee('Reviewer-visible assigned task', false);
     }
 
     public function test_reviewer_show_returns_403_for_monthly_report(): void
