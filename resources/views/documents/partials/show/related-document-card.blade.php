@@ -1,9 +1,12 @@
     @php
-        $hasRelatedWeeklyPanel = ($relatedDocument || $relatedAction)
-            && in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true);
+        $isWeeklyDocument = in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true);
+        $hasRelatedWeeklyPanel = ($showWeeklyRelatedPanel ?? false)
+            || (($relatedDocument ?? null) || ($relatedAction ?? null))
+            && $isWeeklyDocument;
         $relatedShowRoute = ($reviewerPresentation ?? false)
             ? 'documents.reviewer-show'
             : 'documents.show';
+        $relatedTypeLabel = $document->type === \App\Models\Document::TYPE_WEEKLY_PLAN ? 'Weekly Report' : 'Weekly Plan';
     @endphp
     @if($hasRelatedWeeklyPanel)
             <div class="col-md-6">
@@ -11,7 +14,7 @@
                     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">
                             <i class="ti ti-link me-2"></i>
-                            Related {{ $document->type === \App\Models\Document::TYPE_WEEKLY_PLAN ? 'Weekly Report' : 'Weekly Plan' }}
+                            Related {{ $relatedTypeLabel }}
                         </h6>
                         @if($relatedDocument)
                             @if($relatedDocument->state === 'draft')
@@ -60,6 +63,10 @@
                                     <i class="ti ti-plus-circle me-1"></i> Create
                                 </a>
                             </div>
+                        @else
+                            <p class="text-muted mb-0 small">
+                                No {{ strtolower($relatedTypeLabel) }} has been created for this week yet.
+                            </p>
                         @endif
                     </div>
                 </div>

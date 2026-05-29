@@ -1,9 +1,9 @@
         @php
-            $hasRelatedWeeklyPanel = ($relatedDocument ?? null) || ($relatedAction ?? null);
-            $infoColumnClass = $hasRelatedWeeklyPanel
-                && in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true)
-                ? 'col-md-6'
-                : 'col-12';
+            $isWeeklyDocument = in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true);
+            $hasRelatedWeeklyPanel = ($showWeeklyRelatedPanel ?? false)
+                || (($relatedDocument ?? null) || ($relatedAction ?? null))
+                && $isWeeklyDocument;
+            $infoColumnClass = $hasRelatedWeeklyPanel && $isWeeklyDocument ? 'col-md-6' : 'col-12';
         @endphp
         <div class="{{ $infoColumnClass }}">
             <div class="card shadow-none border">

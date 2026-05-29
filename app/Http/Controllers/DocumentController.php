@@ -897,12 +897,13 @@ class DocumentController extends Controller
         $this->authorize('view', $document);
 
         [$relatedDocument, $relatedAction] = $this->resolveWeeklyRelatedDocumentContext($document);
+        $showWeeklyRelatedPanel = $this->shouldShowWeeklyRelatedPanel($document, $relatedDocument, $relatedAction);
 
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
 
         $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
     }
 
     /**
@@ -929,6 +930,7 @@ class DocumentController extends Controller
         [$relatedDocument] = $this->resolveWeeklyRelatedDocumentContext($document, includeCreateAction: false);
         $relatedAction = null;
         $reviewerPresentation = true;
+        $showWeeklyRelatedPanel = $this->shouldShowWeeklyRelatedPanel($document, $relatedDocument, $relatedAction, reviewerPresentation: true);
 
         if ($relatedDocument) {
             $relatedDocument->loadMissing('user');
@@ -938,7 +940,7 @@ class DocumentController extends Controller
 
         $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
     }
 
     /**
@@ -3792,5 +3794,29 @@ class DocumentController extends Controller
         }
 
         return [$relatedDocument, $relatedAction];
+    }
+
+    private function shouldShowWeeklyRelatedPanel(
+        Document $document,
+        ?Document $relatedDocument,
+        ?array $relatedAction,
+        bool $reviewerPresentation = false
+    ): bool {
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return false;
+        }
+
+        if ($relatedDocument || $relatedAction) {
+            return true;
+        }
+
+        if ($reviewerPresentation) {
+            return true;
+        }
+
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        return $user?->hasPermissionTo('view all documents') ?? false;
     }
 }

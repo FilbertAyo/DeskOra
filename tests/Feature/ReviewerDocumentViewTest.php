@@ -146,6 +146,42 @@ class ReviewerDocumentViewTest extends TestCase
             ->assertSee('Reviewer-visible assigned task', false);
     }
 
+    public function test_reviewer_show_shows_related_panel_when_paired_document_missing(): void
+    {
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 16,
+            'week_start_date' => '2026-04-13',
+            'week_end_date' => '2026-04-19',
+            'plan_deadline' => '2026-04-17',
+            'report_deadline' => '2026-04-18',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $dept = Department::create(['name' => 'QA', 'status' => 'active']);
+        $staff = User::factory()->create(['department_id' => $dept->id, 'status' => 'active']);
+        $staff->givePermissionTo('create weekly plan');
+
+        $plan = Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Plan only',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Target',
+            'content' => [],
+        ]);
+
+        $reviewer = User::factory()->create(['status' => 'active']);
+        $reviewer->givePermissionTo('view all documents');
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.reviewer-show', $plan->id))
+            ->assertOk()
+            ->assertSee('Related Weekly Report', false)
+            ->assertSee('Not Created', false);
+    }
+
     public function test_reviewer_show_returns_403_for_monthly_report(): void
     {
         $dept = Department::create(['name' => 'Finance', 'status' => 'active']);

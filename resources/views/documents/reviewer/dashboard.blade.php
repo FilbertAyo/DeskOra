@@ -341,6 +341,11 @@
                                                                 class="btn btn-info btn-sm text-white" title="View">
                                                                 <i class="ti ti-eye"></i>
                                                             </a>
+                                                        @elseif(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true))
+                                                            <a href="{{ route('documents.reviewer-show', $document->id) }}"
+                                                                class="btn btn-info btn-sm text-white" title="View">
+                                                                <i class="ti ti-eye"></i>
+                                                            </a>
                                                         @else
                                                             <a href="{{ route('documents.show', $document->id) }}"
                                                                 class="btn btn-info btn-sm text-white" title="View">
