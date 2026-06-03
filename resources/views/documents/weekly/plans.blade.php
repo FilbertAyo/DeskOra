@@ -13,17 +13,6 @@
                             </ul>
                         </div>
 
-                        <div class="col-auto">
-                            @if(isset($availableTypes['weekly_plan']))
-                                @include('documents.partials.weekly-submission-action-button', [
-                                    'slot' => $weeklyPlanSlot ?? null,
-                                    'documentType' => 'weekly_plan',
-                                    'disabledHint' => ($weeklyPlanSlot ?? null)?->graceActive
-                                        ? 'Your plan for the extended week is already submitted'
-                                        : 'No open work period for a new weekly plan (or you already submitted for the available weeks)',
-                                ])
-                            @endif
-                        </div>
                     </div>
                 </div>
             </div>
@@ -35,7 +24,7 @@
             <div class="card tbl-card mb-2">
                 <div class="card-header bg-white border-bottom">
                     <div class="row align-items-center">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-2 mb-md-0">
                             <h5 class="mb-0">
                                 <i class="ti ti-target me-2 text-info"></i>Weekly Plans
                             </h5>
@@ -90,7 +79,7 @@
                                         @if(($weeklyPlanSlot ?? null)?->period)
                                             <span class="text-muted fw-normal">(for Week {{ $weeklyPlanSlot->period->week_number }} of {{ $weeklyPlanSlot->period->year }})</span>
                                         @elseif(isset($nextPeriod))
-                                            <span class="text-muted fw-normal">(for Week {{ $nextPeriod->week_number }})</span>
+                                            <span class="text-muted fw-normal">(for Week {{ $nextPeriod->week_number }} of {{ $nextPeriod->year }})</span>
                                         @endif
                                     </h6>
                                     <p class="mb-0">
@@ -111,6 +100,7 @@
                                         @include('documents.partials.weekly-submission-action-button', [
                                             'slot' => $weeklyPlanSlot ?? null,
                                             'documentType' => 'weekly_plan',
+                                            'btnClass' => 'btn-info',
                                         ])
                                     @endif
                                 </div>

@@ -1630,18 +1630,24 @@ class DocumentController extends Controller
         );
 
         $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
-        $deadlineStatuses = null;
-        // Plan submissions target the next work period; use that period's plan_deadline for the banner.
-        if ($nextPeriod) {
-            $deadlineStatuses = [
-                'plan_badge' => $nextPeriod->getPlanDeadlineBadgeClass(),
-                'plan_text' => $nextPeriod->getDeadlineStatusText('plan'),
-                'plan_due' => $nextPeriod->getPlanDeadlineCutoff(),
-            ];
-        }
 
         $availableTypes = Document::getAvailableTypesForUser($user);
-        $weeklyPlanSlot = app(\App\Services\WeeklySubmissionWindowService::class)->resolvePlanSlot($user);
+
+        $selectedCreatePeriod = $request->input('period_id')
+            ? WorkPeriod::query()->find($request->input('period_id'))
+            : null;
+        $weeklyPlanSlot = app(\App\Services\WeeklySubmissionWindowService::class)
+            ->resolvePlanSlot($user, $selectedCreatePeriod instanceof WorkPeriod ? $selectedCreatePeriod : null);
+
+        $planDeadlinePeriod = $weeklyPlanSlot->period ?? $nextPeriod;
+        $deadlineStatuses = null;
+        if ($planDeadlinePeriod) {
+            $deadlineStatuses = [
+                'plan_badge' => $planDeadlinePeriod->getPlanDeadlineBadgeClass(),
+                'plan_text' => $planDeadlinePeriod->getDeadlineStatusText('plan'),
+                'plan_due' => $planDeadlinePeriod->getPlanDeadlineCutoff(),
+            ];
+        }
 
         return view('documents.weekly.plans', [
             'documents' => $documents,

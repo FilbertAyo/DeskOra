@@ -13,17 +13,7 @@
                             </ul>
                         </div>
 
-                        <div class="col-auto d-flex align-items-center gap-2">
-                            @if(isset($availableTypes['weekly_report']))
-                                @include('documents.partials.weekly-submission-action-button', [
-                                    'slot' => $weeklyReportSlot ?? null,
-                                    'documentType' => 'weekly_report',
-                                    'disabledHint' => ($weeklyReportSlot ?? null)?->graceActive
-                                        ? 'Your report for the extended week is already submitted'
-                                        : 'No open work period for a new weekly report (or you already submitted for the available weeks)',
-                                ])
-                            @endif
-                        </div>
+                      
                     </div>
                 </div>
             </div>

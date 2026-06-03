@@ -14,7 +14,7 @@ class WeeklySubmissionWindowService
 {
     public function __construct(private readonly WorkPeriodService $workPeriods) {}
 
-    public function resolvePlanSlot(User $user): WeeklySubmissionSlot
+    public function resolvePlanSlot(User $user, ?WorkPeriod $preferredPeriod = null): WeeklySubmissionSlot
     {
         if (! $user->hasPermissionTo('create weekly plan')) {
             return $this->emptySlot();
@@ -23,7 +23,15 @@ class WeeklySubmissionWindowService
         $current = $this->workPeriods->periodForWeeklyReportSubmission();
         $next = $this->workPeriods->periodForWeeklyPlanSubmission();
 
-        return $this->firstActionablePlanSlot($user, $this->planCandidatePeriods($current, $next));
+        $candidates = $this->planCandidatePeriods($current, $next);
+        if ($preferredPeriod && $preferredPeriod->isOpen()) {
+            $candidates = collect([$preferredPeriod])
+                ->merge($candidates)
+                ->unique(fn (WorkPeriod $period) => $period->id)
+                ->values();
+        }
+
+        return $this->firstActionablePlanSlot($user, $candidates);
     }
 
     public function resolveReportSlot(User $user, ?WorkPeriod $preferredPeriod = null): WeeklySubmissionSlot
