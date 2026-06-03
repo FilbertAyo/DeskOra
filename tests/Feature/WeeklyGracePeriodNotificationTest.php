@@ -120,7 +120,6 @@ class WeeklyGracePeriodNotificationTest extends TestCase
 
         $response = $this->actingAs($admin)->put(route('notification.grace-period.update'), [
             'enabled' => '1',
-            'channels' => ['email'],
         ]);
 
         $response->assertRedirect(route('notification.index'));
@@ -132,6 +131,29 @@ class WeeklyGracePeriodNotificationTest extends TestCase
         $this->assertNotNull($config);
         $this->assertTrue($config->enabled);
         $this->assertSame(['email'], $config->channels);
+    }
+
+    public function test_grace_email_sent_to_staff_with_sms_notification_channel(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 3, 10, 0, 0));
+        Mail::fake();
+
+        [, $owingStaff, , $period] = $this->seedGraceScenario();
+        $owingStaff->update(['notification_channel' => 'sms']);
+
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->givePermissionTo('manage work periods');
+
+        $this->actingAs($admin)->put(route('work-periods.update', $period), [
+            'week_start_date' => $period->week_start_date->format('Y-m-d'),
+            'plan_deadline' => '2026-06-03',
+            'report_deadline' => $period->report_deadline->format('Y-m-d'),
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        Mail::assertSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
+            return $mail->hasTo($owingStaff->email);
+        });
     }
 
     public function test_manage_notifications_user_can_run_grace_alerts_manually(): void
@@ -165,7 +187,6 @@ class WeeklyGracePeriodNotificationTest extends TestCase
 
         $response = $this->actingAs($user)->put(route('notification.grace-period.update'), [
             'enabled' => '1',
-            'channels' => ['email'],
         ]);
 
         $response->assertForbidden();

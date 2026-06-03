@@ -59,13 +59,11 @@ class NotificationController extends Controller
     {
         $validated = $request->validate([
             'enabled' => ['nullable', 'boolean'],
-            'channels' => ['required', 'array', 'min:1'],
-            'channels.*' => ['in:email,in_app'],
         ]);
 
         $config = $reminderConfigService->updateWeeklyGracePeriodConfig([
             'enabled' => (bool) ($validated['enabled'] ?? false),
-            'channels' => array_values(array_unique($validated['channels'])),
+            'channels' => ['email'],
         ]);
 
         return redirect()
@@ -131,7 +129,7 @@ class NotificationController extends Controller
 
     public function runGracePeriodNow(WeeklyGracePeriodNotificationDispatcher $dispatcher): RedirectResponse
     {
-        $result = $dispatcher->dispatchNow();
+        $result = $dispatcher->dispatchNow(forceResend: true);
 
         if ($result['skipped_disabled'] ?? false) {
             return redirect()
@@ -139,8 +137,9 @@ class NotificationController extends Controller
                 ->with('error', 'Grace period alerts are disabled. Enable them and save before running.');
         }
 
-        $sent = (int) ($result['sent'] ?? 0);
+        $emailSent = (int) ($result['email_sent'] ?? 0);
         $periodsWithGrace = (int) ($result['periods_with_grace'] ?? 0);
+        $mailer = (string) config('mail.default');
 
         if ($periodsWithGrace === 0) {
             return redirect()
@@ -148,14 +147,35 @@ class NotificationController extends Controller
                 ->with('success', 'No open work periods are in an active grace window right now. Nothing was sent.');
         }
 
-        if ($sent === 0) {
+        if ($emailSent === 0) {
             return redirect()
                 ->route('notification.index')
-                ->with('success', "Grace periods are active for {$periodsWithGrace} week(s), but all eligible staff were already notified (or have no pending submission).");
+                ->with('warning', "Grace is active for {$periodsWithGrace} week(s), but no emails were sent. Check that staff have email addresses and that mail is configured (current mailer: {$mailer}).");
         }
 
         return redirect()
             ->route('notification.index')
-            ->with('success', "Grace period alerts sent to {$sent} staff member(s) across {$periodsWithGrace} week(s) in grace.");
+            ->with('success', "Grace period emails sent to {$emailSent} staff member(s) across {$periodsWithGrace} week(s) (mailer: {$mailer}).");
+    }
+
+    public function sendGracePeriodTestEmail(
+        Request $request,
+        WeeklyGracePeriodNotificationDispatcher $dispatcher,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'test_email' => ['required', 'email'],
+        ]);
+
+        try {
+            $dispatcher->sendTestEmail($validated['test_email']);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('notification.index')
+                ->with('error', 'Test email failed: '.$e->getMessage().' (mailer: '.config('mail.default').')');
+        }
+
+        return redirect()
+            ->route('notification.index')
+            ->with('success', 'Test grace period email sent to '.$validated['test_email'].'.');
     }
 }

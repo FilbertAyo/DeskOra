@@ -18,6 +18,11 @@
             <i class="ti ti-alert-circle me-1"></i>{{ session('error') }}
         </div>
     @endif
+    @if(session('warning'))
+        <div class="alert alert-warning mb-4">
+            <i class="ti ti-alert-triangle me-1"></i>{{ session('warning') }}
+        </div>
+    @endif
 
     <div class="row mb-4">
         <div class="col-md-12">
@@ -64,8 +69,15 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted small">
-                            Sent automatically when you <strong>extend</strong> a work period’s plan or report deadline
-                            and staff still have not submitted for that week.
+                            <strong>Email only</strong> — sent when you extend a plan or report deadline and staff still
+                            have not <strong>submitted</strong> that weekly plan or report (drafts still receive a reminder).
+                            Goes to every active staff member with an email address, not SMS profile settings.
+                        </p>
+                        <p class="small text-muted">
+                            Mail driver: <code>{{ config('mail.default') }}</code>
+                            @if(config('mail.default') === 'log')
+                                <span class="text-danger">— emails are written to the log only until SMTP is configured in <code>.env</code>.</span>
+                            @endif
                         </p>
 
                         <form action="{{ route('notification.grace-period.update') }}" method="POST" class="row g-3">
@@ -76,53 +88,47 @@
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="grace_enabled" name="enabled" value="1"
                                         {{ old('enabled', $graceConfig->enabled) ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="grace_enabled">Enable grace period alerts</label>
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label d-block">Channels</label>
-                                @php
-                                    $graceChannels = old('channels', $graceConfig->channels ?? []);
-                                @endphp
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="channels[]" id="grace_channel_email" value="email"
-                                        {{ in_array('email', $graceChannels, true) ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="grace_channel_email">Email</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="channels[]" id="grace_channel_in_app" value="in_app"
-                                        {{ in_array('in_app', $graceChannels, true) ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="grace_channel_in_app">In-app notification</label>
+                                    <label class="form-check-label" for="grace_enabled">Enable grace period email alerts</label>
                                 </div>
                             </div>
 
                             <div class="col-12">
                                 <p class="mb-2 small text-muted">
-                                    Last sent:
+                                    Last email batch:
                                     @if($lastGraceSentAt)
                                         {{ \Carbon\Carbon::parse($lastGraceSentAt)->timezone(config('app.timezone'))->format('M d, Y H:i') }}
                                     @else
                                         Not sent yet
                                     @endif
                                 </p>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <button type="submit" class="btn btn-warning">
-                                        <i class="ti ti-device-floppy me-1"></i>Save grace alerts
-                                    </button>
-                                </div>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="ti ti-device-floppy me-1"></i>Save grace alerts
+                                </button>
+                            </div>
+                        </form>
+
+                        <form action="{{ route('notification.grace-period.test-email') }}" method="POST" class="row g-2 align-items-end mt-3 border-top pt-3">
+                            @csrf
+                            <div class="col-sm-8">
+                                <label for="test_email" class="form-label small mb-1">Send test email</label>
+                                <input type="email" name="test_email" id="test_email" class="form-control form-control-sm"
+                                    value="filbertayo09@gmail.com" placeholder="you@example.com" required>
+                            </div>
+                            <div class="col-sm-4">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                                    <i class="ti ti-mail me-1"></i>Send test
+                                </button>
                             </div>
                         </form>
 
                         <form action="{{ route('notification.grace-period.run-now') }}" method="POST" class="mt-2">
                             @csrf
                             <button type="submit" class="btn btn-outline-warning btn-sm">
-                                <i class="ti ti-send me-1"></i>Run grace alerts now
+                                <i class="ti ti-send me-1"></i>Run grace emails now
                             </button>
                         </form>
                         <p class="small text-muted mt-2 mb-0">
-                            Sends to staff who still owe a plan or report for any open week currently in a grace window.
-                            Already-notified staff for the same deadline are skipped.
+                            Run now emails all staff who still owe a plan or report for weeks in grace (re-sends even if notified before).
                         </p>
                     </div>
                 </div>

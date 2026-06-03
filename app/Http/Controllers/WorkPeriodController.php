@@ -279,8 +279,8 @@ class WorkPeriodController extends Controller
         );
 
         $successMessage = 'Work period updated successfully.';
-        if (($graceResult['sent'] ?? 0) > 0) {
-            $successMessage .= ' Grace period alerts sent to '.$graceResult['sent'].' staff member(s).';
+        if (($graceResult['email_sent'] ?? 0) > 0) {
+            $successMessage .= ' Grace period emails sent to '.$graceResult['email_sent'].' staff member(s).';
         }
 
         return redirect()->route('work-periods.index')

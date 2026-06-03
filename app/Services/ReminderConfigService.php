@@ -50,7 +50,7 @@ class ReminderConfigService
                 'day_of_week' => 0,
                 'time' => '00:00',
                 'timezone' => config('app.timezone', 'UTC'),
-                'channels' => ['email', 'in_app'],
+                'channels' => ['email'],
                 'audience_rules' => [
                     'permissions' => ['create weekly plan', 'create weekly report'],
                     'status' => 'active',
@@ -58,7 +58,7 @@ class ReminderConfigService
                 'criteria_rules' => ['mode' => 'on_deadline_extension'],
                 'template_key' => 'weekly_grace_period',
                 'meta' => [
-                    'description' => 'Notifies staff when an admin extends a plan or report deadline and they still owe that submission.',
+                    'description' => 'Email-only alerts when an admin extends a deadline and staff still owe that weekly plan or report.',
                 ],
             ]
         );
@@ -67,6 +67,7 @@ class ReminderConfigService
     public function updateWeeklyGracePeriodConfig(array $payload): ReminderConfig
     {
         $config = $this->getWeeklyGracePeriodConfig();
+        $payload['channels'] = ['email'];
         $config->fill($payload);
         $config->save();
 

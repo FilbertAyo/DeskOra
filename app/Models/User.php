@@ -103,6 +103,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Grace-period work emails: any active staff with an email on file (not limited to profile SMS preference).
+     */
+    public function canReceiveGracePeriodWorkEmail(): bool
+    {
+        return $this->status === 'active' && filled(trim((string) $this->email));
+    }
+
+    /**
      * Relationship: User has many Documents
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
