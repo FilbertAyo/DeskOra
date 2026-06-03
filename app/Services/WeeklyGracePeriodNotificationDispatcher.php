@@ -25,7 +25,7 @@ class WeeklyGracePeriodNotificationDispatcher
     /**
      * Notify staff after an admin extends deadlines into an active grace window.
      *
-     * @return array{sent: int, email_sent: int, plan_sent: int, report_sent: int}
+     * @return array{sent: int, emails_sent: int, plan_sent: int, report_sent: int}
      */
     public function notifyAfterPeriodUpdate(
         WorkPeriod $period,
@@ -35,56 +35,54 @@ class WeeklyGracePeriodNotificationDispatcher
         $config = $this->configService->getWeeklyGracePeriodConfig();
 
         if (! $config->enabled || ! $period->isOpen()) {
-            return ['sent' => 0, 'email_sent' => 0, 'plan_sent' => 0, 'report_sent' => 0];
+            return ['sent' => 0, 'emails_sent' => 0, 'plan_sent' => 0, 'report_sent' => 0];
         }
 
         $period = $period->fresh();
-        $planResult = ['sent' => 0, 'email_sent' => 0];
-        $reportResult = ['sent' => 0, 'email_sent' => 0];
+        $planSent = 0;
+        $reportSent = 0;
 
         if ($this->shouldNotifyPlanGrace($period, $previousPlanDeadline)) {
-            $planResult = $this->dispatchForActivity($period, Document::TYPE_WEEKLY_PLAN, $config);
+            $planSent = $this->dispatchForActivity($period, Document::TYPE_WEEKLY_PLAN, $config);
         }
 
         if ($this->shouldNotifyReportGrace($period, $previousReportDeadline)) {
-            $reportResult = $this->dispatchForActivity($period, Document::TYPE_WEEKLY_REPORT, $config);
+            $reportSent = $this->dispatchForActivity($period, Document::TYPE_WEEKLY_REPORT, $config);
         }
 
-        $emailSent = $planResult['email_sent'] + $reportResult['email_sent'];
-
         return [
-            'sent' => $emailSent,
-            'email_sent' => $emailSent,
-            'plan_sent' => $planResult['email_sent'],
-            'report_sent' => $reportResult['email_sent'],
+            'sent' => $planSent + $reportSent,
+            'emails_sent' => $planSent + $reportSent,
+            'plan_sent' => $planSent,
+            'report_sent' => $reportSent,
         ];
     }
 
     /**
      * Manually notify staff for every open work period currently in a grace window.
      *
-     * @return array{sent: int, email_sent: int, plan_sent: int, report_sent: int, periods_with_grace: int, skipped_disabled: bool, skipped_already_emailed: int}
+     * @return array{sent: int, emails_sent: int, plan_sent: int, report_sent: int, periods_with_grace: int, skipped_disabled: bool, skipped_no_email: int}
      */
-    public function dispatchNow(bool $forceResend = false): array
+    public function dispatchNow(): array
     {
         $config = $this->configService->getWeeklyGracePeriodConfig();
 
         if (! $config->enabled) {
             return [
                 'sent' => 0,
-                'email_sent' => 0,
+                'emails_sent' => 0,
                 'plan_sent' => 0,
                 'report_sent' => 0,
                 'periods_with_grace' => 0,
                 'skipped_disabled' => true,
-                'skipped_already_emailed' => 0,
+                'skipped_no_email' => 0,
             ];
         }
 
         $planSent = 0;
         $reportSent = 0;
         $periodsWithGrace = 0;
-        $skippedAlreadyEmailed = 0;
+        $skippedNoEmail = 0;
 
         $openPeriods = WorkPeriod::query()
             ->where('status', WorkPeriod::STATUS_OPEN)
@@ -96,16 +94,16 @@ class WeeklyGracePeriodNotificationDispatcher
 
             if ($period->isPlanGracePeriodActive()) {
                 $hadGrace = true;
-                $result = $this->dispatchForActivity($period, Document::TYPE_WEEKLY_PLAN, $config, $forceResend);
-                $planSent += $result['email_sent'];
-                $skippedAlreadyEmailed += $result['skipped_already_emailed'];
+                [$sent, $skipped] = $this->dispatchForActivityWithStats($period, Document::TYPE_WEEKLY_PLAN, $config);
+                $planSent += $sent;
+                $skippedNoEmail += $skipped;
             }
 
             if ($period->isReportGracePeriodActive()) {
                 $hadGrace = true;
-                $result = $this->dispatchForActivity($period, Document::TYPE_WEEKLY_REPORT, $config, $forceResend);
-                $reportSent += $result['email_sent'];
-                $skippedAlreadyEmailed += $result['skipped_already_emailed'];
+                [$sent, $skipped] = $this->dispatchForActivityWithStats($period, Document::TYPE_WEEKLY_REPORT, $config);
+                $reportSent += $sent;
+                $skippedNoEmail += $skipped;
             }
 
             if ($hadGrace) {
@@ -113,40 +111,17 @@ class WeeklyGracePeriodNotificationDispatcher
             }
         }
 
-        $emailSent = $planSent + $reportSent;
+        $totalSent = $planSent + $reportSent;
 
         return [
-            'sent' => $emailSent,
-            'email_sent' => $emailSent,
+            'sent' => $totalSent,
+            'emails_sent' => $totalSent,
             'plan_sent' => $planSent,
             'report_sent' => $reportSent,
             'periods_with_grace' => $periodsWithGrace,
             'skipped_disabled' => false,
-            'skipped_already_emailed' => $skippedAlreadyEmailed,
+            'skipped_no_email' => $skippedNoEmail,
         ];
-    }
-
-    /**
-     * Send a sample grace-period email (for SMTP configuration testing).
-     */
-    public function sendTestEmail(string $email): void
-    {
-        $period = WorkPeriod::query()
-            ->where('status', WorkPeriod::STATUS_OPEN)
-            ->orderByDesc('week_start_date')
-            ->first();
-
-        $cutoff = ($period ?? WorkPeriod::getCurrent())?->getPlanDeadlineCutoff() ?? Carbon::now()->addDays(2);
-
-        Mail::to($email)->send(new WeeklyGracePeriodMail(
-            'Test Recipient',
-            'Weekly Plan',
-            $period
-                ? "Week {$period->week_number} of {$period->year}"
-                : 'Week (sample)',
-            $cutoff,
-            route('dashboard'),
-        ));
     }
 
     private function shouldNotifyPlanGrace(WorkPeriod $period, ?string $previousPlanDeadline): bool
@@ -185,22 +160,23 @@ class WeeklyGracePeriodNotificationDispatcher
         return Carbon::parse($newDate)->greaterThan(Carbon::parse($previousReportDeadline));
     }
 
-    /**
-     * @return array{sent: int, email_sent: int, skipped_already_emailed: int}
-     */
-    private function dispatchForActivity(
-        WorkPeriod $period,
-        string $documentType,
-        \App\Models\ReminderConfig $config,
-        bool $forceResend = false,
-    ): array {
-        if (! $config->enabled) {
-            return ['sent' => 0, 'email_sent' => 0, 'skipped_already_emailed' => 0];
-        }
+    private function dispatchForActivity(WorkPeriod $period, string $documentType, \App\Models\ReminderConfig $config): int
+    {
+        return $this->dispatchForActivityWithStats($period, $documentType, $config)[0];
+    }
 
+    /**
+     * @return array{0: int, 1: int} [emails_sent, skipped_no_email_address]
+     */
+    private function dispatchForActivityWithStats(WorkPeriod $period, string $documentType, \App\Models\ReminderConfig $config): array
+    {
         $deadlineDate = $documentType === Document::TYPE_WEEKLY_PLAN
             ? $period->plan_deadline?->format('Y-m-d')
             : $period->report_deadline?->format('Y-m-d');
+
+        if ($deadlineDate === null) {
+            return [0, 0];
+        }
 
         $activityKey = $documentType === Document::TYPE_WEEKLY_PLAN ? 'plan' : 'report';
         $windowKey = "{$period->id}_{$activityKey}_{$deadlineDate}";
@@ -213,8 +189,8 @@ class WeeklyGracePeriodNotificationDispatcher
             ? $period->getPlanDeadlineCutoff()
             : $period->getReportDeadlineCutoff();
 
-        $emailSent = 0;
-        $skippedAlreadyEmailed = 0;
+        $emailsSent = 0;
+        $skippedNoEmail = 0;
 
         foreach ($this->submissionWindows->staffOwingWeeklyDocument($period, $documentType) as $row) {
             /** @var User $user */
@@ -222,15 +198,19 @@ class WeeklyGracePeriodNotificationDispatcher
             /** @var WeeklySubmissionSlot $slot */
             $slot = $row['slot'];
 
-            if (! $forceResend && $this->alreadyEmailedForWindow($config->id, $user->id, $documentType, $windowKey)) {
-                $skippedAlreadyEmailed++;
+            if ($this->wasGraceEmailAlreadySent((string) $config->id, (string) $user->id, $documentType, $windowKey)) {
+                continue;
+            }
+
+            if (! $user->canReceiveGracePeriodWorkEmail()) {
+                $skippedNoEmail++;
 
                 continue;
             }
 
             $delivery = $this->deliverEmail($user, $slot, $documentType, $activityLabel, $period, $cutoff);
 
-            if (! $delivery['email_sent']) {
+            if (! in_array('email', $delivery['delivered_channels'], true)) {
                 continue;
             }
 
@@ -240,49 +220,45 @@ class WeeklyGracePeriodNotificationDispatcher
                 'activity_type' => $documentType,
                 'window_key' => $windowKey,
                 'channels' => ['email'],
-                'status' => 'sent',
+                'status' => empty($delivery['failed_channels']) ? 'sent' : 'partially_sent',
                 'meta' => [
                     'period_id' => $period->id,
                     'week_number' => $period->week_number,
                     'year' => $period->year,
                     'grace_cutoff' => $cutoff->toIso8601String(),
-                    'delivered_channels' => ['email'],
+                    'delivered_channels' => $delivery['delivered_channels'],
                     'failed_channels' => $delivery['failed_channels'],
                     'dispatch_type' => 'grace_period',
                 ],
             ]);
 
-            $emailSent++;
+            $emailsSent++;
         }
 
-        return [
-            'sent' => $emailSent,
-            'email_sent' => $emailSent,
-            'skipped_already_emailed' => $skippedAlreadyEmailed,
-        ];
+        return [$emailsSent, $skippedNoEmail];
     }
 
-    private function alreadyEmailedForWindow(
+    private function wasGraceEmailAlreadySent(
         string $configId,
         string $userId,
-        string $documentType,
+        string $activityType,
         string $windowKey,
     ): bool {
         return ReminderDispatchLog::query()
             ->where('reminder_config_id', $configId)
             ->where('user_id', $userId)
-            ->where('activity_type', $documentType)
+            ->where('activity_type', $activityType)
             ->where('window_key', $windowKey)
             ->get()
-            ->contains(function (ReminderDispatchLog $log) {
-                $delivered = $log->meta['delivered_channels'] ?? $log->channels ?? [];
-
-                return is_array($delivered) && in_array('email', $delivered, true);
-            });
+            ->contains(fn (ReminderDispatchLog $log) => in_array(
+                'email',
+                (array) ($log->meta['delivered_channels'] ?? []),
+                true
+            ));
     }
 
     /**
-     * @return array{email_sent: bool, failed_channels: array<string, string>}
+     * @return array{delivered_channels: array<int, string>, failed_channels: array<string, string>}
      */
     private function deliverEmail(
         User $user,
@@ -292,12 +268,6 @@ class WeeklyGracePeriodNotificationDispatcher
         WorkPeriod $period,
         Carbon $cutoff,
     ): array {
-        $failedChannels = [];
-
-        if (! $user->canReceiveGracePeriodWorkEmail()) {
-            return ['email_sent' => false, 'failed_channels' => ['email' => 'No email address on file.']];
-        }
-
         $actionUrl = $slot->actionUrl($documentType, route('dashboard'));
         $periodLabel = "Week {$period->week_number} of {$period->year}";
 
@@ -310,9 +280,11 @@ class WeeklyGracePeriodNotificationDispatcher
                 $actionUrl,
             ));
 
-            return ['email_sent' => true, 'failed_channels' => []];
+            return [
+                'delivered_channels' => ['email'],
+                'failed_channels' => [],
+            ];
         } catch (Throwable $e) {
-            $failedChannels['email'] = $e->getMessage();
             Log::error('Failed sending grace period alert via email.', [
                 'user_id' => $user->id,
                 'email' => $user->email,
@@ -320,7 +292,10 @@ class WeeklyGracePeriodNotificationDispatcher
                 'error' => $e->getMessage(),
             ]);
 
-            return ['email_sent' => false, 'failed_channels' => $failedChannels];
+            return [
+                'delivered_channels' => [],
+                'failed_channels' => ['email' => $e->getMessage()],
+            ];
         }
     }
 }

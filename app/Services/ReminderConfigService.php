@@ -58,17 +58,25 @@ class ReminderConfigService
                 'criteria_rules' => ['mode' => 'on_deadline_extension'],
                 'template_key' => 'weekly_grace_period',
                 'meta' => [
-                    'description' => 'Email-only alerts when an admin extends a deadline and staff still owe that weekly plan or report.',
+                    'description' => 'Email staff when a deadline is extended and they still owe that weekly plan or report.',
                 ],
             ]
         );
+
+        if ($config->channels !== ['email']) {
+            $config->forceFill(['channels' => ['email']])->save();
+        }
+
+        return $config;
     }
 
     public function updateWeeklyGracePeriodConfig(array $payload): ReminderConfig
     {
         $config = $this->getWeeklyGracePeriodConfig();
-        $payload['channels'] = ['email'];
-        $config->fill($payload);
+        $config->fill([
+            'enabled' => (bool) ($payload['enabled'] ?? false),
+            'channels' => ['email'],
+        ]);
         $config->save();
 
         return $config->refresh();

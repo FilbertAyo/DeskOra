@@ -133,16 +133,51 @@ class WeeklyGracePeriodNotificationTest extends TestCase
         $this->assertSame(['email'], $config->channels);
     }
 
-    public function test_grace_email_sent_to_staff_with_sms_notification_channel(): void
+    public function test_grace_email_sent_to_staff_with_sms_profile_preference(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 3, 10, 0, 0));
         Mail::fake();
 
-        [, $owingStaff, , $period] = $this->seedGraceScenario();
-        $owingStaff->update(['notification_channel' => 'sms']);
-
         $admin = User::factory()->create(['status' => 'active']);
         $admin->givePermissionTo('manage work periods');
+
+        $owingStaff = User::factory()->create([
+            'status' => 'active',
+            'notification_channel' => 'sms',
+        ]);
+        $owingStaff->givePermissionTo('create weekly plan');
+
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 22,
+            'week_start_date' => '2026-05-25',
+            'week_end_date' => '2026-05-31',
+            'plan_deadline' => '2026-05-23',
+            'report_deadline' => '2026-05-30',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $period = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 23,
+            'week_start_date' => '2026-06-01',
+            'week_end_date' => '2026-06-07',
+            'plan_deadline' => '2026-05-30',
+            'report_deadline' => '2026-06-06',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 24,
+            'week_start_date' => '2026-06-08',
+            'week_end_date' => '2026-06-14',
+            'plan_deadline' => '2026-06-06',
+            'report_deadline' => '2026-06-13',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        app(ReminderConfigService::class)->getWeeklyGracePeriodConfig();
 
         $this->actingAs($admin)->put(route('work-periods.update', $period), [
             'week_start_date' => $period->week_start_date->format('Y-m-d'),

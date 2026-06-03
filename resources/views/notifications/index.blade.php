@@ -18,11 +18,6 @@
             <i class="ti ti-alert-circle me-1"></i>{{ session('error') }}
         </div>
     @endif
-    @if(session('warning'))
-        <div class="alert alert-warning mb-4">
-            <i class="ti ti-alert-triangle me-1"></i>{{ session('warning') }}
-        </div>
-    @endif
 
     <div class="row mb-4">
         <div class="col-md-12">
@@ -69,15 +64,8 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted small">
-                            <strong>Email only</strong> — sent when you extend a plan or report deadline and staff still
-                            have not <strong>submitted</strong> that weekly plan or report (drafts still receive a reminder).
-                            Goes to every active staff member with an email address, not SMS profile settings.
-                        </p>
-                        <p class="small text-muted">
-                            Mail driver: <code>{{ config('mail.default') }}</code>
-                            @if(config('mail.default') === 'log')
-                                <span class="text-danger">— emails are written to the log only until SMTP is configured in <code>.env</code>.</span>
-                            @endif
+                            Sends an <strong>email</strong> when you extend a work period’s plan or report deadline
+                            to staff who have <strong>not submitted</strong> that weekly plan or report (drafts are included).
                         </p>
 
                         <form action="{{ route('notification.grace-period.update') }}" method="POST" class="row g-3">
@@ -93,42 +81,37 @@
                             </div>
 
                             <div class="col-12">
+                                <p class="mb-0 small text-muted">
+                                    <i class="ti ti-mail me-1"></i>Delivered by email only (not in-app). Uses each staff member’s work email; petty-cash SMS preference does not apply.
+                                </p>
+                            </div>
+
+                            <div class="col-12">
                                 <p class="mb-2 small text-muted">
-                                    Last email batch:
+                                    Last email sent:
                                     @if($lastGraceSentAt)
                                         {{ \Carbon\Carbon::parse($lastGraceSentAt)->timezone(config('app.timezone'))->format('M d, Y H:i') }}
                                     @else
                                         Not sent yet
                                     @endif
                                 </p>
-                                <button type="submit" class="btn btn-warning">
-                                    <i class="ti ti-device-floppy me-1"></i>Save grace alerts
-                                </button>
-                            </div>
-                        </form>
-
-                        <form action="{{ route('notification.grace-period.test-email') }}" method="POST" class="row g-2 align-items-end mt-3 border-top pt-3">
-                            @csrf
-                            <div class="col-sm-8">
-                                <label for="test_email" class="form-label small mb-1">Send test email</label>
-                                <input type="email" name="test_email" id="test_email" class="form-control form-control-sm"
-                                    value="filbertayo09@gmail.com" placeholder="you@example.com" required>
-                            </div>
-                            <div class="col-sm-4">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
-                                    <i class="ti ti-mail me-1"></i>Send test
-                                </button>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="ti ti-device-floppy me-1"></i>Save grace alerts
+                                    </button>
+                                </div>
                             </div>
                         </form>
 
                         <form action="{{ route('notification.grace-period.run-now') }}" method="POST" class="mt-2">
                             @csrf
                             <button type="submit" class="btn btn-outline-warning btn-sm">
-                                <i class="ti ti-send me-1"></i>Run grace emails now
+                                <i class="ti ti-send me-1"></i>Run grace alerts now
                             </button>
                         </form>
                         <p class="small text-muted mt-2 mb-0">
-                            Run now emails all staff who still owe a plan or report for weeks in grace (re-sends even if notified before).
+                            Emails staff who still owe a plan or report for any open week in grace.
+                            Staff already emailed for the same deadline are skipped (in-app-only runs from earlier do not count).
                         </p>
                     </div>
                 </div>
