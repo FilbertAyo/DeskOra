@@ -6,10 +6,10 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
-use App\Models\WeeklyActivityAssignment;
 use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
+use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,7 +20,10 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
-    public function __construct(private readonly WorkPeriodService $workPeriodService) {}
+    public function __construct(
+        private readonly WorkPeriodService $workPeriodService,
+        private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
+    ) {}
 
     public function redirect()
     {
@@ -336,17 +339,12 @@ class DashboardController extends Controller
             ->values();
 
         $actionLogProgress = $this->buildActionLogProgressForUser($user);
-        $assignedWeeklyActivities = WeeklyActivityAssignment::query()
-            ->with([
-                'sourceUser:id,name',
-                'sourceWeeklyPlan:id,title,user_id,period_id,state',
-            ])
-            ->where('assignee_user_id', $user->id)
-            ->whereColumn('source_user_id', '!=', 'assignee_user_id')
-            ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [WeeklyActivityAssignment::STATUS_PREVIEW])
-            ->orderByDesc('updated_at')
-            ->take(10)
-            ->get();
+        $assignedWeeklyActivities = $currentPeriod
+            ? $this->weeklyActivityAssignmentService->assignmentsForUser(
+                (string) $user->id,
+                (string) $currentPeriod->id,
+            )
+            : collect();
 
         $currentPlanYear = (int) now()->year;
         $currentYearPlan = YearPlan::query()

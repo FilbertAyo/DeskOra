@@ -189,7 +189,7 @@ class WeeklySubmissionWindowService
         return $this->emptySlot();
     }
 
-    private function planSlotForPeriod(User $user, WorkPeriod $period): WeeklySubmissionSlot
+    public function planSlotForPeriod(User $user, WorkPeriod $period): WeeklySubmissionSlot
     {
         if (! $period->isOpen()) {
             return $this->emptySlot();
@@ -208,7 +208,7 @@ class WeeklySubmissionWindowService
         );
     }
 
-    private function reportSlotForPeriod(User $user, WorkPeriod $period): WeeklySubmissionSlot
+    public function reportSlotForPeriod(User $user, WorkPeriod $period): WeeklySubmissionSlot
     {
         if (! $period->isOpen()) {
             return $this->emptySlot();
@@ -260,6 +260,36 @@ class WeeklySubmissionWindowService
         }
 
         return null;
+    }
+
+    /**
+     * Active staff who still owe a weekly plan or report for the given period.
+     *
+     * @return Collection<int, array{user: User, slot: WeeklySubmissionSlot}>
+     */
+    public function staffOwingWeeklyDocument(WorkPeriod $period, string $documentType): Collection
+    {
+        if (! in_array($documentType, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            return collect();
+        }
+
+        $permission = $documentType === Document::TYPE_WEEKLY_PLAN
+            ? 'create weekly plan'
+            : 'create weekly report';
+
+        return User::query()
+            ->where('status', 'active')
+            ->get()
+            ->filter(fn (User $user) => $user->hasPermissionTo($permission))
+            ->map(function (User $user) use ($period, $documentType) {
+                $slot = $documentType === Document::TYPE_WEEKLY_PLAN
+                    ? $this->planSlotForPeriod($user, $period)
+                    : $this->reportSlotForPeriod($user, $period);
+
+                return ['user' => $user, 'slot' => $slot];
+            })
+            ->filter(fn (array $row) => $row['slot']->showAction())
+            ->values();
     }
 
     private function emptySlot(): WeeklySubmissionSlot

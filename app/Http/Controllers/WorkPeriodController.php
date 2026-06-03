@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\User;
 use App\Models\WeeklyPlan;
 use App\Models\WorkPeriod;
+use App\Services\WeeklyGracePeriodNotificationDispatcher;
 use App\Services\WorkflowEmailNotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ use Illuminate\Support\Facades\DB;
 class WorkPeriodController extends Controller
 {
     public function __construct(
-        private readonly WorkflowEmailNotificationService $workflowEmailNotifications
+        private readonly WorkflowEmailNotificationService $workflowEmailNotifications,
+        private readonly WeeklyGracePeriodNotificationDispatcher $gracePeriodNotifications,
     ) {}
 
     private function authenticatedUser(): User
@@ -255,6 +257,9 @@ class WorkPeriodController extends Controller
             'status' => ['required', 'in:open,closed,archived'],
         ]);
 
+        $previousPlanDeadline = $period->plan_deadline?->format('Y-m-d');
+        $previousReportDeadline = $period->report_deadline?->format('Y-m-d');
+
         // Calculate week end date
         $startDate = Carbon::parse($request->week_start_date);
         $endDate = $startDate->copy()->addDays(6);
@@ -267,8 +272,19 @@ class WorkPeriodController extends Controller
             'status' => $request->status,
         ]);
 
+        $graceResult = $this->gracePeriodNotifications->notifyAfterPeriodUpdate(
+            $period,
+            $previousPlanDeadline,
+            $previousReportDeadline,
+        );
+
+        $successMessage = 'Work period updated successfully.';
+        if (($graceResult['sent'] ?? 0) > 0) {
+            $successMessage .= ' Grace period alerts sent to '.$graceResult['sent'].' staff member(s).';
+        }
+
         return redirect()->route('work-periods.index')
-            ->with('success', 'Work period updated successfully.');
+            ->with('success', $successMessage);
     }
 
     /**

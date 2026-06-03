@@ -11,9 +11,15 @@
     $assignmentTitle = $isAssignedToCurrentUser
         ? 'Assigned by Others'
         : 'Assigned to '.($assignmentOwner->name ?? 'Staff').' by Others';
+    $periodLabel = isset($assignmentPeriod) && $assignmentPeriod
+        ? 'Week '.$assignmentPeriod->week_number.' of '.$assignmentPeriod->year
+        : null;
     $assignmentSubtitle = $isAssignedToCurrentUser
-        ? 'Tasks from shared weekly plans where another staff member assigned you'
-        : 'Tasks from shared weekly plans where another staff member assigned '.($assignmentOwner->name ?? 'this staff member');
+        ? 'Tasks from weekly plans where another staff member assigned you'
+        : 'Tasks from weekly plans where another staff member assigned '.($assignmentOwner->name ?? 'this staff member');
+    if ($periodLabel) {
+        $assignmentSubtitle .= ' · '.$periodLabel;
+    }
     $hasMultipleAssignees = $assignedRows
         ->pluck('assignee_user_id')
         ->filter()

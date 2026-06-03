@@ -289,7 +289,7 @@
             </div>
         </div>
 
-        <div class="col-12 col-lg-4 col-md-4 mb-3">
+        <div class="col-12 col-lg-4 col-md-4">
             <div class="row">
                 <div class="col-6 col-lg-6 col-md-6">
                     <div class="card shadow-none border">
@@ -337,14 +337,10 @@
                             <h4 class="mb-0">
                                 @if ($currentPeriod)
                                     <span class="fs-5">Week {{ $currentPeriod->week_number }}, {{ $currentPeriod->year }}</span>
-                                    <span class="badge bg-light-success border border-success text-success">
-                                        <i class="ti ti-calendar"></i>
-                                    </span>
+                                   
                                 @else
                                     <span class="fs-5 text-muted">—</span>
-                                    <span class="badge bg-light border border-secondary text-muted">
-                                        <i class="ti ti-calendar"></i>
-                                    </span>
+                                  
                                 @endif
                             </h4>
                         </div>
@@ -353,89 +349,19 @@
             </div>
         </div>
 
-        <div class="col-xl-8 col-md-6 col-12 mb-3">
+        @if($assignedWeeklyActivityCount > 0 && $currentPeriod)
+            @include('documents.partials.weekly-assigned-activities-card', [
+                'assignmentPeriod' => $currentPeriod,
+            ])
+        @endif
+
+        <div class="col-xl-6 col-md-6 col-12">
             <div class="card shadow-none border h-100">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Focus Tasks</h5>
-                    <small class="text-muted">What to do next</small>
+                    <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Weekly Activities</h5>
+                    <small class="text-muted">Revisions and drafts</small>
                 </div>
                 <div class="card-body">
-                    @if($activeActionTaskCount > 0)
-                        <div class="mb-3">
-                            <h6 class="text-primary mb-2"><i class="ti ti-clipboard-list me-1"></i>Action Log Tasks</h6>
-                            <div class="border rounded p-3 bg-light-subtle">
-                                <p class="mb-2 text-muted">
-                                    {{ $activeActionTaskCount }} task{{ $activeActionTaskCount === 1 ? '' : 's' }} need update.
-                                </p>
-                                <div class="mb-2">
-                                    @foreach($activeActionTasks->take(3) as $task)
-                                        <div class="d-flex justify-content-between align-items-center border rounded bg-white px-2 py-1 mb-1">
-                                            <span class="small text-dark">{{ $task['task'] ?? 'Task' }}</span>
-                                            <span class="badge bg-secondary">{{ $task['latest_progress'] ?? 'Not Started' }}</span>
-                                        </div>
-                                    @endforeach
-                                    @if($activeActionTaskCount > 3)
-                                        <small class="text-muted">+ {{ $activeActionTaskCount - 3 }} more task{{ ($activeActionTaskCount - 3) === 1 ? '' : 's' }}</small>
-                                    @endif
-                                </div>
-                                <div class="d-flex justify-content-end">
-                                    @if($currentActionLogDraftId)
-                                        <a href="{{ route('action-logs.edit', $currentActionLogDraftId) }}" class="btn btn-sm btn-primary">
-                                            <i class="ti ti-edit me-1"></i>Update
-                                        </a>
-                                    @else
-                                        <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-primary">
-                                            <i class="ti ti-eye me-1"></i>View Action Logs
-                                        </a>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-
-                    @if($assignedWeeklyActivityCount > 0)
-                        <div class="mb-3">
-                            <h6 class="text-secondary mb-2"><i class="ti ti-clipboard-list me-1"></i>Assigned Weekly Activities</h6>
-                            @foreach($assignedWeeklyActivities->take(3) as $assignment)
-                                @php
-                                    $payload = is_array($assignment->activity_payload ?? null) ? $assignment->activity_payload : [];
-                                    $isLockedAssignment = ($assignment->status ?? '') === \App\Models\WeeklyActivityAssignment::STATUS_LOCKED;
-                                @endphp
-                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
-                                    <div>
-                                        <strong>{{ $payload['activity'] ?? 'Assigned activity' }}</strong>
-                                        <div class="small text-muted">
-                                            {{ $payload['day'] ?? 'Day not set' }} • From {{ $assignment->sourceUser->name ?? 'Team member' }}
-                                            @if(!empty($payload['location']))
-                                                • {{ $payload['location'] }}
-                                            @endif
-                                        </div>
-                                        <span class="badge {{ $isLockedAssignment ? 'bg-success' : 'bg-warning text-dark' }} mt-1">
-                                            {{ $isLockedAssignment ? 'Locked' : 'Preview' }}
-                                        </span>
-                                    </div>
-                                    @php
-                                        $sourceWeeklyPlan = $assignment->sourceWeeklyPlan;
-                                        $sourcePlanUrl = null;
-
-                                        if ($sourceWeeklyPlan) {
-                                            if (\Illuminate\Support\Facades\Route::has('weekly-plans.show')) {
-                                                $sourcePlanUrl = route('weekly-plans.show', $sourceWeeklyPlan->id);
-                                            } elseif (\Illuminate\Support\Facades\Route::has('documents.weekly-plans.show')) {
-                                                $sourcePlanUrl = route('documents.weekly-plans.show', $sourceWeeklyPlan->id);
-                                            } elseif (!empty($sourceWeeklyPlan->id)) {
-                                                $sourcePlanUrl = route('documents.show', $sourceWeeklyPlan->id);
-                                            }
-                                        }
-                                    @endphp
-                                    @if($sourcePlanUrl)
-                                        <a href="{{ $sourcePlanUrl }}" class="btn btn-sm btn-outline-secondary">Open Plan</a>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
                     @if($returnedDocs->count() > 0)
                         <div class="mb-3">
                             <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>
@@ -516,45 +442,46 @@
         </div>
 
 
-        <div class="col-xl-4 col-md-6 col-12">
+        <div class="col-xl-6 col-md-6 col-12">
             <div class="card shadow-none border h-100">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-bolt me-2"></i>Quick Shortcuts</h5>
-                    <small class="text-muted">Personalized actions</small>
+                    <h5 class="mb-0"><i class="ti ti-bolt me-2"></i>Action Log Tasks</h5>
+                    <small class="text-muted">What to do next</small>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{{ route('documents.index') }}" class="btn btn-light text-start">
-                            <i class="ti ti-folders me-2 text-primary"></i>My Documents Hub
-                        </a>
-                        @if($showWeeklyPlanShortcut)
-                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_plan', 'period_id' => $nextPeriod->id ?? null])) }}" class="btn btn-light text-start">
-                                <i class="ti ti-calendar-plus me-2 text-info"></i>Create Weekly Plan
-                            </a>
-                        @elseif(isset($availableTypes['weekly_plan']) && ($nextPeriod ?? null))
-                            <button type="button" class="btn btn-light text-start" disabled title="Plan deadline has passed">
-                                <i class="ti ti-calendar-off me-2 text-muted"></i>Weekly plan closed for this window
-                            </button>
-                        @endif
-                        @if($showWeeklyReportShortcut)
-                            <a href="{{ route('documents.create', array_filter(['type' => 'weekly_report', 'period_id' => $currentPeriod->id ?? null])) }}" class="btn btn-light text-start">
-                                <i class="ti ti-file-analytics me-2 text-success"></i>Create Weekly Report
-                            </a>
-                        @elseif(isset($availableTypes['weekly_report']) && ($currentPeriod ?? null))
-                            <button type="button" class="btn btn-light text-start" disabled title="Report deadline has passed">
-                                <i class="ti ti-file-minus me-2 text-muted"></i>Weekly report closed for this window
-                            </button>
-                        @endif
-                    
-                        <a href="{{ route('profile.edit') }}" class="btn btn-light text-start">
-                            <i class="ti ti-user me-2 text-secondary"></i>My Profile Settings
-                        </a>
-                        @if($hasReviewerAccess)
-                            <a href="{{ route('documents.reviewer-dashboard') }}" class="btn btn-light text-start">
-                                <i class="ti ti-eye-check me-2 text-danger"></i>Reviewer Dashboard
-                            </a>
-                        @endif
-                    </div>
+                @if($activeActionTaskCount > 0)
+                        <div class="mb-3">
+                            <h6 class="text-primary mb-2"><i class="ti ti-clipboard-list me-1"></i>Action Log Tasks</h6>
+                            <div class="border rounded p-3 bg-light-subtle">
+                                <p class="mb-2 text-muted">
+                                    {{ $activeActionTaskCount }} task{{ $activeActionTaskCount === 1 ? '' : 's' }} need update.
+                                </p>
+                                <div class="mb-2">
+                                    @foreach($activeActionTasks->take(3) as $task)
+                                        <div class="d-flex justify-content-between align-items-center border rounded bg-white px-2 py-1 mb-1">
+                                            <span class="small text-dark">{{ $task['task'] ?? 'Task' }}</span>
+                                            <span class="badge bg-secondary">{{ $task['latest_progress'] ?? 'Not Started' }}</span>
+                                        </div>
+                                    @endforeach
+                                    @if($activeActionTaskCount > 3)
+                                        <small class="text-muted">+ {{ $activeActionTaskCount - 3 }} more task{{ ($activeActionTaskCount - 3) === 1 ? '' : 's' }}</small>
+                                    @endif
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    @if($currentActionLogDraftId)
+                                        <a href="{{ route('action-logs.edit', $currentActionLogDraftId) }}" class="btn btn-sm btn-primary">
+                                            <i class="ti ti-edit me-1"></i>Update
+                                        </a>
+                                    @else
+                                        <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-primary">
+                                            <i class="ti ti-eye me-1"></i>View Action Logs
+                                        </a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                 </div>
             </div>
         </div>

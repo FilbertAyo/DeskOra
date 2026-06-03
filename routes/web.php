@@ -226,6 +226,10 @@ Route::middleware(['auth', 'permission:view notification settings'])->group(func
 });
 
 Route::middleware(['auth', 'permission:manage notifications'])->group(function () {
+    Route::put('/settings/notifications/grace-period', [NotificationController::class, 'updateGracePeriod'])
+        ->name('notification.grace-period.update');
+    Route::post('/settings/notifications/grace-period/run-now', [NotificationController::class, 'runGracePeriodNow'])
+        ->name('notification.grace-period.run-now');
     Route::put('/settings/notifications/weekly-reminder', [NotificationController::class, 'updateWeeklyReminder'])
         ->name('notification.weekly-reminder.update');
     Route::post('/settings/notifications/weekly-reminder/run-now', [NotificationController::class, 'runWeeklyReminderNow'])

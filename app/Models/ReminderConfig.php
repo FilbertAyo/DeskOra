@@ -13,6 +13,8 @@ class ReminderConfig extends Model
 
     public const KEY_WEEKLY_PLAN_REPORT = 'weekly_plan_report_followup';
 
+    public const KEY_WEEKLY_GRACE_PERIOD = 'weekly_grace_period';
+
     protected $fillable = [
         'key',
         'name',

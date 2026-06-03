@@ -38,4 +38,38 @@ class ReminderConfigService
 
         return $config->refresh();
     }
+
+    public function getWeeklyGracePeriodConfig(): ReminderConfig
+    {
+        return ReminderConfig::query()->firstOrCreate(
+            ['key' => ReminderConfig::KEY_WEEKLY_GRACE_PERIOD],
+            [
+                'name' => 'Weekly Grace Period Alerts',
+                'enabled' => true,
+                'schedule_type' => 'event',
+                'day_of_week' => 0,
+                'time' => '00:00',
+                'timezone' => config('app.timezone', 'UTC'),
+                'channels' => ['email', 'in_app'],
+                'audience_rules' => [
+                    'permissions' => ['create weekly plan', 'create weekly report'],
+                    'status' => 'active',
+                ],
+                'criteria_rules' => ['mode' => 'on_deadline_extension'],
+                'template_key' => 'weekly_grace_period',
+                'meta' => [
+                    'description' => 'Notifies staff when an admin extends a plan or report deadline and they still owe that submission.',
+                ],
+            ]
+        );
+    }
+
+    public function updateWeeklyGracePeriodConfig(array $payload): ReminderConfig
+    {
+        $config = $this->getWeeklyGracePeriodConfig();
+        $config->fill($payload);
+        $config->save();
+
+        return $config->refresh();
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ReminderDispatchLog;
 use App\Services\NotificationService;
 use App\Services\ReminderConfigService;
+use App\Services\WeeklyGracePeriodNotificationDispatcher;
 use App\Services\WeeklySubmissionReminderDispatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,18 +16,61 @@ class NotificationController extends Controller
     {
         $smsInfo = $notificationService->getSmsAccountInfo();
         $reminderConfig = $reminderConfigService->getWeeklyPlanReportConfig();
+        $graceConfig = $reminderConfigService->getWeeklyGracePeriodConfig();
+
         $recentReminderLogs = ReminderDispatchLog::query()
             ->with(['user:id,name,email'])
-            ->where('reminder_config_id', $reminderConfig->id)
+            ->whereIn('reminder_config_id', [$reminderConfig->id, $graceConfig->id])
             ->latest()
-            ->limit(20)
-            ->get();
+            ->limit(25)
+            ->get()
+            ->map(function (ReminderDispatchLog $log) use ($reminderConfig, $graceConfig) {
+                $log->setAttribute(
+                    'dispatch_type_label',
+                    $log->reminder_config_id === $graceConfig->id
+                        ? 'Grace period'
+                        : 'Scheduled reminder'
+                );
+
+                return $log;
+            });
+
         $lastReminderSentAt = ReminderDispatchLog::query()
             ->where('reminder_config_id', $reminderConfig->id)
             ->latest('created_at')
             ->value('created_at');
 
-        return view('notifications.index', compact('smsInfo', 'reminderConfig', 'recentReminderLogs', 'lastReminderSentAt'));
+        $lastGraceSentAt = ReminderDispatchLog::query()
+            ->where('reminder_config_id', $graceConfig->id)
+            ->latest('created_at')
+            ->value('created_at');
+
+        return view('notifications.index', compact(
+            'smsInfo',
+            'reminderConfig',
+            'graceConfig',
+            'recentReminderLogs',
+            'lastReminderSentAt',
+            'lastGraceSentAt',
+        ));
+    }
+
+    public function updateGracePeriod(Request $request, ReminderConfigService $reminderConfigService)
+    {
+        $validated = $request->validate([
+            'enabled' => ['nullable', 'boolean'],
+            'channels' => ['required', 'array', 'min:1'],
+            'channels.*' => ['in:email,in_app'],
+        ]);
+
+        $config = $reminderConfigService->updateWeeklyGracePeriodConfig([
+            'enabled' => (bool) ($validated['enabled'] ?? false),
+            'channels' => array_values(array_unique($validated['channels'])),
+        ]);
+
+        return redirect()
+            ->route('notification.index')
+            ->with('success', "Grace period alert settings updated for {$config->name}.");
     }
 
     public function updateWeeklyReminder(Request $request, ReminderConfigService $reminderConfigService)
@@ -83,5 +127,35 @@ class NotificationController extends Controller
         return redirect()
             ->route('notification.index')
             ->with('success', "Manual reminder run completed. Sent to {$sent} recipient activity rows out of {$targets} targets.");
+    }
+
+    public function runGracePeriodNow(WeeklyGracePeriodNotificationDispatcher $dispatcher): RedirectResponse
+    {
+        $result = $dispatcher->dispatchNow();
+
+        if ($result['skipped_disabled'] ?? false) {
+            return redirect()
+                ->route('notification.index')
+                ->with('error', 'Grace period alerts are disabled. Enable them and save before running.');
+        }
+
+        $sent = (int) ($result['sent'] ?? 0);
+        $periodsWithGrace = (int) ($result['periods_with_grace'] ?? 0);
+
+        if ($periodsWithGrace === 0) {
+            return redirect()
+                ->route('notification.index')
+                ->with('success', 'No open work periods are in an active grace window right now. Nothing was sent.');
+        }
+
+        if ($sent === 0) {
+            return redirect()
+                ->route('notification.index')
+                ->with('success', "Grace periods are active for {$periodsWithGrace} week(s), but all eligible staff were already notified (or have no pending submission).");
+        }
+
+        return redirect()
+            ->route('notification.index')
+            ->with('success', "Grace period alerts sent to {$sent} staff member(s) across {$periodsWithGrace} week(s) in grace.");
     }
 }
