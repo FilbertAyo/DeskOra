@@ -82,6 +82,57 @@ class WeeklyGracePeriodNotificationTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_grace_email_updates_existing_in_app_dispatch_log_without_duplicate_key_error(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 3, 10, 0, 0));
+        Mail::fake();
+
+        [, $owingStaff, , $period] = $this->seedGraceScenario();
+        $period->update(['plan_deadline' => '2026-06-03']);
+        $period = $period->fresh();
+
+        $graceConfig = app(ReminderConfigService::class)->getWeeklyGracePeriodConfig();
+
+        $windowKey = "{$period->id}_plan_2026-06-03";
+
+        ReminderDispatchLog::query()->create([
+            'reminder_config_id' => $graceConfig->id,
+            'user_id' => $owingStaff->id,
+            'activity_type' => Document::TYPE_WEEKLY_PLAN,
+            'window_key' => $windowKey,
+            'channels' => ['in_app'],
+            'status' => 'sent',
+            'meta' => [
+                'delivered_channels' => ['in_app'],
+                'dispatch_type' => 'grace_period',
+            ],
+        ]);
+
+        app(\App\Services\WeeklyGracePeriodNotificationDispatcher::class)->dispatchNow();
+
+        Mail::assertSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
+            return $mail->hasTo($owingStaff->email);
+        });
+
+        $this->assertSame(
+            1,
+            ReminderDispatchLog::query()
+                ->where('reminder_config_id', $graceConfig->id)
+                ->where('user_id', $owingStaff->id)
+                ->where('activity_type', Document::TYPE_WEEKLY_PLAN)
+                ->where('window_key', $windowKey)
+                ->count()
+        );
+
+        $log = ReminderDispatchLog::query()
+            ->where('reminder_config_id', $graceConfig->id)
+            ->where('user_id', $owingStaff->id)
+            ->where('window_key', $windowKey)
+            ->first();
+
+        $this->assertContains('email', (array) ($log->meta['delivered_channels'] ?? []));
+    }
+
     public function test_duplicate_save_with_same_deadline_does_not_send_twice(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 3, 10, 0, 0));

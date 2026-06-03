@@ -214,28 +214,34 @@ class WeeklyGracePeriodNotificationDispatcher
                 continue;
             }
 
-            ReminderDispatchLog::query()->create([
-                'reminder_config_id' => $config->id,
-                'user_id' => $user->id,
-                'activity_type' => $documentType,
-                'window_key' => $windowKey,
-                'channels' => ['email'],
-                'status' => empty($delivery['failed_channels']) ? 'sent' : 'partially_sent',
-                'meta' => [
-                    'period_id' => $period->id,
-                    'week_number' => $period->week_number,
-                    'year' => $period->year,
-                    'grace_cutoff' => $cutoff->toIso8601String(),
-                    'delivered_channels' => $delivery['delivered_channels'],
-                    'failed_channels' => $delivery['failed_channels'],
-                    'dispatch_type' => 'grace_period',
-                ],
-            ]);
+            $this->recordGraceEmailDispatch(
+                $config,
+                $user,
+                $documentType,
+                $windowKey,
+                $period,
+                $cutoff,
+                $delivery,
+            );
 
             $emailsSent++;
         }
 
         return [$emailsSent, $skippedNoEmail];
+    }
+
+    private function findGraceDispatchLog(
+        \App\Models\ReminderConfig $config,
+        User $user,
+        string $documentType,
+        string $windowKey,
+    ): ?ReminderDispatchLog {
+        return ReminderDispatchLog::query()
+            ->where('reminder_config_id', $config->id)
+            ->where('user_id', $user->id)
+            ->where('activity_type', $documentType)
+            ->where('window_key', $windowKey)
+            ->first();
     }
 
     private function wasGraceEmailAlreadySent(
@@ -244,17 +250,60 @@ class WeeklyGracePeriodNotificationDispatcher
         string $activityType,
         string $windowKey,
     ): bool {
-        return ReminderDispatchLog::query()
+        $log = ReminderDispatchLog::query()
             ->where('reminder_config_id', $configId)
             ->where('user_id', $userId)
             ->where('activity_type', $activityType)
             ->where('window_key', $windowKey)
-            ->get()
-            ->contains(fn (ReminderDispatchLog $log) => in_array(
-                'email',
-                (array) ($log->meta['delivered_channels'] ?? []),
-                true
-            ));
+            ->first();
+
+        if (! $log) {
+            return false;
+        }
+
+        return in_array('email', (array) ($log->meta['delivered_channels'] ?? []), true);
+    }
+
+    /**
+     * @param  array{delivered_channels: array<int, string>, failed_channels: array<string, string>}  $delivery
+     */
+    private function recordGraceEmailDispatch(
+        \App\Models\ReminderConfig $config,
+        User $user,
+        string $documentType,
+        string $windowKey,
+        WorkPeriod $period,
+        Carbon $cutoff,
+        array $delivery,
+    ): void {
+        $existing = $this->findGraceDispatchLog($config, $user, $documentType, $windowKey);
+        $priorDelivered = $existing
+            ? (array) ($existing->meta['delivered_channels'] ?? [])
+            : [];
+
+        $deliveredChannels = array_values(array_unique([...$priorDelivered, 'email']));
+
+        ReminderDispatchLog::query()->updateOrCreate(
+            [
+                'reminder_config_id' => $config->id,
+                'user_id' => $user->id,
+                'activity_type' => $documentType,
+                'window_key' => $windowKey,
+            ],
+            [
+                'channels' => ['email'],
+                'status' => empty($delivery['failed_channels']) ? 'sent' : 'partially_sent',
+                'meta' => [
+                    'period_id' => $period->id,
+                    'week_number' => $period->week_number,
+                    'year' => $period->year,
+                    'grace_cutoff' => $cutoff->toIso8601String(),
+                    'delivered_channels' => $deliveredChannels,
+                    'failed_channels' => $delivery['failed_channels'],
+                    'dispatch_type' => 'grace_period',
+                ],
+            ],
+        );
     }
 
     /**
