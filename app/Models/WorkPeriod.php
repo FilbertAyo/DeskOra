@@ -285,6 +285,58 @@ class WorkPeriod extends Model
     }
 
     /**
+     * Default plan cutoff before any admin extension (Saturday 23:59 before week start).
+     */
+    public function getDefaultPlanDeadlineCutoff(): Carbon
+    {
+        return Carbon::parse($this->week_start_date)->subDays(2)->setTime(23, 59, 0);
+    }
+
+    /**
+     * Default report cutoff before any admin extension (Saturday 23:59 of the work week).
+     */
+    public function getDefaultReportDeadlineCutoff(): Carbon
+    {
+        return Carbon::parse($this->week_start_date)->addDays(5)->setTime(23, 59, 0);
+    }
+
+    /**
+     * Whether the plan deadline was extended and the user is in the post-default, pre-extended window.
+     */
+    public function isPlanGracePeriodActive(?Carbon $now = null): bool
+    {
+        if (! $this->isOpen()) {
+            return false;
+        }
+
+        $now ??= Carbon::now();
+        $extendedCutoff = $this->getPlanDeadlineCutoff();
+        $defaultCutoff = $this->getDefaultPlanDeadlineCutoff();
+
+        return $extendedCutoff->greaterThan($defaultCutoff)
+            && $now->greaterThan($defaultCutoff)
+            && $now->lessThanOrEqualTo($extendedCutoff);
+    }
+
+    /**
+     * Whether the report deadline was extended and the user is in the post-default, pre-extended window.
+     */
+    public function isReportGracePeriodActive(?Carbon $now = null): bool
+    {
+        if (! $this->isOpen()) {
+            return false;
+        }
+
+        $now ??= Carbon::now();
+        $extendedCutoff = $this->getReportDeadlineCutoff();
+        $defaultCutoff = $this->getDefaultReportDeadlineCutoff();
+
+        return $extendedCutoff->greaterThan($defaultCutoff)
+            && $now->greaterThan($defaultCutoff)
+            && $now->lessThanOrEqualTo($extendedCutoff);
+    }
+
+    /**
      * Check if plan deadline has passed
      */
     public function isPlanDeadlinePassed(): bool

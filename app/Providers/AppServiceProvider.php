@@ -98,11 +98,21 @@ class AppServiceProvider extends ServiceProvider
         $weeklyReminderViews = [
             'dashboard',
             'documents.employee-dashboard',
+            'documents.weekly.plans',
+            'documents.weekly.reports',
         ];
 
         View::composer($weeklyReminderViews, function ($view) {
             if (! Auth::check()) {
                 $view->with('weeklySubmissionReminder', new WeeklySubmissionReminder(false, null, null, []));
+                $view->with('weeklyPlanSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyGracePlanSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyGraceReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyPlanGracePeriod', null);
+                $view->with('weeklyPlanGraceEndsAt', null);
+                $view->with('weeklyReportGracePeriod', null);
+                $view->with('weeklyReportGraceEndsAt', null);
 
                 return;
             }
@@ -111,14 +121,32 @@ class AppServiceProvider extends ServiceProvider
             $user = Auth::user();
             if (($user->status ?? '') !== 'active') {
                 $view->with('weeklySubmissionReminder', new WeeklySubmissionReminder(false, null, null, []));
+                $view->with('weeklyPlanSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyGracePlanSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyGraceReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyPlanGracePeriod', null);
+                $view->with('weeklyPlanGraceEndsAt', null);
+                $view->with('weeklyReportGracePeriod', null);
+                $view->with('weeklyReportGraceEndsAt', null);
 
                 return;
             }
+
+            $windows = app(\App\Services\WeeklySubmissionWindowService::class);
 
             $view->with(
                 'weeklySubmissionReminder',
                 app(WeeklySubmissionReminderService::class)->forUser($user)
             );
+            $view->with('weeklyPlanSlot', $windows->resolvePlanSlot($user));
+            $view->with('weeklyReportSlot', $windows->resolveReportSlot($user));
+            $view->with('weeklyGracePlanSlot', $windows->gracePlanSlot($user));
+            $view->with('weeklyGraceReportSlot', $windows->graceReportSlot($user));
+            $view->with('weeklyPlanGracePeriod', $windows->activePlanGracePeriod($user));
+            $view->with('weeklyPlanGraceEndsAt', $windows->planGraceEndsAt($user));
+            $view->with('weeklyReportGracePeriod', $windows->activeReportGracePeriod($user));
+            $view->with('weeklyReportGraceEndsAt', $windows->reportGraceEndsAt($user));
         });
     }
 

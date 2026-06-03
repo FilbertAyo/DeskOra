@@ -12,7 +12,10 @@ use App\Models\WorkPeriod;
 
 class WeeklySubmissionReminderService
 {
-    public function __construct(private readonly WorkPeriodService $workPeriods) {}
+    public function __construct(
+        private readonly WorkPeriodService $workPeriods,
+        private readonly WeeklySubmissionWindowService $submissionWindows,
+    ) {}
 
     public function forUser(User $user): WeeklySubmissionReminder
     {
@@ -30,14 +33,52 @@ class WeeklySubmissionReminderService
         $reportSegment = null;
         $missedMessages = [];
 
-        if ($canPlan && $next) {
-            $doc = $this->findWeeklyDocument($user, $next, Document::TYPE_WEEKLY_PLAN);
-            $planSegment = $this->buildPlanSegment($next, $doc, $missedMessages);
+        if ($canPlan) {
+            $planSlot = $this->submissionWindows->resolvePlanSlot($user);
+            if ($planSlot->showAction()) {
+                $planSegment = new WeeklyReminderSegment(
+                    $planSlot->period,
+                    $planSlot->document,
+                    false,
+                    true,
+                );
+            } else {
+                foreach ($this->submissionWindows->planCandidatePeriods($current, $next) as $period) {
+                    if ($period->isOpen()) {
+                        continue;
+                    }
+                    $doc = $this->findWeeklyDocument($user, $period, Document::TYPE_WEEKLY_PLAN);
+                    if (! $doc || ! $doc->isSubmitted()) {
+                        $planSegment = $this->buildPlanSegment($period, $doc, $missedMessages);
+
+                        break;
+                    }
+                }
+            }
         }
 
-        if ($canReport && $current) {
-            $doc = $this->findWeeklyDocument($user, $current, Document::TYPE_WEEKLY_REPORT);
-            $reportSegment = $this->buildReportSegment($current, $doc, $missedMessages);
+        if ($canReport) {
+            $reportSlot = $this->submissionWindows->resolveReportSlot($user);
+            if ($reportSlot->showAction()) {
+                $reportSegment = new WeeklyReminderSegment(
+                    $reportSlot->period,
+                    $reportSlot->document,
+                    false,
+                    true,
+                );
+            } else {
+                foreach ($this->submissionWindows->reportCandidatePeriods($current) as $period) {
+                    if ($period->isOpen()) {
+                        continue;
+                    }
+                    $doc = $this->findWeeklyDocument($user, $period, Document::TYPE_WEEKLY_REPORT);
+                    if (! $doc || ! $doc->isSubmitted()) {
+                        $reportSegment = $this->buildReportSegment($period, $doc, $missedMessages);
+
+                        break;
+                    }
+                }
+            }
         }
 
         // Floating toast only when staff can still act (before deadline or returned for revision).

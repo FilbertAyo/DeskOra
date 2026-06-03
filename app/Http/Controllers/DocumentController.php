@@ -1641,30 +1641,7 @@ class DocumentController extends Controller
         }
 
         $availableTypes = Document::getAvailableTypesForUser($user);
-
-        /*
-         * New Weekly Plan button: earliest open target week where the user has no plan yet (draft or submitted).
-         */
-        $planCreatePeriod = null;
-        if (isset($availableTypes['weekly_plan']) && $currentPeriod) {
-            $candidatePeriods = collect([$currentPeriod, $nextPeriod])
-                ->filter()
-                ->unique(fn (WorkPeriod $p) => $p->id)
-                ->sortBy(fn (WorkPeriod $p) => $p->week_start_date);
-
-            foreach ($candidatePeriods as $period) {
-                if (! $period->isOpen()) {
-                    continue;
-                }
-                if (Document::findWeeklyPlanForPeriodOwner((string) $period->id, (string) $user->id)) {
-                    continue;
-                }
-                $planCreatePeriod = $period;
-                break;
-            }
-        }
-
-        $canCreateWeeklyPlan = $planCreatePeriod !== null;
+        $weeklyPlanSlot = app(\App\Services\WeeklySubmissionWindowService::class)->resolvePlanSlot($user);
 
         return view('documents.weekly.plans', [
             'documents' => $documents,
@@ -1675,8 +1652,7 @@ class DocumentController extends Controller
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
-            'planCreatePeriod' => $planCreatePeriod,
-            'canCreateWeeklyPlan' => $canCreateWeeklyPlan,
+            'weeklyPlanSlot' => $weeklyPlanSlot,
         ]);
     }
 
@@ -1813,6 +1789,12 @@ class DocumentController extends Controller
 
         $availableTypes = Document::getAvailableTypesForUser($user);
 
+        $selectedCreatePeriod = $request->input('period_id')
+            ? WorkPeriod::query()->find($request->input('period_id'))
+            : null;
+        $weeklyReportSlot = app(\App\Services\WeeklySubmissionWindowService::class)
+            ->resolveReportSlot($user, $selectedCreatePeriod instanceof WorkPeriod ? $selectedCreatePeriod : null);
+
         return view('documents.weekly.reports', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
@@ -1822,6 +1804,7 @@ class DocumentController extends Controller
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
+            'weeklyReportSlot' => $weeklyReportSlot,
         ]);
     }
 

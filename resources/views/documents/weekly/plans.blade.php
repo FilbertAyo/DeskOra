@@ -14,14 +14,14 @@
                         </div>
 
                         <div class="col-auto">
-                            @if($canCreateWeeklyPlan ?? false)
-                                <a href="{{ route('documents.create', ['type' => 'weekly_plan', 'period_id' => $planCreatePeriod->id, 'return_to' => request()->fullUrl()]) }}" class="btn btn-info btn-sm">
-                                    <i class="ti ti-circle-plus me-1"></i> New Weekly Plan
-                                </a>
-                            @elseif(isset($availableTypes['weekly_plan']))
-                                <button type="button" class="btn btn-light btn-sm" disabled title="No open work period slot (or you already have a plan for the available weeks)">
-                                    <i class="ti ti-calendar-off me-1"></i> Weekly plan window closed
-                                </button>
+                            @if(isset($availableTypes['weekly_plan']))
+                                @include('documents.partials.weekly-submission-action-button', [
+                                    'slot' => $weeklyPlanSlot ?? null,
+                                    'documentType' => 'weekly_plan',
+                                    'disabledHint' => ($weeklyPlanSlot ?? null)?->graceActive
+                                        ? 'Your plan for the extended week is already submitted'
+                                        : 'No open work period for a new weekly plan (or you already submitted for the available weeks)',
+                                ])
                             @endif
                         </div>
                     </div>
@@ -82,14 +82,16 @@
                 <div class="card-body">
                     <!-- Deadline Status -->
                     @if($deadlineStatuses)
-                        <div class="alert alert-info mb-4">
+                        <div class="alert {{ ($weeklyPlanSlot ?? null)?->graceActive ? 'alert-warning' : 'alert-info' }} mb-4">
                             <div class="row align-items-center">
                                 <div class="col-md-8">
                                     <h6 class="mb-1">
                                         Weekly Plan Deadline
-                                        @isset($nextPeriod)
+                                        @if(($weeklyPlanSlot ?? null)?->period)
+                                            <span class="text-muted fw-normal">(for Week {{ $weeklyPlanSlot->period->week_number }} of {{ $weeklyPlanSlot->period->year }})</span>
+                                        @elseif(isset($nextPeriod))
                                             <span class="text-muted fw-normal">(for Week {{ $nextPeriod->week_number }})</span>
-                                        @endisset
+                                        @endif
                                     </h6>
                                     <p class="mb-0">
                                         <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y H:i') }}</strong>
@@ -97,6 +99,20 @@
                                             {{ $deadlineStatuses['plan_text'] }}
                                         </span>
                                     </p>
+                                    @if(($weeklyPlanSlot ?? null)?->graceActive && ($weeklyPlanSlot->graceEndsAt ?? null))
+                                        <p class="mb-0 mt-2 small">
+                                            <i class="ti ti-clock-hour-4 me-1"></i>
+                                            Grace period: you can still create or submit until {{ $weeklyPlanSlot->graceEndsAt->format('M d, Y H:i') }}.
+                                        </p>
+                                    @endif
+                                </div>
+                                <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                                    @if(isset($availableTypes['weekly_plan']))
+                                        @include('documents.partials.weekly-submission-action-button', [
+                                            'slot' => $weeklyPlanSlot ?? null,
+                                            'documentType' => 'weekly_plan',
+                                        ])
+                                    @endif
                                 </div>
                             </div>
                         </div>

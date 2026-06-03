@@ -14,26 +14,14 @@
                         </div>
 
                         <div class="col-auto d-flex align-items-center gap-2">
-                            @php
-                                $selectedCreatePeriod = request('period_id')
-                                    ? collect($periods)->firstWhere('id', request('period_id'))
-                                    : null;
-                                $reportCreatePeriod = null;
-                                if ($selectedCreatePeriod && $selectedCreatePeriod->isOpen()) {
-                                    $reportCreatePeriod = $selectedCreatePeriod;
-                                } elseif (isset($currentPeriod) && $currentPeriod && $currentPeriod->isOpen()) {
-                                    $reportCreatePeriod = $currentPeriod;
-                                }
-                                $canCreateWeeklyReport = isset($availableTypes['weekly_report']) && $reportCreatePeriod !== null;
-                            @endphp
-                            @if($canCreateWeeklyReport)
-                                <a href="{{ route('documents.create', ['type' => 'weekly_report', 'period_id' => $reportCreatePeriod->id, 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
-                                    <i class="ti ti-circle-plus me-1"></i> New Weekly Report
-                                </a>
-                            @elseif(isset($availableTypes['weekly_report']))
-                                <button type="button" class="btn btn-light btn-sm" disabled title="No open work period for a new weekly report">
-                                    <i class="ti ti-file-minus me-1"></i> Weekly report window closed
-                                </button>
+                            @if(isset($availableTypes['weekly_report']))
+                                @include('documents.partials.weekly-submission-action-button', [
+                                    'slot' => $weeklyReportSlot ?? null,
+                                    'documentType' => 'weekly_report',
+                                    'disabledHint' => ($weeklyReportSlot ?? null)?->graceActive
+                                        ? 'Your report for the extended week is already submitted'
+                                        : 'No open work period for a new weekly report (or you already submitted for the available weeks)',
+                                ])
                             @endif
                         </div>
                     </div>
@@ -94,11 +82,16 @@
                 <div class="card-body">
                     <!-- Deadline Status -->
                     @if($deadlineStatuses)
-                        <div class="alert alert-info mb-4">
+                        <div class="alert {{ ($weeklyReportSlot ?? null)?->graceActive ? 'alert-warning' : 'alert-info' }} mb-4">
                             <div class="row align-items-center">
                                 <div class="col-md-8">
                                     <h6 class="mb-1">
-                                      Weekly Report Deadline
+                                        Weekly Report Deadline
+                                        @if(($weeklyReportSlot ?? null)?->period)
+                                            <span class="text-muted fw-normal">(for Week {{ $weeklyReportSlot->period->week_number }} of {{ $weeklyReportSlot->period->year }})</span>
+                                        @elseif(isset($currentPeriod))
+                                            <span class="text-muted fw-normal">(for Week {{ $currentPeriod->week_number }})</span>
+                                        @endif
                                     </h6>
                                     <p class="mb-0">
                                         <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}</strong>
@@ -106,16 +99,19 @@
                                             {{ $deadlineStatuses['report_text'] }}
                                         </span>
                                     </p>
+                                    @if(($weeklyReportSlot ?? null)?->graceActive && ($weeklyReportSlot->graceEndsAt ?? null))
+                                        <p class="mb-0 mt-2 small">
+                                            <i class="ti ti-clock-hour-4 me-1"></i>
+                                            Grace period: you can still create or submit until {{ $weeklyReportSlot->graceEndsAt->format('M d, Y H:i') }}.
+                                        </p>
+                                    @endif
                                 </div>
-                                <div class="col-md-4 text-md-end">
-                                    @if($canCreateWeeklyReport)
-                                        <a href="{{ route('documents.create', ['type' => 'weekly_report', 'period_id' => $reportCreatePeriod->id, 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm">
-                                            <i class="ti ti-circle-plus me-1"></i> Create New Report
-                                        </a>
-                                    @elseif(isset($availableTypes['weekly_report']))
-                                        <button type="button" class="btn btn-light btn-sm" disabled title="Report deadline has passed for the current window">
-                                            <i class="ti ti-file-minus me-1"></i> Weekly report window closed
-                                        </button>
+                                <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                                    @if(isset($availableTypes['weekly_report']))
+                                        @include('documents.partials.weekly-submission-action-button', [
+                                            'slot' => $weeklyReportSlot ?? null,
+                                            'documentType' => 'weekly_report',
+                                        ])
                                     @endif
                                 </div>
                             </div>
