@@ -148,6 +148,30 @@ class WeeklySubmissionWindowTest extends TestCase
         $this->assertTrue($slot->document->isDraft());
     }
 
+    public function test_plan_candidate_periods_do_not_error_when_next_period_is_missing(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 10, 10, 0, 0));
+
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 24,
+            'week_start_date' => '2026-06-08',
+            'week_end_date' => '2026-06-14',
+            'plan_deadline' => '2026-06-10',
+            'report_deadline' => '2026-06-13',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $user = User::factory()->create();
+        $user->givePermissionTo('create weekly plan');
+
+        $slot = app(WeeklySubmissionWindowService::class)->resolvePlanSlot($user);
+
+        $this->assertInstanceOf(\App\Data\WeeklySubmissionSlot::class, $slot);
+        $this->assertTrue($slot->showAction());
+        $this->assertSame(24, $slot->period?->week_number);
+    }
+
     public function test_grace_entries_include_all_extended_plan_and_report_windows_user_still_owes(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 10, 10, 0, 0));

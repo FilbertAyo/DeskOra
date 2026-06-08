@@ -29,10 +29,10 @@ class WeeklySubmissionWindowService
 
         $candidates = $this->planCandidatePeriods($current, $next);
         if ($preferredPeriod && $preferredPeriod->isOpen()) {
-            $candidates = collect([$preferredPeriod])
-                ->merge($candidates)
-                ->unique(fn (WorkPeriod $period) => $period->id)
-                ->values();
+            $candidates = $this->mergeUniquePeriods(
+                collect([$preferredPeriod]),
+                $candidates->all(),
+            );
         }
 
         return $this->firstActionablePlanSlot($user, $candidates);
@@ -140,7 +140,7 @@ class WeeklySubmissionWindowService
      */
     public function planCandidatePeriods(?WorkPeriod $current, ?WorkPeriod $next): Collection
     {
-        $gracePeriods = $this->recentWorkPeriods()
+        $gracePeriods = collect($this->recentWorkPeriods()->all())
             ->filter(fn (WorkPeriod $period) => $period->isPlanGracePeriodActive());
 
         // Normally plans target next week; grace periods (newest first) take priority.
@@ -148,11 +148,7 @@ class WeeklySubmissionWindowService
             ? [$current, $next]
             : [$next, $current];
 
-        return $gracePeriods
-            ->merge(collect($ordered))
-            ->filter()
-            ->unique(fn (WorkPeriod $period) => $period->id)
-            ->values();
+        return $this->mergeUniquePeriods($gracePeriods, $ordered);
     }
 
     /**
@@ -162,18 +158,14 @@ class WeeklySubmissionWindowService
     {
         $previous = $current?->getPreviousPeriod();
 
-        $gracePeriods = $this->recentWorkPeriods()
+        $gracePeriods = collect($this->recentWorkPeriods()->all())
             ->filter(fn (WorkPeriod $period) => $period->isReportGracePeriodActive());
 
         $ordered = ($previous && $previous->isReportGracePeriodActive())
             ? [$previous, $current]
             : [$current, $previous];
 
-        return $gracePeriods
-            ->merge(collect($ordered))
-            ->filter()
-            ->unique(fn (WorkPeriod $period) => $period->id)
-            ->values();
+        return $this->mergeUniquePeriods($gracePeriods, $ordered);
     }
 
     /**
@@ -304,5 +296,22 @@ class WeeklySubmissionWindowService
     private function emptySlot(): WeeklySubmissionSlot
     {
         return new WeeklySubmissionSlot(null, null);
+    }
+
+    /**
+     * Merge period lists without nulls. Uses a base Collection so Eloquent merge/unique never calls getKey() on null.
+     *
+     * @param  Collection<int, WorkPeriod>  $primary
+     * @param  list<WorkPeriod|null>  $additional
+     * @return Collection<int, WorkPeriod>
+     */
+    private function mergeUniquePeriods(Collection $primary, array $additional): Collection
+    {
+        return collect($primary->all())
+            ->concat(
+                collect($additional)->filter(fn ($period) => $period instanceof WorkPeriod)
+            )
+            ->unique(fn (WorkPeriod $period) => (string) $period->getKey())
+            ->values();
     }
 }
