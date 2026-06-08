@@ -234,29 +234,21 @@
                                                 @endif
                                             </td>
                                             <td class="text-center">
-                                                @if($planDoc)
-                                                    <a href="{{ route('documents.reviewer-show', $planDoc->id) }}"
-                                                        class="btn btn-icon btn-outline-info btn-sm mx-1" title="View Plan">
-                                                        <i class="ti ti-file-text"></i>
-                                                    </a>
-                                                @else
-                                                    <span class="text-muted mx-1" title="Plan not created">
-                                                        <i class="ti ti-file-x"></i>
-                                                    </span>
-                                                @endif
-
-                                                @if($reportDoc)
-                                                    <a href="{{ route('documents.reviewer-show', $reportDoc->id) }}"
-                                                        class="btn btn-icon btn-outline-primary btn-sm mx-1" title="View Report">
-                                                        <i class="ti ti-file-description"></i>
-                                                    </a>
-                                                @else
-                                                    <span class="text-muted mx-1" title="Report not created">
-                                                        <i class="ti ti-file-x"></i>
-                                                    </span>
-                                                @endif
+                                                <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                                    @if($planDoc)
+                                                        <a href="{{ route('documents.reviewer-show', $planDoc->id) }}"
+                                                            class="btn btn-info btn-sm text-white" title="View Plan">
+                                                            <i class="ti ti-eye"></i> Plan
+                                                        </a>
+                                                    @endif
+                                                    @if($reportDoc)
+                                                        <a href="{{ route('documents.reviewer-show', $reportDoc->id) }}"
+                                                            class="btn btn-primary btn-sm text-white" title="View Report">
+                                                            <i class="ti ti-eye"></i> Report
+                                                        </a>
+                                                    @endif
+                                                </div>
                                             </td>
-                                       
                                         </tr>
                                     @endforeach
                                 </tbody>
