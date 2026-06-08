@@ -234,7 +234,7 @@
                                                 @endif
                                             </td>
                                             <td class="text-center">
-                                                <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                            <div class="d-flex flex-wrap gap-1 justify-content-center btn-group btn-group-sm">
                                                     @if($planDoc)
                                                         <a href="{{ route('documents.reviewer-show', $planDoc->id) }}"
                                                             class="btn btn-info btn-sm text-white" title="View Plan">
