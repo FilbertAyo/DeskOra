@@ -1432,6 +1432,10 @@ class Document extends Model
             $content = app(DocumentContentAssembler::class)->normalizeWeeklyReportContent($content);
         }
 
+        if ($content !== null && $this->type === self::TYPE_WEEKLY_PLAN) {
+            $content = app(DocumentContentAssembler::class)->normalizeWeeklyPlanContent($content);
+        }
+
         return $content;
     }
 

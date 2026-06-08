@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Document;
 use App\Models\WeeklyPlan;
 use App\Models\WeeklyActivityAssignment;
+use App\Services\Documents\DocumentContentAssembler;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -35,7 +36,7 @@ class WeeklyActivityAssignmentService
                     'day' => (string) ($activity->day ?? ''),
                     'activity' => (string) ($activity->activity ?? ''),
                     'location' => (string) ($activity->location ?? ''),
-                    'notes_inclusion' => (string) ($activity->notes_inclusion ?? ''),
+                    'notes_inclusion' => app(DocumentContentAssembler::class)->sanitizeNotesInclusion((string) ($activity->notes_inclusion ?? '')),
                     'team_member_ids' => $activity->assignees->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
                 ];
             })->all();
@@ -56,7 +57,7 @@ class WeeklyActivityAssignmentService
                     'day' => trim((string) ($row['day'] ?? '')),
                     'activity' => trim((string) ($row['activity'] ?? '')),
                     'location' => trim((string) ($row['location'] ?? '')),
-                    'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')),
+                    'notes_inclusion' => app(DocumentContentAssembler::class)->sanitizeNotesInclusion((string) ($row['notes_inclusion'] ?? '')),
                     'team_member_ids' => collect(is_array($row['team_member_ids'] ?? null) ? $row['team_member_ids'] : [])
                         ->map(static fn ($id) => trim((string) $id))
                         ->filter()

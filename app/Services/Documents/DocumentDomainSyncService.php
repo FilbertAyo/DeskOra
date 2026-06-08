@@ -81,7 +81,7 @@ class DocumentDomainSyncService
                 'day' => trim((string) ($row['day'] ?? '')) ?: null,
                 'activity' => trim((string) ($row['activity'] ?? '')) ?: null,
                 'location' => trim((string) ($row['location'] ?? '')) ?: null,
-                'notes_inclusion' => trim((string) ($row['notes_inclusion'] ?? '')) ?: null,
+                'notes_inclusion' => app(DocumentContentAssembler::class)->sanitizeNotesInclusion((string) ($row['notes_inclusion'] ?? '')) ?: null,
                 'carry_over_source_weekly_report_id' => $carryOverSourceWeeklyReportId,
                 'sort_order' => $index,
             ]);

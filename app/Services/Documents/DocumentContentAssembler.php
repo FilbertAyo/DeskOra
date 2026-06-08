@@ -61,7 +61,7 @@ class DocumentContentAssembler
                 'day' => (string) ($activity->day ?? ''),
                 'activity' => (string) ($activity->activity ?? ''),
                 'location' => (string) ($activity->location ?? ''),
-                'notes_inclusion' => (string) ($activity->notes_inclusion ?? ''),
+                'notes_inclusion' => $this->sanitizeNotesInclusion((string) ($activity->notes_inclusion ?? '')),
                 'carry_over_source_weekly_report_id' => $activity->carry_over_source_weekly_report_id,
                 'team_member_ids' => $activity->assignees->pluck('id')->map(fn ($id) => (string) $id)->all(),
             ];
@@ -178,6 +178,56 @@ class DocumentContentAssembler
             'challenges_mitigation' => $challengesMitigation,
             'budget_statuses' => $budgetStatuses,
         ]);
+    }
+
+    /**
+     * Align weekly plan content for forms, show, and sync.
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    public function normalizeWeeklyPlanContent(array $content): array
+    {
+        $plannedActivities = is_array($content['planned_activities'] ?? null) ? $content['planned_activities'] : [];
+        $content['planned_activities'] = array_values(array_map(function ($row) {
+            if (! is_array($row)) {
+                return $row;
+            }
+
+            if (array_key_exists('notes_inclusion', $row)) {
+                $row['notes_inclusion'] = $this->sanitizeNotesInclusion((string) ($row['notes_inclusion'] ?? ''));
+            }
+
+            return $row;
+        }, $plannedActivities));
+
+        return $content;
+    }
+
+    /**
+     * Decode accidental URL-encoding and import artifacts in notes/inclusion fields.
+     */
+    public function sanitizeNotesInclusion(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (preg_match('/%[0-9A-Fa-f]{2}/', $value)) {
+            $decoded = rawurldecode($value);
+            if (preg_match('/%[0-9A-Fa-f]{2}/', $decoded)) {
+                $decoded = rawurldecode($decoded);
+            }
+            $value = $decoded;
+        }
+
+        if (preg_match('/^(?:notes_)?(?:include|inclusion):\s*/i', $value)) {
+            $value = preg_replace('/^(?:notes_)?(?:include|inclusion):\s*/i', '', $value);
+        }
+
+        return trim($value);
     }
 
     /**

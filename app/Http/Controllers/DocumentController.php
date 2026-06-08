@@ -2832,6 +2832,7 @@ class DocumentController extends Controller
                 $content['planned_activities'] ?? [],
                 ['day', 'activity', 'location', 'team_member_ids', 'notes_inclusion']
             );
+            $content = app(DocumentContentAssembler::class)->normalizeWeeklyPlanContent($content);
             $content['planned_activities'] = $this->ensureWeeklyPlanActivityUids($content['planned_activities']);
 
             $content['key_meetings'] = $this->filterNonEmptyRows(
