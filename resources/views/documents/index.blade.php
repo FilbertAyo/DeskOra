@@ -39,7 +39,7 @@
                                 @if(request('type') !== 'monthly_report')
                                 <div class="col-md-3 mb-2">
                                     <select name="period_id" class="form-control">
-                                        <option value="" {{ request('period_id') ? '' : 'selected' }}>All Weeks</option>
+                                        <option value="" {{ request('period_id') ? '' : 'selected' }}>Last 2 work periods</option>
                                         @foreach($periods as $period)
                                             <option value="{{ $period->id }}" {{ request('period_id') == $period->id ? 'selected' : '' }}>
                                                 Week {{ $period->week_number }} • {{ $period->date_range }}
