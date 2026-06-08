@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Data\WeeklySubmissionReminder;
+use App\Database\DocumentsUnionView;
 use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
 use App\Services\WeeklySubmissionReminderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->ensureDocumentsUnionView();
         $this->configureSessionAndUrl();
 
         View::composer('*', function ($view) {
@@ -158,6 +161,25 @@ class AppServiceProvider extends ServiceProvider
             $view->with('weeklyReportGracePeriod', $firstReportGrace?->period);
             $view->with('weeklyReportGraceEndsAt', $firstReportGrace?->graceEndsAt);
         });
+    }
+
+    /**
+     * The Document model reads from a SQL view over domain tables. Recreate it
+     * when missing so create/save redirects do not 404 after cutover.
+     */
+    protected function ensureDocumentsUnionView(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
+        if (! Schema::hasTable('weekly_plans')) {
+            return;
+        }
+
+        if (! DocumentsUnionView::exists()) {
+            DocumentsUnionView::recreate();
+        }
     }
 
     /**

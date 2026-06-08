@@ -62,6 +62,13 @@
         @error('period_id')
             <div class="invalid-feedback d-block">{{ $message }}</div>
         @enderror
+        @if(session('existing_document_url'))
+            <div class="mt-2">
+                <a href="{{ session('existing_document_url') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="ti ti-external-link me-1"></i>Open existing document
+                </a>
+            </div>
+        @endif
         <small class="form-text text-muted">Select the work period for this document</small>
     </div>
 </div>

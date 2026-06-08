@@ -19,6 +19,8 @@ use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkflowEmailNotificationService;
 use App\Services\WorkPeriodService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -26,6 +28,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -307,6 +310,15 @@ class DocumentController extends Controller
             $monthlyYearChoices = $planYears->merge($monthlyYearChoices)->unique()->sortDesc()->values();
         }
 
+        if ($redirect = $this->redirectIfWeeklyDocumentAlreadyExists(
+            $request,
+            $user,
+            $selectedType,
+            $defaultPeriodId ? (string) $defaultPeriodId : null
+        )) {
+            return $redirect;
+        }
+
         // If type is provided in query string, pre-select it
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
@@ -401,9 +413,17 @@ class DocumentController extends Controller
             $validationRules['content'] = ['nullable', 'array'];
         }
 
-        // Add validation for main_target for weekly plans
+        $action = $request->input('action', 'draft');
+        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+
+        // Main target is required when submitting; drafts may save without it.
         if ($request->type === Document::TYPE_WEEKLY_PLAN) {
-            $validationRules['main_target'] = ['required', 'string', 'max:2000'];
+            $validationRules['main_target'] = [
+                Rule::requiredIf($action === 'submit'),
+                'nullable',
+                'string',
+                'max:2000',
+            ];
         }
 
         // Online template content (weekly_plan/weekly_report)
@@ -475,8 +495,6 @@ class DocumentController extends Controller
 
         $request->validate($validationRules);
 
-        $action = $request->input('action', 'draft');
-        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
         $sharedUserIds = [];
 
         if ($request->type === Document::TYPE_WEEKLY_PLAN) {
@@ -621,12 +639,7 @@ class DocumentController extends Controller
         // Check if document already exists for this user, period/month/year, and type
         $existingDocument = null;
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT]) && $period) {
-            // For weekly plans and reports, a user can own one or collaborate on one per period.
-            $existingDocument = Document::query()
-                ->forOwnerOrSharedUser($user->id)
-                ->where('period_id', $period->id)
-                ->where('type', $request->type)
-                ->first();
+            $existingDocument = $this->findExistingWeeklyDocumentForStore($user, $period->id, $request->type);
         } elseif ($request->type === Document::TYPE_MONTHLY_REPORT) {
             // For monthly reports - one per month/year combination
             $existingDocument = Document::where('user_id', $user->id)
@@ -714,8 +727,12 @@ class DocumentController extends Controller
                     Storage::disk('public')->delete($filePath);
                 }
 
-                return redirect()->route('documents.show', $existingDocument)
-                    ->with('info', 'A '.str_replace('_', ' ', $request->type).' already exists for this week period. You can view it below.');
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors([
+                        'period_id' => $this->existingWeeklyDocumentMessage($existingDocument),
+                    ])
+                    ->with('existing_document_url', route('documents.show', $existingDocument->id));
             }
 
             // Check if we can update (authorize update action - only works for drafts)
@@ -841,31 +858,20 @@ class DocumentController extends Controller
             } catch (ValidationException $e) {
                 throw $e;
             } catch (\Throwable $e) {
-                logger()->error('WP_SAVE_FAILED', [
-                    'user_id' => (string) $user->id,
-                    'document_id' => (string) $existingDocument->id,
-                    'type' => (string) $existingDocument->type,
-                    'period_id' => (string) ($existingDocument->period_id ?? ''),
-                    'action' => $action,
-                    'exception' => get_class($e),
-                    'message' => $e->getMessage(),
-                ]);
-
-                return redirect()->route('documents.show', $existingDocument)
-                    ->with('error', $existingDocument->type === Document::TYPE_WEEKLY_PLAN
-                        ? ($action === 'draft'
-                            ? 'Unable to save your weekly plan draft due to a server error. Please try again.'
-                            : 'Unable to save your weekly plan due to a server error. Please try again.'
-                        )
-                        : 'Unable to save your document due to a server error. Please try again.');
+                return $this->weeklyDocumentSaveErrorResponse(
+                    $e,
+                    $request,
+                    $action,
+                    $existingDocument,
+                    (string) $user->id
+                );
             }
 
             $message = ($action === 'submit')
                 ? 'Document updated and submitted successfully.'
                 : 'Document updated successfully.';
 
-            return redirect()->route('documents.show', $existingDocument)
-                ->with('success', $message);
+            return $this->redirectToWeeklyDocument($existingDocument, $message);
         }
 
         // Create new document
@@ -926,29 +932,20 @@ class DocumentController extends Controller
                 $this->syncWeeklyPlanAssignments($document);
 
                 if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-                    $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
+                    $this->syncNextWeeklyPlanCarryOverFromReport($document);
                 }
             });
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            logger()->error('WP_SAVE_FAILED', [
-                'user_id' => (string) $user->id,
-                'type' => (string) $request->type,
-                'period_id' => (string) ($period?->id ?? ''),
-                'action' => $action,
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
-            ]);
-
-            return redirect()->back()
-                ->withInput()
-                ->with('error', $request->type === Document::TYPE_WEEKLY_PLAN
-                    ? ($action === 'draft'
-                        ? 'Unable to save your weekly plan draft due to a server error. Please try again.'
-                        : 'Unable to save your weekly plan due to a server error. Please try again.'
-                    )
-                    : 'Unable to save your document due to a server error. Please try again.');
+            return $this->weeklyDocumentSaveErrorResponse(
+                $e,
+                $request,
+                $action,
+                null,
+                (string) $user->id,
+                $period?->id
+            );
         }
 
         if (! $document instanceof Document) {
@@ -966,8 +963,7 @@ class DocumentController extends Controller
             ? 'Document submitted successfully.'
             : 'Document saved as draft.';
 
-        return redirect()->route('documents.show', $document)
-            ->with('success', $message);
+        return $this->redirectToWeeklyDocument($document, $message);
     }
 
     /**
@@ -1408,24 +1404,13 @@ class DocumentController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            logger()->error('WP_SAVE_FAILED', [
-                'user_id' => (string) $actingUser->id,
-                'document_id' => (string) $document->id,
-                'type' => (string) $document->type,
-                'period_id' => (string) ($document->period_id ?? ''),
-                'action' => $action,
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
-            ]);
-
-            return redirect()->back()
-                ->withInput()
-                ->with('error', $document->type === Document::TYPE_WEEKLY_PLAN
-                    ? ($action === 'draft'
-                        ? 'Unable to save your weekly plan draft due to a server error. Please try again.'
-                        : 'Unable to save your weekly plan due to a server error. Please try again.'
-                    )
-                    : 'Unable to save your document due to a server error. Please try again.');
+            return $this->weeklyDocumentSaveErrorResponse(
+                $e,
+                $request,
+                $action,
+                $document,
+                (string) $actingUser->id
+            );
         }
 
         if ($action === 'submit' && ! $wasSubmitted) {
@@ -1438,8 +1423,7 @@ class DocumentController extends Controller
             ? 'Document submitted successfully.'
             : 'Document updated successfully.';
 
-        return redirect()->route('documents.show', $document)
-            ->with('success', $message);
+        return $this->redirectToWeeklyDocument($document, $message);
     }
 
     /**
@@ -4019,5 +4003,134 @@ class DocumentController extends Controller
         $user = Auth::user();
 
         return $user?->hasPermissionTo('view all documents') ?? false;
+    }
+
+    private function findExistingWeeklyDocumentForStore(User $user, string $periodId, string $type): ?Document
+    {
+        if ($type === Document::TYPE_WEEKLY_PLAN) {
+            return Document::findWeeklyPlanForPeriodOwner($periodId, (string) $user->id);
+        }
+
+        if ($type === Document::TYPE_WEEKLY_REPORT) {
+            return Document::findWeeklyReportForPeriodOwner($periodId, (string) $user->id);
+        }
+
+        return Document::query()
+            ->forOwnerOrSharedUser($user->id)
+            ->where('period_id', $periodId)
+            ->where('type', $type)
+            ->first();
+    }
+
+    private function redirectIfWeeklyDocumentAlreadyExists(
+        Request $request,
+        User $user,
+        ?string $selectedType,
+        ?string $periodId
+    ): ?RedirectResponse {
+        if (! $selectedType || ! $periodId) {
+            return null;
+        }
+
+        $existing = $this->findExistingWeeklyDocumentForStore($user, $periodId, $selectedType);
+        if (! $existing) {
+            return null;
+        }
+
+        if ($existing->isSubmitted()) {
+            return redirect()->route('documents.show', $existing->id)
+                ->with('info', $this->existingWeeklyDocumentMessage($existing));
+        }
+
+        return redirect()->route('documents.edit', [
+            'document' => $existing->id,
+            'return_to' => $request->fullUrl(),
+        ])->with('info', 'You already have a draft '.$existing->type_name.' for this work period. Continue editing it below.');
+    }
+
+    private function existingWeeklyDocumentMessage(Document $document): string
+    {
+        $typeName = $document->type_name;
+        $weekLabel = $document->period
+            ? 'Week '.$document->period->week_number.' of '.$document->period->year
+            : 'this work period';
+
+        return "A {$typeName} already exists for {$weekLabel}. Open the existing document instead of creating a new one.";
+    }
+
+    private function redirectToWeeklyDocument(Document $document, string $successMessage): RedirectResponse
+    {
+        $resolved = Document::fromDomainId((string) $document->id) ?? $document;
+
+        return redirect()->route('documents.show', ['document' => $resolved->id])
+            ->with('success', $successMessage);
+    }
+
+    private function weeklyDocumentSaveErrorResponse(
+        \Throwable $e,
+        Request $request,
+        string $action,
+        ?Document $document,
+        string $userId,
+        ?string $periodId = null
+    ): RedirectResponse {
+        if ($e instanceof ValidationException) {
+            throw $e;
+        }
+
+        if ($e instanceof QueryException && $this->isWeeklyPlanPeriodDuplicate($e)) {
+            $existing = null;
+            if ($periodId && in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+                $existing = $this->findExistingWeeklyDocumentForStore(
+                    $request->user(),
+                    $periodId,
+                    (string) $request->type
+                );
+            }
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors([
+                    'period_id' => $existing
+                        ? $this->existingWeeklyDocumentMessage($existing)
+                        : 'A weekly document already exists for this work period.',
+                ])
+                ->with('existing_document_url', $existing ? route('documents.show', $existing->id) : null);
+        }
+
+        logger()->error('WP_SAVE_FAILED', [
+            'user_id' => $userId,
+            'document_id' => $document ? (string) $document->id : null,
+            'type' => (string) ($document?->type ?? $request->type ?? ''),
+            'period_id' => (string) ($document?->period_id ?? $periodId ?? ''),
+            'action' => $action,
+            'exception' => get_class($e),
+            'message' => $e->getMessage(),
+        ]);
+
+        $fallback = ($document?->type ?? $request->type) === Document::TYPE_WEEKLY_PLAN
+            ? ($action === 'draft'
+                ? 'Unable to save your weekly plan draft. Please review the highlighted fields and try again.'
+                : 'Unable to save your weekly plan. Please review the highlighted fields and try again.')
+            : 'Unable to save your document. Please review the highlighted fields and try again.';
+
+        $message = config('app.debug')
+            ? $fallback.' ('.$e->getMessage().')'
+            : $fallback;
+
+        if ($document) {
+            return redirect()->route('documents.show', $document->id)->with('error', $message);
+        }
+
+        return redirect()->back()->withInput()->with('error', $message);
+    }
+
+    private function isWeeklyPlanPeriodDuplicate(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'weekly_plans_user_period_unique')
+            || str_contains($message, 'weekly_reports_user_period_unique')
+            || (str_contains($message, 'duplicate entry') && str_contains($message, 'period_id'));
     }
 }

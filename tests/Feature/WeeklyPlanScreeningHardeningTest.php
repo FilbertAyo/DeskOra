@@ -162,6 +162,75 @@ class WeeklyPlanScreeningHardeningTest extends TestCase
         );
     }
 
+    public function test_create_weekly_plan_redirects_to_edit_when_draft_already_exists(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Existing draft',
+            'main_target' => 'Existing target',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $existing = Document::findWeeklyPlanForPeriodOwner((string) $nextPeriod->id, (string) $owner->id);
+        $this->assertNotNull($existing);
+
+        $response = $this->actingAs($owner)->get(route('documents.create', [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+        ]));
+
+        $response->assertRedirect();
+        $location = (string) $response->headers->get('Location');
+        $this->assertStringContainsString('/documents/'.$existing->id.'/edit', $location);
+        $this->assertStringContainsString('return_to=', $location);
+    }
+
+    public function test_store_weekly_plan_reports_duplicate_validation_for_submitted_plan(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Submitted plan',
+            'main_target' => 'Submitted target',
+            'state' => Document::STATE_SUBMITTED,
+        ]);
+
+        $response = $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'action' => 'draft',
+            'main_target' => 'Another target',
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'day' => 'Monday',
+                        'activity' => 'Activity 1',
+                        'location' => 'Office',
+                        'team_member_ids' => [],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('period_id');
+        $response->assertSessionHas('existing_document_url');
+    }
+
     public function test_token_mismatch_sets_warning_flash_on_staff_pages(): void
     {
         [, $nextPeriod] = $this->createCurrentAndNextPeriods();

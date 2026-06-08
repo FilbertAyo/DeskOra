@@ -27,7 +27,7 @@ class DocumentDomainSyncService
 {
     public function syncFromDocument(Document $document): void
     {
-        DB::transaction(function () use ($document) {
+        $callback = function () use ($document): void {
             match ($document->type) {
                 Document::TYPE_WEEKLY_PLAN => $this->syncWeeklyPlan($document),
                 Document::TYPE_WEEKLY_REPORT => $this->syncWeeklyReport($document),
@@ -35,7 +35,17 @@ class DocumentDomainSyncService
                 Document::TYPE_ACTION_LOG => $this->syncActionLog($document),
                 default => null,
             };
-        }, 3);
+        };
+
+        // Participate in the caller's transaction so a later failure rolls back
+        // the domain sync instead of leaving a partially saved weekly plan/report.
+        if (DB::transactionLevel() > 0) {
+            $callback();
+
+            return;
+        }
+
+        DB::transaction($callback, 3);
     }
 
     private function syncWeeklyPlan(Document $document): void

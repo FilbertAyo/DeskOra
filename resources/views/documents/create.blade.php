@@ -1030,12 +1030,12 @@
                     }
                 }
 
-                // Validate main target for weekly plans
-                if (selectedTypeValue === 'weekly_plan') {
+                // Validate main target for weekly plans when submitting
+                if (selectedTypeValue === 'weekly_plan' && action === 'submit') {
                     const mainTarget = document.getElementById('main_target');
                     if (mainTarget && !mainTarget.value.trim()) {
                         e.preventDefault();
-                        alert('Please enter the main target for this week.');
+                        alert('Please enter the main target for this week before submitting.');
                         return false;
                     }
                 }

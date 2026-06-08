@@ -688,6 +688,17 @@ class Document extends Model
      */
     public static function findWeeklyPlanForPeriodOwner(string $periodId, string $ownerUserId): ?Document
     {
+        $plan = WeeklyPlan::query()
+            ->where('period_id', $periodId)
+            ->where('user_id', $ownerUserId)
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+
+        if ($plan) {
+            return self::fromWeeklyPlanModel($plan);
+        }
+
         return static::query()
             ->where('period_id', $periodId)
             ->ofType(self::TYPE_WEEKLY_PLAN)
@@ -702,6 +713,31 @@ class Document extends Model
      */
     public static function findWeeklyPlanForUserAndPeriod(string $periodId, string $userId): ?Document
     {
+        $ownedPlan = WeeklyPlan::query()
+            ->where('period_id', $periodId)
+            ->where('user_id', $userId)
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+
+        if ($ownedPlan) {
+            return self::fromWeeklyPlanModel($ownedPlan);
+        }
+
+        $sharedPlanId = DB::table('document_user_shares')
+            ->join('weekly_plans', 'weekly_plans.id', '=', 'document_user_shares.weekly_plan_id')
+            ->where('document_user_shares.user_id', $userId)
+            ->where('weekly_plans.period_id', $periodId)
+            ->orderByDesc('weekly_plans.id')
+            ->value('weekly_plans.id');
+
+        if ($sharedPlanId) {
+            $sharedPlan = WeeklyPlan::query()->find($sharedPlanId);
+            if ($sharedPlan) {
+                return self::fromWeeklyPlanModel($sharedPlan);
+            }
+        }
+
         return static::query()
             ->forOwnerOrSharedUser($userId)
             ->where('period_id', $periodId)
@@ -716,6 +752,17 @@ class Document extends Model
      */
     public static function findWeeklyReportForPeriodOwner(string $periodId, string $ownerUserId): ?Document
     {
+        $report = WeeklyReport::query()
+            ->where('period_id', $periodId)
+            ->where('user_id', $ownerUserId)
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+
+        if ($report) {
+            return self::fromWeeklyReportModel($report);
+        }
+
         return static::query()
             ->where('period_id', $periodId)
             ->ofType(self::TYPE_WEEKLY_REPORT)
@@ -723,6 +770,126 @@ class Document extends Model
             ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $field = $field ?? $this->getRouteKeyName();
+
+        $document = $this->newQuery()->where($field, $value)->first();
+        if ($document !== null) {
+            return $document;
+        }
+
+        return self::fromDomainId((string) $value);
+    }
+
+    public static function fromDomainId(string $id): ?self
+    {
+        $plan = WeeklyPlan::query()->find($id);
+        if ($plan) {
+            return self::fromWeeklyPlanModel($plan);
+        }
+
+        $report = WeeklyReport::query()->find($id);
+        if ($report) {
+            return self::fromWeeklyReportModel($report);
+        }
+
+        $monthlyReport = MonthlyReport::query()->find($id);
+        if ($monthlyReport) {
+            return self::fromMonthlyReportModel($monthlyReport);
+        }
+
+        $actionLog = ActionLog::query()->find($id);
+        if ($actionLog) {
+            return self::fromActionLogModel($actionLog);
+        }
+
+        return null;
+    }
+
+    public static function fromWeeklyPlanModel(WeeklyPlan $plan): self
+    {
+        $document = new self;
+        $document->id = (string) $plan->id;
+        $document->user_id = (string) $plan->user_id;
+        $document->period_id = $plan->period_id ? (string) $plan->period_id : null;
+        $document->type = self::TYPE_WEEKLY_PLAN;
+        $document->title = $plan->title;
+        $document->main_target = $plan->main_target;
+        $document->state = $plan->state;
+        $document->review_rejection_reason = $plan->review_rejection_reason;
+        $document->budget_review_status = $plan->budget_review_status;
+        $document->budget_reviewed_by = $plan->budget_reviewed_by;
+        $document->budget_reviewed_at = $plan->budget_reviewed_at;
+        $document->budget_provided_amount = $plan->budget_provided_amount;
+        $document->budget_review_note = $plan->budget_review_note;
+        $document->created_at = $plan->created_at;
+        $document->updated_at = $plan->updated_at;
+        $document->deleted_at = $plan->deleted_at;
+        $document->exists = true;
+
+        return $document;
+    }
+
+    public static function fromWeeklyReportModel(WeeklyReport $report): self
+    {
+        $document = new self;
+        $document->id = (string) $report->id;
+        $document->user_id = (string) $report->user_id;
+        $document->period_id = $report->period_id ? (string) $report->period_id : null;
+        $document->type = self::TYPE_WEEKLY_REPORT;
+        $document->title = $report->title;
+        $document->target_accomplished = $report->target_accomplished;
+        $document->target_explanation = $report->target_explanation;
+        $document->state = $report->state;
+        $document->review_rejection_reason = $report->review_rejection_reason;
+        $document->created_at = $report->created_at;
+        $document->updated_at = $report->updated_at;
+        $document->deleted_at = $report->deleted_at;
+        $document->exists = true;
+
+        return $document;
+    }
+
+    public static function fromMonthlyReportModel(MonthlyReport $report): self
+    {
+        $document = new self;
+        $document->id = (string) $report->id;
+        $document->user_id = (string) $report->user_id;
+        $document->type = self::TYPE_MONTHLY_REPORT;
+        $document->month = $report->month;
+        $document->year = $report->year;
+        $document->title = $report->title;
+        $document->file_path = $report->file_path;
+        $document->attachment = $report->attachment;
+        $document->file_size = $report->file_size;
+        $document->original_filename = $report->original_filename;
+        $document->state = $report->state;
+        $document->created_at = $report->created_at;
+        $document->updated_at = $report->updated_at;
+        $document->deleted_at = $report->deleted_at;
+        $document->exists = true;
+
+        return $document;
+    }
+
+    public static function fromActionLogModel(ActionLog $actionLog): self
+    {
+        $document = new self;
+        $document->id = (string) $actionLog->id;
+        $document->user_id = (string) $actionLog->user_id;
+        $document->period_id = $actionLog->period_id ? (string) $actionLog->period_id : null;
+        $document->type = self::TYPE_ACTION_LOG;
+        $document->title = $actionLog->title;
+        $document->state = $actionLog->state;
+        $document->created_at = $actionLog->created_at;
+        $document->updated_at = $actionLog->updated_at;
+        $document->deleted_at = $actionLog->deleted_at;
+        $document->exists = true;
+
+        return $document;
     }
 
     /**
