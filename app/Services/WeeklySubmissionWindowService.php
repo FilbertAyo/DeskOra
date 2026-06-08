@@ -8,10 +8,14 @@ use App\Data\WeeklySubmissionSlot;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class WeeklySubmissionWindowService
 {
+    /** @var Collection<int, WorkPeriod>|null */
+    private ?Collection $recentWorkPeriodsCache = null;
+
     public function __construct(private readonly WorkPeriodService $workPeriods) {}
 
     public function resolvePlanSlot(User $user, ?WorkPeriod $preferredPeriod = null): WeeklySubmissionSlot
@@ -54,25 +58,7 @@ class WeeklySubmissionWindowService
      */
     public function gracePlanSlot(User $user): WeeklySubmissionSlot
     {
-        if (! $user->hasPermissionTo('create weekly plan')) {
-            return $this->emptySlot();
-        }
-
-        $current = $this->workPeriods->periodForWeeklyReportSubmission();
-        $next = $this->workPeriods->periodForWeeklyPlanSubmission();
-
-        foreach ($this->planCandidatePeriods($current, $next) as $period) {
-            if (! $period->isPlanGracePeriodActive()) {
-                continue;
-            }
-
-            $slot = $this->planSlotForPeriod($user, $period);
-            if ($slot->showAction()) {
-                return $slot;
-            }
-        }
-
-        return $this->emptySlot();
+        return $this->gracePlanEntries($user)->first() ?? $this->emptySlot();
     }
 
     /**
@@ -80,24 +66,43 @@ class WeeklySubmissionWindowService
      */
     public function graceReportSlot(User $user): WeeklySubmissionSlot
     {
+        return $this->graceReportEntries($user)->first() ?? $this->emptySlot();
+    }
+
+    /**
+     * All weekly plan grace windows the user can still act on.
+     *
+     * @return Collection<int, WeeklySubmissionSlot>
+     */
+    public function gracePlanEntries(User $user): Collection
+    {
+        if (! $user->hasPermissionTo('create weekly plan')) {
+            return collect();
+        }
+
+        return $this->recentWorkPeriods()
+            ->filter(fn (WorkPeriod $period) => $period->isPlanGracePeriodActive())
+            ->map(fn (WorkPeriod $period) => $this->planSlotForPeriod($user, $period))
+            ->filter(fn (WeeklySubmissionSlot $slot) => $slot->showAction() && $slot->graceActive)
+            ->values();
+    }
+
+    /**
+     * All weekly report grace windows the user can still act on.
+     *
+     * @return Collection<int, WeeklySubmissionSlot>
+     */
+    public function graceReportEntries(User $user): Collection
+    {
         if (! $user->hasPermissionTo('create weekly report')) {
-            return $this->emptySlot();
+            return collect();
         }
 
-        $current = $this->workPeriods->periodForWeeklyReportSubmission();
-
-        foreach ($this->reportCandidatePeriods($current) as $period) {
-            if (! $period->isReportGracePeriodActive()) {
-                continue;
-            }
-
-            $slot = $this->reportSlotForPeriod($user, $period);
-            if ($slot->showAction()) {
-                return $slot;
-            }
-        }
-
-        return $this->emptySlot();
+        return $this->recentWorkPeriods()
+            ->filter(fn (WorkPeriod $period) => $period->isReportGracePeriodActive())
+            ->map(fn (WorkPeriod $period) => $this->reportSlotForPeriod($user, $period))
+            ->filter(fn (WeeklySubmissionSlot $slot) => $slot->showAction() && $slot->graceActive)
+            ->values();
     }
 
     public function hasActivePlanGrace(User $user): bool
@@ -112,26 +117,22 @@ class WeeklySubmissionWindowService
 
     public function activePlanGracePeriod(User $user): ?WorkPeriod
     {
-        return $this->anyPlanGracePeriod($user);
+        return $this->gracePlanEntries($user)->first()?->period;
     }
 
     public function activeReportGracePeriod(User $user): ?WorkPeriod
     {
-        return $this->anyReportGracePeriod($user);
+        return $this->graceReportEntries($user)->first()?->period;
     }
 
     public function planGraceEndsAt(User $user): ?\Carbon\Carbon
     {
-        $period = $this->anyPlanGracePeriod($user);
-
-        return $period?->getPlanDeadlineCutoff();
+        return $this->gracePlanEntries($user)->first()?->graceEndsAt;
     }
 
     public function reportGraceEndsAt(User $user): ?\Carbon\Carbon
     {
-        $period = $this->anyReportGracePeriod($user);
-
-        return $period?->getReportDeadlineCutoff();
+        return $this->graceReportEntries($user)->first()?->graceEndsAt;
     }
 
     /**
@@ -139,12 +140,16 @@ class WeeklySubmissionWindowService
      */
     public function planCandidatePeriods(?WorkPeriod $current, ?WorkPeriod $next): Collection
     {
-        // Normally plans target next week; during an admin plan grace on the current week, that week comes first.
+        $gracePeriods = $this->recentWorkPeriods()
+            ->filter(fn (WorkPeriod $period) => $period->isPlanGracePeriodActive());
+
+        // Normally plans target next week; grace periods (newest first) take priority.
         $ordered = ($current && $current->isPlanGracePeriodActive())
             ? [$current, $next]
             : [$next, $current];
 
-        return collect($ordered)
+        return $gracePeriods
+            ->merge(collect($ordered))
             ->filter()
             ->unique(fn (WorkPeriod $period) => $period->id)
             ->values();
@@ -157,11 +162,15 @@ class WeeklySubmissionWindowService
     {
         $previous = $current?->getPreviousPeriod();
 
+        $gracePeriods = $this->recentWorkPeriods()
+            ->filter(fn (WorkPeriod $period) => $period->isReportGracePeriodActive());
+
         $ordered = ($previous && $previous->isReportGracePeriodActive())
             ? [$previous, $current]
             : [$current, $previous];
 
-        return collect($ordered)
+        return $gracePeriods
+            ->merge(collect($ordered))
             ->filter()
             ->unique(fn (WorkPeriod $period) => $period->id)
             ->values();
@@ -199,7 +208,7 @@ class WeeklySubmissionWindowService
 
     public function planSlotForPeriod(User $user, WorkPeriod $period): WeeklySubmissionSlot
     {
-        if (! $period->isOpen()) {
+        if (! $period->isOpen() && ! $period->isPlanGracePeriodActive()) {
             return $this->emptySlot();
         }
 
@@ -218,7 +227,7 @@ class WeeklySubmissionWindowService
 
     public function reportSlotForPeriod(User $user, WorkPeriod $period): WeeklySubmissionSlot
     {
-        if (! $period->isOpen()) {
+        if (! $period->isOpen() && ! $period->isReportGracePeriodActive()) {
             return $this->emptySlot();
         }
 
@@ -237,37 +246,29 @@ class WeeklySubmissionWindowService
 
     private function anyPlanGracePeriod(User $user): ?WorkPeriod
     {
-        if (! $user->hasPermissionTo('create weekly plan')) {
-            return null;
-        }
-
-        $current = $this->workPeriods->periodForWeeklyReportSubmission();
-        $next = $this->workPeriods->periodForWeeklyPlanSubmission();
-
-        foreach ($this->planCandidatePeriods($current, $next) as $period) {
-            if ($period->isPlanGracePeriodActive()) {
-                return $period;
-            }
-        }
-
-        return null;
+        return $this->activePlanGracePeriod($user);
     }
 
     private function anyReportGracePeriod(User $user): ?WorkPeriod
     {
-        if (! $user->hasPermissionTo('create weekly report')) {
-            return null;
+        return $this->activeReportGracePeriod($user);
+    }
+
+    /**
+     * @return Collection<int, WorkPeriod>
+     */
+    private function recentWorkPeriods(): Collection
+    {
+        if ($this->recentWorkPeriodsCache !== null) {
+            return $this->recentWorkPeriodsCache;
         }
 
-        $current = $this->workPeriods->periodForWeeklyReportSubmission();
+        $this->recentWorkPeriodsCache = WorkPeriod::query()
+            ->where('week_start_date', '>=', Carbon::now()->subWeeks(16)->startOfWeek()->format('Y-m-d'))
+            ->orderByDesc('week_start_date')
+            ->get();
 
-        foreach ($this->reportCandidatePeriods($current) as $period) {
-            if ($period->isReportGracePeriodActive()) {
-                return $period;
-            }
-        }
-
-        return null;
+        return $this->recentWorkPeriodsCache;
     }
 
     /**

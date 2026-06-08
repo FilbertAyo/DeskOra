@@ -85,7 +85,7 @@ class WeeklyGracePeriodNotificationDispatcher
         $skippedNoEmail = 0;
 
         $openPeriods = WorkPeriod::query()
-            ->where('status', WorkPeriod::STATUS_OPEN)
+            ->where('week_start_date', '>=', now()->subWeeks(16)->startOfWeek()->format('Y-m-d'))
             ->orderBy('week_start_date')
             ->get();
 

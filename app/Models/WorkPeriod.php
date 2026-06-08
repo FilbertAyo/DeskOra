@@ -305,10 +305,6 @@ class WorkPeriod extends Model
      */
     public function isPlanGracePeriodActive(?Carbon $now = null): bool
     {
-        if (! $this->isOpen()) {
-            return false;
-        }
-
         $now ??= Carbon::now();
         $extendedCutoff = $this->getPlanDeadlineCutoff();
         $defaultCutoff = $this->getDefaultPlanDeadlineCutoff();
@@ -323,10 +319,6 @@ class WorkPeriod extends Model
      */
     public function isReportGracePeriodActive(?Carbon $now = null): bool
     {
-        if (! $this->isOpen()) {
-            return false;
-        }
-
         $now ??= Carbon::now();
         $extendedCutoff = $this->getReportDeadlineCutoff();
         $defaultCutoff = $this->getDefaultReportDeadlineCutoff();

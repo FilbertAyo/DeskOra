@@ -583,7 +583,10 @@ class DocumentController extends Controller
                 : $this->workPeriodService->periodForWeeklyReportSubmission();
 
             $isExpectedPeriod = $expectedPeriod && $period->id === $expectedPeriod->id;
-            if (! $isExpectedPeriod && ! $period->isOpen()) {
+            $inGraceWindow = $request->type === Document::TYPE_WEEKLY_PLAN
+                ? $period->isPlanGracePeriodActive()
+                : $period->isReportGracePeriodActive();
+            if (! $isExpectedPeriod && ! $period->isOpen() && ! $inGraceWindow) {
                 $errorMessage = $request->type === Document::TYPE_WEEKLY_PLAN
                     ? 'The selected weekly plan work period is closed.'
                     : 'The selected weekly report work period is closed.';
@@ -598,8 +601,12 @@ class DocumentController extends Controller
         }
 
         if ($period && ! $period->isOpen()) {
+            $inGraceWindow = $request->type === Document::TYPE_WEEKLY_PLAN
+                ? $period->isPlanGracePeriodActive()
+                : $period->isReportGracePeriodActive();
+
             // Drafts are allowed even when work periods are closed.
-            if ($action === 'submit') {
+            if ($action === 'submit' && ! $inGraceWindow) {
                 return redirect()->back()
                     ->withInput()
                     ->with('error', 'This work period is closed. Please contact your administrator.');

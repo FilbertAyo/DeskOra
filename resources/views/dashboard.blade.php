@@ -47,13 +47,9 @@
             && ($currentPeriod ?? null)
             && $wr
             && ($wr->report !== null && $wr->report->showCta);
-        $planGraceActive = ($weeklyPlanGracePeriod ?? null) !== null;
-        $reportGraceActive = ($weeklyReportGracePeriod ?? null) !== null;
-        $planGracePeriod = $weeklyPlanGracePeriod ?? null;
-        $reportGracePeriod = $weeklyReportGracePeriod ?? null;
-        $planGraceEndsAt = $weeklyPlanGraceEndsAt ?? null;
-        $reportGraceEndsAt = $weeklyReportGraceEndsAt ?? null;
-        $hasWeeklyGraceWindow = $planGraceActive || $reportGraceActive;
+        $planGraceEntries = collect($weeklyPlanGraceEntries ?? []);
+        $reportGraceEntries = collect($weeklyReportGraceEntries ?? []);
+        $hasWeeklyGraceWindow = $planGraceEntries->isNotEmpty() || $reportGraceEntries->isNotEmpty();
         $focusTaskShowRoute = function ($doc) {
             if (($doc->type ?? null) === \App\Models\Document::TYPE_ACTION_LOG) {
                 return route('action-logs.show', $doc->id);
@@ -221,46 +217,50 @@
                                 Your administrator extended the deadline. Use the buttons below to create or finish the document before the new cutoff.
                             </p>
                             <ul class="mb-3 ps-3 small">
-                                @if($planGraceActive && $planGraceEndsAt)
+                                @foreach($planGraceEntries as $planGraceEntry)
                                     <li class="mb-2">
                                         <span class="d-block">
                                             Weekly plan deadline was extended
-                                            @if($planGracePeriod)
-                                                for Week {{ $planGracePeriod->week_number }} of {{ $planGracePeriod->year }}
+                                            @if($planGraceEntry->period)
+                                                for Week {{ $planGraceEntry->period->week_number }} of {{ $planGraceEntry->period->year }}
                                             @endif.
-                                            You can still submit until {{ $planGraceEndsAt->format('M d, Y H:i') }}.
+                                            @if($planGraceEntry->graceEndsAt)
+                                                You can still submit until {{ $planGraceEntry->graceEndsAt->format('M d, Y H:i') }}.
+                                            @endif
                                         </span>
                                         @if(isset($availableTypes['weekly_plan']))
                                             <span class="d-inline-block mt-1">
                                                 @include('documents.partials.weekly-submission-action-button', [
-                                                    'slot' => $weeklyGracePlanSlot ?? $weeklyPlanSlot ?? null,
+                                                    'slot' => $planGraceEntry,
                                                     'documentType' => 'weekly_plan',
                                                     'btnClass' => 'btn-warning',
                                                 ])
                                             </span>
                                         @endif
                                     </li>
-                                @endif
-                                @if($reportGraceActive && $reportGraceEndsAt)
-                                    <li class="mb-0">
+                                @endforeach
+                                @foreach($reportGraceEntries as $reportGraceEntry)
+                                    <li class="{{ $loop->last ? 'mb-0' : 'mb-2' }}">
                                         <span class="d-block">
                                             Weekly report deadline was extended
-                                            @if($reportGracePeriod)
-                                                for Week {{ $reportGracePeriod->week_number }} of {{ $reportGracePeriod->year }}
+                                            @if($reportGraceEntry->period)
+                                                for Week {{ $reportGraceEntry->period->week_number }} of {{ $reportGraceEntry->period->year }}
                                             @endif.
-                                            You can still submit until {{ $reportGraceEndsAt->format('M d, Y H:i') }}.
+                                            @if($reportGraceEntry->graceEndsAt)
+                                                You can still submit until {{ $reportGraceEntry->graceEndsAt->format('M d, Y H:i') }}.
+                                            @endif
                                         </span>
                                         @if(isset($availableTypes['weekly_report']))
                                             <span class="d-inline-block mt-1">
                                                 @include('documents.partials.weekly-submission-action-button', [
-                                                    'slot' => $weeklyGraceReportSlot ?? $weeklyReportSlot ?? null,
+                                                    'slot' => $reportGraceEntry,
                                                     'documentType' => 'weekly_report',
                                                     'btnClass' => 'btn-warning',
                                                 ])
                                             </span>
                                         @endif
                                     </li>
-                                @endif
+                                @endforeach
                             </ul>
                         </div>
                     @endif

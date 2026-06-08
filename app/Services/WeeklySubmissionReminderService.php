@@ -96,7 +96,11 @@ class WeeklySubmissionReminderService
             return false;
         }
 
-        return ! $period->isOpen();
+        if ($type === Document::TYPE_WEEKLY_PLAN) {
+            return ! $period->isOpen() && ! $period->isPlanGracePeriodActive();
+        }
+
+        return ! $period->isOpen() && ! $period->isReportGracePeriodActive();
     }
 
     /**
@@ -112,6 +116,14 @@ class WeeklySubmissionReminderService
         $period = $document->period;
         if (! $period) {
             return true;
+        }
+
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            return $period->isOpen() || $period->isPlanGracePeriodActive();
+        }
+
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            return $period->isOpen() || $period->isReportGracePeriodActive();
         }
 
         return $period->isOpen();

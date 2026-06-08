@@ -109,6 +109,8 @@ class AppServiceProvider extends ServiceProvider
                 $view->with('weeklyReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
                 $view->with('weeklyGracePlanSlot', new \App\Data\WeeklySubmissionSlot(null, null));
                 $view->with('weeklyGraceReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyPlanGraceEntries', collect());
+                $view->with('weeklyReportGraceEntries', collect());
                 $view->with('weeklyPlanGracePeriod', null);
                 $view->with('weeklyPlanGraceEndsAt', null);
                 $view->with('weeklyReportGracePeriod', null);
@@ -125,6 +127,8 @@ class AppServiceProvider extends ServiceProvider
                 $view->with('weeklyReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
                 $view->with('weeklyGracePlanSlot', new \App\Data\WeeklySubmissionSlot(null, null));
                 $view->with('weeklyGraceReportSlot', new \App\Data\WeeklySubmissionSlot(null, null));
+                $view->with('weeklyPlanGraceEntries', collect());
+                $view->with('weeklyReportGraceEntries', collect());
                 $view->with('weeklyPlanGracePeriod', null);
                 $view->with('weeklyPlanGraceEndsAt', null);
                 $view->with('weeklyReportGracePeriod', null);
@@ -134,6 +138,10 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $windows = app(\App\Services\WeeklySubmissionWindowService::class);
+            $planGraceEntries = $windows->gracePlanEntries($user);
+            $reportGraceEntries = $windows->graceReportEntries($user);
+            $firstPlanGrace = $planGraceEntries->first();
+            $firstReportGrace = $reportGraceEntries->first();
 
             $view->with(
                 'weeklySubmissionReminder',
@@ -141,12 +149,14 @@ class AppServiceProvider extends ServiceProvider
             );
             $view->with('weeklyPlanSlot', $windows->resolvePlanSlot($user));
             $view->with('weeklyReportSlot', $windows->resolveReportSlot($user));
-            $view->with('weeklyGracePlanSlot', $windows->gracePlanSlot($user));
-            $view->with('weeklyGraceReportSlot', $windows->graceReportSlot($user));
-            $view->with('weeklyPlanGracePeriod', $windows->activePlanGracePeriod($user));
-            $view->with('weeklyPlanGraceEndsAt', $windows->planGraceEndsAt($user));
-            $view->with('weeklyReportGracePeriod', $windows->activeReportGracePeriod($user));
-            $view->with('weeklyReportGraceEndsAt', $windows->reportGraceEndsAt($user));
+            $view->with('weeklyGracePlanSlot', $firstPlanGrace ?? new \App\Data\WeeklySubmissionSlot(null, null));
+            $view->with('weeklyGraceReportSlot', $firstReportGrace ?? new \App\Data\WeeklySubmissionSlot(null, null));
+            $view->with('weeklyPlanGraceEntries', $planGraceEntries);
+            $view->with('weeklyReportGraceEntries', $reportGraceEntries);
+            $view->with('weeklyPlanGracePeriod', $firstPlanGrace?->period);
+            $view->with('weeklyPlanGraceEndsAt', $firstPlanGrace?->graceEndsAt);
+            $view->with('weeklyReportGracePeriod', $firstReportGrace?->period);
+            $view->with('weeklyReportGraceEndsAt', $firstReportGrace?->graceEndsAt);
         });
     }
 

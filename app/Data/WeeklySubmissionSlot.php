@@ -28,14 +28,14 @@ final readonly class WeeklySubmissionSlot
     public function canCreateNew(): bool
     {
         return $this->period !== null
-            && $this->period->isOpen()
+            && ($this->period->isOpen() || $this->graceActive)
             && $this->document === null;
     }
 
     public function canContinueDraft(): bool
     {
         return $this->period !== null
-            && $this->period->isOpen()
+            && ($this->period->isOpen() || $this->graceActive)
             && $this->document !== null
             && $this->document->isDraft();
     }
