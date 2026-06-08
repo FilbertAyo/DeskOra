@@ -23,33 +23,32 @@
         </div>
     </div>
 
+    <!-- Filters -->
     <div class="row">
         <div class="col-md-12">
-            <div class="card shadow-none border mb-4">
-                <div class="card-header bg-white border-bottom">
-                    <div class="row align-items-center">
-                        <div class="col-md-6">
-                            <h5 class="mb-0"><i class="ti ti-list me-2"></i>Submitted documents (all staff)</h5>
-                        </div>
-                        <div class="col-md-6">
-                            <form method="GET" action="{{ route('documents.index') }}" class="row">
-                                @if(request()->filled('type'))
-                                    <input type="hidden" name="type" value="{{ request('type') }}">
-                                @endif
-                                @if(request('type') !== 'monthly_report')
-                                <div class="col-md-3 mb-2">
-                                    <select name="period_id" class="form-control">
+            <div class="card shadow-none border">
+                <div class="card-body">
+                    <form method="GET" action="{{ route('documents.index') }}" id="filterForm">
+                        @if(request()->filled('type'))
+                            <input type="hidden" name="type" value="{{ request('type') }}">
+                        @endif
+                        <div class="row g-2 align-items-end">
+                            @if(request('type') !== 'monthly_report')
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">Work Period</label>
+                                    <select class="form-control form-control-sm" name="period_id" id="periodFilter">
                                         <option value="" {{ request('period_id') ? '' : 'selected' }}>Last 2 work periods</option>
                                         @foreach($periods as $period)
                                             <option value="{{ $period->id }}" {{ request('period_id') == $period->id ? 'selected' : '' }}>
-                                                Week {{ $period->week_number }} • {{ $period->date_range }}
+                                                Week {{ $period->week_number }}, {{ $period->year }} ({{ $period->date_range }})
                                             </option>
                                         @endforeach
                                     </select>
                                 </div>
-                                @else
-                                <div class="col-md-4 mb-2">
-                                    <select name="month" class="form-control">
+                            @else
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">Month</label>
+                                    <select class="form-control form-control-sm" name="month" id="monthFilter">
                                         <option value="" {{ ! request()->filled('month') ? 'selected' : '' }}>All months</option>
                                         @foreach([
                                             1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
@@ -60,36 +59,49 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                @endif
-                                <div class="col-md-4 mb-2">
-                                    <select name="year" class="form-control">
-                                        <option value="" {{ request('year') ? '' : 'selected' }}>All Years</option>
-                                        @foreach($years as $year)
-                                            <option value="{{ $year }}" {{ request('year') == $year ? 'selected' : '' }}>
-                                                {{ $year }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                              
-                                <div class="col-md-3 d-flex justify-content-end gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm">
-                                        <i class="ti ti-filter me-1"></i>Apply
-                                    </button>
-                                    @php
-                                        $resetMonthly = request('type') === 'monthly_report'
-                                            ? route('documents.index', ['type' => 'monthly_report'])
-                                            : route('documents.index');
-                                    @endphp
-                                    @if(request()->hasAny(['period_id', 'year', 'review_status', 'month']))
-                                        <a href="{{ $resetMonthly }}" class="btn btn-light btn-sm">
-                                            <i class="ti ti-x me-1"></i>Reset
-                                        </a>
-                                    @endif
-                                </div>
-                            </form>
+                            @endif
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Year</label>
+                                <select class="form-control form-control-sm" name="year" id="yearFilter">
+                                    <option value="" {{ request('year') ? '' : 'selected' }}>All Years</option>
+                                    @foreach($years as $year)
+                                        <option value="{{ $year }}" {{ request('year') == $year ? 'selected' : '' }}>
+                                            {{ $year }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary btn-sm w-100">
+                                    <i class="ti ti-filter me-1"></i> Filter
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                        @php
+                            $clearFiltersUrl = request('type') === 'monthly_report'
+                                ? route('documents.index', ['type' => 'monthly_report'])
+                                : route('documents.index');
+                        @endphp
+                        @if(request()->hasAny(['period_id', 'year', 'review_status', 'month']))
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <a href="{{ $clearFiltersUrl }}" class="btn btn-sm btn-light">
+                                        <i class="ti ti-x me-1"></i> Clear Filters
+                                    </a>
+                                </div>
+                            </div>
+                        @endif
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow-none border mb-4">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0"><i class="ti ti-list me-2"></i>Submitted documents (all staff)</h5>
                 </div>
                 <div class="card-body">
                   
