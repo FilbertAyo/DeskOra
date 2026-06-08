@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -19,6 +20,25 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Document extends Model
 {
     use HasFactory, HasUlids, LogsActivity, SoftDeletes;
+
+    private static function supportsBinaryComparison(): bool
+    {
+        return DB::connection()->getDriverName() === 'mysql';
+    }
+
+    private static function binaryEq(string $column): string
+    {
+        return self::supportsBinaryComparison()
+            ? "BINARY {$column} = BINARY ?"
+            : "{$column} = ?";
+    }
+
+    private static function submittedOrderByExpression(): string
+    {
+        return self::supportsBinaryComparison()
+            ? 'CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END'
+            : 'CASE WHEN state = ? THEN 0 ELSE 1 END';
+    }
 
     public function newEloquentBuilder($query): DocumentBuilder
     {
@@ -645,7 +665,7 @@ class Document extends Model
     public function isSharedWith(string $userId): bool
     {
         return $this->sharedUsers()
-            ->whereRaw('BINARY users.id = BINARY ?', [$userId])
+            ->whereRaw(self::binaryEq('users.id'), [$userId])
             ->exists();
     }
 
@@ -672,7 +692,7 @@ class Document extends Model
             ->where('period_id', $periodId)
             ->ofType(self::TYPE_WEEKLY_PLAN)
             ->forUser($ownerUserId)
-            ->orderByRaw('CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
     }
@@ -686,7 +706,7 @@ class Document extends Model
             ->forOwnerOrSharedUser($userId)
             ->where('period_id', $periodId)
             ->ofType(self::TYPE_WEEKLY_PLAN)
-            ->orderByRaw('CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
     }
@@ -700,7 +720,7 @@ class Document extends Model
             ->where('period_id', $periodId)
             ->ofType(self::TYPE_WEEKLY_REPORT)
             ->forUser($ownerUserId)
-            ->orderByRaw('CASE WHEN BINARY state = BINARY ? THEN 0 ELSE 1 END', [self::STATE_SUBMITTED])
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
             ->latest('id')
             ->first();
     }
@@ -790,7 +810,7 @@ class Document extends Model
      */
     public function scopeOfType($query, string $type)
     {
-        return $query->whereRaw('BINARY type = BINARY ?', [$type]);
+        return $query->whereRaw(self::binaryEq('type'), [$type]);
     }
 
     /**
@@ -801,7 +821,7 @@ class Document extends Model
      */
     public function scopeOfState($query, string $state)
     {
-        return $query->whereRaw('BINARY state = BINARY ?', [$state]);
+        return $query->whereRaw(self::binaryEq('state'), [$state]);
     }
 
     /**
@@ -812,7 +832,7 @@ class Document extends Model
      */
     public function scopeForUser($query, string $userId)
     {
-        return $query->whereRaw('BINARY user_id = BINARY ?', [$userId]);
+        return $query->whereRaw(self::binaryEq('user_id'), [$userId]);
     }
 
     public function scopeForOwnerOrSharedUser($query, string $userId)
@@ -820,7 +840,7 @@ class Document extends Model
         return $query->where(function ($nested) use ($userId) {
             $nested->forUser($userId)
                 ->orWhereHas('sharedUsers', function ($sharedUsers) use ($userId) {
-                    $sharedUsers->whereRaw('BINARY users.id = BINARY ?', [$userId]);
+                    $sharedUsers->whereRaw(self::binaryEq('users.id'), [$userId]);
                 });
         });
     }
@@ -840,26 +860,40 @@ class Document extends Model
                             $planScope->whereExists(function ($planQuery) use ($userId) {
                                 $planQuery->selectRaw('1')
                                     ->from('weekly_plans as wp')
-                                    ->whereRaw('BINARY wp.period_id = BINARY documents.period_id')
+                                    ->whereRaw(self::supportsBinaryComparison()
+                                        ? 'BINARY wp.period_id = BINARY documents.period_id'
+                                        : 'wp.period_id = documents.period_id')
                                     ->where(function ($planAccess) use ($userId) {
-                                        $planAccess->whereRaw('BINARY wp.user_id = BINARY ?', [$userId])
+                                        $planAccess->whereRaw(self::supportsBinaryComparison()
+                                            ? 'BINARY wp.user_id = BINARY ?'
+                                            : 'wp.user_id = ?', [$userId])
                                             ->orWhereExists(function ($planShares) use ($userId) {
                                                 $planShares->selectRaw('1')
                                                     ->from('document_user_shares as weekly_plan_shares')
-                                                    ->whereRaw('BINARY weekly_plan_shares.weekly_plan_id = BINARY wp.id')
-                                                    ->whereRaw('BINARY weekly_plan_shares.user_id = BINARY ?', [$userId]);
+                                                    ->whereRaw(self::supportsBinaryComparison()
+                                                        ? 'BINARY weekly_plan_shares.weekly_plan_id = BINARY wp.id'
+                                                        : 'weekly_plan_shares.weekly_plan_id = wp.id')
+                                                    ->whereRaw(self::supportsBinaryComparison()
+                                                        ? 'BINARY weekly_plan_shares.user_id = BINARY ?'
+                                                        : 'weekly_plan_shares.user_id = ?', [$userId]);
                                             });
                                     })
                                     // Prevent cross-team leaks: a weekly report is reachable via plan
                                     // collaboration only when the report author belongs to that same
                                     // plan collaboration group (owner or shared member).
                                     ->where(function ($authorAccess) {
-                                        $authorAccess->whereRaw('BINARY wp.user_id = BINARY documents.user_id')
+                                        $authorAccess->whereRaw(self::supportsBinaryComparison()
+                                            ? 'BINARY wp.user_id = BINARY documents.user_id'
+                                            : 'wp.user_id = documents.user_id')
                                             ->orWhereExists(function ($authorShares) {
                                                 $authorShares->selectRaw('1')
                                                     ->from('document_user_shares as weekly_plan_member_shares')
-                                                    ->whereRaw('BINARY weekly_plan_member_shares.weekly_plan_id = BINARY wp.id')
-                                                    ->whereRaw('BINARY weekly_plan_member_shares.user_id = BINARY documents.user_id');
+                                                    ->whereRaw(self::supportsBinaryComparison()
+                                                        ? 'BINARY weekly_plan_member_shares.weekly_plan_id = BINARY wp.id'
+                                                        : 'weekly_plan_member_shares.weekly_plan_id = wp.id')
+                                                    ->whereRaw(self::supportsBinaryComparison()
+                                                        ? 'BINARY weekly_plan_member_shares.user_id = BINARY documents.user_id'
+                                                        : 'weekly_plan_member_shares.user_id = documents.user_id');
                                             });
                                     });
                             });

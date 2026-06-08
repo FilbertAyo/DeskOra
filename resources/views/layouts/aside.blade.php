@@ -221,7 +221,7 @@
                     <li class="pc-item {{ Request::routeIs('reports') ? 'active' : '' }}">
                         <a href="{{ route('reports') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-file-text"></i></span>
-                            <span class="pc-mtext">Org Reports</span>
+                            <span class="pc-mtext">Org Reports & Documents</span>
                         </a>
                     </li>
              

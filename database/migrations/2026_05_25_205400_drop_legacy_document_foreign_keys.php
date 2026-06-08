@@ -9,6 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // SQLite doesn't expose `information_schema.referential_constraints` like MySQL.
+            return;
+        }
+
         Schema::table('weekly_plans', function (Blueprint $table) {
             if ($this->hasForeignKey('weekly_plans', 'weekly_plans_legacy_document_id_foreign')) {
                 $table->dropForeign('weekly_plans_legacy_document_id_foreign');
@@ -60,6 +65,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
         Schema::table('weekly_plans', function (Blueprint $table) {
             if (! $this->hasForeignKey('weekly_plans', 'weekly_plans_legacy_document_id_foreign')) {
                 $table->foreign('legacy_document_id', 'weekly_plans_legacy_document_id_foreign')

@@ -479,6 +479,11 @@ class DocumentController extends Controller
         $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
         $sharedUserIds = [];
 
+        if ($request->type === Document::TYPE_WEEKLY_PLAN) {
+            $content = is_array($request->input('content')) ? $request->input('content') : [];
+            $this->validateWeeklyPlanPlannedActivities($content, $action);
+        }
+
         if (Document::supportsSharedEditing($request->type) && $request->type !== Document::TYPE_WEEKLY_REPORT) {
             $sharedUserIds = $this->extractRequestedSharedUserIds($request);
             $sharedUserIds = $this->validateSharedMembersWithinDepartment($user, $sharedUserIds);
@@ -583,16 +588,22 @@ class DocumentController extends Controller
                     ? 'The selected weekly plan work period is closed.'
                     : 'The selected weekly report work period is closed.';
 
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', $errorMessage);
+                // Drafts are allowed even when work periods are closed.
+                if ($action === 'submit') {
+                    return redirect()->back()
+                        ->withInput()
+                        ->with('error', $errorMessage);
+                }
             }
         }
 
         if ($period && ! $period->isOpen()) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'This work period is closed. Please contact your administrator.');
+            // Drafts are allowed even when work periods are closed.
+            if ($action === 'submit') {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'This work period is closed. Please contact your administrator.');
+            }
         }
 
         if ($request->type === Document::TYPE_WEEKLY_REPORT) {
@@ -634,7 +645,10 @@ class DocumentController extends Controller
         }
 
         if ($period && in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
-            if (! $existingDocument && $this->weeklySubmissionReminderService->blocksNewWeeklyDocument($request->type, $period)) {
+            if ($action === 'submit'
+                && ! $existingDocument
+                && $this->weeklySubmissionReminderService->blocksNewWeeklyDocument($request->type, $period)
+            ) {
                 return redirect()->back()
                     ->withInput()
                     ->with('error', 'The submission window for this weekly document has closed.');
@@ -787,18 +801,56 @@ class DocumentController extends Controller
                 $updateData['review_rejection_reason'] = null;
             }
 
-            $existingDocument->update($updateData);
-            $this->documentDomainSyncService->syncFromDocument($existingDocument);
-            if (Document::supportsSharedEditing($existingDocument->type)) {
-                $this->syncDocumentShares($existingDocument, $sharedUserIds, $user);
-            }
-            if ($existingDocument->type === Document::TYPE_WEEKLY_REPORT) {
-                $this->syncNextWeeklyPlanCarryOverFromReport($existingDocument->fresh());
-            }
-            if ($action === 'submit') {
-                $existingDocument->loadMissing('period');
-                $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($existingDocument, $user);
-                $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($existingDocument, $user);
+            try {
+                DB::transaction(function () use (
+                    $existingDocument,
+                    $updateData,
+                    $sharedUserIds,
+                    $user,
+                    $action
+                ) {
+                    $existingDocument->update($updateData);
+                    $this->documentDomainSyncService->syncFromDocument($existingDocument);
+
+                    if (Document::supportsSharedEditing($existingDocument->type)) {
+                        $this->syncDocumentShares($existingDocument, $sharedUserIds, $user);
+                    }
+
+                    // Keep assignment rows in sync with the weekly plan content.
+                    if ($existingDocument->type === Document::TYPE_WEEKLY_PLAN) {
+                        $this->syncWeeklyPlanAssignments($existingDocument);
+                    }
+
+                    if ($existingDocument->type === Document::TYPE_WEEKLY_REPORT) {
+                        $this->syncNextWeeklyPlanCarryOverFromReport($existingDocument->fresh());
+                    }
+                });
+
+                if ($action === 'submit') {
+                    $existingDocument->loadMissing('period');
+                    $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($existingDocument, $user);
+                    $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($existingDocument, $user);
+                }
+            } catch (ValidationException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                logger()->error('WP_SAVE_FAILED', [
+                    'user_id' => (string) $user->id,
+                    'document_id' => (string) $existingDocument->id,
+                    'type' => (string) $existingDocument->type,
+                    'period_id' => (string) ($existingDocument->period_id ?? ''),
+                    'action' => $action,
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                ]);
+
+                return redirect()->route('documents.show', $existingDocument)
+                    ->with('error', $existingDocument->type === Document::TYPE_WEEKLY_PLAN
+                        ? ($action === 'draft'
+                            ? 'Unable to save your weekly plan draft due to a server error. Please try again.'
+                            : 'Unable to save your weekly plan due to a server error. Please try again.'
+                        )
+                        : 'Unable to save your document due to a server error. Please try again.');
             }
 
             $message = ($action === 'submit')
@@ -855,15 +907,48 @@ class DocumentController extends Controller
             }
         }
 
-        $document = Document::create($documentData);
-        $this->documentDomainSyncService->syncFromDocument($document);
-        if (Document::supportsSharedEditing($document->type)) {
-            $this->syncDocumentShares($document, $sharedUserIds, $user);
+        $document = null;
+        try {
+            DB::transaction(function () use ($documentData, &$document, $sharedUserIds, $user, $action) {
+                $document = Document::create($documentData);
+
+                if (Document::supportsSharedEditing($document->type)) {
+                    $this->syncDocumentShares($document, $sharedUserIds, $user);
+                }
+
+                $this->syncWeeklyPlanAssignments($document);
+
+                if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+                    $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
+                }
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            logger()->error('WP_SAVE_FAILED', [
+                'user_id' => (string) $user->id,
+                'type' => (string) $request->type,
+                'period_id' => (string) ($period?->id ?? ''),
+                'action' => $action,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', $request->type === Document::TYPE_WEEKLY_PLAN
+                    ? ($action === 'draft'
+                        ? 'Unable to save your weekly plan draft due to a server error. Please try again.'
+                        : 'Unable to save your weekly plan due to a server error. Please try again.'
+                    )
+                    : 'Unable to save your document due to a server error. Please try again.');
         }
-        $this->syncWeeklyPlanAssignments($document);
-        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-            $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
+
+        if (! $document instanceof Document) {
+            // Should never happen: the transaction catch returns a redirect response.
+            throw new \RuntimeException('Weekly document was not created.');
         }
+
         if ($action === 'submit') {
             $document->loadMissing('period');
             $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $user);
@@ -1038,7 +1123,7 @@ class DocumentController extends Controller
 
         // Add validation for main_target for weekly plans
         if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-            $validationRules['main_target'] = ['nullable', 'string', 'max:2000'];
+            $validationRules['main_target'] = ['required', 'string', 'max:2000'];
 
             $validationRules['content.objective.description'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.objective.reflection_progress'] = ['nullable', 'string', 'max:4000'];
@@ -1117,6 +1202,11 @@ class DocumentController extends Controller
         $action = $request->input('action', 'draft');
         $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
         $sharedUserIds = [];
+
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $content = is_array($request->input('content')) ? $request->input('content') : [];
+            $this->validateWeeklyPlanPlannedActivities($content, $action);
+        }
 
         if (Document::supportsSharedEditing($document->type)) {
             if ($document->type === Document::TYPE_WEEKLY_REPORT) {
@@ -1287,15 +1377,50 @@ class DocumentController extends Controller
             $updateData['review_rejection_reason'] = null;
         }
 
-        $document->update($updateData);
-        $this->documentDomainSyncService->syncFromDocument($document);
-        if (Document::supportsSharedEditing($document->type)) {
-            $this->syncDocumentShares($document, $sharedUserIds, $actingUser);
+        try {
+            DB::transaction(function () use (
+                $document,
+                $updateData,
+                $sharedUserIds,
+                $actingUser,
+                $action
+            ) {
+                $document->update($updateData);
+                $this->documentDomainSyncService->syncFromDocument($document);
+
+                if (Document::supportsSharedEditing($document->type)) {
+                    $this->syncDocumentShares($document, $sharedUserIds, $actingUser);
+                }
+
+                $this->syncWeeklyPlanAssignments($document);
+
+                if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+                    $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
+                }
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            logger()->error('WP_SAVE_FAILED', [
+                'user_id' => (string) $actingUser->id,
+                'document_id' => (string) $document->id,
+                'type' => (string) $document->type,
+                'period_id' => (string) ($document->period_id ?? ''),
+                'action' => $action,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', $document->type === Document::TYPE_WEEKLY_PLAN
+                    ? ($action === 'draft'
+                        ? 'Unable to save your weekly plan draft due to a server error. Please try again.'
+                        : 'Unable to save your weekly plan due to a server error. Please try again.'
+                    )
+                    : 'Unable to save your document due to a server error. Please try again.');
         }
-        $this->syncWeeklyPlanAssignments($document);
-        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-            $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
-        }
+
         if ($action === 'submit' && ! $wasSubmitted) {
             $document->loadMissing('period');
             $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $actingUser);
@@ -1338,9 +1463,29 @@ class DocumentController extends Controller
         // Authorize submit action
         $this->authorize('submit', $document);
 
-        $document->submit();
-        $this->documentDomainSyncService->syncFromDocument($document);
-        $this->syncWeeklyPlanAssignments($document);
+        try {
+            DB::transaction(function () use ($document) {
+                $document->submit();
+                $this->documentDomainSyncService->syncFromDocument($document);
+                $this->syncWeeklyPlanAssignments($document);
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            logger()->error('WP_SAVE_FAILED', [
+                'user_id' => (string) $actingUser->id,
+                'document_id' => (string) $document->id,
+                'type' => (string) $document->type,
+                'period_id' => (string) ($document->period_id ?? ''),
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('documents.show', $document)
+                ->with('error', $document->type === Document::TYPE_WEEKLY_PLAN
+                    ? 'Unable to submit your weekly plan due to a server error. Please try again.'
+                    : 'Unable to submit your document due to a server error. Please try again.');
+        }
         if (! $wasSubmitted) {
             $document->loadMissing('period');
             $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $actingUser);
@@ -2828,10 +2973,25 @@ class DocumentController extends Controller
                 'reflection_progress' => $reflectionProgress,
             ], static fn ($value) => is_string($value) ? $value !== '' : $value !== null);
 
-            $content['planned_activities'] = $this->filterNonEmptyRows(
-                $content['planned_activities'] ?? [],
-                ['day', 'activity', 'location', 'team_member_ids', 'notes_inclusion']
-            );
+            // Keep only "complete" activity rows (Day + Activity).
+            // This prevents downstream sync from failing due to half-filled rows.
+            $plannedActivities = is_array($content['planned_activities'] ?? null) ? $content['planned_activities'] : [];
+            $content['planned_activities'] = array_values(array_filter($plannedActivities, function ($row) {
+                if (! is_array($row)) {
+                    return false;
+                }
+
+                $day = trim((string) ($row['day'] ?? ''));
+                $activity = trim((string) ($row['activity'] ?? ''));
+
+                // Treat blank rows as empty.
+                if ($day === '' && $activity === '') {
+                    return false;
+                }
+
+                // Discard incomplete rows; they should be caught by validation anyway.
+                return $day !== '' && $activity !== '';
+            }));
             $content = app(DocumentContentAssembler::class)->normalizeWeeklyPlanContent($content);
             $content['planned_activities'] = $this->ensureWeeklyPlanActivityUids($content['planned_activities']);
 
@@ -2944,6 +3104,75 @@ class DocumentController extends Controller
         }
 
         return $content;
+    }
+
+    /**
+     * Weekly-plan planned activities must be either completely empty or contain both:
+     * - day
+     * - activity
+     *
+     * For submit we also require at least one complete activity row.
+     *
+     * @param  array<string,mixed>  $content
+     */
+    private function validateWeeklyPlanPlannedActivities(array $content, string $action): void
+    {
+        $plannedActivities = is_array($content['planned_activities'] ?? null)
+            ? $content['planned_activities']
+            : [];
+
+        if (! is_array($plannedActivities)) {
+            $plannedActivities = [];
+        }
+
+        $messages = [];
+        $completeRows = 0;
+
+        foreach ($plannedActivities as $idx => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $day = trim((string) ($row['day'] ?? ''));
+            $activity = trim((string) ($row['activity'] ?? ''));
+            $location = trim((string) ($row['location'] ?? ''));
+            $notes = trim((string) ($row['notes_inclusion'] ?? ''));
+
+            $teamIds = is_array($row['team_member_ids'] ?? null) ? $row['team_member_ids'] : [];
+            $teamIds = array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $teamIds), static fn ($id) => $id !== ''));
+
+            $hasAny =
+                $day !== ''
+                || $activity !== ''
+                || $location !== ''
+                || $notes !== ''
+                || $teamIds !== [];
+
+            if (! $hasAny) {
+                continue;
+            }
+
+            if ($day === '' || $activity === '') {
+                // Drafts are allowed to be incomplete; we rely on normalization
+                // to discard half-filled rows. Submitting should be strict.
+                if ($action === 'submit') {
+                    $rowNo = is_numeric($idx) ? ((int) $idx + 1) : $idx;
+                    $messages["content.planned_activities.$idx.day"] = "Activity row {$rowNo} requires both Day and Activity.";
+                }
+
+                continue;
+            }
+
+            $completeRows++;
+        }
+
+        if ($action === 'submit' && $completeRows === 0) {
+            $messages['content.planned_activities'] = 'Please add at least one activity (Day + Activity text) before submitting.';
+        }
+
+        if ($messages !== []) {
+            throw ValidationException::withMessages($messages);
+        }
     }
 
     /**
@@ -3606,7 +3835,9 @@ class DocumentController extends Controller
             return;
         }
 
-        $document->refresh();
+        // Avoid `$document->refresh()` which queries the `documents` union view.
+        // In SQLite test environments (and during cutover states), the union view
+        // may not reflect the just-synced domain row within the same transaction.
         $this->weeklyActivityAssignmentService->syncForWeeklyPlan($document);
     }
 

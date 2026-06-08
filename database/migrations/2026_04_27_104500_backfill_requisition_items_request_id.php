@@ -20,11 +20,16 @@ return new class extends Migration
             });
         }
 
+        $driver = DB::connection()->getDriverName();
+        $legacyPettyIdExpr = $driver === 'sqlite'
+            ? "JSON_EXTRACT(meta, '$.legacy_petty_id')"
+            : "JSON_UNQUOTE(JSON_EXTRACT(meta, '$.legacy_petty_id'))";
+
         $mappings = DB::table('request_approvals')
             ->where('step', 'system')
             ->where('action', 'created')
             ->whereRaw("JSON_EXTRACT(meta, '$.source') = 'legacy-petty'")
-            ->select('request_id', DB::raw("JSON_UNQUOTE(JSON_EXTRACT(meta, '$.legacy_petty_id')) as legacy_petty_id"))
+            ->select('request_id', DB::raw("{$legacyPettyIdExpr} as legacy_petty_id"))
             ->get();
 
         foreach ($mappings as $mapping) {

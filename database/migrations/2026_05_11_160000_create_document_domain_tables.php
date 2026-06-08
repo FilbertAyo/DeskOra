@@ -3,14 +3,22 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('weekly_plans', function (Blueprint $table) {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
+        Schema::create('weekly_plans', function (Blueprint $table) use ($isSqlite) {
             $table->ulid('id')->primary();
-            $table->foreignUlid('legacy_document_id')->unique()->constrained('documents')->cascadeOnDelete();
+            if ($isSqlite) {
+                // `documents` is a SQL view in production; SQLite foreign keys can't reference views.
+                $table->ulid('legacy_document_id')->nullable()->unique();
+            } else {
+                $table->foreignUlid('legacy_document_id')->unique()->constrained('documents')->cascadeOnDelete();
+            }
             $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUlid('period_id')->nullable()->constrained('work_periods')->nullOnDelete();
             $table->string('title')->nullable();
@@ -31,7 +39,7 @@ return new class extends Migration
             $table->unique(['user_id', 'period_id'], 'weekly_plans_user_period_unique');
         });
 
-        Schema::create('weekly_plan_activities', function (Blueprint $table) {
+        Schema::create('weekly_plan_activities', function (Blueprint $table) use ($isSqlite) {
             $table->ulid('id')->primary();
             $table->foreignUlid('weekly_plan_id')->constrained('weekly_plans')->cascadeOnDelete();
             $table->string('activity_uid', 64);
@@ -39,7 +47,11 @@ return new class extends Migration
             $table->text('activity')->nullable();
             $table->string('location')->nullable();
             $table->text('notes_inclusion')->nullable();
-            $table->foreignUlid('carry_over_source_report_id')->nullable()->constrained('documents')->nullOnDelete();
+            if ($isSqlite) {
+                $table->ulid('carry_over_source_report_id')->nullable();
+            } else {
+                $table->foreignUlid('carry_over_source_report_id')->nullable()->constrained('documents')->nullOnDelete();
+            }
             $table->foreignUlid('carry_over_source_weekly_report_id')->nullable()->constrained('weekly_reports')->nullOnDelete();
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
@@ -143,9 +155,13 @@ return new class extends Migration
             $table->index('reviewed_by');
         });
 
-        Schema::create('weekly_reports', function (Blueprint $table) {
+        Schema::create('weekly_reports', function (Blueprint $table) use ($isSqlite) {
             $table->ulid('id')->primary();
-            $table->foreignUlid('legacy_document_id')->unique()->constrained('documents')->cascadeOnDelete();
+            if ($isSqlite) {
+                $table->ulid('legacy_document_id')->nullable()->unique();
+            } else {
+                $table->foreignUlid('legacy_document_id')->unique()->constrained('documents')->cascadeOnDelete();
+            }
             $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUlid('period_id')->nullable()->constrained('work_periods')->nullOnDelete();
             $table->string('title')->nullable();

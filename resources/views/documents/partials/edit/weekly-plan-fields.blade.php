@@ -76,6 +76,9 @@
                                             </div>
                                         </div>
                                         <div class="card-body">
+                                            <small class="form-text text-muted mb-2">
+                                                Drafts can be saved without activities. For any activity row you fill in, please provide both a Day and Activity text.
+                                            </small>
                                             <div class="mb-2">
                                                 <small class="text-muted">Activities marked with this badge were carried from previous week: <span class="badge bg-light-info text-info">Carried</span></small>
                                             </div>

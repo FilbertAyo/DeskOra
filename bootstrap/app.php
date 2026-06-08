@@ -47,12 +47,12 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('login', 'logout') || $request->routeIs('login', 'logout', 'password.*', 'register')) {
                 return redirect()
                     ->route('login')
-                    ->with('status', $message);
+                    ->with('warning', $message);
             }
 
             return redirect()
                 ->back()
                 ->withInput($request->except('password', 'password_confirmation', '_token'))
-                ->with('status', $message);
+                ->with('warning', $message);
         });
     })->create();

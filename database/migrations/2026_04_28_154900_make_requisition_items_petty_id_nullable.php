@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // SQLite does not support MySQL's `ALTER TABLE ... MODIFY` syntax.
+            return;
+        }
+
         if (! Schema::hasTable('requisition_items') || ! Schema::hasColumn('requisition_items', 'petty_id')) {
             return;
         }
@@ -19,6 +24,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
         if (! Schema::hasTable('requisition_items') || ! Schema::hasColumn('requisition_items', 'petty_id')) {
             return;
         }

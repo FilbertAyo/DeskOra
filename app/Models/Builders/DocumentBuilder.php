@@ -3,11 +3,18 @@
 namespace App\Models\Builders;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class DocumentBuilder extends Builder
 {
     /** @var list<string> */
     private const BINARY_COLUMNS = ['id', 'type', 'state', 'user_id', 'period_id'];
+
+    private function supportsBinaryComparison(): bool
+    {
+        // `BINARY` keyword is MySQL-specific; SQLite rejects it.
+        return DB::connection()->getDriverName() === 'mysql';
+    }
 
     /**
      * @param  \Closure|string|array|\Illuminate\Contracts\Database\Query\Expression>  $column
@@ -31,7 +38,7 @@ class DocumentBuilder extends Builder
             $operator = '=';
         }
 
-        if ($this->shouldUseBinaryComparison($column, $operator, $value)) {
+        if ($this->supportsBinaryComparison() && $this->shouldUseBinaryComparison($column, $operator, $value)) {
             $wrapped = $this->getGrammar()->wrap($column);
 
             return $this->whereRaw(
@@ -53,7 +60,11 @@ class DocumentBuilder extends Builder
      */
     public function whereIn($column, $values, $boolean = 'and', $not = false)
     {
-        if ($this->isBinaryColumn($column) && is_array($values) && $values !== []) {
+        if ($this->supportsBinaryComparison()
+            && $this->isBinaryColumn($column)
+            && is_array($values)
+            && $values !== []
+        ) {
             $wrapped = $this->getGrammar()->wrap($column);
             $operator = $not ? 'not in' : 'in';
             $placeholders = implode(', ', array_fill(0, count($values), 'BINARY ?'));
@@ -92,6 +103,10 @@ class DocumentBuilder extends Builder
 
     private function shouldUseBinaryComparison(mixed $column, mixed $operator, mixed $value): bool
     {
+        if (! $this->supportsBinaryComparison()) {
+            return false;
+        }
+
         if (! is_string($column) || ! $this->isBinaryColumn($column)) {
             return false;
         }

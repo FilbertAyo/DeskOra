@@ -51,9 +51,9 @@
                 <div class="alert alert-warning border mb-3" role="alert">
                     <i class="ti ti-lock me-1"></i>
                     @if($isWeeklyPlanWindowClosed)
-                        This work period is closed. Weekly plans cannot be saved or submitted for it.
+                        This work period is closed. You can save weekly plan drafts, but cannot submit.
                     @elseif($isWeeklyReportWindowClosed)
-                        This work period is closed. Weekly reports cannot be saved or submitted for it.
+                        This work period is closed. You can save weekly report drafts, but cannot submit.
                     @endif
                 </div>
             @endif
@@ -95,7 +95,7 @@
                                 <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div class="btn-group">
-                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn" @disabled($isWeeklyWindowClosed)>
+                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
                                     <i class="ti ti-save me-1"></i> Save Draft
                                 </button>
                                 <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn" @disabled($isWeeklyWindowClosed)>
@@ -118,7 +118,8 @@
             "nextPeriodId": {!! json_encode(isset($nextPeriod) ? $nextPeriod->id : null) !!},
             "relatedPlanMainTarget": {!! json_encode(isset($relatedPlan) && $relatedPlan ? $relatedPlan->main_target : null) !!},
             "canProcessWeeklyBudgets": {!! json_encode(auth()->user()?->can('process weekly budgets') ?? false) !!},
-            "currentUserId": {!! json_encode((string) (auth()->id() ?? '')) !!}
+            "currentUserId": {!! json_encode((string) (auth()->id() ?? '')) !!},
+            "sessionLifetimeMinutes": {!! json_encode((int) config('session.lifetime', 120)) !!}
         }
     </script>
     <script>
@@ -150,6 +151,86 @@
             const relatedPlanMainTarget = formData.relatedPlanMainTarget;
             const canProcessWeeklyBudgets = formData.canProcessWeeklyBudgets;
             const currentUserId = formData.currentUserId;
+
+            // Session monitoring for long-lived weekly forms.
+            // Prevents confusing "session expired" errors by warning/locking before timeout.
+            const sessionPingUrl = "{{ route('session.ping') }}";
+            const sessionLifetimeMinutes = Number(formData.sessionLifetimeMinutes ?? 120);
+            const isWeeklyForm = ['weekly_plan', 'weekly_report'].includes(selectedType);
+            const startedAt = Date.now();
+            let sessionWarningShown = false;
+            let sessionExpiredHandled = false;
+
+            function showNotifier(title, message, type) {
+                if (!window.notifier || typeof window.notifier.show !== 'function') return;
+                window.notifier.show(title, message, type || 'info', '', 6000);
+            }
+
+            function lockWeeklyForm() {
+                const saveDraftBtn = document.getElementById('saveDraftBtn');
+                const submitBtn = document.getElementById('submitBtn');
+                if (saveDraftBtn) saveDraftBtn.disabled = true;
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Refreshing...';
+                }
+            }
+
+            function startSessionMonitoring() {
+                const lifetimeSeconds = Math.max(60, Math.floor(sessionLifetimeMinutes * 60));
+                const localWarnAtSeconds = Math.floor(lifetimeSeconds * 0.9);
+
+                const maybeWarnLocally = () => {
+                    if (sessionWarningShown || sessionExpiredHandled) return;
+                    const elapsedSeconds = (Date.now() - startedAt) / 1000;
+                    if (elapsedSeconds >= localWarnAtSeconds) {
+                        sessionWarningShown = true;
+                        showNotifier(
+                            'Session expiring',
+                            'Your session will expire soon. Please save your work or refresh the page.',
+                            'warning'
+                        );
+                    }
+                };
+
+                const pingEveryMs = 120000; // 2 minutes
+                setInterval(maybeWarnLocally, 60000);
+
+                setInterval(async () => {
+                    if (sessionExpiredHandled) return;
+
+                    try {
+                        const res = await fetch(sessionPingUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            credentials: 'same-origin'
+                        });
+
+                        if (res.status === 200) {
+                            return;
+                        }
+
+                        if (res.status === 401 || res.status === 419) {
+                            sessionExpiredHandled = true;
+                            showNotifier(
+                                'Session expired',
+                                'Please refresh the page and try again.',
+                                'danger'
+                            );
+                            lockWeeklyForm();
+                        }
+                    } catch (e) {
+                        // Network errors shouldn't block the form; ignore.
+                    }
+                }, pingEveryMs);
+            }
+
+            if (isWeeklyForm) {
+                startSessionMonitoring();
+            }
 
             // Show/hide work period dropdown based on document type
             function toggleWorkPeriod() {

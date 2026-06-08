@@ -23,6 +23,13 @@ use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
 use Illuminate\Support\Facades\Route;
 
+// Lightweight session liveness check for long-lived forms.
+Route::get('/session/ping', function () {
+    return auth()->check()
+        ? response()->json(['ok' => true])
+        : response()->json(['ok' => false], 401);
+})->name('session.ping');
+
 Route::prefix('feedback/{token}')
     ->middleware(['feedback.token'])
     ->group(function () {

@@ -47,6 +47,17 @@
         ];
     }
 
+    // Backwards-compatible flash support.
+    // Some controllers still use `with('status', ...)` instead of `success/error/warning`.
+    if (session('status')) {
+        $globalNotifications[] = [
+            'title' => 'Notice',
+            'message' => session('status'),
+            'type' => 'info',
+            'delay' => 5000,
+        ];
+    }
+
     if (isset($errors) && $errors->any()) {
         $globalNotifications = array_merge(
             $globalNotifications,

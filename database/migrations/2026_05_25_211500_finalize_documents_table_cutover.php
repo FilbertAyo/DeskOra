@@ -9,6 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // Cutover SQL relies on MySQL-specific UPDATE JOIN + information_schema.
+            // Skip it for SQLite-based test environments.
+            return;
+        }
+
         $this->backfillDomainForeignKeys();
 
         Schema::table('weekly_plan_activities', function (Blueprint $table) {

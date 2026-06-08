@@ -68,6 +68,9 @@
             </div>
         </div>
         <div class="card-body">
+            <small class="form-text text-muted mb-2">
+                Drafts can be saved without activities. For any activity row you fill in, please provide both a Day and Activity text.
+            </small>
             <div class="table-responsive">
                 <table class="table table-bordered table-striped align-middle mb-0">
                     <thead class="wh-thead-weekly-plan">

@@ -7,6 +7,82 @@
             const attachmentInput = document.getElementById('attachment');
             const attachmentLabel = document.getElementById('attachmentLabel');
 
+            // Session monitoring for long-lived weekly edit forms.
+            const isWeeklyForm = {!! json_encode(in_array($document->type, ['weekly_plan', 'weekly_report'], true)) !!};
+            const sessionPingUrl = "{{ route('session.ping') }}";
+            const sessionLifetimeMinutes = Number({!! json_encode((int) config('session.lifetime', 120)) !!});
+            const startedAt = Date.now();
+            let sessionWarningShown = false;
+            let sessionExpiredHandled = false;
+
+            function showNotifier(title, message, type) {
+                if (!window.notifier || typeof window.notifier.show !== 'function') return;
+                window.notifier.show(title, message, type || 'info', '', 6000);
+            }
+
+            function lockWeeklyForm() {
+                const saveDraftBtn = document.getElementById('saveDraftBtn');
+                const submitBtn = document.getElementById('submitBtn');
+                if (saveDraftBtn) saveDraftBtn.disabled = true;
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Refreshing...';
+                }
+            }
+
+            function startSessionMonitoring() {
+                const lifetimeSeconds = Math.max(60, Math.floor(sessionLifetimeMinutes * 60));
+                const localWarnAtSeconds = Math.floor(lifetimeSeconds * 0.9);
+
+                const maybeWarnLocally = () => {
+                    if (sessionWarningShown || sessionExpiredHandled) return;
+                    const elapsedSeconds = (Date.now() - startedAt) / 1000;
+                    if (elapsedSeconds >= localWarnAtSeconds) {
+                        sessionWarningShown = true;
+                        showNotifier(
+                            'Session expiring',
+                            'Your session will expire soon. Please save your work or refresh the page.',
+                            'warning'
+                        );
+                    }
+                };
+
+                setInterval(maybeWarnLocally, 60000);
+
+                setInterval(async () => {
+                    if (sessionExpiredHandled) return;
+
+                    try {
+                        const res = await fetch(sessionPingUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            credentials: 'same-origin'
+                        });
+
+                        if (res.status === 200) return;
+
+                        if (res.status === 401 || res.status === 419) {
+                            sessionExpiredHandled = true;
+                            showNotifier(
+                                'Session expired',
+                                'Please refresh the page and try again.',
+                                'danger'
+                            );
+                            lockWeeklyForm();
+                        }
+                    } catch (e) {
+                        // Ignore transient network failures.
+                    }
+                }, 120000);
+            }
+
+            if (isWeeklyForm) {
+                startSessionMonitoring();
+            }
+
             // Update file label when file is selected
             if (fileInput && fileLabel) {
                 fileInput.addEventListener('change', function(e) {
