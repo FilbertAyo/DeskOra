@@ -1398,22 +1398,31 @@ class DocumentController extends Controller
 
         $periodOptionIds = $periodOptions->pluck('id')->map(fn ($id): string => (string) $id)->all();
 
-        $defaultWorkPeriod = $this->workPeriodService->periodForWeeklyReportSubmission()
-            ?? $periodOptions->first();
+        $latestWorkPeriodIds = WorkPeriod::query()
+            ->orderBy('year', 'desc')
+            ->orderBy('week_number', 'desc')
+            ->limit(2)
+            ->pluck('id')
+            ->all();
 
-        $defaultWorkPeriodId = $defaultWorkPeriod?->id;
+        $defaultWorkPeriodFilter = 'last_2';
 
         $selectedWorkPeriodId = $request->input('work_period_id');
         if ($selectedWorkPeriodId === null || $selectedWorkPeriodId === '') {
-            $selectedWorkPeriodId = $defaultWorkPeriodId;
-        } elseif (! in_array((string) $selectedWorkPeriodId, $periodOptionIds, true)) {
-            $selectedWorkPeriodId = $defaultWorkPeriodId;
+            $selectedWorkPeriodId = $defaultWorkPeriodFilter;
+        } elseif ($selectedWorkPeriodId !== $defaultWorkPeriodFilter
+            && ! in_array((string) $selectedWorkPeriodId, $periodOptionIds, true)) {
+            $selectedWorkPeriodId = $defaultWorkPeriodFilter;
         }
 
         $baseQuery = Document::with(['user', 'period', 'sharedUsers:id,name'])
             ->submitted();
 
-        if ($selectedWorkPeriodId) {
+        if ($selectedWorkPeriodId === $defaultWorkPeriodFilter) {
+            if (! empty($latestWorkPeriodIds)) {
+                $baseQuery->whereIn('period_id', $latestWorkPeriodIds);
+            }
+        } elseif ($selectedWorkPeriodId) {
             $baseQuery->where('period_id', $selectedWorkPeriodId);
         }
 
@@ -1439,9 +1448,13 @@ class DocumentController extends Controller
             'action_logs' => (clone $statsQuery)->actionLogs()->count(),
         ];
 
-        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) use ($selectedWorkPeriodId) {
+        $usersWithDocuments = \App\Models\User::whereHas('documents', function ($q) use ($selectedWorkPeriodId, $defaultWorkPeriodFilter, $latestWorkPeriodIds) {
             $q->submitted();
-            if ($selectedWorkPeriodId) {
+            if ($selectedWorkPeriodId === $defaultWorkPeriodFilter) {
+                if (! empty($latestWorkPeriodIds)) {
+                    $q->whereIn('period_id', $latestWorkPeriodIds);
+                }
+            } elseif ($selectedWorkPeriodId) {
                 $q->where('period_id', $selectedWorkPeriodId);
             }
         })->orderBy('name')->get();
@@ -1452,7 +1465,7 @@ class DocumentController extends Controller
             'stats',
             'usersWithDocuments',
             'selectedWorkPeriodId',
-            'defaultWorkPeriodId',
+            'defaultWorkPeriodFilter',
             'periodOptions'
         ));
     }

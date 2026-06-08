@@ -103,8 +103,11 @@
                             <div class="col-md-4">
                                 <label class="form-label small text-muted">Work Period</label>
                                 <select class="form-control form-control-sm" name="work_period_id" id="workPeriodFilter">
+                                    <option value="{{ $defaultWorkPeriodFilter }}" {{ (string) ($selectedWorkPeriodId ?? $defaultWorkPeriodFilter) === (string) $defaultWorkPeriodFilter ? 'selected' : '' }}>
+                                        Last 2 work periods
+                                    </option>
                                     @foreach($periodOptions as $periodOption)
-                                        <option value="{{ $periodOption->id }}" {{ (string) ($selectedWorkPeriodId ?? $defaultWorkPeriodId) === (string) $periodOption->id ? 'selected' : '' }}>
+                                        <option value="{{ $periodOption->id }}" {{ (string) ($selectedWorkPeriodId ?? $defaultWorkPeriodFilter) === (string) $periodOption->id ? 'selected' : '' }}>
                                             Week {{ $periodOption->week_number }}, {{ $periodOption->year }} ({{ $periodOption->date_range }})
                                         </option>
                                     @endforeach
@@ -116,7 +119,7 @@
                                 </button>
                             </div>
                         </div>
-                        @if(request()->filled('user_id') || (request()->has('work_period_id') && (string) request('work_period_id') !== (string) ($defaultWorkPeriodId ?? '')))
+                        @if(request()->filled('user_id') || (request()->has('work_period_id') && (string) request('work_period_id') !== (string) ($defaultWorkPeriodFilter ?? 'last_2')))
                             <div class="row mt-2">
                                 <div class="col-md-12">
                                     <a href="{{ route('documents.reviewer-dashboard') }}" class="btn btn-sm btn-light">
