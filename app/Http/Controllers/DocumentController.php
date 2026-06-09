@@ -1116,6 +1116,11 @@ class DocumentController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
+        // Resolve the intended action early so validation rules can mirror the
+        // create flow: drafts may be saved incomplete, submissions are strict.
+        $action = $request->input('action', 'draft');
+        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+
         // Validate file upload (file is optional for updates, but if provided must be PDF)
         $validationRules = [
             'file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
@@ -1124,9 +1129,15 @@ class DocumentController extends Controller
             'content' => ['nullable', 'array'],
         ];
 
-        // Add validation for main_target for weekly plans
+        // Add validation for main_target for weekly plans.
+        // Required only when submitting; drafts may be saved without it (parity with create).
         if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-            $validationRules['main_target'] = ['required', 'string', 'max:2000'];
+            $validationRules['main_target'] = [
+                Rule::requiredIf($action === 'submit'),
+                'nullable',
+                'string',
+                'max:2000',
+            ];
 
             $validationRules['content.objective.description'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.objective.reflection_progress'] = ['nullable', 'string', 'max:4000'];
@@ -1202,8 +1213,6 @@ class DocumentController extends Controller
 
         $request->validate($validationRules);
 
-        $action = $request->input('action', 'draft');
-        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
         $sharedUserIds = [];
 
         if ($document->type === Document::TYPE_WEEKLY_PLAN) {

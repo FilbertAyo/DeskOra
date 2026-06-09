@@ -162,6 +162,131 @@ class WeeklyPlanScreeningHardeningTest extends TestCase
         );
     }
 
+    public function test_store_weekly_plan_redirect_target_is_reachable(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        Notification::fake();
+
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $response = $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'action' => 'draft',
+            'main_target' => 'My main target',
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'day' => 'Monday',
+                        'activity' => 'Activity 1',
+                        'location' => 'Office',
+                        'team_member_ids' => [],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+
+        // The persisted weekly plan id must equal the Document id used in the
+        // redirect, otherwise viewing the freshly saved plan returns 404.
+        $weeklyPlan = WeeklyPlan::query()
+            ->where('user_id', $owner->id)
+            ->where('period_id', $nextPeriod->id)
+            ->firstOrFail();
+
+        $this->assertNotNull(Document::find((string) $weeklyPlan->id));
+
+        // Following the post-save redirect should resolve, not 404.
+        $followUp = $this->actingAs($owner)->get((string) $response->headers->get('Location'));
+        $followUp->assertOk();
+    }
+
+    public function test_edit_weekly_plan_draft_saves_with_empty_main_target(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        Notification::fake();
+
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Draft plan',
+            'main_target' => 'Initial target',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $response = $this->actingAs($owner)->put(route('documents.update', $plan->id), [
+            'action' => 'draft',
+            'main_target' => '',
+            'content' => [
+                'objective' => [
+                    'reflection_progress' => 'Updated reflection',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionDoesntHaveErrors();
+
+        $this->assertSame(
+            1,
+            WeeklyPlan::query()
+                ->where('user_id', $owner->id)
+                ->where('period_id', $nextPeriod->id)
+                ->where('state', WeeklyPlan::STATE_DRAFT)
+                ->count()
+        );
+    }
+
+    public function test_edit_weekly_plan_submit_requires_main_target(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        Notification::fake();
+
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $plan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Draft plan',
+            'main_target' => 'Initial target',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        $response = $this->actingAs($owner)->put(route('documents.update', $plan->id), [
+            'action' => 'submit',
+            'main_target' => '',
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'day' => 'Monday',
+                        'activity' => 'Activity 1',
+                        'location' => 'Office',
+                        'team_member_ids' => [],
+                        'notes_inclusion' => '',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('main_target');
+
+        // Plan must remain a draft (submission rejected).
+        $this->assertSame(
+            WeeklyPlan::STATE_DRAFT,
+            WeeklyPlan::query()->where('user_id', $owner->id)->where('period_id', $nextPeriod->id)->firstOrFail()->state
+        );
+    }
+
     public function test_create_weekly_plan_redirects_to_edit_when_draft_already_exists(): void
     {
         [, $nextPeriod] = $this->createCurrentAndNextPeriods();

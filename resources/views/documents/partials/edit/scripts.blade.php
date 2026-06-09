@@ -485,6 +485,8 @@
                 });
             }
 
+            const documentType = {!! json_encode($document->type) !!};
+
             form.addEventListener('submit', function(e) {
                 const clickedButton = e.submitter;
                 const action = clickedButton?.value || document.getElementById('hiddenAction')?.value || 'draft';
@@ -492,6 +494,39 @@
                 // Ensure the hidden action field is set to the correct value
                 if (hiddenActionInput) {
                     hiddenActionInput.value = action;
+                }
+
+                // Submission-time guards (parity with create screen).
+                // Drafts may be saved incomplete; submissions must be valid.
+                if (action === 'submit') {
+                    if (documentType === 'weekly_plan') {
+                        const mainTarget = document.getElementById('main_target');
+                        if (mainTarget && !mainTarget.value.trim()) {
+                            e.preventDefault();
+                            alert('Please enter the main target for this week before submitting.');
+                            mainTarget.focus();
+                            return false;
+                        }
+                    }
+
+                    if (documentType === 'weekly_report') {
+                        const targetAccomplished = document.getElementById('target_accomplished_status');
+                        if (targetAccomplished && !targetAccomplished.value) {
+                            e.preventDefault();
+                            alert('Please select target accomplishment status.');
+                            targetAccomplished.focus();
+                            return false;
+                        }
+                        if (targetAccomplished && (targetAccomplished.value === 'not_completed' || targetAccomplished.value === 'partially_completed')) {
+                            const targetExplanation = document.getElementById('target_explanation');
+                            if (targetExplanation && !targetExplanation.value.trim()) {
+                                e.preventDefault();
+                                alert('Please explain why the target was not fully accomplished.');
+                                targetExplanation.focus();
+                                return false;
+                            }
+                        }
+                    }
                 }
                 
                 // Validate file if provided

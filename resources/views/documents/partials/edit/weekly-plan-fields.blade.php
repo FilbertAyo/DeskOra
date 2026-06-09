@@ -46,7 +46,6 @@
                                         name="main_target"
                                         id="main_target"
                                                     rows="5"
-                                                    required
                                                     placeholder="Enter the main objective for this week">{{ old('main_target', $document->main_target) }}</textarea>
                                     @error('main_target')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>

@@ -48,28 +48,52 @@ class DocumentDomainSyncService
         DB::transaction($callback, 3);
     }
 
+    /**
+     * Create or update a domain row while forcing its primary key to match the
+     * given Document id.
+     *
+     * `updateOrCreate(['id' => $id], $values)` cannot be used here: the domain
+     * models do not list `id` as fillable, so the matching attribute is dropped
+     * when a new instance is built and the `HasUlids` trait then assigns a fresh
+     * (different) ULID. That mismatch makes the saved row unreachable by the
+     * Document id and surfaces as "page not found" right after saving.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  class-string<TModel>  $modelClass
+     * @param  array<string, mixed>  $values
+     * @return TModel
+     */
+    private function upsertWithId(string $modelClass, string $id, array $values)
+    {
+        /** @var \Illuminate\Database\Eloquent\Model $model */
+        $model = $modelClass::query()->find($id) ?? new $modelClass;
+        $model->setAttribute($model->getKeyName(), $id);
+        $model->fill($values);
+        $model->save();
+
+        return $model;
+    }
+
     private function syncWeeklyPlan(Document $document): void
     {
         $content = is_array($document->content) ? $document->content : [];
         $objective = is_array($content['objective'] ?? null) ? $content['objective'] : [];
 
-        $weeklyPlan = WeeklyPlan::query()->updateOrCreate(
-            ['id' => (string) $document->id],
-            [
-                'user_id' => (string) $document->user_id,
-                'period_id' => $document->period_id ? (string) $document->period_id : null,
-                'title' => $document->title,
-                'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
-                'main_target' => $document->main_target,
-                'objective_reflection_progress' => trim((string) ($objective['reflection_progress'] ?? '')) ?: null,
-                'review_rejection_reason' => $document->review_rejection_reason,
-                'budget_review_status' => $document->budget_review_status,
-                'budget_reviewed_by' => $document->budget_reviewed_by,
-                'budget_reviewed_at' => $document->budget_reviewed_at,
-                'budget_provided_amount' => $document->budget_provided_amount,
-                'budget_review_note' => $document->budget_review_note,
-            ]
-        );
+        $weeklyPlan = $this->upsertWithId(WeeklyPlan::class, (string) $document->id, [
+            'user_id' => (string) $document->user_id,
+            'period_id' => $document->period_id ? (string) $document->period_id : null,
+            'title' => $document->title,
+            'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
+            'main_target' => $document->main_target,
+            'objective_reflection_progress' => trim((string) ($objective['reflection_progress'] ?? '')) ?: null,
+            'review_rejection_reason' => $document->review_rejection_reason,
+            'budget_review_status' => $document->budget_review_status,
+            'budget_reviewed_by' => $document->budget_reviewed_by,
+            'budget_reviewed_at' => $document->budget_reviewed_at,
+            'budget_provided_amount' => $document->budget_provided_amount,
+            'budget_review_note' => $document->budget_review_note,
+        ]);
 
         $weeklyPlan->activities()->delete();
         $weeklyPlan->meetings()->delete();
@@ -198,20 +222,17 @@ class DocumentDomainSyncService
         $content = is_array($document->content) ? $document->content : [];
         $content = app(DocumentContentAssembler::class)->normalizeWeeklyReportContent($content);
 
-        $weeklyReport = WeeklyReport::query()->updateOrCreate(
-            ['id' => (string) $document->id],
-            [
-                'user_id' => (string) $document->user_id,
-                'period_id' => $document->period_id ? (string) $document->period_id : null,
-                'title' => $document->title,
-                'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
-                'summary' => trim((string) ($content['summary'] ?? '')) ?: null,
-                'target_accomplished' => $document->target_accomplished,
-                'target_accomplished_status' => trim((string) ($content['target_accomplished_status'] ?? '')) ?: null,
-                'target_explanation' => $document->target_explanation,
-                'review_rejection_reason' => $document->review_rejection_reason,
-            ]
-        );
+        $weeklyReport = $this->upsertWithId(WeeklyReport::class, (string) $document->id, [
+            'user_id' => (string) $document->user_id,
+            'period_id' => $document->period_id ? (string) $document->period_id : null,
+            'title' => $document->title,
+            'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
+            'summary' => trim((string) ($content['summary'] ?? '')) ?: null,
+            'target_accomplished' => $document->target_accomplished,
+            'target_accomplished_status' => trim((string) ($content['target_accomplished_status'] ?? '')) ?: null,
+            'target_explanation' => $document->target_explanation,
+            'review_rejection_reason' => $document->review_rejection_reason,
+        ]);
 
         $weeklyReport->activities()->delete();
         $weeklyReport->meetings()->delete();
@@ -315,21 +336,18 @@ class DocumentDomainSyncService
     {
         $content = is_array($document->content) ? $document->content : [];
 
-        $monthlyReport = MonthlyReport::query()->updateOrCreate(
-            ['id' => (string) $document->id],
-            [
-                'user_id' => (string) $document->user_id,
-                'month' => (int) ($document->month ?? 0),
-                'year' => (int) ($document->year ?? 0),
-                'title' => $document->title,
-                'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
-                'file_path' => $document->file_path,
-                'attachment' => $document->attachment,
-                'file_size' => $document->file_size,
-                'original_filename' => $document->original_filename,
-                'month_summary' => trim((string) ($content['month_summary'] ?? '')) ?: null,
-            ]
-        );
+        $monthlyReport = $this->upsertWithId(MonthlyReport::class, (string) $document->id, [
+            'user_id' => (string) $document->user_id,
+            'month' => (int) ($document->month ?? 0),
+            'year' => (int) ($document->year ?? 0),
+            'title' => $document->title,
+            'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
+            'file_path' => $document->file_path,
+            'attachment' => $document->attachment,
+            'file_size' => $document->file_size,
+            'original_filename' => $document->original_filename,
+            'month_summary' => trim((string) ($content['month_summary'] ?? '')) ?: null,
+        ]);
 
         $monthlyReport->plannedItems()->delete();
         $monthlyReport->offPlanItems()->delete();
@@ -391,15 +409,12 @@ class DocumentDomainSyncService
         $content = is_array($document->content) ? $document->content : [];
         $taskRows = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
 
-        $actionLog = ActionLog::query()->updateOrCreate(
-            ['id' => (string) $document->id],
-            [
-                'user_id' => (string) $document->user_id,
-                'period_id' => $document->period_id ? (string) $document->period_id : null,
-                'title' => $document->title,
-                'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
-            ]
-        );
+        $actionLog = $this->upsertWithId(ActionLog::class, (string) $document->id, [
+            'user_id' => (string) $document->user_id,
+            'period_id' => $document->period_id ? (string) $document->period_id : null,
+            'title' => $document->title,
+            'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
+        ]);
 
         $actionLog->tasks()->delete();
 

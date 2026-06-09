@@ -1671,7 +1671,11 @@ class Document extends Model
         }
 
         if (! $this->id) {
-            $this->id = (string) Str::ulid();
+            // Lowercase to match the `HasUlids` convention used by the domain
+            // tables (weekly_plans, weekly_reports, ...). Keeping the same casing
+            // ensures the Document id resolves the persisted domain row on
+            // case-sensitive databases.
+            $this->id = Str::lower((string) Str::ulid());
         }
 
         if ($this->fireModelEvent('saving') === false) {
