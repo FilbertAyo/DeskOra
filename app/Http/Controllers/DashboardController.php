@@ -540,12 +540,11 @@ class DashboardController extends Controller
                     continue;
                 }
 
-                $taskKey = trim((string) ($task['task_uid'] ?? ''));
-                if ($taskKey === '') {
-                    $taskKey = md5($taskLabel.'|'.implode(',', $responsibleIds));
-                }
+                $taskUid = trim((string) ($task['task_uid'] ?? ''));
+                $taskKey = $taskUid !== '' ? $taskUid : md5($taskLabel.'|'.implode(',', $responsibleIds));
 
                 $taskTimeline[$taskKey]['task'] = $taskLabel;
+                $taskTimeline[$taskKey]['task_uid'] = $taskUid;
                 $taskTimeline[$taskKey]['history'][] = [
                     'period_label' => 'Week '.$document->period->week_number.' of '.$document->period->year,
                     'period_range' => $document->period->date_range,
@@ -554,6 +553,7 @@ class DashboardController extends Controller
                     'due_date' => $task['due_date'] ?? null,
                     'compilation_date' => $task['compilation_date'] ?? null,
                     'is_current_period' => $currentPeriod && $document->period_id === $currentPeriod->id,
+                    'period_open' => (bool) $document->period->isOpen(),
                     'document_id' => $document->id,
                 ];
             }
@@ -567,9 +567,20 @@ class DashboardController extends Controller
                     return null;
                 }
 
+                $taskUid = trim((string) ($taskData['task_uid'] ?? ''));
+                $documentId = $latest['document_id'] ?? null;
+                $editable = $taskUid !== ''
+                    && ! empty($documentId)
+                    && (bool) ($latest['period_open'] ?? false);
+
                 return [
                     'task' => $taskData['task'] ?? '',
+                    'task_uid' => $taskUid,
+                    'document_id' => $documentId,
+                    'period_label' => $latest['period_label'] ?? '',
                     'latest_progress' => $latest['progress'] ?? 'Not Started',
+                    'latest_notes' => (string) ($latest['notes_progress'] ?? ''),
+                    'editable' => $editable,
                     'history' => $history->all(),
                 ];
             })

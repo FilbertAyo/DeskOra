@@ -104,6 +104,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [ActionLogController::class, 'create'])->name('create');
         Route::post('/', [ActionLogController::class, 'store'])->name('store');
         Route::get('/{document}/download', [ActionLogController::class, 'downloadPdf'])->name('download');
+        Route::put('/{document}/quick-update', [ActionLogController::class, 'quickUpdate'])->name('quick-update');
         Route::get('/{document}', [ActionLogController::class, 'show'])->name('show');
         Route::get('/{document}/edit', [ActionLogController::class, 'edit'])->name('edit');
         Route::put('/{document}', [ActionLogController::class, 'update'])->name('update');

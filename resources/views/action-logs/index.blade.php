@@ -26,18 +26,21 @@
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
 
     @if(session('error'))
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if(session('info'))
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="ti ti-info-circle me-2"></i>{{ session('info') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
 
@@ -208,8 +211,10 @@
                     @else
                         <div class="text-center py-5">
                             <i class="ti ti-clipboard fs-1 text-muted"></i>
-                            <p class="text-muted mb-3 mt-3">No action logs found</p>
-                       
+                            <p class="text-muted mb-3 mt-3">No action logs found.</p>
+                            <a href="{{ route('action-logs.create') }}" class="btn btn-primary btn-sm">
+                                <i class="ti ti-plus-circle me-1"></i> Open Current Week Log
+                            </a>
                         </div>
                     @endif
                 </div>

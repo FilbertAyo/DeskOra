@@ -486,6 +486,79 @@ class ActionLogController extends Controller
     }
 
     /**
+     * Apply a lightweight progress + notes update to a single assigned task.
+     * Used by the dashboard "My Action Tasks" quick-update widget so assignees
+     * can report progress without opening the full editor.
+     */
+    public function quickUpdate(Request $request, Document $document)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if ($document->type !== Document::TYPE_ACTION_LOG) {
+            abort(404, 'Document not found.');
+        }
+
+        $this->authorize('update', $document);
+
+        $validated = $request->validate([
+            'task_uid' => ['required', 'string', 'max:80'],
+            'progress' => ['required', 'string', 'in:Not Started,In Progress,Done'],
+            'notes_progress' => ['nullable', 'string', 'max:4000'],
+        ]);
+
+        $document->loadMissing('period');
+        $period = $document->period;
+        if (! $period || ! $period->isOpen()) {
+            return redirect()->back()
+                ->with('error', 'This action log belongs to a closed work period and cannot be updated.');
+        }
+
+        $isManager = $this->isActionLogManager($user);
+        $tasks = $this->extractTasks($document->content);
+        $found = false;
+
+        foreach ($tasks as &$task) {
+            if (! is_array($task)) {
+                continue;
+            }
+            if (trim((string) ($task['task_uid'] ?? '')) !== $validated['task_uid']) {
+                continue;
+            }
+
+            $responsibleIds = is_array($task['responsible_user_ids'] ?? null)
+                ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $task['responsible_user_ids'])))
+                : [];
+
+            if (! $isManager && ! in_array((string) $user->id, $responsibleIds, true)) {
+                return redirect()->back()
+                    ->with('error', 'You can only update tasks where you are assigned as the responsible person.');
+            }
+
+            $before = $task;
+            $task['progress'] = $validated['progress'];
+            $task['notes_progress'] = trim((string) ($validated['notes_progress'] ?? ''));
+            $task = $this->appendTaskHistoryIfChanged($before, $task, $period, (string) $user->id);
+            $found = true;
+            break;
+        }
+        unset($task);
+
+        if (! $found) {
+            return redirect()->back()
+                ->with('error', 'The selected task could not be found on this action log.');
+        }
+
+        $document->update([
+            'content' => ['tasks' => $this->renumberTasks($tasks)],
+        ]);
+        $this->documentDomainSyncService->syncFromDocument($document);
+
+        return redirect()->back()
+            ->with('success', 'Task progress updated successfully.');
+    }
+
+    /**
      * Remove the specified action log document.
      */
     public function destroy(Document $document)

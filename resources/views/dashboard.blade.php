@@ -97,6 +97,19 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="row">
         @if($showPlanCoverageAlert)
             <div class="col-12 mb-3">
@@ -445,50 +458,157 @@
         <div class="col-xl-6 col-md-6 col-12">
             <div class="card shadow-none border h-100">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-bolt me-2"></i>Action Log Tasks</h5>
-                    <small class="text-muted">What to do next</small>
+                    <h5 class="mb-0">
+                        <i class="ti ti-bolt me-2"></i>My Action Tasks
+                        @if($activeActionTaskCount > 0)
+                            <span class="badge bg-primary ms-1">{{ $activeActionTaskCount }}</span>
+                        @endif
+                    </h5>
+                    <a href="{{ route('action-logs.index') }}" class="small text-decoration-none">View all</a>
                 </div>
                 <div class="card-body">
-                @if($activeActionTaskCount > 0)
-                        <div class="mb-3">
-                            <h6 class="text-primary mb-2"><i class="ti ti-clipboard-list me-1"></i>Action Log Tasks</h6>
-                            <div class="border rounded p-3 bg-light-subtle">
-                                <p class="mb-2 text-muted">
-                                    {{ $activeActionTaskCount }} task{{ $activeActionTaskCount === 1 ? '' : 's' }} need update.
-                                </p>
-                                <div class="mb-2">
-                                    @foreach($activeActionTasks->take(3) as $task)
-                                        <div class="d-flex justify-content-between align-items-center border rounded bg-white px-2 py-1 mb-1">
-                                            <span class="small text-dark">{{ $task['task'] ?? 'Task' }}</span>
-                                            <span class="badge bg-secondary">{{ $task['latest_progress'] ?? 'Not Started' }}</span>
+                    @if($activeActionTaskCount > 0)
+                        <p class="text-muted small mb-3">
+                            Tasks assigned to you that still need an update. Give a quick progress update without leaving the dashboard.
+                        </p>
+                        <div class="list-group list-group-flush border rounded">
+                            @foreach($activeActionTasks as $task)
+                                @php
+                                    $tProgress = $task['latest_progress'] ?? 'Not Started';
+                                    $badgeClass = match($tProgress) {
+                                        'Done' => 'bg-success',
+                                        'Cancelled' => 'bg-danger',
+                                        'In Progress' => 'bg-info',
+                                        default => 'bg-secondary',
+                                    };
+                                @endphp
+                                <div class="list-group-item px-2 py-2">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div class="flex-grow-1 min-w-0">
+                                            <div class="small text-dark text-break">{{ $task['task'] ?? 'Task' }}</div>
+                                            <div class="mt-1">
+                                                <span class="badge {{ $badgeClass }}">{{ $tProgress }}</span>
+                                                @if(!empty($task['period_label']))
+                                                    <span class="badge bg-light text-dark border">{{ $task['period_label'] }}</span>
+                                                @endif
+                                            </div>
                                         </div>
-                                    @endforeach
-                                    @if($activeActionTaskCount > 3)
-                                        <small class="text-muted">+ {{ $activeActionTaskCount - 3 }} more task{{ ($activeActionTaskCount - 3) === 1 ? '' : 's' }}</small>
-                                    @endif
+                                        <div class="flex-shrink-0">
+                                            @if(!empty($task['editable']))
+                                                <button type="button"
+                                                    class="btn btn-sm btn-primary js-quick-update-task"
+                                                    data-task="{{ $task['task'] ?? 'Task' }}"
+                                                    data-task-uid="{{ $task['task_uid'] }}"
+                                                    data-document-id="{{ $task['document_id'] }}"
+                                                    data-progress="{{ $tProgress }}"
+                                                    data-notes="{{ $task['latest_notes'] ?? '' }}"
+                                                    data-period="{{ $task['period_label'] ?? '' }}">
+                                                    <i class="ti ti-edit me-1"></i>Update
+                                                </button>
+                                            @elseif(!empty($task['document_id']))
+                                                <a href="{{ route('action-logs.show', $task['document_id']) }}" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="ti ti-eye"></i>
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="d-flex justify-content-end">
-                                    @if($currentActionLogDraftId)
-                                        <a href="{{ route('action-logs.edit', $currentActionLogDraftId) }}" class="btn btn-sm btn-primary">
-                                            <i class="ti ti-edit me-1"></i>Update
-                                        </a>
-                                    @else
-                                        <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-primary">
-                                            <i class="ti ti-eye me-1"></i>View Action Logs
-                                        </a>
-                                    @endif
-                                </div>
-                            </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-4">
+                            <i class="ti ti-checkup-list fs-1 text-muted"></i>
+                            <p class="text-muted mb-0 mt-2">No action tasks need your attention right now.</p>
+                            <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-outline-primary mt-2">
+                                <i class="ti ti-eye me-1"></i>View Action Logs
+                            </a>
                         </div>
                     @endif
-
                 </div>
             </div>
         </div>
-
-      
-       
     </div>
+
+    <!-- Quick Action Task Update Modal -->
+    <div class="modal fade" id="quickActionTaskModal" tabindex="-1" aria-labelledby="quickActionTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" id="quickActionTaskForm" data-action-template="{{ route('action-logs.quick-update', ['document' => '__DOCUMENT__']) }}">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="quickActionTaskModalLabel"><i class="ti ti-bolt me-2"></i>Quick Update</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="task_uid" id="quickTaskUid" value="">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Task</label>
+                            <div class="border rounded bg-light px-2 py-2 small text-dark" id="quickTaskLabel"></div>
+                            <small class="text-muted" id="quickTaskPeriod"></small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="quickTaskProgress" class="form-label">Progress status <span class="text-danger">*</span></label>
+                            <select class="form-select" name="progress" id="quickTaskProgress" required>
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Done">Done</option>
+                            </select>
+                        </div>
+                        <div class="mb-0">
+                            <label for="quickTaskNotes" class="form-label">Progress notes</label>
+                            <textarea class="form-control" name="notes_progress" id="quickTaskNotes" rows="4" maxlength="4000" placeholder="What did you do this week? Any blockers or context?"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="quickTaskSaveBtn">
+                            <i class="ti ti-check me-1"></i>Save update
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalEl = document.getElementById('quickActionTaskModal');
+            if (!modalEl) {
+                return;
+            }
+            const form = document.getElementById('quickActionTaskForm');
+            const actionTemplate = form.getAttribute('data-action-template');
+            const labelEl = document.getElementById('quickTaskLabel');
+            const periodEl = document.getElementById('quickTaskPeriod');
+            const uidEl = document.getElementById('quickTaskUid');
+            const progressEl = document.getElementById('quickTaskProgress');
+            const notesEl = document.getElementById('quickTaskNotes');
+            const saveBtn = document.getElementById('quickTaskSaveBtn');
+
+            document.querySelectorAll('.js-quick-update-task').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const documentId = btn.getAttribute('data-document-id') || '';
+                    form.setAttribute('action', actionTemplate.replace('__DOCUMENT__', documentId));
+                    labelEl.textContent = btn.getAttribute('data-task') || 'Task';
+                    periodEl.textContent = btn.getAttribute('data-period') || '';
+                    uidEl.value = btn.getAttribute('data-task-uid') || '';
+                    progressEl.value = btn.getAttribute('data-progress') || 'Not Started';
+                    notesEl.value = btn.getAttribute('data-notes') || '';
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    }
+                });
+            });
+
+            form.addEventListener('submit', function () {
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Saving...';
+                }
+            });
+        });
+    </script>
 
     @if($showWeeklyToast)
         <script>

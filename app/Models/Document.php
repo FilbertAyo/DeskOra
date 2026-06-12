@@ -246,118 +246,78 @@ class Document extends Model
             return [];
         }
 
-        $actionLog = ActionLog::query()
-            ->with([
-                'tasks.assignees:id,name',
-                'tasks.history',
-            ])
-            ->where('id', $this->id)
-            ->first();
+        // Always derive the display rows (and the cross-week timeline) from the
+        // document content JSON, which is the source of truth. The domain
+        // ActionLog tables only mirror a single week, so reading them here would
+        // limit the timeline to the current week instead of aggregating real
+        // updates from the first week the task appeared through the current week.
+        $content = is_array($this->content) ? $this->content : [];
+        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+        $periodId = $this->period_id !== null && $this->period_id !== ''
+            ? (string) $this->period_id
+            : null;
 
-        if (! $actionLog) {
-            $content = is_array($this->content) ? $this->content : [];
-            $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-            $periodId = $this->period_id !== null && $this->period_id !== ''
-                ? (string) $this->period_id
-                : null;
-
-            $currentPeriod = $periodId !== null ? WorkPeriod::query()->find($periodId) : null;
-            $otherActionLogDocs = null;
-            if ($currentPeriod) {
-                $otherActionLogDocs = self::query()
-                    ->ofType(self::TYPE_ACTION_LOG)
-                    ->where('id', '!=', $this->id)
-                    ->whereHas('period', function ($query) use ($currentPeriod): void {
-                        $query->whereDate('week_start_date', '<=', $currentPeriod->week_start_date);
-                    })
-                    ->with('period')
-                    ->get();
-            }
-
-            $result = [];
-            foreach ($tasks as $task) {
-                if (! is_array($task)) {
-                    continue;
-                }
-
-                if ($periodId === null || $currentPeriod === null) {
-                    $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
-                    $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
-                    $task['display_history'] = is_array($task['history'] ?? null)
-                        ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
-                        : [];
-                    $result[] = $task;
-
-                    continue;
-                }
-
-                $ownHistory = is_array($task['history'] ?? null)
-                    ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
-                    : [];
-                $taskUid = trim((string) ($task['task_uid'] ?? ''));
-
-                $aggregatedByPeriod = $this->aggregateActionLogTaskHistory(
-                    $taskUid,
-                    $ownHistory,
-                    $otherActionLogDocs ?? collect(),
-                    $periodId
-                );
-
-                $task['display_history'] = $this->buildActionLogDisplayTimeline($aggregatedByPeriod, $currentPeriod);
-
-                $currentEntry = $aggregatedByPeriod[$periodId] ?? null;
-                if (is_array($currentEntry)) {
-                    $task['display_notes_progress'] = trim((string) ($currentEntry['notes_progress'] ?? ''));
-                    $toProgress = trim((string) ($currentEntry['to_progress'] ?? ''));
-                    $task['display_progress'] = $toProgress !== '' ? $toProgress : 'Not Started';
-                } elseif ($ownHistory === [] && $task['display_history'] === []) {
-                    $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
-                    $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
-                } else {
-                    $task['display_notes_progress'] = '';
-                    $task['display_progress'] = null;
-                }
-
-                $result[] = $task;
-            }
-
-            return $result;
+        $currentPeriod = $periodId !== null ? WorkPeriod::query()->find($periodId) : null;
+        $otherActionLogDocs = null;
+        if ($currentPeriod) {
+            $otherActionLogDocs = self::query()
+                ->ofType(self::TYPE_ACTION_LOG)
+                ->where('id', '!=', $this->id)
+                ->whereHas('period', function ($query) use ($currentPeriod): void {
+                    $query->whereDate('week_start_date', '<=', $currentPeriod->week_start_date);
+                })
+                ->with('period')
+                ->get();
         }
 
-        return $actionLog->tasks->map(function (ActionLogTask $task): array {
-            $history = $task->history
-                ->map(function (ActionLogTaskHistory $entry): array {
-                    return [
-                        'period_id' => $entry->period_id,
-                        'period_label' => $entry->period_label,
-                        'updated_by' => $entry->updated_by,
-                        'from_progress' => $entry->from_progress,
-                        'to_progress' => $entry->to_progress,
-                        'notes_progress' => $entry->notes_progress,
-                        'status_reason' => $entry->status_reason,
-                        'changed_at' => optional($entry->changed_at)->toDateTimeString(),
-                        'source' => $entry->source,
-                    ];
-                })
-                ->values()
-                ->all();
+        $result = [];
+        foreach ($tasks as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
 
-            return [
-                'task_uid' => $task->task_uid,
-                'task_no' => $task->task_no,
-                'task' => $task->task,
-                'responsible_user_ids' => $task->assignees->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
-                'progress' => $task->progress,
-                'due_date' => optional($task->due_date)->format('Y-m-d'),
-                'compilation_date' => optional($task->compilation_date)->format('Y-m-d'),
-                'notes_progress' => $task->notes_progress,
-                'status_reason' => $task->status_reason,
-                'history' => $history,
-                'display_notes_progress' => $task->notes_progress,
-                'display_progress' => $task->progress ?: 'Not Started',
-                'display_history' => $history,
-            ];
-        })->values()->all();
+            if ($periodId === null || $currentPeriod === null) {
+                $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
+                $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
+                $task['display_history'] = is_array($task['history'] ?? null)
+                    ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
+                    : [];
+                $result[] = $task;
+
+                continue;
+            }
+
+            $ownHistory = is_array($task['history'] ?? null)
+                ? array_values(array_filter($task['history'], static fn ($e) => is_array($e)))
+                : [];
+            $taskUid = trim((string) ($task['task_uid'] ?? ''));
+
+            $aggregatedByPeriod = $this->aggregateActionLogTaskHistory(
+                $taskUid,
+                $ownHistory,
+                $otherActionLogDocs ?? collect(),
+                $periodId
+            );
+
+            $task['display_history'] = $this->buildActionLogDisplayTimeline($aggregatedByPeriod, $currentPeriod);
+
+            $currentEntry = $aggregatedByPeriod[$periodId] ?? null;
+            if (is_array($currentEntry)) {
+                $task['display_notes_progress'] = trim((string) ($currentEntry['notes_progress'] ?? ''));
+                $toProgress = trim((string) ($currentEntry['to_progress'] ?? ''));
+                $task['display_progress'] = $toProgress !== '' ? $toProgress : 'Not Started';
+            } elseif ($ownHistory === [] && $task['display_history'] === []) {
+                $task['display_notes_progress'] = trim((string) ($task['notes_progress'] ?? ''));
+                $task['display_progress'] = trim((string) ($task['progress'] ?? 'Not Started')) ?: 'Not Started';
+            } else {
+                $task['display_notes_progress'] = '';
+                $task['display_progress'] = null;
+            }
+
+            $result[] = $task;
+        }
+
+        return $result;
     }
 
     /**
