@@ -109,13 +109,13 @@
                                             Edit & Resubmit
                                         </a>
                                     @else
-                                        <span class="badge bg-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
+                                        <span class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
                                             <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
                                             {{ $statusInfo['text'] }}
                                         </span>
                                     @endif
                                 @else
-                                    <span class="badge bg-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
+                                    <span class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
                                         <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
                                         {{ $statusInfo['text'] }}
                                     </span>

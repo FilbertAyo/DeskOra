@@ -11,7 +11,7 @@
                     {{ $dept->name }}
                 </h5>
                 @if ($dept->plan_section_number === null)
-                    <span class="badge bg-warning text-dark mt-1">Section number not set — codes show as —.n</span>
+                    <span class="badge bg-light-warning text-dark mt-1">Section number not set — codes show as —.n</span>
                 @endif
             </div>
             <button type="button" class="btn btn-sm btn-outline-primary btn-add-activity" data-bs-toggle="modal"

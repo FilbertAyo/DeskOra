@@ -118,7 +118,7 @@
                                     <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
                                         <span class="pc-mtext">Submissions</span>
                                         @if($reviewActivitiesSubmittedCount > 0)
-                                            <span class="badge bg-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
+                                            <span class="badge bg-light-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -128,7 +128,7 @@
                                     <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
                                         <span class="pc-mtext">Weekly Budget</span>
                                         @if($reviewActivitiesPendingBudgetCount > 0)
-                                            <span class="badge bg-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
+                                            <span class="badge bg-light-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -163,7 +163,7 @@
                             <span class="pc-micon"><i class="ti ti-users"></i></span>
                             <span class="pc-mtext">Approvals</span>
                             @if ($pendingPettiesCount > 0)
-                                <span class="badge bg-danger">{{ $pendingPettiesCount }}</span>
+                                <span class="badge bg-light-danger">{{ $pendingPettiesCount }}</span>
                             @endif
                         </a>
                     </li>
@@ -183,7 +183,7 @@
                                 <a href="{{ route('petty.cashier') }}" class="pc-link">
                                     <span class="pc-mtext">Payments</span>
                                     @if ($approvedPettiesCount > 0)
-                                        <span class="badge bg-success">{{ $approvedPettiesCount }}</span>
+                                        <span class="badge bg-light-success">{{ $approvedPettiesCount }}</span>
                                     @endif
                                 </a>
                             </li>

@@ -177,7 +177,7 @@
                                                         @endif
                                                       
                                                         @if(isset($returnedDocumentMap[$planDoc->id]))
-                                                            <span class="badge bg-danger mt-1">Returned for Revision</span>
+                                                            <span class="badge bg-light-danger mt-1">Returned for Revision</span>
                                                         @endif
                                                     @else
                                                         <span class="text-muted">Not created</span>
@@ -197,7 +197,7 @@
                                                         @endif
                                                      
                                                         @if(isset($returnedDocumentMap[$reportDoc->id]))
-                                                            <span class="badge bg-danger mt-1">Returned for Revision</span>
+                                                            <span class="badge bg-light-danger mt-1">Returned for Revision</span>
                                                         @endif
                                                     @else
                                                         <span class="text-muted">Not created</span>

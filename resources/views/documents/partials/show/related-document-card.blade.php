@@ -18,16 +18,16 @@
                         </h6>
                         @if($relatedDocument)
                             @if($relatedDocument->state === 'draft')
-                                <span class="badge bg-warning">
+                                <span class="badge bg-light-warning">
                                     <i class="ti ti-edit me-1"></i>Draft
                                 </span>
                             @else
-                                <span class="badge bg-success">
+                                <span class="badge bg-light-success">
                                     <i class="ti ti-check-circle me-1"></i>Submitted
                                 </span>
                             @endif
                         @else
-                            <span class="badge bg-secondary">
+                            <span class="badge bg-light-secondary">
                                 <i class="ti ti-alert-triangle me-1"></i>Not Created
                             </span>
                         @endif

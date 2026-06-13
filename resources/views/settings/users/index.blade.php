@@ -90,11 +90,11 @@
                                         </td>
 
                                         <td>
-                                            <span class="badge bg-light text-dark">
+                                            <span class="badge bg-light-light text-dark">
                                                 {{ $u->department->name ?? 'N/A' }}
                                             </span>
                                             @if(optional($u->department)->head_user_id === $u->id)
-                                                <span class="badge bg-warning text-dark ms-1">HOD</span>
+                                                <span class="badge bg-light-warning text-dark ms-1">HOD</span>
                                             @endif
                                         </td>
                                         <td>
@@ -120,7 +120,7 @@
                                             @endif
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge {{ $u->status === 'active' ? 'bg-success' : 'bg-danger' }}">
+                                            <span class="badge {{ $u->status === 'active' ? 'bg-light-success' : 'bg-light-danger' }}">
                                                 <i class="ti {{ $u->status === 'active' ? 'ti-circle-check' : 'ti-circle-x' }} me-1"></i>
                                                 {{ ucfirst($u->status) }}
                                             </span>

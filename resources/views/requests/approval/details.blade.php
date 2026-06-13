@@ -183,7 +183,7 @@
                                     ];
                                 @endphp
                                 <span
-                                    class="badge bg-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">
+                                    class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">
                                     <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
                                     {{ ucfirst($request->status) }}
                                 </span>
@@ -220,7 +220,7 @@
                                         'icon' => 'fe-info',
                                     ];
                                 @endphp
-                                <span class="badge bg-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">
+                                <span class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">
                                     <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
                                     {{ ucfirst($request->status) }}
                                 </span>
@@ -276,7 +276,7 @@
             <div class="modal-content shadow-sm border">
                 <div class="modal-header py-3 border-bottom align-items-center">
                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                        <span class="rounded-circle bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                        <span class="rounded-circle bg-light-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center flex-shrink-0"
                             style="width: 40px; height: 40px;">
                             <i class="ti ti-user-check fs-5"></i>
                         </span>
@@ -308,7 +308,7 @@
                                 </div>
                                 <div class="col-sm-6">
                                     <span class="text-muted">Status</span>
-                                    <div><span class="badge bg-secondary">{{ $request->status }}</span></div>
+                                    <div><span class="badge bg-light-secondary">{{ $request->status }}</span></div>
                                 </div>
                             </div>
                         </div>

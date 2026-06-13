@@ -51,11 +51,11 @@
                         <div class="col-md-6 col-lg-3 mb-3">
                             <small class="text-muted d-block">Status</small>
                             @if($period->status === 'open')
-                                <span class="badge bg-success">Open</span>
+                                <span class="badge bg-light-success">Open</span>
                             @elseif($period->status === 'closed')
-                                <span class="badge bg-secondary">Closed</span>
+                                <span class="badge bg-light-secondary">Closed</span>
                             @else
-                                <span class="badge bg-dark">Archived</span>
+                                <span class="badge bg-light-dark">Archived</span>
                             @endif
                         </div>
                     </div>
@@ -123,14 +123,14 @@
                                 <tbody>
                                     @foreach($period->documents->sortBy('type') as $doc)
                                         <tr>
-                                            <td><span class="badge bg-light text-dark">{{ $doc->type_name }}</span></td>
+                                            <td><span class="badge bg-light-light text-dark">{{ $doc->type_name }}</span></td>
                                             <td>{{ $doc->display_title }}</td>
                                             <td>{{ $doc->user?->name ?? '—' }}</td>
                                             <td class="text-center">
                                                 @if($doc->state === 'submitted')
-                                                    <span class="badge bg-success">Submitted</span>
+                                                    <span class="badge bg-light-success">Submitted</span>
                                                 @else
-                                                    <span class="badge bg-warning text-dark">Draft</span>
+                                                    <span class="badge bg-light-warning text-dark">Draft</span>
                                                 @endif
                                             </td>
                                             <td class="text-center">

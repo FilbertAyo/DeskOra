@@ -14,7 +14,7 @@
                             <div class="col-md-8 mb-2 mb-md-0">
                                 <h5 class="mb-0">
                                     <i class="ti ti-file-text me-2"></i>Edit Document
-                                    <span class="badge bg-info ml-2">{{ $document->type_name }}</span>
+                                    <span class="badge bg-light-info ml-2">{{ $document->type_name }}</span>
                                 </h5>
                             </div>
                             <div class="col-md-4 text-md-end">

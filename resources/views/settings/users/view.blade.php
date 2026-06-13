@@ -43,7 +43,7 @@
                                         class="rounded-circle shadow"
                                         style="width: 150px; height: 150px; object-fit: cover;">
                                 @else
-                                    <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center shadow"
+                                    <div class="rounded-circle bg-light-primary d-inline-flex align-items-center justify-content-center shadow"
                                         style="width: 150px; height: 150px; font-size: 60px; font-weight: 600;">
                                         {{ strtoupper(substr($user->name, 0, 2)) }}
                                     </div>
@@ -189,7 +189,7 @@
                                     <div class="d-flex align-items-center flex-wrap">
                                         @if($user->roles->count() > 0)
                                             @foreach($user->roles as $role)
-                                                <span class="badge bg-primary rounded-pill me-2 mb-1">
+                                                <span class="badge bg-light-primary rounded-pill me-2 mb-1">
                                                     <i class="ti ti-shield me-1"></i>
                                                     {{ ucwords(str_replace('_', ' ', $role->name)) }}
                                                 </span>
@@ -215,7 +215,7 @@
                         <div
                             class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="ti ti-shield me-2"></i>Current Permissions</h5>
-                            <span class="badge bg-primary">{{ $effectivePermissions->count() }}
+                            <span class="badge bg-light-primary">{{ $effectivePermissions->count() }}
                                 Active</span>
                         </div>
                         <div class="card-body">

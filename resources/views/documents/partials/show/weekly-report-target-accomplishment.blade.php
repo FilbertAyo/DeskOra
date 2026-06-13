@@ -22,7 +22,7 @@
             @endphp
             
             <div class="card shadow-none border border-info">
-                <div class="card-header bg-info text-white">
+                <div class="card-header bg-light-info">
                     <h6 class="mb-0">
                         <i class="ti ti-target me-2"></i>Main Target Accomplishment Status
                     </h6>
@@ -42,15 +42,15 @@
                             <label class="form-label text-muted font-weight-bold">Accomplishment Status:</label>
                             <div>
                                 @if($targetStatus === 'completed')
-                                    <span class="badge bg-success rounded-pill px-3 py-2">
+                                    <span class="badge bg-light-success rounded-pill px-3 py-2">
                                         <i class="ti ti-check-circle me-1"></i>Completed
                                     </span>
                                 @elseif($targetStatus === 'partially_completed')
-                                    <span class="badge bg-warning rounded-pill px-3 py-2 text-dark">
+                                    <span class="badge bg-light-warning rounded-pill px-3 py-2 text-dark">
                                         <i class="ti ti-progress-check me-1"></i>Partially completed
                                     </span>
                                 @else
-                                    <span class="badge bg-danger rounded-pill px-3 py-2">
+                                    <span class="badge bg-light-danger rounded-pill px-3 py-2">
                                         <i class="ti ti-x-circle me-1"></i>Not completed
                                     </span>
                                 @endif

@@ -38,7 +38,7 @@
                                 <i class="ti ti-alert-triangle me-1"></i>Low balance — please top up.
                             </div>
                         @else
-                            <span class="badge bg-success">
+                            <span class="badge bg-light-success">
                                 <i class="ti ti-check-circle me-1"></i>Connected
                             </span>
                         @endif
@@ -240,7 +240,7 @@
                                         <tr>
                                             <td>{{ $log->created_at?->timezone(config('app.timezone'))->format('M d, Y H:i') }}</td>
                                             <td>
-                                                <span class="badge {{ ($log->dispatch_type_label ?? '') === 'Grace period' ? 'bg-warning text-dark' : 'bg-light text-dark border' }}">
+                                                <span class="badge {{ ($log->dispatch_type_label ?? '') === 'Grace period' ? 'bg-light-warning text-dark' : 'bg-light text-dark border' }}">
                                                     {{ $log->dispatch_type_label ?? 'Reminder' }}
                                                 </span>
                                             </td>
@@ -250,7 +250,7 @@
                                             </td>
                                             <td>{{ ucfirst(str_replace('_', ' ', $log->activity_type)) }}</td>
                                             <td>
-                                                <span class="badge {{ $log->status === 'sent' ? 'bg-success' : 'bg-warning text-dark' }}">
+                                                <span class="badge {{ $log->status === 'sent' ? 'bg-light-success' : 'bg-light-warning text-dark' }}">
                                                     {{ ucfirst(str_replace('_', ' ', $log->status)) }}
                                                 </span>
                                             </td>

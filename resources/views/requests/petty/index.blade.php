@@ -64,15 +64,15 @@
 
                                             <td>
                                                 @if ($item->status == 'pending')
-                                                    <span class="badge bg-danger text-white">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-danger">{{ $item->status }}</span>
                                                 @elseif($item->status == 'processing')
-                                                    <span class="badge bg-warning">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-warning">{{ $item->status }}</span>
                                                 @elseif($item->status == 'rejected')
-                                                    <span class="badge bg-secondary text-white">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-secondary">{{ $item->status }}</span>
                                                 @elseif($item->status == 'resubmission')
-                                                    <span class="badge btn-label-danger">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-danger">{{ $item->status }}</span>
                                                 @else
-                                                    <span class="badge bg-success">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-success">{{ $item->status }}</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -96,15 +96,15 @@
 
                                             <td>
                                                 @if ($item->status == 'pending')
-                                                    <span class="badge bg-danger text-white">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-danger">{{ $item->status }}</span>
                                                 @elseif($item->status == 'processing')
-                                                    <span class="badge bg-warning ">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-warning ">{{ $item->status }}</span>
                                                 @elseif($item->status == 'rejected')
-                                                    <span class="badge bg-secondary text-white">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-secondary">{{ $item->status }}</span>
                                                 @elseif($item->status == 'resubmission')
-                                                    <span class="badge btn-label-danger">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-danger">{{ $item->status }}</span>
                                                 @else
-                                                    <span class="badge bg-success">{{ $item->status }}</span>
+                                                    <span class="badge bg-light-success">{{ $item->status }}</span>
                                                 @endif
                                             </td>
                                             <td>

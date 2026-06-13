@@ -148,7 +148,7 @@
                     <h5 class="mb-0">
                         <i class="ti ti-calendar-stats me-2 text-info"></i>
                         Weekly Plan + Report 
-                        <span class="badge badge-info ml-2">{{ $mergedWeeklyRows->count() }}</span>
+                        <span class="badge bg-light-info ml-2">{{ $mergedWeeklyRows->count() }}</span>
                     </h5>
                 </div>
                 <div class="card-body">
@@ -275,7 +275,7 @@
                                 <h5 class="mb-0">
                                     <i class="{{ $typeLabels[$type]['icon'] }} me-2 text-{{ $typeLabels[$type]['color'] }}"></i>
                                     {{ $typeLabels[$type]['name'] }}
-                                    <span class="badge badge-{{ $typeLabels[$type]['color'] }} ml-2">{{ $documents->count() }}</span>
+                                    <span class="badge bg-light-{{ $typeLabels[$type]['color'] }} ml-2">{{ $documents->count() }}</span>
                                 </h5>
                             </div>
                         </div>

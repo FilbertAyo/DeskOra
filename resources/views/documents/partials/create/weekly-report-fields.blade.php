@@ -1,6 +1,6 @@
 <div class="col-12 mb-3">
     <div class="card border-info">
-        <div class="card-header bg-info text-white">
+        <div class="card-header bg-light-info">
             <h6 class="mb-0"><i class="ti ti-target me-2"></i>Main Target Accomplishment</h6>
         </div>
         <div class="card-body">
@@ -501,11 +501,11 @@
                                     </td>
                                     <td class="text-center">
                                         @if($reviewDecision === 'approved')
-                                            <span class="badge bg-success">Approved</span>
+                                            <span class="badge bg-light-success">Approved</span>
                                         @elseif($reviewDecision === 'rejected')
-                                            <span class="badge bg-danger">Rejected</span>
+                                            <span class="badge bg-light-danger">Rejected</span>
                                         @elseif($reviewDecision === 'pending')
-                                            <span class="badge bg-warning">Pending</span>
+                                            <span class="badge bg-light-warning">Pending</span>
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif

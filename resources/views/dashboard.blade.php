@@ -138,7 +138,7 @@
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
-                    <span class="badge bg-primary">
+                    <span class="badge bg-light-primary">
                         {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount + $assignedWeeklyActivityCount }}
                     </span>
                 </div>
@@ -461,7 +461,7 @@
                     <h5 class="mb-0">
                         <i class="ti ti-bolt me-2"></i>My Action Tasks
                         @if($activeActionTaskCount > 0)
-                            <span class="badge bg-primary ms-1">{{ $activeActionTaskCount }}</span>
+                            <span class="badge bg-light-primary ms-1">{{ $activeActionTaskCount }}</span>
                         @endif
                     </h5>
                     <a href="{{ route('action-logs.index') }}" class="small text-decoration-none">View all</a>
@@ -476,10 +476,10 @@
                                 @php
                                     $tProgress = $task['latest_progress'] ?? 'Not Started';
                                     $badgeClass = match($tProgress) {
-                                        'Done' => 'bg-success',
-                                        'Cancelled' => 'bg-danger',
-                                        'In Progress' => 'bg-info',
-                                        default => 'bg-secondary',
+                                        'Done' => 'bg-light-success',
+                                        'Cancelled' => 'bg-light-danger',
+                                        'In Progress' => 'bg-light-info',
+                                        default => 'bg-light-secondary',
                                     };
                                 @endphp
                                 <div class="list-group-item px-2 py-2">
@@ -489,7 +489,7 @@
                                             <div class="mt-1">
                                                 <span class="badge {{ $badgeClass }}">{{ $tProgress }}</span>
                                                 @if(!empty($task['period_label']))
-                                                    <span class="badge bg-light text-dark border">{{ $task['period_label'] }}</span>
+                                                    <span class="badge bg-light-light text-dark">{{ $task['period_label'] }}</span>
                                                 @endif
                                             </div>
                                         </div>

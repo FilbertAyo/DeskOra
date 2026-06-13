@@ -58,7 +58,7 @@
                                 @endphp
                                 <tr>
                                     <td>
-                                        <span class="badge {{ $isLocked ? 'bg-success' : 'bg-warning text-dark' }}">
+                                        <span class="badge {{ $isLocked ? 'bg-light-success' : 'bg-light-warning text-dark' }}">
                                             {{ $isLocked ? 'Locked' : 'Preview' }}
                                         </span>
                                     </td>

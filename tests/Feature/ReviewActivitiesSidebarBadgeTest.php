@@ -81,7 +81,7 @@ class ReviewActivitiesSidebarBadgeTest extends TestCase
         $response->assertOk();
         $response->assertSeeInOrder([
             'Submissions',
-            '<span class="badge bg-primary ms-2">2</span>',
+            '<span class="badge bg-light-primary ms-2">2</span>',
         ], false);
     }
 
@@ -113,7 +113,7 @@ class ReviewActivitiesSidebarBadgeTest extends TestCase
         $response->assertOk();
         $response->assertSeeInOrder([
             'Weekly Budget',
-            '<span class="badge bg-warning ms-2">2</span>',
+            '<span class="badge bg-light-warning ms-2">2</span>',
         ], false);
     }
 

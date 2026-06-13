@@ -440,12 +440,12 @@
                     const meta = document.createElement('div');
                     meta.className = 'mt-2';
                     const badge = document.createElement('span');
-                    badge.className = 'badge bg-secondary';
+                    badge.className = 'badge bg-light-secondary';
                     badge.textContent = task.progress || 'Not Started';
                     meta.appendChild(badge);
                     if (!task.can_edit) {
                         const lock = document.createElement('span');
-                        lock.className = 'badge bg-light text-dark border ml-1';
+                        lock.className = 'badge bg-light-light text-dark ml-1';
                         lock.textContent = 'View only';
                         meta.appendChild(lock);
                     }

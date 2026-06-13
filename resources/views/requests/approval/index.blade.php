@@ -68,27 +68,27 @@
                                     <td>{{ $item->user->name ?? 'N/A' }}</td>
                                     <td>{{ $isStaffRequisition ? ($item->activity_title ?: $item->request_for) : $item->request_for }}</td>
                                     <td>
-                                        <span class="badge {{ $isStaffRequisition ? 'bg-info' : 'bg-primary' }}">
+                                        <span class="badge {{ $isStaffRequisition ? 'bg-light-info' : 'bg-light-primary' }}">
                                             {{ $item->request_type }}
                                         </span>
                                     </td>
                                     <td>
                                         @if (!$item->reviewed_at)
-                                            <span class="badge bg-warning">Review</span>
+                                            <span class="badge bg-light-warning">Review</span>
                                         @elseif(!$item->approved_at)
-                                            <span class="badge bg-primary">Approve</span>
+                                            <span class="badge bg-light-primary">Approve</span>
                                         @elseif(!$item->authorized_at)
-                                            <span class="badge bg-secondary">Authorize</span>
+                                            <span class="badge bg-light-secondary">Authorize</span>
                                         @elseif($item->status === 'approved' && $item->request_type !== 'Staff Requisition')
-                                            <span class="badge bg-success">Awaiting Payment</span>
+                                            <span class="badge bg-light-success">Awaiting Payment</span>
                                         @else
-                                            <span class="badge bg-success">Completed</span>
+                                            <span class="badge bg-light-success">Completed</span>
                                         @endif
                                     </td>
                                     <td>{{ number_format($item->amount, 2) }}</td>
                                     <td>{{ $item->created_at->format('d M, Y') }}</td>
                                     <td>
-                                        <span class="badge bg-{{ $statusClass }} text-white">{{ $item->status }}</span>
+                                        <span class="badge bg-light-{{ $statusClass }} text-white">{{ $item->status }}</span>
                                     </td>
                                     <td>
                                         <x-table-action-dropdown>

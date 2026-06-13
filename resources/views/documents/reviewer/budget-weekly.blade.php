@@ -143,8 +143,8 @@
                                 <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
                             </h6>
                             <div class="text-end">
-                                <span class="badge bg-light text-dark border me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
-                                <span class="badge bg-light text-dark border">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
+                                <span class="badge bg-light-light text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
+                                <span class="badge bg-light-light text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -171,13 +171,13 @@
                                     <div class="text-end">
                 
                                         @if($staffSummary['pending'] > 0)
-                                            <span class="badge bg-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
+                                            <span class="badge bg-light-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
                                         @endif
                                         @if($staffSummary['approved'] > 0)
-                                            <span class="badge bg-success">{{ $staffSummary['approved'] }} approved</span>
+                                            <span class="badge bg-light-success">{{ $staffSummary['approved'] }} approved</span>
                                         @endif
                                         @if($staffSummary['rejected'] > 0)
-                                            <span class="badge bg-danger">{{ $staffSummary['rejected'] }} rejected</span>
+                                            <span class="badge bg-light-danger">{{ $staffSummary['rejected'] }} rejected</span>
                                         @endif
                                     </div>
                                 </div>
@@ -237,15 +237,15 @@
                                                     </td>
                                                     <td>
                                                         @if($isFinalApproved)
-                                                            <span class="badge bg-success">Approved</span>
+                                                            <span class="badge bg-light-success">Approved</span>
                                                         @elseif($isRejected)
-                                                            <span class="badge bg-danger">Rejected</span>
+                                                            <span class="badge bg-light-danger">Rejected</span>
                                                         @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
-                                                            <span class="badge bg-primary">Pending Final Approval</span>
+                                                            <span class="badge bg-light-primary">Pending Final Approval</span>
                                                         @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED)
-                                                            <span class="badge bg-info text-dark">Pending Approval</span>
+                                                            <span class="badge bg-light-info text-dark">Pending Approval</span>
                                                         @else
-                                                            <span class="badge bg-warning text-dark">Pending Review</span>
+                                                            <span class="badge bg-light-warning text-dark">Pending Review</span>
                                                         @endif
                                                     </td>
                                                     <!-- <td>

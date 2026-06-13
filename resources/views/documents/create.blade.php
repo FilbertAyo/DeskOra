@@ -804,11 +804,11 @@
                                     const reviewDecision = item.review_decision ?? null;
                                     let reviewBadge = '<span class="text-muted">-</span>';
                                     if (reviewDecision === 'approved') {
-                                        reviewBadge = '<span class="badge bg-success">Approved</span>';
+                                        reviewBadge = '<span class="badge bg-light-success">Approved</span>';
                                     } else if (reviewDecision === 'rejected') {
-                                        reviewBadge = '<span class="badge bg-danger">Rejected</span>';
+                                        reviewBadge = '<span class="badge bg-light-danger">Rejected</span>';
                                     } else if (reviewDecision === 'pending') {
-                                        reviewBadge = '<span class="badge bg-warning">Pending</span>';
+                                        reviewBadge = '<span class="badge bg-light-warning">Pending</span>';
                                     }
 
                                     return `

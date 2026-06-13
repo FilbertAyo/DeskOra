@@ -131,7 +131,7 @@
                                         <td class="small">{{ $causerLabel }}</td>
                                         <td><code class="small">{{ $activity->event ?? '—' }}</code></td>
                                         <td class="small">{{ \Illuminate\Support\Str::limit($activity->description, 80) }}</td>
-                                        <td><span class="badge bg-light text-dark">{{ $activity->log_name ?? 'default' }}</span></td>
+                                        <td><span class="badge bg-light-light text-dark">{{ $activity->log_name ?? 'default' }}</span></td>
                                         <td class="small font-monospace">{{ $subjectLabel }}</td>
                                         <td class="text-end">
                                             <a href="{{ route('activity-log.show', $activity) }}" class="btn btn-sm btn-outline-primary">

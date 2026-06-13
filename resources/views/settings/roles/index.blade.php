@@ -52,10 +52,10 @@
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-info">{{ $role->permissions_count }}</span>
+                                            <span class="badge bg-light-info">{{ $role->permissions_count }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-secondary">{{ $role->users_count }}</span>
+                                            <span class="badge bg-light-secondary">{{ $role->users_count }}</span>
                                         </td>
                                         <td class="text-center">
                                             <x-table-action-dropdown>

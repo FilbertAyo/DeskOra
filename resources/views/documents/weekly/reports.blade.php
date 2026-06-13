@@ -85,7 +85,7 @@
                                     </h6>
                                     <p class="mb-0">
                                         <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}</strong>
-                                        <span class="badge bg-danger {{ $deadlineStatuses['report_badge'] }} ml-2">
+                                        <span class="badge bg-light-danger {{ $deadlineStatuses['report_badge'] }} ml-2">
                                             {{ $deadlineStatuses['report_text'] }}
                                         </span>
                                     </p>
@@ -181,16 +181,16 @@
                                             </td>
                                             <td class="text-center">
                                                 @if($document->state === 'draft')
-                                                    <span class="badge bg-warning">
+                                                    <span class="badge bg-light-warning">
                                                         <i class="ti ti-edit me-1"></i>Draft
                                                     </span>
                                                     @if(isset($returnedDocumentMap[$document->id]))
-                                                        <span class="badge bg-danger mt-1">
+                                                        <span class="badge bg-light-danger mt-1">
                                                             <i class="ti ti-arrow-back-up me-1"></i>Returned
                                                         </span>
                                                     @endif
                                                 @else
-                                                    <span class="badge bg-success">
+                                                    <span class="badge bg-light-success">
                                                         <i class="ti ti-circle-check me-1"></i>Submitted
                                                     </span>
                                                 @endif
