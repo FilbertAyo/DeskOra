@@ -236,21 +236,17 @@
                                             <td class="text-center">
                                                 @if($planDoc || $reportDoc)
                                                     <x-table-action-dropdown>
-                                                        @if($planDoc)
-                                                            <li>
-                                                                <a class="dropdown-item" href="{{ route('documents.reviewer-show', $planDoc->id) }}">
-                                                                    <i class="ti ti-target me-2"></i> View Plan
-                                                                </a>
-                                                            </li>
-                                                        @endif
-                                                        @if($reportDoc)
-                                                            <li>
-                                                                <a class="dropdown-item" href="{{ route('documents.reviewer-show', $reportDoc->id) }}">
-                                                                    <i class="ti ti-activity me-2"></i> View Report
-                                                                </a>
-                                                            </li>
-                                                        @endif
-                                                    </x-table-action-dropdown>
+    @if($planDoc)
+    <a class="dropdown-item" href="{{ route('documents.reviewer-show', $planDoc->id) }}">
+    <i class="ti ti-target me-2"></i> View Plan
+    </a>
+    @endif
+    @if($reportDoc)
+    <a class="dropdown-item" href="{{ route('documents.reviewer-show', $reportDoc->id) }}">
+    <i class="ti ti-activity me-2"></i> View Report
+    </a>
+    @endif
+</x-table-action-dropdown>
                                                 @else
                                                     <span class="text-muted">—</span>
                                                 @endif
@@ -315,26 +311,20 @@
                                                     </td>
                                                     <td class="text-center">
                                                         <x-table-action-dropdown>
-                                                            @if($document->type === \App\Models\Document::TYPE_ACTION_LOG)
-                                                                <li>
-                                                                    <a class="dropdown-item" href="{{ route('action-logs.show', $document->id) }}">
-                                                                        <i class="ti ti-eye me-2"></i> View
-                                                                    </a>
-                                                                </li>
-                                                            @elseif(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true))
-                                                                <li>
-                                                                    <a class="dropdown-item" href="{{ route('documents.reviewer-show', $document->id) }}">
-                                                                        <i class="ti ti-eye me-2"></i> View
-                                                                    </a>
-                                                                </li>
-                                                            @else
-                                                                <li>
-                                                                    <a class="dropdown-item" href="{{ route('documents.show', $document->id) }}">
-                                                                        <i class="ti ti-eye me-2"></i> View
-                                                                    </a>
-                                                                </li>
-                                                            @endif
-                                                        </x-table-action-dropdown>
+    @if($document->type === \App\Models\Document::TYPE_ACTION_LOG)
+    <a class="dropdown-item" href="{{ route('action-logs.show', $document->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @elseif(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true))
+    <a class="dropdown-item" href="{{ route('documents.reviewer-show', $document->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @else
+    <a class="dropdown-item" href="{{ route('documents.show', $document->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @endif
+</x-table-action-dropdown>
                                                     </td>
                                                 </tr>
                                             @endforeach

@@ -188,31 +188,25 @@
                                             </td>
                                             <td class="text-center">
                                                 <x-table-action-dropdown>
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ route('work-periods.show', $period->id) }}">
-                                                            <i class="ti ti-eye me-2"></i> View
-                                                        </a>
-                                                    </li>
-                                                    @if(Auth::user()->hasPermissionTo('manage work periods'))
-                                                        <li>
-                                                            <a class="dropdown-item" href="{{ route('work-periods.edit', $period->id) }}">
-                                                                <i class="ti ti-edit me-2"></i> Edit
-                                                            </a>
-                                                        </li>
-                                                        @if($period->status === 'open')
-                                                            <li>
-                                                                <form action="{{ route('work-periods.close', $period->id) }}"
-                                                                      method="POST"
-                                                                      onsubmit="return confirm('Are you sure you want to close this period?');">
-                                                                    @csrf
-                                                                    <button type="submit" class="dropdown-item">
-                                                                        <i class="ti ti-lock me-2"></i> Close
-                                                                    </button>
-                                                                </form>
-                                                            </li>
-                                                        @endif
-                                                    @endif
-                                                </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('work-periods.show', $period->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @if(Auth::user()->hasPermissionTo('manage work periods'))
+    <a class="dropdown-item" href="{{ route('work-periods.edit', $period->id) }}">
+    <i class="ti ti-edit me-2"></i> Edit
+    </a>
+    @if($period->status === 'open')
+    <form action="{{ route('work-periods.close', $period->id) }}"
+    method="POST"
+    onsubmit="return confirm('Are you sure you want to close this period?');">
+    @csrf
+    <button type="submit" class="dropdown-item">
+    <i class="ti ti-lock me-2"></i> Close
+    </button>
+    </form>
+    @endif
+    @endif
+</x-table-action-dropdown>
                                             </td>
                                         </tr>
                                     @endforeach

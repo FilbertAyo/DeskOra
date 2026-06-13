@@ -49,12 +49,10 @@
                                         <td class="text-center">{{ $plan->activities_count }}</td>
                                         <td class="text-center">
                                             <x-table-action-dropdown label="Open">
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ route('year-plan.show', $plan->year) }}">
-                                                        <i class="ti ti-eye me-2"></i> Open
-                                                    </a>
-                                                </li>
-                                            </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('year-plan.show', $plan->year) }}">
+    <i class="ti ti-eye me-2"></i> Open
+    </a>
+</x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

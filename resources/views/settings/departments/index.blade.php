@@ -84,31 +84,25 @@
                                         </td>
                                         <td class="text-center">
                                             <x-table-action-dropdown>
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ route('department.show', $department->id) }}">
-                                                        <i class="ti ti-eye me-2"></i> View
-                                                    </a>
-                                                </li>
-                                                @can('manage departments')
-                                                    <li>
-                                                        <button type="button" class="dropdown-item edit-btn"
-                                                            data-id="{{ $department->id }}"
-                                                            data-name="{{ $department->name }}"
-                                                            data-status="{{ $department->status }}"
-                                                            data-parent-id="{{ $department->parent_id }}"
-                                                            data-head-user-id="{{ $department->head_user_id }}">
-                                                            <i class="ti ti-edit me-2"></i> Edit
-                                                        </button>
-                                                    </li>
-                                                    <li>
-                                                        <button type="button" class="dropdown-item text-danger delete-btn"
-                                                            data-id="{{ $department->id }}"
-                                                            data-name="{{ $department->name }}">
-                                                            <i class="ti ti-trash me-2"></i> Delete
-                                                        </button>
-                                                    </li>
-                                                @endcan
-                                            </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('department.show', $department->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @can('manage departments')
+    <button type="button" class="dropdown-item edit-btn"
+    data-id="{{ $department->id }}"
+    data-name="{{ $department->name }}"
+    data-status="{{ $department->status }}"
+    data-parent-id="{{ $department->parent_id }}"
+    data-head-user-id="{{ $department->head_user_id }}">
+    <i class="ti ti-edit me-2"></i> Edit
+    </button>
+    <button type="button" class="dropdown-item text-danger delete-btn"
+    data-id="{{ $department->id }}"
+    data-name="{{ $department->name }}">
+    <i class="ti ti-trash me-2"></i> Delete
+    </button>
+    @endcan
+</x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

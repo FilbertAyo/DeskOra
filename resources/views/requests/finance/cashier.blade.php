@@ -68,19 +68,17 @@
                                                 <td>{{ $deposit->user->name }}</td>
                                                 <td>
                                                     <x-table-action-dropdown>
-                                                        <li>
-                                                            <button type="button" class="dropdown-item"
-                                                                data-toggle="modal" data-target="#depositDetailModal"
-                                                                data-deposit="{{ number_format($deposit->deposit, 0, '.', ',') }}/="
-                                                                data-remaining="{{ number_format($deposit->remaining, 0, '.', ',') }}/="
-                                                                data-date="{{ $deposit->created_at }}"
-                                                                data-by="{{ $deposit->user->name }}"
-                                                                data-description="{{ $deposit->description ?? 'No description provided' }}"
-                                                                onclick="openDepositModal('{{ number_format($deposit->deposit, 0, '.', ',') }}/=', '{{ number_format($deposit->remaining, 0, '.', ',') }}/=', '{{ $deposit->created_at }}', '{{ $deposit->user->name }}', '{{ $deposit->description ?? 'No description provided' }}')">
-                                                                <i class="ti ti-eye me-2"></i> View
-                                                            </button>
-                                                        </li>
-                                                    </x-table-action-dropdown>
+    <button type="button" class="dropdown-item"
+    data-toggle="modal" data-target="#depositDetailModal"
+    data-deposit="{{ number_format($deposit->deposit, 0, '.', ',') }}/="
+    data-remaining="{{ number_format($deposit->remaining, 0, '.', ',') }}/="
+    data-date="{{ $deposit->created_at }}"
+    data-by="{{ $deposit->user->name }}"
+    data-description="{{ $deposit->description ?? 'No description provided' }}"
+    onclick="openDepositModal('{{ number_format($deposit->deposit, 0, '.', ',') }}/=', '{{ number_format($deposit->remaining, 0, '.', ',') }}/=', '{{ $deposit->created_at }}', '{{ $deposit->user->name }}', '{{ $deposit->description ?? 'No description provided' }}')">
+    <i class="ti ti-eye me-2"></i> View
+    </button>
+</x-table-action-dropdown>
                                                 </td>
                                             </tr>
                                         @endforeach

@@ -122,15 +122,13 @@
                                         </td>
                                         <td class="text-center">
                                             <x-table-action-dropdown>
-                                                <li>
-                                                    <button type="button"
-                                                            class="dropdown-item"
-                                                            data-bs-toggle="modal"
-                                                            data-bs-target="#anonymousFeedbackModal{{ $row->id }}">
-                                                        <i class="ti ti-eye me-2"></i> View
-                                                    </button>
-                                                </li>
-                                            </x-table-action-dropdown>
+    <button type="button"
+    class="dropdown-item"
+    data-bs-toggle="modal"
+    data-bs-target="#anonymousFeedbackModal{{ $row->id }}">
+    <i class="ti ti-eye me-2"></i> View
+    </button>
+</x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

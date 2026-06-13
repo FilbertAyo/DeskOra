@@ -59,22 +59,18 @@
                                         </td>
                                         <td class="text-center">
                                             <x-table-action-dropdown>
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ route('roles.edit', $role) }}">
-                                                        <i class="ti ti-edit me-2"></i> Edit
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <form action="{{ route('roles.destroy', $role) }}" method="POST"
-                                                        onsubmit="return confirm('Delete this role?');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="dropdown-item text-danger">
-                                                            <i class="ti ti-trash me-2"></i> Delete
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                            </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('roles.edit', $role) }}">
+    <i class="ti ti-edit me-2"></i> Edit
+    </a>
+    <form action="{{ route('roles.destroy', $role) }}" method="POST"
+    onsubmit="return confirm('Delete this role?');">
+    @csrf
+    @method('DELETE')
+    <button type="submit" class="dropdown-item text-danger">
+    <i class="ti ti-trash me-2"></i> Delete
+    </button>
+    </form>
+</x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

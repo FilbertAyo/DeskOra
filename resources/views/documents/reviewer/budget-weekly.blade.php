@@ -254,15 +254,13 @@
                                                     <td class="text-center">
                                                         @if($canProcessStage)
                                                             <x-table-action-dropdown label="{{ $nextStage === 'authorize' ? 'Authorize' : ucfirst($nextStage) }}">
-                                                                <li>
-                                                                    <button type="button" class="dropdown-item"
-                                                                        data-bs-toggle="modal"
-                                                                        data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
-                                                                        <i class="ti ti-check me-2"></i>
-                                                                        {{ $nextStage === 'authorize' ? 'Final Authorize' : ucfirst($nextStage) }}
-                                                                    </button>
-                                                                </li>
-                                                            </x-table-action-dropdown>
+    <button type="button" class="dropdown-item"
+    data-bs-toggle="modal"
+    data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
+    <i class="ti ti-check me-2"></i>
+    {{ $nextStage === 'authorize' ? 'Final Authorize' : ucfirst($nextStage) }}
+    </button>
+</x-table-action-dropdown>
                                                         @else
                                                             <span class="text-muted">—</span>
                                                         @endif

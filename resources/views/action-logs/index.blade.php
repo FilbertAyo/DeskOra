@@ -204,19 +204,15 @@
                                             </td>
                                             <td class="text-center">
                                                 <x-table-action-dropdown>
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ route('action-logs.show', $document->id) }}">
-                                                            <i class="ti ti-eye me-2"></i> View
-                                                        </a>
-                                                    </li>
-                                                    @can('update', $document)
-                                                        <li>
-                                                            <a class="dropdown-item" href="{{ route('action-logs.edit', $document->id) }}">
-                                                                <i class="ti ti-edit me-2"></i> Edit
-                                                            </a>
-                                                        </li>
-                                                    @endcan
-                                                </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('action-logs.show', $document->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @can('update', $document)
+    <a class="dropdown-item" href="{{ route('action-logs.edit', $document->id) }}">
+    <i class="ti ti-edit me-2"></i> Edit
+    </a>
+    @endcan
+</x-table-action-dropdown>
                                             </td>
                                         </tr>
                                     @endforeach

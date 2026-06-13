@@ -87,22 +87,18 @@
                                         <td class="small text-muted">{{ optional($matrix->updated_at)->diffForHumans() }}</td>
                                         <td>
                                             <x-table-action-dropdown>
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ route('matrix-report.edit', $matrix) }}">
-                                                        <i class="ti ti-eye me-2"></i> Open
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <form method="POST" action="{{ route('matrix-report.destroy', $matrix) }}"
-                                                          onsubmit="return confirm('Delete this matrix?');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="dropdown-item text-danger">
-                                                            <i class="ti ti-trash me-2"></i> Delete
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                            </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('matrix-report.edit', $matrix) }}">
+    <i class="ti ti-eye me-2"></i> Open
+    </a>
+    <form method="POST" action="{{ route('matrix-report.destroy', $matrix) }}"
+    onsubmit="return confirm('Delete this matrix?');">
+    @csrf
+    @method('DELETE')
+    <button type="submit" class="dropdown-item text-danger">
+    <i class="ti ti-trash me-2"></i> Delete
+    </button>
+    </form>
+</x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @endforeach

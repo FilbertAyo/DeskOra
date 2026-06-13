@@ -127,19 +127,15 @@
                                         </td>
                                         <td class="text-center">
                                             <x-table-action-dropdown>
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ route('admin.show', $u->id) }}">
-                                                        <i class="ti ti-eye me-2"></i> View
-                                                    </a>
-                                                </li>
-                                                @can('users management settings')
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ route('admin.edit', $u->id) }}">
-                                                            <i class="ti ti-edit me-2"></i> Edit
-                                                        </a>
-                                                    </li>
-                                                @endcan
-                                            </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('admin.show', $u->id) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @can('users management settings')
+    <a class="dropdown-item" href="{{ route('admin.edit', $u->id) }}">
+    <i class="ti ti-edit me-2"></i> Edit
+    </a>
+    @endcan
+</x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

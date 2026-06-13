@@ -1,16 +1,11 @@
 @props(['label' => 'Actions'])
 
-<div class="text-center text-sm-start">
-    <div class="btn-group btn-group-sm">
-        <button type="button"
-                class="btn btn-light-secondary dropdown-toggle"
-                data-bs-toggle="dropdown"
-                data-bs-display="static"
-                aria-expanded="false">
-            {{ $label }}
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-lg-start">
-            {{ $slot }}
-        </ul>
+<div class="btn-group-dropdown">
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+            data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        {{ $label }}
+    </button>
+    <div class="dropdown-menu">
+        {{ $slot }}
     </div>
 </div>

@@ -135,12 +135,10 @@
                                             </td>
                                             <td class="text-center">
                                                 <x-table-action-dropdown>
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ $doc->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $doc) : route('documents.show', $doc) }}">
-                                                            <i class="ti ti-eye me-2"></i> View
-                                                        </a>
-                                                    </li>
-                                                </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ $doc->type === \App\Models\Document::TYPE_ACTION_LOG ? route('action-logs.show', $doc) : route('documents.show', $doc) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+</x-table-action-dropdown>
                                             </td>
                                         </tr>
                                     @endforeach

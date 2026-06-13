@@ -216,21 +216,17 @@
                                                 <td class="text-center">
                                                     @if($planDoc || $reportDoc)
                                                         <x-table-action-dropdown>
-                                                            @if($planDoc)
-                                                                <li>
-                                                                    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}">
-                                                                        <i class="ti ti-target me-2"></i> View Plan
-                                                                    </a>
-                                                                </li>
-                                                            @endif
-                                                            @if($reportDoc)
-                                                                <li>
-                                                                    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}">
-                                                                        <i class="ti ti-activity me-2"></i> View Report
-                                                                    </a>
-                                                                </li>
-                                                            @endif
-                                                        </x-table-action-dropdown>
+    @if($planDoc)
+    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}">
+    <i class="ti ti-target me-2"></i> View Plan
+    </a>
+    @endif
+    @if($reportDoc)
+    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}">
+    <i class="ti ti-activity me-2"></i> View Report
+    </a>
+    @endif
+</x-table-action-dropdown>
                                                     @else
                                                         <span class="text-muted">—</span>
                                                     @endif

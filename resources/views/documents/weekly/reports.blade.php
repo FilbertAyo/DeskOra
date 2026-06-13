@@ -197,31 +197,25 @@
                                             </td>
                                             <td class="text-center">
                                                 <x-table-action-dropdown>
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
-                                                            <i class="ti ti-eye me-2"></i> View
-                                                        </a>
-                                                    </li>
-                                                    @if($document->canBeEdited())
-                                                        <li>
-                                                            <a class="dropdown-item" href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
-                                                                <i class="ti ti-edit me-2"></i> Edit
-                                                            </a>
-                                                        </li>
-                                                    @endif
-                                                    @if($document->period)
-                                                        @php
-                                                            $relatedPlan = $document->relatedWeeklyDocument();
-                                                        @endphp
-                                                        @if($relatedPlan)
-                                                            <li>
-                                                                <a class="dropdown-item" href="{{ route('documents.show', ['document' => $relatedPlan->id, 'return_to' => request()->fullUrl()]) }}">
-                                                                    <i class="ti ti-target me-2"></i> View Related Plan
-                                                                </a>
-                                                            </li>
-                                                        @endif
-                                                    @endif
-                                                </x-table-action-dropdown>
+    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
+    <i class="ti ti-eye me-2"></i> View
+    </a>
+    @if($document->canBeEdited())
+    <a class="dropdown-item" href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
+    <i class="ti ti-edit me-2"></i> Edit
+    </a>
+    @endif
+    @if($document->period)
+    @php
+    $relatedPlan = $document->relatedWeeklyDocument();
+    @endphp
+    @if($relatedPlan)
+    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $relatedPlan->id, 'return_to' => request()->fullUrl()]) }}">
+    <i class="ti ti-target me-2"></i> View Related Plan
+    </a>
+    @endif
+    @endif
+</x-table-action-dropdown>
                                             </td>
                                         </tr>
                                     @endforeach
