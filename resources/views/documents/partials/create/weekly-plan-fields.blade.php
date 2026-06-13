@@ -108,6 +108,9 @@
                                     <input type="hidden"
                                         name="content[planned_activities][{{ $i }}][activity_uid]"
                                         value="{{ old("content.planned_activities.$i.activity_uid", $activityRow['activity_uid'] ?? '') }}">
+                                    <input type="hidden"
+                                        name="content[planned_activities][{{ $i }}][carry_over_source_weekly_report_id]"
+                                        value="{{ old("content.planned_activities.$i.carry_over_source_weekly_report_id", $activityRow['carry_over_source_weekly_report_id'] ?? '') }}">
                                     <textarea class="form-control" rows="5"
                                         name="content[planned_activities][{{ $i }}][activity]"
                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $activityRow['activity'] ?? '') }}</textarea>

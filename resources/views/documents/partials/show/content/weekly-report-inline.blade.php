@@ -101,7 +101,8 @@
                                                                     $activityOutputRaw = trim((string) ($row['activity_output'] ?? ''));
                                                                     $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
                                                                     $activityOutputDisplay = $activityOutputRaw;
-                                                                    $carryToNextPlan = in_array(trim((string) ($row['progress'] ?? '')), ['Not started', 'Partially done'], true);
+                                                                    $carryToNextPlan = trim((string) ($row['progress'] ?? '')) === 'Partially done'
+                                                                        || (bool) ($row['carry_to_next_plan'] ?? false);
                                                                     if ($activityOutputRaw === '__off_plan__') {
                                                                         $activityOutputDisplay = $offPlanActivity !== '' ? ('Other (Not on Plan): '.$offPlanActivity) : 'Other (Not on Plan)';
                                                                     } elseif ($activityOutputRaw === '' && $offPlanActivity !== '') {

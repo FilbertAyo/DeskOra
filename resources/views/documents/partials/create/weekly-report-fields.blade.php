@@ -209,13 +209,21 @@
                                     <select class="form-select"
                                         name="content[activity_progress][{{ $i }}][progress]">
                                         <option value="">-- Select --</option>
-                                        @foreach(['Not started','In progress','Done','Partially done'] as $opt)
-                                            <option value="{{ $opt }}" {{ old("content.activity_progress.$i.progress", $row['progress'] ?? '') === $opt ? 'selected' : '' }}>
-                                                {{ $opt }}
-                                            </option>
+                                        @php
+                                            $cur = old("content.activity_progress.$i.progress", $row['progress'] ?? '');
+                                            $progressOptions = [
+                                                'Done' => 'Done',
+                                                'Partially done' => 'Carry to next week',
+                                                'Not done' => 'Not done',
+                                            ];
+                                        @endphp
+                                        @foreach($progressOptions as $value => $label)
+                                            <option value="{{ $value }}" {{ $cur === $value ? 'selected' : '' }}>{{ $label }}</option>
                                         @endforeach
+                                        @if($cur !== '' && ! array_key_exists($cur, $progressOptions))
+                                            <option value="{{ $cur }}" selected>{{ $cur }}</option>
+                                        @endif
                                     </select>
-                                    <small class="text-muted">Not started or partially done activities are carried to next weekly plan.</small>
                                 </td>
                                 <td>
                                     <textarea class="form-control" rows="5"

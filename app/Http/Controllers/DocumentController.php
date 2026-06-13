@@ -462,7 +462,7 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not done,Not started,In progress'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 
@@ -1174,7 +1174,7 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not done,Not started,In progress'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 
@@ -3082,7 +3082,7 @@ class DocumentController extends Controller
                     $offPlanActivity = '';
                 }
                 $progress = trim((string) ($row['progress'] ?? ''));
-                $row['carry_to_next_plan'] = in_array($progress, ['Not started', 'Partially done'], true);
+                $row['carry_to_next_plan'] = $progress === 'Partially done';
 
                 $row['activity_output'] = $activityOutput;
                 $row['off_plan_activity'] = $offPlanActivity;
@@ -3326,7 +3326,7 @@ class DocumentController extends Controller
             }
 
             $progress = trim((string) ($row['progress'] ?? ''));
-            if (! in_array($progress, ['Not started', 'Partially done'], true)) {
+            if ($progress !== 'Partially done') {
                 continue;
             }
 
@@ -3336,6 +3336,7 @@ class DocumentController extends Controller
             $activity = '';
             $location = '';
             $teamMemberIds = [];
+            $sourceActivityUid = '';
 
             if ($activityOutput === '__off_plan__') {
                 $activity = $offPlanActivity;
@@ -3345,6 +3346,7 @@ class DocumentController extends Controller
                 $activity = trim((string) ($sourceRow['activity'] ?? ''));
                 $location = trim((string) ($sourceRow['location'] ?? ''));
                 $teamMemberIds = is_array($sourceRow['team_member_ids'] ?? null) ? array_values(array_filter($sourceRow['team_member_ids'])) : [];
+                $sourceActivityUid = trim((string) ($sourceRow['activity_uid'] ?? ''));
             } else {
                 $activity = $activityOutput;
                 if (str_contains($activityOutput, ' - ')) {
@@ -3374,7 +3376,7 @@ class DocumentController extends Controller
             }
 
             $carriedRows[] = [
-                'activity_uid' => (string) Str::ulid(),
+                'activity_uid' => $sourceActivityUid !== '' ? $sourceActivityUid : (string) Str::ulid(),
                 'day' => $day,
                 'activity' => $activity,
                 'location' => $location,
@@ -3777,35 +3779,56 @@ class DocumentController extends Controller
         $domainWeeklyReportId = optional($weeklyReport->weeklyReportDomain)->id;
         $nextPlanContent = is_array($nextPlan->content) ? $nextPlan->content : [];
         $existingActivities = is_array($nextPlanContent['planned_activities'] ?? null) ? $nextPlanContent['planned_activities'] : [];
-        $existingActivities = array_values(array_filter($existingActivities, function ($row) use ($weeklyReport, $domainWeeklyReportId) {
-            if (! is_array($row)) {
-                return false;
-            }
-
-            $domainMatch = $domainWeeklyReportId !== null
-                && trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) === (string) $domainWeeklyReportId;
-
-            return ! $domainMatch;
-        }));
 
         $carriedRows = $this->buildCarriedActivitiesFromWeeklyReport($weeklyReport);
+        $carriedByUid = [];
+        foreach ($carriedRows as $carriedRow) {
+            if (! is_array($carriedRow)) {
+                continue;
+            }
+            $uid = trim((string) ($carriedRow['activity_uid'] ?? ''));
+            if ($uid !== '') {
+                $carriedByUid[$uid] = $carriedRow;
+            }
+        }
+
+        $mergedActivities = [];
         $existingKeys = [];
         foreach ($existingActivities as $existingRow) {
             if (! is_array($existingRow)) {
                 continue;
             }
+
+            $carrySource = trim((string) ($existingRow['carry_over_source_weekly_report_id'] ?? ''));
+            $uid = trim((string) ($existingRow['activity_uid'] ?? ''));
+            if (
+                $domainWeeklyReportId !== null
+                && $carrySource === (string) $domainWeeklyReportId
+                && $uid !== ''
+                && isset($carriedByUid[$uid])
+            ) {
+                unset($carriedByUid[$uid]);
+            } elseif (
+                $domainWeeklyReportId !== null
+                && $carrySource === (string) $domainWeeklyReportId
+            ) {
+                continue;
+            }
+
+            $mergedActivities[] = $existingRow;
             $existingKeys[mb_strtolower(trim((string) ($existingRow['day'] ?? '')).'|'.trim((string) ($existingRow['activity'] ?? '')))] = true;
         }
-        foreach ($carriedRows as $carriedRow) {
+
+        foreach ($carriedByUid as $carriedRow) {
             $rowKey = mb_strtolower(trim((string) ($carriedRow['day'] ?? '')).'|'.trim((string) ($carriedRow['activity'] ?? '')));
             if (isset($existingKeys[$rowKey])) {
                 continue;
             }
-            $existingActivities[] = $carriedRow;
+            $mergedActivities[] = $carriedRow;
             $existingKeys[$rowKey] = true;
         }
 
-        $nextPlanContent['planned_activities'] = $this->ensureWeeklyPlanActivityUids($existingActivities);
+        $nextPlanContent['planned_activities'] = $this->ensureWeeklyPlanActivityUids($mergedActivities);
         $nextPlanContent = $this->normalizeTemplateContent($nextPlanContent, Document::TYPE_WEEKLY_PLAN);
         $nextPlan->update(['content' => $nextPlanContent]);
         $this->documentDomainSyncService->syncFromDocument($nextPlan);

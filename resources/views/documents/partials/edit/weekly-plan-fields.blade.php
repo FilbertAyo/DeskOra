@@ -103,15 +103,24 @@
 
                                                             $carryRows = is_array($carriedActivities ?? null) ? $carriedActivities : [];
                                                             $activityKeys = [];
+                                                            $activityUids = [];
                                                             foreach ($activityRows as $existingRow) {
                                                                 if (!is_array($existingRow)) {
                                                                     continue;
                                                                 }
                                                                 $activityKey = mb_strtolower(trim((string) ($existingRow['day'] ?? '')).'|'.trim((string) ($existingRow['activity'] ?? '')));
                                                                 $activityKeys[$activityKey] = true;
+                                                                $existingUid = trim((string) ($existingRow['activity_uid'] ?? ''));
+                                                                if ($existingUid !== '') {
+                                                                    $activityUids[$existingUid] = true;
+                                                                }
                                                             }
                                                             foreach ($carryRows as $carryRow) {
                                                                 if (!is_array($carryRow)) {
+                                                                    continue;
+                                                                }
+                                                                $carryUid = trim((string) ($carryRow['activity_uid'] ?? ''));
+                                                                if ($carryUid !== '' && isset($activityUids[$carryUid])) {
                                                                     continue;
                                                                 }
                                                                 $carryKey = mb_strtolower(trim((string) ($carryRow['day'] ?? '')).'|'.trim((string) ($carryRow['activity'] ?? '')));
@@ -120,6 +129,9 @@
                                                                 }
                                                                 $activityRows[] = $carryRow;
                                                                 $activityKeys[$carryKey] = true;
+                                                                if ($carryUid !== '') {
+                                                                    $activityUids[$carryUid] = true;
+                                                                }
                                                             }
 
                                                             if (empty($activityRows)) {
@@ -141,6 +153,9 @@
                                                                     <input type="hidden"
                                                                         name="content[planned_activities][{{ $i }}][activity_uid]"
                                                                         value="{{ old("content.planned_activities.$i.activity_uid", $row['activity_uid'] ?? '') }}">
+                                                                    <input type="hidden"
+                                                                        name="content[planned_activities][{{ $i }}][carry_over_source_weekly_report_id]"
+                                                                        value="{{ old("content.planned_activities.$i.carry_over_source_weekly_report_id", $row['carry_over_source_weekly_report_id'] ?? '') }}">
                                                                     <textarea class="form-control" rows="5"
                                                                         name="content[planned_activities][{{ $i }}][activity]"
                                                                         placeholder="Activity">{{ old("content.planned_activities.$i.activity", $row['activity'] ?? '') }}</textarea>

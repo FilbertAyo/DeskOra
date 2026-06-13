@@ -440,7 +440,7 @@
                                 <option value="Saturday">Saturday</option>
                             </select>
                         </td>
-                        <td><input type="hidden" name="content[planned_activities][${activityIndex}][activity_uid]" value=""><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
+                        <td><input type="hidden" name="content[planned_activities][${activityIndex}][activity_uid]" value=""><input type="hidden" name="content[planned_activities][${activityIndex}][carry_over_source_weekly_report_id]" value=""><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][activity]" placeholder="Activity"></textarea></td>
                         <td>
                             <select class="form-select" name="content[planned_activities][${activityIndex}][location]">
                                 <option value="">-- Select --</option>
@@ -558,10 +558,9 @@
                         <td>
                             <select class="form-select" name="content[activity_progress][${reportActivityIndex}][progress]">
                                 <option value="">-- Select --</option>
-                                <option value="Not started">Not started</option>
-                                <option value="In progress">In progress</option>
                                 <option value="Done">Done</option>
-                                <option value="Partially done">Partially done</option>
+                                <option value="Partially done">Carry to next week</option>
+                                <option value="Not done">Not done</option>
                             </select>
                         </td>
                         <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][remarks_challenges]" placeholder="Remarks/Challenges"></textarea></td>
