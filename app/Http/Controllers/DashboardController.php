@@ -456,14 +456,13 @@ class DashboardController extends Controller
 
     private function buildActionLogProgressForUser(User $user): array
     {
-        $isActionLogManager = $user->hasAnyPermission(['create action logs', 'manage action logs']);
+        $canManageActionLogs = $user->hasPermissionTo('manage action logs');
         $documentsQuery = Document::with('period')
             ->actionLogs()
             ->whereNotNull('period_id');
 
-        $documents = $isActionLogManager
-            ? $documentsQuery->forUser($user->id)->get()
-            // Regular staff only see tasks from submitted logs; drafts stay manager-only.
+        $documents = $canManageActionLogs
+            ? $documentsQuery->get()
             : $documentsQuery->where('state', Document::STATE_SUBMITTED)->get()
                 ->filter(fn (Document $document) => $this->isUserAssignedToActionLog($user, $document))->values();
 
@@ -601,7 +600,7 @@ class DashboardController extends Controller
 
         return [
             'activeTasks' => $activeTasks,
-            'currentDraftId' => $isActionLogManager ? $currentDraftDoc?->id : null,
+            'currentDraftId' => $canManageActionLogs ? $currentDraftDoc?->id : null,
             'showNotifications' => ! empty($activeTasks),
         ];
     }

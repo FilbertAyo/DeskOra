@@ -23,7 +23,7 @@ class DocumentPolicy
      *
      * Rules:
      * - Submitted documents: Any authenticated user may view (org-wide transparency).
-     * - Drafts: Owner, weekly collaborators, reviewers/admins, or action-log assignees/managers as below.
+     * - Draft action logs: Only users with manage action logs, or the draft creator.
      */
     public function view(User $user, Document $document): bool
     {
@@ -32,12 +32,10 @@ class DocumentPolicy
         }
 
         if ($document->type === Document::TYPE_ACTION_LOG) {
-            // Drafts stay hidden from regular staff until the log is submitted.
-            // Only action-log managers (manage/create action logs), the creator,
-            // or users with org-wide visibility can preview an unsubmitted draft.
-            return $user->hasPermissionTo('view all documents')
-                || $this->isActionLogManager($user)
-                || $document->user_id === $user->id;
+            // Draft action logs are visible only to users with manage action logs,
+            // or the user who created the draft (e.g. after saving a new weekly log).
+            return $user->hasPermissionTo('manage action logs')
+                || (string) $document->user_id === (string) $user->id;
         }
 
         // User owns the document

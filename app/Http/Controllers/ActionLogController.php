@@ -48,42 +48,30 @@ class ActionLogController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $canViewAllActionLogs = $user->hasAnyPermission(['create action logs', 'manage action logs', 'view action logs', 'view all documents']);
+        $canManageActionLogs = $user->hasPermissionTo('manage action logs');
         $query = Document::with(['user', 'period'])->actionLogs();
 
-        // Filter by state if provided
-        if ($request->has('state') && $request->state) {
-            $query->ofState($request->state);
-        }
+        if ($canManageActionLogs) {
+            // Managers see every action log (draft + submitted) and may filter by state.
+            if ($request->filled('state')) {
+                $query->ofState($request->state);
+            }
 
-        if ($canViewAllActionLogs) {
             $documents = $query->latest()->paginate(15)->withQueryString();
         } else {
-            // Regular staff only see submitted action logs they are assigned to.
-            // Unsubmitted drafts stay hidden until a manager submits them.
-            $assignedDocs = $query->ofState(Document::STATE_SUBMITTED)->latest()->get()->filter(function (Document $document) use ($user) {
-                return $this->isUserAssignedToActionLog($user, $document);
-            })->values();
-
-            $perPage = 15;
-            $currentPage = (int) $request->input('page', 1);
-            $offset = max(0, ($currentPage - 1) * $perPage);
-            $pageItems = $assignedDocs->slice($offset, $perPage)->values();
-
-            $documents = new \Illuminate\Pagination\LengthAwarePaginator(
-                $pageItems,
-                $assignedDocs->count(),
-                $perPage,
-                $currentPage,
-                ['path' => $request->url(), 'query' => $request->query()]
-            );
-
-            if ($documents->total() === 0) {
-                abort(403, 'Unauthorized access. You are not assigned to any action log tasks.');
+            // Everyone else only sees submitted logs. Drafts stay hidden until submitted.
+            if ($request->filled('state') && $request->state !== Document::STATE_SUBMITTED) {
+                abort(403, 'You do not have permission to view draft action logs.');
             }
+
+            $documents = $query
+                ->ofState(Document::STATE_SUBMITTED)
+                ->latest()
+                ->paginate(15)
+                ->withQueryString();
         }
 
-        return view('action-logs.index', compact('documents'));
+        return view('action-logs.index', compact('documents', 'canManageActionLogs'));
     }
 
     /**

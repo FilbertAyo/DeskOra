@@ -13,9 +13,11 @@
                       </div>
 
                         <div class="col-auto d-flex align-items-center gap-2">
-                            <a href="{{ route('action-logs.create') }}" class="btn btn-primary btn-sm">
-                                <i class="ti ti-plus-circle me-1"></i> Open Current Week Log
-                            </a>
+                            @if(($canManageActionLogs ?? false) || auth()->user()->hasPermissionTo('create action logs'))
+                                <a href="{{ route('action-logs.create') }}" class="btn btn-primary btn-sm">
+                                    <i class="ti ti-plus-circle me-1"></i> Open Current Week Log
+                                </a>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -67,8 +69,20 @@
         <div class="col-md-4 mb-2">
             <div class="card shadow-none border h-100">
                 <div class="card-body py-3">
-                    <span class="text-muted d-block">Draft / Submitted</span>
-                    <h4 class="mb-0">{{ $draftCount }} / {{ $submittedCount }}</h4>
+                    <span class="text-muted d-block">
+                        @if($canManageActionLogs ?? false)
+                            Draft / Submitted
+                        @else
+                            Submitted Logs
+                        @endif
+                    </span>
+                    <h4 class="mb-0">
+                        @if($canManageActionLogs ?? false)
+                            {{ $draftCount }} / {{ $submittedCount }}
+                        @else
+                            {{ $submittedCount }}
+                        @endif
+                    </h4>
                 </div>
             </div>
         </div>
@@ -91,20 +105,24 @@
                             <h5 class="mb-0"><i class="ti ti-list-details me-2"></i>Weekly Action Log Register</h5>
                         </div>
                         <div class="col-md-6 text-right">
-                            <div class="btn-group btn-group-sm" role="group">
-                                <a href="{{ route('action-logs.index') }}" 
-                                   class="btn {{ !request('state') ? 'btn-primary' : 'btn-light' }}">
-                                    All
-                                </a>
-                                <a href="{{ route('action-logs.index', ['state' => 'draft']) }}" 
-                                   class="btn {{ request('state') == 'draft' ? 'btn-primary' : 'btn-light' }}">
-                                    Drafts
-                                </a>
-                                <a href="{{ route('action-logs.index', ['state' => 'submitted']) }}" 
-                                   class="btn {{ request('state') == 'submitted' ? 'btn-primary' : 'btn-light' }}">
-                                    Submitted
-                                </a>
-                            </div>
+                            @if($canManageActionLogs ?? false)
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{{ route('action-logs.index') }}"
+                                       class="btn {{ !request('state') ? 'btn-primary' : 'btn-light' }}">
+                                        All
+                                    </a>
+                                    <a href="{{ route('action-logs.index', ['state' => 'draft']) }}"
+                                       class="btn {{ request('state') == 'draft' ? 'btn-primary' : 'btn-light' }}">
+                                        Drafts
+                                    </a>
+                                    <a href="{{ route('action-logs.index', ['state' => 'submitted']) }}"
+                                       class="btn {{ request('state') == 'submitted' ? 'btn-primary' : 'btn-light' }}">
+                                        Submitted
+                                    </a>
+                                </div>
+                            @else
+                                <span class="badge bg-success">Submitted action logs only</span>
+                            @endif
                         </div>
                     </div>
                 </div>

@@ -53,13 +53,11 @@
                                 <span class="pc-mtext">Weekly Reports</span>
                             </a>
                         </li>
-                        @if(Auth::user()->hasAnyPermission(['view action logs', 'manage action logs', 'create action logs']))
-                            <li class="{{ Request::routeIs('action-logs.*') ? 'active' : '' }}">
-                                <a href="{{ route('action-logs.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Action Log</span>
-                                </a>
-                            </li>
-                        @endif
+                        <li class="{{ Request::routeIs('action-logs.*') ? 'active' : '' }}">
+                            <a href="{{ route('action-logs.index') }}" class="pc-link">
+                                <span class="pc-mtext">Action Log</span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
 
