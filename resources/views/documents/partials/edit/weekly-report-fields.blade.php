@@ -217,7 +217,7 @@
                                                                             $progressOptions = [
                                                                                 'Done' => 'Done',
                                                                                 'Partially done' => 'Carry to next week',
-                                                                                'Not done' => 'Not done',
+                                                                                'Not started' => 'Not done',
                                                                             ];
                                                                         @endphp
                                                                         @foreach($progressOptions as $value => $label)

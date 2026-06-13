@@ -110,11 +110,19 @@
                                                                     }
                                                                 @endphp
                                                                 @if(!$apEmpty)
-                                                                    @php $apNum++; @endphp
+                                                                    @php
+                                                                        $apNum++;
+                                                                        $progressRaw = trim((string) ($row['progress'] ?? ''));
+                                                                        $progressDisplay = match ($progressRaw) {
+                                                                            'Partially done' => 'Carry to next week',
+                                                                            'Not started' => 'Not done',
+                                                                            default => $progressRaw,
+                                                                        };
+                                                                    @endphp
                                                                     <tr>
                                                                         <td class="text-center">{{ $apNum }}</td>
                                                                         <td>{{ $activityOutputDisplay }}</td>
-                                                                        <td>{{ $row['progress'] ?? '' }}</td>
+                                                                        <td>{{ $progressDisplay }}</td>
                                                                         <td>{{ $row['remarks_challenges'] ?? '' }}</td>
                                                                         <td>
                                                                             {{ $row['next_step'] ?? '' }}

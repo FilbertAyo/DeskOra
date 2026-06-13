@@ -462,7 +462,7 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not done,Not started,In progress'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not started,In progress'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 
@@ -1174,7 +1174,7 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not done,Not started,In progress'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not started,In progress'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 

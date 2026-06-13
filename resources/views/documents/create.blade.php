@@ -560,7 +560,7 @@
                                 <option value="">-- Select --</option>
                                 <option value="Done">Done</option>
                                 <option value="Partially done">Carry to next week</option>
-                                <option value="Not done">Not done</option>
+                                <option value="Not started">Not done</option>
                             </select>
                         </td>
                         <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][remarks_challenges]" placeholder="Remarks/Challenges"></textarea></td>
