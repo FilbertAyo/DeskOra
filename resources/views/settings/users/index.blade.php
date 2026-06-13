@@ -126,18 +126,20 @@
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{{ route('admin.show', $u->id) }}"
-                                                    class="btn btn-info text-white" title="View Details">
-                                                    <i class="ti ti-eye"></i>
-                                                </a>
-                                                @can('users management settings')
-                                                    <a href="{{ route('admin.edit', $u->id) }}"
-                                                        class="btn btn-primary text-white" title="Edit User">
-                                                        <i class="ti ti-edit"></i>
+                                            <x-table-action-dropdown>
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ route('admin.show', $u->id) }}">
+                                                        <i class="ti ti-eye me-2"></i> View
                                                     </a>
+                                                </li>
+                                                @can('users management settings')
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('admin.edit', $u->id) }}">
+                                                            <i class="ti ti-edit me-2"></i> Edit
+                                                        </a>
+                                                    </li>
                                                 @endcan
-                                            </div>
+                                            </x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

@@ -121,15 +121,16 @@
                                             <span class="badge {{ $statusClass }}">{{ $statusLabel }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <button type="button"
-                                                        class="btn btn-info text-white"
-                                                        title="View"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#anonymousFeedbackModal{{ $row->id }}">
-                                                    <i class="ti ti-eye"></i>
-                                                </button>
-                                            </div>
+                                            <x-table-action-dropdown>
+                                                <li>
+                                                    <button type="button"
+                                                            class="dropdown-item"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#anonymousFeedbackModal{{ $row->id }}">
+                                                        <i class="ti ti-eye me-2"></i> View
+                                                    </button>
+                                                </li>
+                                            </x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

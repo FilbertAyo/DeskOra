@@ -196,29 +196,32 @@
                                                 @endif
                                             </td>
                                             <td class="text-center">
-                                                <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
-                                                        class="btn btn-info text-white" title="View">
-                                                        <i class="ti ti-eye"></i>
-                                                    </a>
-                                                    @if($document->canBeEdited())
-                                                        <a href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}"
-                                                            class="btn btn-primary text-white" title="Edit">
-                                                            <i class="ti ti-edit"></i>
+                                                <x-table-action-dropdown>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
+                                                            <i class="ti ti-eye me-2"></i> View
                                                         </a>
+                                                    </li>
+                                                    @if($document->canBeEdited())
+                                                        <li>
+                                                            <a class="dropdown-item" href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
+                                                                <i class="ti ti-edit me-2"></i> Edit
+                                                            </a>
+                                                        </li>
                                                     @endif
                                                     @if($document->period)
                                                         @php
                                                             $relatedPlan = $document->relatedWeeklyDocument();
                                                         @endphp
                                                         @if($relatedPlan)
-                                                            <a href="{{ route('documents.show', ['document' => $relatedPlan->id, 'return_to' => request()->fullUrl()]) }}"
-                                                                class="btn btn-outline-primary" title="View Related Plan">
-                                                                <i class="ti ti-target"></i>
-                                                            </a>
+                                                            <li>
+                                                                <a class="dropdown-item" href="{{ route('documents.show', ['document' => $relatedPlan->id, 'return_to' => request()->fullUrl()]) }}">
+                                                                    <i class="ti ti-target me-2"></i> View Related Plan
+                                                                </a>
+                                                            </li>
                                                         @endif
                                                     @endif
-                                                </div>
+                                                </x-table-action-dropdown>
                                             </td>
                                         </tr>
                                     @endforeach

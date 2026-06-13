@@ -203,18 +203,20 @@
                                                 </small>
                                             </td>
                                             <td class="text-center">
-                                                <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{{ route('action-logs.show', $document->id) }}"
-                                                        class="btn btn-info text-white" title="View">
-                                                        <i class="ti ti-eye"></i>
-                                                    </a>
-                                                    @can('update', $document)
-                                                        <a href="{{ route('action-logs.edit', $document->id) }}"
-                                                            class="btn btn-primary text-white" title="Edit">
-                                                            <i class="ti ti-edit"></i>
+                                                <x-table-action-dropdown>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('action-logs.show', $document->id) }}">
+                                                            <i class="ti ti-eye me-2"></i> View
                                                         </a>
+                                                    </li>
+                                                    @can('update', $document)
+                                                        <li>
+                                                            <a class="dropdown-item" href="{{ route('action-logs.edit', $document->id) }}">
+                                                                <i class="ti ti-edit me-2"></i> Edit
+                                                            </a>
+                                                        </li>
                                                     @endcan
-                                                </div>
+                                                </x-table-action-dropdown>
                                             </td>
                                         </tr>
                                     @endforeach

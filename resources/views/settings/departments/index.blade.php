@@ -83,30 +83,32 @@
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{{ route('department.show', $department->id) }}"
-                                                    class="btn btn-info text-white"
-                                                    title="View Details">
-                                                    <i class="ti ti-eye"></i>
-                                                </a>
+                                            <x-table-action-dropdown>
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ route('department.show', $department->id) }}">
+                                                        <i class="ti ti-eye me-2"></i> View
+                                                    </a>
+                                                </li>
                                                 @can('manage departments')
-                                                    <button type="button" class="btn btn-primary edit-btn"
-                                                        data-id="{{ $department->id }}"
-                                                        data-name="{{ $department->name }}"
-                                                        data-status="{{ $department->status }}"
-                                                        data-parent-id="{{ $department->parent_id }}"
-                                                        data-head-user-id="{{ $department->head_user_id }}"
-                                                        title="Edit Department">
-                                                        <i class="ti ti-edit"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-danger delete-btn"
-                                                        data-id="{{ $department->id }}"
-                                                        data-name="{{ $department->name }}"
-                                                        title="Delete Department">
-                                                        <i class="ti ti-trash"></i>
-                                                    </button>
+                                                    <li>
+                                                        <button type="button" class="dropdown-item edit-btn"
+                                                            data-id="{{ $department->id }}"
+                                                            data-name="{{ $department->name }}"
+                                                            data-status="{{ $department->status }}"
+                                                            data-parent-id="{{ $department->parent_id }}"
+                                                            data-head-user-id="{{ $department->head_user_id }}">
+                                                            <i class="ti ti-edit me-2"></i> Edit
+                                                        </button>
+                                                    </li>
+                                                    <li>
+                                                        <button type="button" class="dropdown-item text-danger delete-btn"
+                                                            data-id="{{ $department->id }}"
+                                                            data-name="{{ $department->name }}">
+                                                            <i class="ti ti-trash me-2"></i> Delete
+                                                        </button>
+                                                    </li>
                                                 @endcan
-                                            </div>
+                                            </x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

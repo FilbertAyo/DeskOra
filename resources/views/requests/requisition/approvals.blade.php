@@ -27,9 +27,13 @@
                             <td>{{ number_format($item->amount, 2) }}</td>
                             <td><span class="badge bg-info">{{ $item->status }}</span></td>
                             <td>
-                                <a href="{{ route('petty.details', $item->id) }}" class="btn btn-sm btn-secondary text-white">
-                                    <i class="ti ti-eye"></i>
-                                </a>
+                                <x-table-action-dropdown>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route('petty.details', $item->id) }}">
+                                            <i class="ti ti-eye me-2"></i> View
+                                        </a>
+                                    </li>
+                                </x-table-action-dropdown>
                             </td>
                         </tr>
                     @endforeach

@@ -76,9 +76,13 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.show', $item->id) }}"
-                                                    class="btn btn-sm btn-secondary text-white">
-                                                    <i class="ti ti-eye"></i></a>
+                                                <x-table-action-dropdown>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('petty.show', $item->id) }}">
+                                                            <i class="ti ti-eye me-2"></i> View
+                                                        </a>
+                                                    </li>
+                                                </x-table-action-dropdown>
                                             </td>
                                         </tr>
                                         @else
@@ -106,9 +110,13 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('petty.show', $item->id) }}"
-                                                    class="btn btn-sm btn-secondary text-white">
-                                                    <i class="ti ti-eye"></i></a>
+                                                <x-table-action-dropdown>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('petty.show', $item->id) }}">
+                                                            <i class="ti ti-eye me-2"></i> View
+                                                        </a>
+                                                    </li>
+                                                </x-table-action-dropdown>
                                             </td>
                                         </tr>
 

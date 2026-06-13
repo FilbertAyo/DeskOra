@@ -76,23 +76,27 @@
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{{ route('department.show', $child->id) }}" class="btn btn-info text-white" title="View">
-                                                    <i class="ti ti-eye"></i>
-                                                </a>
+                                            <x-table-action-dropdown>
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ route('department.show', $child->id) }}">
+                                                        <i class="ti ti-eye me-2"></i> View
+                                                    </a>
+                                                </li>
                                                 @can('manage departments')
-                                                    <button type="button" class="btn btn-primary edit-sub-dept-btn" title="Edit"
-                                                        data-bs-toggle="modal" data-bs-target="#editSubDepartmentModal"
-                                                        data-hashid="{{ $child->id }}"
-                                                        data-name="{{ e($child->name) }}"
-                                                        data-status="{{ $child->status }}"
-                                                        data-head-user-id="{{ $child->head_user_id ?? '' }}"
-                                                        data-plan-section-number="{{ $child->plan_section_number ?? '' }}"
-                                                        data-parent-id="{{ $child->parent_id }}">
-                                                        <i class="ti ti-edit"></i>
-                                                    </button>
+                                                    <li>
+                                                        <button type="button" class="dropdown-item edit-sub-dept-btn"
+                                                            data-bs-toggle="modal" data-bs-target="#editSubDepartmentModal"
+                                                            data-hashid="{{ $child->id }}"
+                                                            data-name="{{ e($child->name) }}"
+                                                            data-status="{{ $child->status }}"
+                                                            data-head-user-id="{{ $child->head_user_id ?? '' }}"
+                                                            data-plan-section-number="{{ $child->plan_section_number ?? '' }}"
+                                                            data-parent-id="{{ $child->parent_id }}">
+                                                            <i class="ti ti-edit me-2"></i> Edit
+                                                        </button>
+                                                    </li>
                                                 @endcan
-                                            </div>
+                                            </x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @empty

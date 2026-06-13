@@ -86,19 +86,23 @@
                                         <td>{{ $matrix->overall_budget !== null ? number_format((float) $matrix->overall_budget, 2) : 'N/A' }}</td>
                                         <td class="small text-muted">{{ optional($matrix->updated_at)->diffForHumans() }}</td>
                                         <td>
-                                            <div class="d-flex gap-2">
-                                                <a href="{{ route('matrix-report.edit', $matrix) }}" class="btn btn-sm btn-outline-primary">
-                                                    <i class="ti ti-eye me-1"></i>Open
-                                                </a>
-                                                <form method="POST" action="{{ route('matrix-report.destroy', $matrix) }}"
-                                                      onsubmit="return confirm('Delete this matrix?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                        <i class="ti ti-trash me-1"></i>Delete
-                                                    </button>
-                                                </form>
-                                            </div>
+                                            <x-table-action-dropdown>
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ route('matrix-report.edit', $matrix) }}">
+                                                        <i class="ti ti-eye me-2"></i> Open
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <form method="POST" action="{{ route('matrix-report.destroy', $matrix) }}"
+                                                          onsubmit="return confirm('Delete this matrix?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="ti ti-trash me-2"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            </x-table-action-dropdown>
                                         </td>
                                     </tr>
                                 @endforeach

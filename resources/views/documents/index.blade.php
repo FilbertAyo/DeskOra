@@ -214,20 +214,26 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-center">
-                                                    <div class="d-flex flex-wrap gap-1 justify-content-center btn-group btn-group-sm">
-                                                        @if($planDoc)
-                                                            <a href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}"
-                                                                class="btn btn-sm btn-info text-white btn-sm" title="View Plan">
-                                                                <i class="ti ti-eye"></i> Plan
-                                                            </a>
-                                                        @endif
-                                                        @if($reportDoc)
-                                                            <a href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}"
-                                                                class="btn btn-sm btn-primary text-white btn-sm" title="View Report">
-                                                                <i class="ti ti-eye"></i> Report
-                                                            </a>
-                                                        @endif
-                                                    </div>
+                                                    @if($planDoc || $reportDoc)
+                                                        <x-table-action-dropdown>
+                                                            @if($planDoc)
+                                                                <li>
+                                                                    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}">
+                                                                        <i class="ti ti-target me-2"></i> View Plan
+                                                                    </a>
+                                                                </li>
+                                                            @endif
+                                                            @if($reportDoc)
+                                                                <li>
+                                                                    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}">
+                                                                        <i class="ti ti-activity me-2"></i> View Report
+                                                                    </a>
+                                                                </li>
+                                                            @endif
+                                                        </x-table-action-dropdown>
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach

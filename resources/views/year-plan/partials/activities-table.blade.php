@@ -55,27 +55,33 @@
                                     </td>
                                 @endforeach
                                 <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-light btn-edit-activity" title="Edit"
-                                        data-activity-b64="{{ base64_encode(json_encode([
-                                            'id' => $activity->id,
-                                            'department_id' => (string) $activity->department_id,
-                                            'sort_order' => (int) $activity->sort_order,
-                                            'description' => (string) $activity->description,
-                                            'frequency' => (string) $activity->frequency,
-                                            'unit_count' => (string) $activity->unit_count,
-                                            'unit_value_tzs' => (string) $activity->unit_value_tzs,
-                                            'planned_months' => array_values(array_map('intval', $activity->planned_months ?? [])),
-                                        ], JSON_UNESCAPED_UNICODE)) }}">
-                                        <i class="ti ti-edit"></i>
-                                    </button>
-                                    <form action="{{ route('year-plan.activities.destroy', [$yearPlan->year, $activity]) }}" method="post" class="d-inline"
-                                        onsubmit="return confirm('Remove this activity?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-light text-danger" title="Delete">
-                                            <i class="ti ti-trash"></i>
-                                        </button>
-                                    </form>
+                                    <x-table-action-dropdown>
+                                        <li>
+                                            <button type="button" class="dropdown-item btn-edit-activity"
+                                                data-activity-b64="{{ base64_encode(json_encode([
+                                                    'id' => $activity->id,
+                                                    'department_id' => (string) $activity->department_id,
+                                                    'sort_order' => (int) $activity->sort_order,
+                                                    'description' => (string) $activity->description,
+                                                    'frequency' => (string) $activity->frequency,
+                                                    'unit_count' => (string) $activity->unit_count,
+                                                    'unit_value_tzs' => (string) $activity->unit_value_tzs,
+                                                    'planned_months' => array_values(array_map('intval', $activity->planned_months ?? [])),
+                                                ], JSON_UNESCAPED_UNICODE)) }}">
+                                                <i class="ti ti-edit me-2"></i> Edit
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('year-plan.activities.destroy', [$yearPlan->year, $activity]) }}" method="post"
+                                                onsubmit="return confirm('Remove this activity?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="ti ti-trash me-2"></i> Delete
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </x-table-action-dropdown>
                                 </td>
                             </tr>
                         @endforeach
