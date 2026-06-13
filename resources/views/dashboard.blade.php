@@ -72,14 +72,6 @@
         $planCoverageActionUrl = $planCoverageAlert['actionUrl'] ?? null;
     @endphp
 
-    @if($showWeeklyToast)
-        <div class="position-fixed bottom-0 end-0 p-2 p-sm-3 d-flex flex-column gap-2 align-items-stretch dashboard-toast-stack"
-             style="z-index: 1080; width: 100%; max-width: min(22rem, calc(100vw - 1rem)); box-sizing: border-box; pointer-events: none;">
-            @include('components.weekly-submission-reminder-toast', ['fixedWrapper' => false, 'withScript' => false])
-        </div>
-    @endif
-    
-
     <div class="page-header">
         <div class="page-block">
             <div class="row align-items-center">
@@ -97,23 +89,11 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
+  
     <div class="row">
         @if($showPlanCoverageAlert)
             <div class="col-12 mb-3">
-                <div class="alert alert-danger border shadow-sm d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-0">
+                <div class="alert alert-danger border shadow-none d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-0">
                     <div>
                         <h6 class="alert-heading mb-1">
                             <i class="ti ti-alert-triangle me-1"></i>Year Plan Update Required
@@ -137,7 +117,7 @@
         <div class="col-12 col-lg-8 col-md-8 mb-3">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-bell me-2"></i>My Notifications</h5>
+                    <h5 class="mb-0"><i class="ti ti-bell me-2"></i>Insights</h5>
                     <span class="badge bg-light-primary">
                         {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount + $assignedWeeklyActivityCount }}
                     </span>
@@ -147,33 +127,33 @@
                         <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
-                                    <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned for revision
+                                    <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned
                                 </p>
-                                <h4 class="mb-1 text-danger">{{ $returnedDocs->count() }}</h4>
+                                <h4 class="mb-1 text-dark">{{ $returnedDocs->count() }}</h4>
                           </div>
                         </div>
                         <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
-                                    <i class="ti ti-file-edit text-warning me-1"></i>Drafts waiting submission
+                                    <i class="ti ti-file-edit text-warning me-1"></i>Drafts 
                                 </p>
-                                <h4 class="mb-1 text-warning">{{ $plainDraftDocs->count() }}</h4>
+                                <h4 class="mb-1 text-dark">{{ $plainDraftDocs->count() }}</h4>
                            </div>
                         </div>
                         <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
-                                    <i class="ti ti-clipboard-list text-primary me-1"></i>Open action tasks
+                                    <i class="ti ti-clipboard-list text-primary me-1"></i>Open
                                 </p>
-                                <h4 class="mb-1 text-primary">{{ $activeActionTaskCount }}</h4>
+                                <h4 class="mb-1 text-dark">{{ $activeActionTaskCount }}</h4>
                            </div>
                         </div>
                         <div class="col-6 col-xl-4">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
-                                    <i class="ti ti-users-group text-info me-1"></i>Shared weekly docs
+                                    <i class="ti ti-users-group text-info me-1"></i>Shared
                                 </p>
-                                <h4 class="mb-1 text-info">{{ $sharedWithMeCount }}</h4>
+                                <h4 class="mb-1 text-dark">{{ $sharedWithMeCount }}</h4>
                               @if($sharedWithMeCount > 0)
                                     <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top small">
                                         @if(isset($dashboardAvailableTypes['weekly_plan']))
@@ -193,9 +173,9 @@
                         <div class="col-6 col-xl-2">
                             <div class="p-3 border rounded h-100">
                                 <p class="mb-1 text-muted small">
-                                    <i class="ti ti-clipboard-list text-secondary me-1"></i>Assigned activities
+                                    <i class="ti ti-clipboard-list text-secondary me-1"></i>Assigned
                                 </p>
-                                <h4 class="mb-1 text-secondary">{{ $assignedWeeklyActivityCount }}</h4>
+                                <h4 class="mb-1 text-dark">{{ $assignedWeeklyActivityCount }}</h4>
                            </div>
                         </div>
                     </div>
@@ -302,62 +282,89 @@
             </div>
         </div>
 
-        <div class="col-12 col-lg-4 col-md-4">
-            <div class="row">
-                <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border">
-                        <div class="card-body">
-                            <h6 class="mb-2 f-w-400 text-muted">Departments</h6>
-                            <h4 class="mb-0">
-                                {{ number_format($departmentNo ?? 0) }}
-                                <span class="badge bg-light border border-secondary text-muted">
-                                    <i class="ti ti-building"></i>
-                                </span>
-                            </h4>
-                        </div>
-                    </div>
+        <div class="col-12 col-lg-4 col-md-4 mb-3">
+            <div class="card shadow-none border h-100">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0"><i class="ti ti-calendar-event me-2"></i>Weekly plan & report</h5>
                 </div>
-                <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border">
-                        <div class="card-body">
-                            <h6 class="mb-2 f-w-400 text-muted">Total Users</h6>
-                            <h4 class="mb-0">
-                                {{ number_format($userNo ?? 0) }}
-                                <span class="badge bg-light-primary border border-primary text-primary">
-                                    <i class="ti ti-users"></i>
-                                </span>
-                            </h4>
+                <div class="card-body">
+                    @if($showWeeklyToast && $wr)
+                        <ul class="mb-3 ps-3 small text-muted">
+                            @if($wr->plan && $wr->plan->showCta)
+                                <li class="mb-2">
+                                    <strong class="text-dark">Plan</strong> for next week (W{{ $wr->plan->period->week_number }}, {{ $wr->plan->period->year }}) —
+                                    @if($wr->plan->document && $wr->plan->document->isReturnedForRevision())
+                                        reviewer asked for changes; please revise and resubmit.
+                                    @elseif($wr->plan->document)
+                                        finish your draft and submit before the deadline.
+                                    @else
+                                        not started yet.
+                                    @endif
+                                </li>
+                            @endif
+                            @if($wr->report && $wr->report->showCta)
+                                <li class="{{ ($wr->plan && $wr->plan->showCta) ? 'mb-0' : 'mb-2' }}">
+                                    <strong class="text-dark">Report</strong> for this week (W{{ $wr->report->period->week_number }}, {{ $wr->report->period->year }}) —
+                                    @if($wr->report->document && $wr->report->document->isReturnedForRevision())
+                                        reviewer asked for changes; please revise and resubmit.
+                                    @elseif($wr->report->document)
+                                        finish your draft and submit before the deadline.
+                                    @else
+                                        not started yet.
+                                    @endif
+                                </li>
+                            @endif
+                        </ul>
+                        <div class="d-flex flex-wrap gap-2">
+                            @if($wr->plan && $wr->plan->showCta)
+                                <a href="{{ $wr->plan->document
+                                    ? route('documents.edit', $wr->plan->document->id)
+                                    : route('documents.create', ['type' => 'weekly_plan', 'period_id' => $wr->plan->period->id]) }}"
+                                   class="btn btn-sm btn-primary">
+                                    <i class="ti {{ $wr->plan->document ? 'ti-edit' : 'ti-circle-plus' }} me-1"></i>
+                                    @if($wr->plan->document && $wr->plan->document->isReturnedForRevision())
+                                        Revise plan
+                                    @elseif($wr->plan->document)
+                                        Open plan
+                                    @else
+                                        Create plan
+                                    @endif
+                                </a>
+                            @endif
+                            @if($wr->report && $wr->report->showCta)
+                                <a href="{{ $wr->report->document
+                                    ? route('documents.edit', $wr->report->document->id)
+                                    : route('documents.create', ['type' => 'weekly_report', 'period_id' => $wr->report->period->id]) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="ti {{ $wr->report->document ? 'ti-edit' : 'ti-circle-plus' }} me-1"></i>
+                                    @if($wr->report->document && $wr->report->document->isReturnedForRevision())
+                                        Revise report
+                                    @elseif($wr->report->document)
+                                        Open report
+                                    @else
+                                        Create report
+                                    @endif
+                                </a>
+                            @endif
                         </div>
-                    </div>
-                </div>
-                <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border">
-                        <div class="card-body">
-                            <h6 class="mb-2 f-w-400 text-muted">Your document drafts</h6>
-                            <h4 class="mb-0">
-                                {{ number_format($pendingDraftsTotal) }}
-                                <span class="badge bg-light-warning border border-warning text-warning">
-                                    <i class="ti ti-pencil"></i>
-                                </span>
-                            </h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-lg-6 col-md-6">
-                    <div class="card shadow-none border">
-                        <div class="card-body">
-                            <h6 class="mb-2 f-w-400 text-muted">Active work period</h6>
-                            <h4 class="mb-0">
-                                @if ($currentPeriod)
-                                    <span class="fs-5">Week {{ $currentPeriod->week_number }}, {{ $currentPeriod->year }}</span>
-                                   
-                                @else
-                                    <span class="fs-5 text-muted">—</span>
-                                  
+                    @else
+                        <div class="text-center">
+                            <i class="ti ti-mood-smile fs-1 text-success"></i>
+                            <p class="text-muted mb-0 mt-2">No action needed. Your weekly plan and report are up to date.</p>
+                            <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
+                                @if(isset($availableTypes['weekly_plan']))
+                                    <a href="{{ route('documents.weekly-plans') }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="ti ti-target me-1"></i>Weekly plans
+                                    </a>
                                 @endif
-                            </h4>
+                                @if(isset($availableTypes['weekly_report']))
+                                    <a href="{{ route('documents.weekly-reports') }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="ti ti-activity me-1"></i>Weekly reports
+                                    </a>
+                                @endif
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -610,16 +617,4 @@
         });
     </script>
 
-    @if($showWeeklyToast)
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                if (typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
-
-                var weeklyEl = document.getElementById('weeklySubmissionReminderToast');
-                if (weeklyEl) {
-                    new bootstrap.Toast(weeklyEl, { autohide: false }).show();
-                }
-            });
-        </script>
-    @endif
 </x-app-layout>
