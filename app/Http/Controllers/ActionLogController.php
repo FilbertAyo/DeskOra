@@ -57,16 +57,18 @@ class ActionLogController extends Controller
                 $query->ofState($request->state);
             }
 
-            $documents = $query->latest()->paginate(15)->withQueryString();
+            $documents = $this->orderActionLogsByWorkPeriodDesc($query)
+                ->paginate(15)
+                ->withQueryString();
         } else {
             // Everyone else only sees submitted logs. Drafts stay hidden until submitted.
             if ($request->filled('state') && $request->state !== Document::STATE_SUBMITTED) {
                 abort(403, 'You do not have permission to view draft action logs.');
             }
 
-            $documents = $query
-                ->ofState(Document::STATE_SUBMITTED)
-                ->latest()
+            $documents = $this->orderActionLogsByWorkPeriodDesc(
+                $query->ofState(Document::STATE_SUBMITTED)
+            )
                 ->paginate(15)
                 ->withQueryString();
         }
@@ -576,6 +578,22 @@ class ActionLogController extends Controller
     private function isActionLogManager(User $user): bool
     {
         return $user->hasAnyPermission(['create action logs', 'manage action logs']);
+    }
+
+    /**
+     * Newest work periods first (e.g. Week 23, 22, 21 …).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function orderActionLogsByWorkPeriodDesc($query)
+    {
+        return $query
+            ->leftJoin('work_periods', 'documents.period_id', '=', 'work_periods.id')
+            ->orderByDesc('work_periods.year')
+            ->orderByDesc('work_periods.week_number')
+            ->orderByDesc('documents.updated_at')
+            ->select('documents.*');
     }
 
     private function getCarryForwardTasks(WorkPeriod $period): array
