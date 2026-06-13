@@ -101,39 +101,6 @@
                                                                 $activityRows = [];
                                                             }
 
-                                                            $carryRows = is_array($carriedActivities ?? null) ? $carriedActivities : [];
-                                                            $activityKeys = [];
-                                                            $activityUids = [];
-                                                            foreach ($activityRows as $existingRow) {
-                                                                if (!is_array($existingRow)) {
-                                                                    continue;
-                                                                }
-                                                                $activityKey = mb_strtolower(trim((string) ($existingRow['day'] ?? '')).'|'.trim((string) ($existingRow['activity'] ?? '')));
-                                                                $activityKeys[$activityKey] = true;
-                                                                $existingUid = trim((string) ($existingRow['activity_uid'] ?? ''));
-                                                                if ($existingUid !== '') {
-                                                                    $activityUids[$existingUid] = true;
-                                                                }
-                                                            }
-                                                            foreach ($carryRows as $carryRow) {
-                                                                if (!is_array($carryRow)) {
-                                                                    continue;
-                                                                }
-                                                                $carryUid = trim((string) ($carryRow['activity_uid'] ?? ''));
-                                                                if ($carryUid !== '' && isset($activityUids[$carryUid])) {
-                                                                    continue;
-                                                                }
-                                                                $carryKey = mb_strtolower(trim((string) ($carryRow['day'] ?? '')).'|'.trim((string) ($carryRow['activity'] ?? '')));
-                                                                if (isset($activityKeys[$carryKey])) {
-                                                                    continue;
-                                                                }
-                                                                $activityRows[] = $carryRow;
-                                                                $activityKeys[$carryKey] = true;
-                                                                if ($carryUid !== '') {
-                                                                    $activityUids[$carryUid] = true;
-                                                                }
-                                                            }
-
                                                             if (empty($activityRows)) {
                                                                 $activityRows = [['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => [], 'notes_inclusion' => '']];
                                                             }

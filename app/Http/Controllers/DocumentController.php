@@ -2992,6 +2992,7 @@ class DocumentController extends Controller
                 // Discard incomplete rows; they should be caught by validation anyway.
                 return $day !== '' && $activity !== '';
             }));
+            $content['planned_activities'] = $this->dedupeWeeklyPlanPlannedActivities($content['planned_activities']);
             $content = app(DocumentContentAssembler::class)->normalizeWeeklyPlanContent($content);
             $content['planned_activities'] = $this->ensureWeeklyPlanActivityUids($content['planned_activities']);
 
@@ -3801,17 +3802,28 @@ class DocumentController extends Controller
 
             $carrySource = trim((string) ($existingRow['carry_over_source_weekly_report_id'] ?? ''));
             $uid = trim((string) ($existingRow['activity_uid'] ?? ''));
-            if (
-                $domainWeeklyReportId !== null
-                && $carrySource === (string) $domainWeeklyReportId
-                && $uid !== ''
-                && isset($carriedByUid[$uid])
-            ) {
-                unset($carriedByUid[$uid]);
-            } elseif (
-                $domainWeeklyReportId !== null
-                && $carrySource === (string) $domainWeeklyReportId
-            ) {
+            if ($domainWeeklyReportId !== null && $carrySource === (string) $domainWeeklyReportId) {
+                if ($uid !== '' && isset($carriedByUid[$uid])) {
+                    unset($carriedByUid[$uid]);
+                } else {
+                    $existingActivity = mb_strtolower(trim((string) ($existingRow['activity'] ?? '')));
+                    foreach ($carriedByUid as $carriedUid => $carriedRow) {
+                        $carriedActivity = mb_strtolower(trim((string) ($carriedRow['activity'] ?? '')));
+                        if ($carriedActivity === '' || $existingActivity === '') {
+                            continue;
+                        }
+                        if ($existingActivity === $carriedActivity
+                            || str_starts_with($existingActivity, $carriedActivity)
+                            || str_starts_with($carriedActivity, $existingActivity)) {
+                            unset($carriedByUid[$carriedUid]);
+                            break;
+                        }
+                    }
+                }
+
+                $mergedActivities[] = $existingRow;
+                $existingKeys[mb_strtolower(trim((string) ($existingRow['day'] ?? '')).'|'.trim((string) ($existingRow['activity'] ?? '')))] = true;
+
                 continue;
             }
 
@@ -3850,6 +3862,67 @@ class DocumentController extends Controller
         unset($row);
 
         return $rows;
+    }
+
+    /**
+     * Collapse duplicate carried activities (e.g. original carry row + staff-edited copy).
+     *
+     * @param  array<int, mixed>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function dedupeWeeklyPlanPlannedActivities(array $rows): array
+    {
+        $deduped = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $uid = trim((string) ($row['activity_uid'] ?? ''));
+            $carrySource = trim((string) ($row['carry_over_source_weekly_report_id'] ?? ''));
+            $activity = mb_strtolower(trim((string) ($row['activity'] ?? '')));
+            $day = mb_strtolower(trim((string) ($row['day'] ?? '')));
+
+            $skip = false;
+            foreach ($deduped as $index => $existing) {
+                $existingUid = trim((string) ($existing['activity_uid'] ?? ''));
+                if ($uid !== '' && $existingUid !== '' && $uid === $existingUid) {
+                    $skip = true;
+                    break;
+                }
+
+                $existingCarry = trim((string) ($existing['carry_over_source_weekly_report_id'] ?? ''));
+                $existingActivity = mb_strtolower(trim((string) ($existing['activity'] ?? '')));
+                $existingDay = mb_strtolower(trim((string) ($existing['day'] ?? '')));
+
+                if ($carrySource !== '' && $carrySource === $existingCarry) {
+                    $sameDay = $day === $existingDay || $day === '' || $existingDay === '';
+                    $relatedActivity = $activity === $existingActivity
+                        || ($activity !== '' && $existingActivity !== ''
+                            && (str_starts_with($activity, $existingActivity) || str_starts_with($existingActivity, $activity)));
+
+                    if ($relatedActivity && $sameDay) {
+                        if (strlen($activity) >= strlen($existingActivity)) {
+                            $deduped[$index] = $row;
+                        }
+                        $skip = true;
+                        break;
+                    }
+                }
+
+                if ($day.'|'.$activity !== '|' && $day.'|'.$activity === $existingDay.'|'.$existingActivity) {
+                    $skip = true;
+                    break;
+                }
+            }
+
+            if (! $skip) {
+                $deduped[] = $row;
+            }
+        }
+
+        return array_values($deduped);
     }
 
     private function syncWeeklyPlanAssignments(Document $document): void
