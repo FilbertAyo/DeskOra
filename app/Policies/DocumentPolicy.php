@@ -32,11 +32,12 @@ class DocumentPolicy
         }
 
         if ($document->type === Document::TYPE_ACTION_LOG) {
-            if ($user->hasPermissionTo('view all documents') || $this->isActionLogManager($user) || $document->user_id === $user->id) {
-                return true;
-            }
-
-            return $this->isUserAssignedToActionLog($user, $document);
+            // Drafts stay hidden from regular staff until the log is submitted.
+            // Only action-log managers (manage/create action logs), the creator,
+            // or users with org-wide visibility can preview an unsubmitted draft.
+            return $user->hasPermissionTo('view all documents')
+                || $this->isActionLogManager($user)
+                || $document->user_id === $user->id;
         }
 
         // User owns the document
@@ -121,8 +122,9 @@ class DocumentPolicy
                 return true;
             }
 
-            // Assigned staff can update their own rows even after submission.
-            return $this->isUserAssignedToActionLog($user, $document);
+            // Assigned staff can update their own rows only once the log is
+            // submitted. Unsubmitted drafts remain manager-only.
+            return $document->isSubmitted() && $this->isUserAssignedToActionLog($user, $document);
         }
 
         // Users who only have 'view all documents' permission cannot update (read-only)

@@ -463,7 +463,9 @@ class DashboardController extends Controller
 
         $documents = $isActionLogManager
             ? $documentsQuery->forUser($user->id)->get()
-            : $documentsQuery->get()->filter(fn (Document $document) => $this->isUserAssignedToActionLog($user, $document))->values();
+            // Regular staff only see tasks from submitted logs; drafts stay manager-only.
+            : $documentsQuery->where('state', Document::STATE_SUBMITTED)->get()
+                ->filter(fn (Document $document) => $this->isUserAssignedToActionLog($user, $document))->values();
 
         if ($documents->isEmpty()) {
             return [

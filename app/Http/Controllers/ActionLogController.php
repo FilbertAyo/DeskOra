@@ -59,8 +59,9 @@ class ActionLogController extends Controller
         if ($canViewAllActionLogs) {
             $documents = $query->latest()->paginate(15)->withQueryString();
         } else {
-            // Assigned staff can access only action logs where they are responsible for at least one task.
-            $assignedDocs = $query->latest()->get()->filter(function (Document $document) use ($user) {
+            // Regular staff only see submitted action logs they are assigned to.
+            // Unsubmitted drafts stay hidden until a manager submits them.
+            $assignedDocs = $query->ofState(Document::STATE_SUBMITTED)->latest()->get()->filter(function (Document $document) use ($user) {
                 return $this->isUserAssignedToActionLog($user, $document);
             })->values();
 
@@ -358,6 +359,12 @@ class ActionLogController extends Controller
         if (! $isManager && ! $isAssigned) {
             return redirect()->route('action-logs.show', $document)
                 ->with('error', 'You can only edit tasks where you are assigned as responsible person.');
+        }
+
+        // Drafts are manager-only until submitted; regular staff cannot edit them.
+        if (! $isManager && ! $document->isSubmitted()) {
+            return redirect()->route('action-logs.index')
+                ->with('error', 'This action log has not been submitted yet. You can update your tasks once it is submitted.');
         }
 
         // Authorize update action

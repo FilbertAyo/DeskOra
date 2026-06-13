@@ -32,6 +32,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view notification settings',
             'manage notifications',
             'users management settings',
+            'manage roles and permissions',
             'manage departments',
             'manage year plans',
             'manage work periods',

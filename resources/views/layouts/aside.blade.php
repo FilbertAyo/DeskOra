@@ -238,11 +238,15 @@
                                     <span class="pc-mtext">Users</span>
                                 </a>
                             </li>
+                           
+                            @can('manage roles and permissions')
                             <li class="pc-item {{ Request::routeIs('roles.*') ? 'active' : '' }}">
                                 <a href="{{ route('roles.index') }}" class="pc-link">
                                     <span class="pc-mtext">Roles</span>
                                 </a>
                             </li>
+                            @endcan
+
                             @can('manage departments')
                                 <li class="pc-item {{ Request::routeIs('departments') ? 'active' : '' }}">
                                     <a href="{{ route('departments') }}" class="pc-link">
