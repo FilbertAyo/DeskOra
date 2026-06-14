@@ -35,6 +35,8 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
         'max_tokens' => env('GEMINI_MAX_TOKENS', 500),
+        'summary_max_tokens' => env('GEMINI_SUMMARY_MAX_TOKENS', 800),
+        'question_max_tokens' => env('GEMINI_QUESTION_MAX_TOKENS', 400),
         'timeout' => env('GEMINI_TIMEOUT', 30),
     ],
 

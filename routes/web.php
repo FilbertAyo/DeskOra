@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActionLogController;
 use App\Http\Controllers\AiAssistController;
+use App\Http\Controllers\DocumentAiSummaryController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
@@ -87,6 +88,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/plan-target', [DocumentDashboardController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentCrudController::class, 'create'])->name('create');
         Route::post('/', [DocumentCrudController::class, 'store'])->name('store');
+        Route::post('/ai-summary', [DocumentAiSummaryController::class, 'summarize'])
+            ->middleware('throttle:15,1')
+            ->name('ai-summary');
+        Route::post('/ai-summary/ask', [DocumentAiSummaryController::class, 'ask'])
+            ->middleware('throttle:30,1')
+            ->name('ai-summary.ask');
         Route::post('/{document}/weekly-budget-review', [DocumentBudgetReviewController::class, 'processWeeklyBudgetReview'])
             ->middleware('permission:review weekly budgets|approve weekly budgets|authorize weekly budgets')
             ->name('process-weekly-budget-review');

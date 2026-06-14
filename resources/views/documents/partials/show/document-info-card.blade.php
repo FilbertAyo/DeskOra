@@ -53,6 +53,29 @@
                         </div>
                     @endif
                     <div class="btn-group mt-2 gap-1" role="group">
+                        @if(config('services.gemini.api_key') && in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true))
+                            @php
+                                $aiPlanId = $document->type === \App\Models\Document::TYPE_WEEKLY_PLAN
+                                    ? $document->id
+                                    : (($relatedDocument ?? null)?->type === \App\Models\Document::TYPE_WEEKLY_PLAN ? $relatedDocument->id : null);
+                                $aiReportId = $document->type === \App\Models\Document::TYPE_WEEKLY_REPORT
+                                    ? $document->id
+                                    : (($relatedDocument ?? null)?->type === \App\Models\Document::TYPE_WEEKLY_REPORT ? $relatedDocument->id : null);
+                                $aiSummaryTitle = $document->period
+                                    ? 'Week '.$document->period->week_number.' of '.$document->period->year
+                                    : 'Weekly submission';
+                            @endphp
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm ai-document-summary-btn"
+                                data-plan-id="{{ $aiPlanId }}"
+                                data-report-id="{{ $aiReportId }}"
+                                data-summary-title="{{ $aiSummaryTitle }}"
+                                data-summary-staff="{{ $document->user?->name }}">
+                                <i class="ti ti-sparkles me-1"></i> AI Summary
+                            </button>
+                        @endif
+
                         @if($document->canBeEdited())
                             <a href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => (request('return_to') ?: request()->fullUrl())]) }}" class="btn btn-primary btn-sm">
                                 Edit
