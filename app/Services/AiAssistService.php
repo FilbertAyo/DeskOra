@@ -134,9 +134,10 @@ class AiAssistService
             ]);
 
         if (! $response->successful()) {
-            $message = $response->json('error.message') ?? 'AI request failed. Please try again.';
-
-            throw new RuntimeException($message);
+            throw new RuntimeException($this->friendlyApiError(
+                $response->status(),
+                (string) ($response->json('error.message') ?? 'AI request failed. Please try again.')
+            ));
         }
 
         $result = trim((string) $response->json('candidates.0.content.parts.0.text', ''));
@@ -153,6 +154,21 @@ class AiAssistService
         return $formatAsSummary
             ? $this->formatSummaryAsParagraphs($result)
             : $this->sanitizePlainText($result);
+    }
+
+    private function friendlyApiError(int $status, string $message): string
+    {
+        if ($status === 429 || str_contains(strtolower($message), 'quota exceeded')) {
+            if (preg_match('/retry in ([0-9.]+)s/i', $message, $matches)) {
+                $seconds = (int) ceil((float) $matches[1]);
+
+                return "Gemini free tier limit reached. Please wait about {$seconds} seconds and try again.";
+            }
+
+            return 'Gemini free tier limit reached. Please wait about a minute and try again.';
+        }
+
+        return $message;
     }
 
     private function formatSummaryAsParagraphs(string $text): string
