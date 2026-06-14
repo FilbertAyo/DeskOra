@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActionLogController;
+use App\Http\Controllers\AiAssistController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
@@ -50,6 +51,10 @@ Route::get('/documents/employee/dashboard', function () {
 })->middleware(['auth', 'verified']);
 
 Route::middleware('auth')->group(function () {
+    Route::post('/ai/assist', AiAssistController::class)
+        ->middleware('throttle:20,1')
+        ->name('ai.assist');
+
     Route::get('/matrix-report', [WeeklyObjectiveMatrixController::class, 'index'])->name('matrix-report.index');
     Route::post('/matrix-report', [WeeklyObjectiveMatrixController::class, 'store'])->name('matrix-report.store');
     Route::get('/matrix-report/{matrix}/edit', [WeeklyObjectiveMatrixController::class, 'edit'])->name('matrix-report.edit');
