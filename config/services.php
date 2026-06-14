@@ -41,7 +41,6 @@ return [
         'summary_cache_enabled' => filter_var(env('GEMINI_SUMMARY_CACHE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'summary_cache_seconds' => env('GEMINI_SUMMARY_CACHE_SECONDS', 604800),
         'max_requests_per_minute' => env('GEMINI_MAX_REQUESTS_PER_MINUTE', 5),
-        'retry_attempts' => env('GEMINI_RETRY_ATTEMPTS', 3),
     ],
 
 ];

@@ -103,8 +103,6 @@ class AiAssistService
 
     private function generate(string $systemPrompt, string $userText, ?int $maxTokens = null, bool $formatAsSummary = false): string
     {
-        set_time_limit(max(120, ((int) config('services.gemini.timeout', 30) * max(1, (int) config('services.gemini.retry_attempts', 3))) + 90));
-
         $model = config('services.gemini.model', 'gemini-2.5-flash-lite');
         $url = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
@@ -130,49 +128,35 @@ class AiAssistService
             ],
         ];
 
-        $maxAttempts = max(1, (int) config('services.gemini.retry_attempts', 3));
-        $lastMessage = 'AI request failed. Please try again.';
+        $this->acquireGeminiSlot();
 
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $this->acquireGeminiSlot();
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'x-goog-api-key' => config('services.gemini.api_key'),
+        ])
+            ->timeout((int) config('services.gemini.timeout', 30))
+            ->post($url, $payload);
 
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => config('services.gemini.api_key'),
-            ])
-                ->timeout((int) config('services.gemini.timeout', 30))
-                ->post($url, $payload);
+        if ($response->successful()) {
+            $result = trim((string) $response->json('candidates.0.content.parts.0.text', ''));
 
-            if ($response->successful()) {
-                $result = trim((string) $response->json('candidates.0.content.parts.0.text', ''));
-
-                if ($result === '') {
-                    $blockReason = $response->json('promptFeedback.blockReason');
-                    if ($blockReason) {
-                        throw new RuntimeException('AI could not process this document. Please try again later.');
-                    }
-
-                    throw new RuntimeException('AI returned an empty response. Please try again.');
+            if ($result === '') {
+                $blockReason = $response->json('promptFeedback.blockReason');
+                if ($blockReason) {
+                    throw new RuntimeException('AI could not process this document. Please try again later.');
                 }
 
-                return $formatAsSummary
-                    ? $this->formatSummaryAsParagraphs($result)
-                    : $this->sanitizePlainText($result);
+                throw new RuntimeException('AI returned an empty response. Please try again.');
             }
 
-            $lastMessage = (string) ($response->json('error.message') ?? 'AI request failed. Please try again.');
-
-            if ($response->status() === 429 && $attempt < $maxAttempts) {
-                $waitSeconds = $this->retryWaitSeconds($lastMessage);
-                sleep($waitSeconds);
-
-                continue;
-            }
-
-            throw new RuntimeException($this->friendlyApiError($response->status(), $lastMessage));
+            return $formatAsSummary
+                ? $this->formatSummaryAsParagraphs($result)
+                : $this->sanitizePlainText($result);
         }
 
-        throw new RuntimeException($this->friendlyApiError(429, $lastMessage));
+        $message = (string) ($response->json('error.message') ?? 'AI request failed. Please try again.');
+
+        throw new RuntimeException($this->friendlyApiError($response->status(), $message));
     }
 
     private function acquireGeminiSlot(): void
@@ -187,15 +171,6 @@ class AiAssistService
         }
 
         RateLimiter::hit($key, 60);
-    }
-
-    private function retryWaitSeconds(string $message): int
-    {
-        if (preg_match('/retry in ([0-9.]+)s/i', $message, $matches)) {
-            return max(2, (int) ceil((float) $matches[1]) + 1);
-        }
-
-        return 15;
     }
 
     private function friendlyApiError(int $status, string $message): string

@@ -62,10 +62,10 @@ class DocumentAiSummaryCache
             return (string) $generator();
         }
 
-        $lock = Cache::lock('lock:'.$cacheKey, 120);
+        $lock = Cache::lock('lock:'.$cacheKey, 30);
 
         try {
-            $lock->block(90);
+            $lock->block(15);
 
             $cached = Cache::get($cacheKey);
             if (is_string($cached) && $cached !== '') {
