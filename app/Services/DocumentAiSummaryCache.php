@@ -9,26 +9,52 @@ use RuntimeException;
 
 class DocumentAiSummaryCache
 {
+    private bool $lastSummaryWasCached = false;
+
+    private bool $lastAnswerWasCached = false;
+
     public function rememberSummary(?Document $plan, ?Document $report, callable $generator): string
     {
-        return $this->remember(
+        $wasCached = false;
+        $value = $this->remember(
             $this->summaryCacheKey($plan, $report),
-            $generator
+            $generator,
+            $wasCached
         );
+        $this->lastSummaryWasCached = $wasCached;
+
+        return $value;
     }
 
     public function rememberAnswer(?Document $plan, ?Document $report, string $question, callable $generator): string
     {
-        return $this->remember(
+        $wasCached = false;
+        $value = $this->remember(
             $this->answerCacheKey($plan, $report, $question),
-            $generator
+            $generator,
+            $wasCached
         );
+        $this->lastAnswerWasCached = $wasCached;
+
+        return $value;
     }
 
-    private function remember(string $cacheKey, callable $generator): string
+    public function wasLastSummaryCached(): bool
+    {
+        return $this->lastSummaryWasCached;
+    }
+
+    public function wasLastAnswerCached(): bool
+    {
+        return $this->lastAnswerWasCached;
+    }
+
+    private function remember(string $cacheKey, callable $generator, bool &$wasCached): string
     {
         $cached = Cache::get($cacheKey);
         if (is_string($cached) && $cached !== '') {
+            $wasCached = true;
+
             return $cached;
         }
 
@@ -43,6 +69,8 @@ class DocumentAiSummaryCache
 
             $cached = Cache::get($cacheKey);
             if (is_string($cached) && $cached !== '') {
+                $wasCached = true;
+
                 return $cached;
             }
 
@@ -53,6 +81,8 @@ class DocumentAiSummaryCache
         } catch (LockTimeoutException) {
             $cached = Cache::get($cacheKey);
             if (is_string($cached) && $cached !== '') {
+                $wasCached = true;
+
                 return $cached;
             }
 

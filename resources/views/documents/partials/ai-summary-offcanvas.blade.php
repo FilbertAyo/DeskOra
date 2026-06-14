@@ -15,7 +15,7 @@
         <div class="offcanvas-body d-flex flex-column">
             <div id="documentAiSummaryLoading" class="text-center py-5 d-none">
                 <i class="ti ti-loader spinning fs-2 text-primary d-block mb-3"></i>
-                <p class="text-muted mb-0">Generating summary...</p>
+                <p class="text-muted mb-0">Generating summary... this may take up to 30 seconds.</p>
             </div>
             <div id="documentAiSummaryError" class="alert alert-danger d-none mb-0"></div>
             <div id="documentAiSummaryContent" class="document-ai-summary-prose"></div>

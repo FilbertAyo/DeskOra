@@ -38,8 +38,10 @@ return [
         'summary_max_tokens' => env('GEMINI_SUMMARY_MAX_TOKENS', 800),
         'question_max_tokens' => env('GEMINI_QUESTION_MAX_TOKENS', 400),
         'timeout' => env('GEMINI_TIMEOUT', 30),
-        'summary_cache_enabled' => env('GEMINI_SUMMARY_CACHE_ENABLED', true),
+        'summary_cache_enabled' => filter_var(env('GEMINI_SUMMARY_CACHE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'summary_cache_seconds' => env('GEMINI_SUMMARY_CACHE_SECONDS', 604800),
+        'max_requests_per_minute' => env('GEMINI_MAX_REQUESTS_PER_MINUTE', 5),
+        'retry_attempts' => env('GEMINI_RETRY_ATTEMPTS', 3),
     ],
 
 ];

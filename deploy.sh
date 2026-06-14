@@ -62,10 +62,8 @@ echo "==> Running database seeders..."
 "$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder --force --no-interaction
 
 
-echo "==> Clearing old caches..."
-"$PHP_BIN" artisan optimize:clear
+echo "==> Clearing framework caches (keeping application cache for AI summaries)..."
 "$PHP_BIN" artisan config:clear
-"$PHP_BIN" artisan cache:clear
 "$PHP_BIN" artisan route:clear
 "$PHP_BIN" artisan view:clear
 "$PHP_BIN" artisan event:clear || true
@@ -95,6 +93,7 @@ GEMINI_KEY_SET="$("$PHP_BIN" artisan tinker --execute="echo filled(config('servi
 GEMINI_MODEL="$("$PHP_BIN" artisan tinker --execute="echo (string) config('services.gemini.model');" | tr -d '\r')"
 GEMINI_CACHE_ENABLED="$("$PHP_BIN" artisan tinker --execute="echo config('services.gemini.summary_cache_enabled') ? 'yes' : 'no';" | tr -d '\r')"
 CACHE_STORE="$("$PHP_BIN" artisan tinker --execute="echo (string) config('cache.default');" | tr -d '\r')"
+GEMINI_RPM="$("$PHP_BIN" artisan tinker --execute="echo (string) config('services.gemini.max_requests_per_minute');" | tr -d '\r')"
 
 if [ "$GEMINI_KEY_SET" != "yes" ]; then
   echo "WARNING: GEMINI_API_KEY is empty in runtime config. AI Summary buttons will be hidden."
@@ -103,6 +102,10 @@ else
   echo "    Gemini model: ${GEMINI_MODEL:-gemini-2.5-flash-lite}"
   echo "    Summary cache: ${GEMINI_CACHE_ENABLED:-yes}"
   echo "    Cache store: ${CACHE_STORE:-database}"
+  echo "    Gemini max requests/min: ${GEMINI_RPM:-5}"
+  if [ "${CACHE_STORE:-database}" != "database" ]; then
+    echo "WARNING: CACHE_STORE is '${CACHE_STORE}'. Use CACHE_STORE=database so AI summaries persist."
+  fi
 fi
 
 if [ "$CUTOVER_MODE" = "1" ]; then

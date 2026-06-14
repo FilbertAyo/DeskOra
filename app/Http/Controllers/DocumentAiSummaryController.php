@@ -53,6 +53,7 @@ class DocumentAiSummaryController extends Controller
             'type' => 'Weekly Plan & Report',
             'staff' => $contextDocument?->user?->name,
             'summary' => $summary,
+            'cached' => $this->summaryCache->wasLastSummaryCached(),
         ]);
     }
 
@@ -90,6 +91,7 @@ class DocumentAiSummaryController extends Controller
         return response()->json([
             'question' => trim($validated['question']),
             'answer' => $answer,
+            'cached' => $this->summaryCache->wasLastAnswerCached(),
         ]);
     }
 

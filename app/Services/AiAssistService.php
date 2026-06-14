@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use RuntimeException;
 
 class AiAssistService
@@ -102,58 +103,99 @@ class AiAssistService
 
     private function generate(string $systemPrompt, string $userText, ?int $maxTokens = null, bool $formatAsSummary = false): string
     {
+        set_time_limit(max(120, ((int) config('services.gemini.timeout', 30) * max(1, (int) config('services.gemini.retry_attempts', 3))) + 90));
+
         $model = config('services.gemini.model', 'gemini-2.5-flash-lite');
         $url = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
             $model
         );
-
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'x-goog-api-key' => config('services.gemini.api_key'),
-        ])
-            ->timeout((int) config('services.gemini.timeout', 30))
-            ->post($url, [
-                'system_instruction' => [
+        $payload = [
+            'system_instruction' => [
+                'parts' => [
+                    ['text' => $systemPrompt],
+                ],
+            ],
+            'contents' => [
+                [
+                    'role' => 'user',
                     'parts' => [
-                        ['text' => $systemPrompt],
+                        ['text' => $userText],
                     ],
                 ],
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [
-                            ['text' => $userText],
-                        ],
-                    ],
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.4,
-                    'maxOutputTokens' => $maxTokens ?? (int) config('services.gemini.max_tokens', 500),
-                ],
-            ]);
+            ],
+            'generationConfig' => [
+                'temperature' => 0.4,
+                'maxOutputTokens' => $maxTokens ?? (int) config('services.gemini.max_tokens', 500),
+            ],
+        ];
 
-        if (! $response->successful()) {
-            throw new RuntimeException($this->friendlyApiError(
-                $response->status(),
-                (string) ($response->json('error.message') ?? 'AI request failed. Please try again.')
-            ));
-        }
+        $maxAttempts = max(1, (int) config('services.gemini.retry_attempts', 3));
+        $lastMessage = 'AI request failed. Please try again.';
 
-        $result = trim((string) $response->json('candidates.0.content.parts.0.text', ''));
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $this->acquireGeminiSlot();
 
-        if ($result === '') {
-            $blockReason = $response->json('promptFeedback.blockReason');
-            if ($blockReason) {
-                throw new RuntimeException('AI could not process this document. Please try again later.');
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => config('services.gemini.api_key'),
+            ])
+                ->timeout((int) config('services.gemini.timeout', 30))
+                ->post($url, $payload);
+
+            if ($response->successful()) {
+                $result = trim((string) $response->json('candidates.0.content.parts.0.text', ''));
+
+                if ($result === '') {
+                    $blockReason = $response->json('promptFeedback.blockReason');
+                    if ($blockReason) {
+                        throw new RuntimeException('AI could not process this document. Please try again later.');
+                    }
+
+                    throw new RuntimeException('AI returned an empty response. Please try again.');
+                }
+
+                return $formatAsSummary
+                    ? $this->formatSummaryAsParagraphs($result)
+                    : $this->sanitizePlainText($result);
             }
 
-            throw new RuntimeException('AI returned an empty response. Please try again.');
+            $lastMessage = (string) ($response->json('error.message') ?? 'AI request failed. Please try again.');
+
+            if ($response->status() === 429 && $attempt < $maxAttempts) {
+                $waitSeconds = $this->retryWaitSeconds($lastMessage);
+                sleep($waitSeconds);
+
+                continue;
+            }
+
+            throw new RuntimeException($this->friendlyApiError($response->status(), $lastMessage));
         }
 
-        return $formatAsSummary
-            ? $this->formatSummaryAsParagraphs($result)
-            : $this->sanitizePlainText($result);
+        throw new RuntimeException($this->friendlyApiError(429, $lastMessage));
+    }
+
+    private function acquireGeminiSlot(): void
+    {
+        $key = 'gemini-api-global';
+        $maxAttempts = max(1, (int) config('services.gemini.max_requests_per_minute', 5));
+
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            throw new RuntimeException("AI is busy. Please wait about {$seconds} seconds and try again.");
+        }
+
+        RateLimiter::hit($key, 60);
+    }
+
+    private function retryWaitSeconds(string $message): int
+    {
+        if (preg_match('/retry in ([0-9.]+)s/i', $message, $matches)) {
+            return max(2, (int) ceil((float) $matches[1]) + 1);
+        }
+
+        return 15;
     }
 
     private function friendlyApiError(int $status, string $message): string

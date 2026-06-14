@@ -89,10 +89,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [DocumentCrudController::class, 'create'])->name('create');
         Route::post('/', [DocumentCrudController::class, 'store'])->name('store');
         Route::post('/ai-summary', [DocumentAiSummaryController::class, 'summarize'])
-            ->middleware('throttle:15,1')
+            ->middleware('throttle:6,1')
             ->name('ai-summary');
         Route::post('/ai-summary/ask', [DocumentAiSummaryController::class, 'ask'])
-            ->middleware('throttle:30,1')
+            ->middleware('throttle:10,1')
             ->name('ai-summary.ask');
         Route::post('/{document}/weekly-budget-review', [DocumentBudgetReviewController::class, 'processWeeklyBudgetReview'])
             ->middleware('permission:review weekly budgets|approve weekly budgets|authorize weekly budgets')
