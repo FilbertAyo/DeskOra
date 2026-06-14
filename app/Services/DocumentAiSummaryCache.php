@@ -3,34 +3,63 @@
 namespace App\Services;
 
 use App\Models\Document;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
+use RuntimeException;
 
 class DocumentAiSummaryCache
 {
     public function rememberSummary(?Document $plan, ?Document $report, callable $generator): string
     {
-        if (! $this->isEnabled()) {
-            return (string) $generator();
-        }
-
-        return (string) Cache::remember(
+        return $this->remember(
             $this->summaryCacheKey($plan, $report),
-            $this->ttlSeconds(),
             $generator
         );
     }
 
     public function rememberAnswer(?Document $plan, ?Document $report, string $question, callable $generator): string
     {
+        return $this->remember(
+            $this->answerCacheKey($plan, $report, $question),
+            $generator
+        );
+    }
+
+    private function remember(string $cacheKey, callable $generator): string
+    {
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
         if (! $this->isEnabled()) {
             return (string) $generator();
         }
 
-        return (string) Cache::remember(
-            $this->answerCacheKey($plan, $report, $question),
-            $this->ttlSeconds(),
-            $generator
-        );
+        $lock = Cache::lock('lock:'.$cacheKey, 120);
+
+        try {
+            $lock->block(90);
+
+            $cached = Cache::get($cacheKey);
+            if (is_string($cached) && $cached !== '') {
+                return $cached;
+            }
+
+            $value = (string) $generator();
+            Cache::put($cacheKey, $value, $this->ttlSeconds());
+
+            return $value;
+        } catch (LockTimeoutException) {
+            $cached = Cache::get($cacheKey);
+            if (is_string($cached) && $cached !== '') {
+                return $cached;
+            }
+
+            throw new RuntimeException('AI is busy generating a response. Please try again in a few seconds.');
+        } finally {
+            $lock->release();
+        }
     }
 
     private function isEnabled(): bool

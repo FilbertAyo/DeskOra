@@ -90,6 +90,21 @@ fi
 echo "==> Anonymous feedback URL:"
 echo "    $(/usr/bin/env sed -n 's|^APP_URL=||p' .env | head -n 1)/feedback/$AF_TOKEN"
 
+echo "==> Validating Gemini AI config..."
+GEMINI_KEY_SET="$("$PHP_BIN" artisan tinker --execute="echo filled(config('services.gemini.api_key')) ? 'yes' : '';" | tr -d '\r')"
+GEMINI_MODEL="$("$PHP_BIN" artisan tinker --execute="echo (string) config('services.gemini.model');" | tr -d '\r')"
+GEMINI_CACHE_ENABLED="$("$PHP_BIN" artisan tinker --execute="echo config('services.gemini.summary_cache_enabled') ? 'yes' : 'no';" | tr -d '\r')"
+CACHE_STORE="$("$PHP_BIN" artisan tinker --execute="echo (string) config('cache.default');" | tr -d '\r')"
+
+if [ "$GEMINI_KEY_SET" != "yes" ]; then
+  echo "WARNING: GEMINI_API_KEY is empty in runtime config. AI Summary buttons will be hidden."
+else
+  echo "    Gemini API key: configured"
+  echo "    Gemini model: ${GEMINI_MODEL:-gemini-2.5-flash-lite}"
+  echo "    Summary cache: ${GEMINI_CACHE_ENABLED:-yes}"
+  echo "    Cache store: ${CACHE_STORE:-database}"
+fi
+
 if [ "$CUTOVER_MODE" = "1" ]; then
   echo "==> Leaving maintenance mode..."
   "$PHP_BIN" artisan up
