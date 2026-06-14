@@ -38,6 +38,8 @@ return [
         'summary_max_tokens' => env('GEMINI_SUMMARY_MAX_TOKENS', 800),
         'question_max_tokens' => env('GEMINI_QUESTION_MAX_TOKENS', 400),
         'timeout' => env('GEMINI_TIMEOUT', 30),
+        'summary_cache_enabled' => env('GEMINI_SUMMARY_CACHE_ENABLED', true),
+        'summary_cache_seconds' => env('GEMINI_SUMMARY_CACHE_SECONDS', 604800),
     ],
 
 ];

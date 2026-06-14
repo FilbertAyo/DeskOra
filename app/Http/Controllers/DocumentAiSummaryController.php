@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Services\AiAssistService;
 use App\Services\DocumentAiSummaryBuilder;
+use App\Services\DocumentAiSummaryCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -14,6 +15,7 @@ class DocumentAiSummaryController extends Controller
     public function __construct(
         private readonly AiAssistService $aiAssistService,
         private readonly DocumentAiSummaryBuilder $summaryBuilder,
+        private readonly DocumentAiSummaryCache $summaryCache,
     ) {}
 
     public function summarize(Request $request): JsonResponse
@@ -25,11 +27,18 @@ class DocumentAiSummaryController extends Controller
 
         try {
             [$plan, $report] = $this->resolveWeeklyDocuments($validated);
-            $sourceText = $this->summaryBuilder->buildCombined($plan, $report);
-            $summary = $this->aiAssistService->summarizeWeeklySubmission(
-                $sourceText,
-                $plan !== null,
-                $report !== null
+            $summary = $this->summaryCache->rememberSummary(
+                $plan,
+                $report,
+                function () use ($plan, $report): string {
+                    $sourceText = $this->summaryBuilder->buildCombined($plan, $report);
+
+                    return $this->aiAssistService->summarizeWeeklySubmission(
+                        $sourceText,
+                        $plan !== null,
+                        $report !== null
+                    );
+                }
             );
         } catch (RuntimeException $exception) {
             return response()->json([
@@ -58,11 +67,19 @@ class DocumentAiSummaryController extends Controller
 
         try {
             [$plan, $report] = $this->resolveWeeklyDocuments($validated);
-            $sourceText = $this->summaryBuilder->buildCombined($plan, $report);
-            $answer = $this->aiAssistService->answerWeeklySubmissionQuestion(
-                $sourceText,
+            $answer = $this->summaryCache->rememberAnswer(
+                $plan,
+                $report,
                 $validated['question'],
-                $validated['summary'] ?? null
+                function () use ($plan, $report, $validated): string {
+                    $sourceText = $this->summaryBuilder->buildCombined($plan, $report);
+
+                    return $this->aiAssistService->answerWeeklySubmissionQuestion(
+                        $sourceText,
+                        $validated['question'],
+                        $validated['summary'] ?? null
+                    );
+                }
             );
         } catch (RuntimeException $exception) {
             return response()->json([
