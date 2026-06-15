@@ -477,7 +477,7 @@
                 <div class="card-body">
                     @if($activeActionTaskCount > 0)
                         <p class="text-muted small mb-3">
-                            Tasks assigned to you that still need an update. Give a quick progress update without leaving the dashboard.
+                            Tasks assigned to you that still need an update. Give a quick progress update.
                         </p>
                         <div class="list-group list-group-flush border rounded">
                             @foreach($activeActionTasks as $task)
@@ -511,7 +511,7 @@
                                                     data-progress="{{ $tProgress }}"
                                                     data-notes="{{ $task['latest_notes'] ?? '' }}"
                                                     data-period="{{ $task['period_label'] ?? '' }}">
-                                                   Report
+                                                   Update
                                                 </button>
                                             @elseif(!empty($task['document_id']))
                                                 <a href="{{ route('action-logs.show', $task['document_id']) }}" class="btn btn-sm btn-outline-secondary">
