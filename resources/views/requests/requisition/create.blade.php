@@ -95,7 +95,7 @@
                                 <tr>
                                     <td class="row-no">{{ $index + 1 }}</td>
                                     <td>
-                                        <textarea class="form-control form-control-lg" rows="5" name="items[{{ $index }}][description]" required>{{ $item['description'] ?? '' }}</textarea>
+                                        <textarea class="form-control form-control-lg" rows="3" name="items[{{ $index }}][description]" required>{{ $item['description'] ?? '' }}</textarea>
                                     </td>
                                     <td><input type="text" class="form-control form-control-sm" name="items[{{ $index }}][unit]" value="{{ $item['unit'] ?? '' }}"></td>
                                     <td><input type="number" step="0.01" class="form-control item-cost" name="items[{{ $index }}][cost]" value="{{ $item['cost'] ?? '' }}" required></td>
@@ -146,7 +146,7 @@
         const index = tableBody.querySelectorAll('tr').length;
         const row = document.createElement('tr');
         row.innerHTML = `<td class="row-no">${index + 1}</td>
-            <td><textarea class="form-control form-control-lg" rows="5" name="items[${index}][description]" required></textarea></td>
+            <td><textarea class="form-control form-control-lg" rows="3" name="items[${index}][description]" required></textarea></td>
             <td><input type="text" class="form-control form-control-sm" name="items[${index}][unit]"></td>
             <td><input type="number" step="0.01" class="form-control item-cost" name="items[${index}][cost]" required></td>
             <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">Remove</button></td>`;
