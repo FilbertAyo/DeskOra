@@ -511,7 +511,7 @@
                                                     data-progress="{{ $tProgress }}"
                                                     data-notes="{{ $task['latest_notes'] ?? '' }}"
                                                     data-period="{{ $task['period_label'] ?? '' }}">
-                                                    <i class="ti ti-edit me-1"></i>Update
+                                                   Report
                                                 </button>
                                             @elseif(!empty($task['document_id']))
                                                 <a href="{{ route('action-logs.show', $task['document_id']) }}" class="btn btn-sm btn-outline-secondary">
