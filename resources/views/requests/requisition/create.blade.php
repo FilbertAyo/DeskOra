@@ -53,7 +53,7 @@
                         @endforeach
                     </select>
                     @if (($planActivities ?? collect())->isEmpty())
-                        <small class="text-danger">No year plan activities found for your assigned sub-department(s).</small>
+                        <small class="text-danger">No year plan activities found for your department.</small>
                     @endif
                 </div>
                 <div class="col-md-3 mt-2">

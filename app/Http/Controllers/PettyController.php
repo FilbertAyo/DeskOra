@@ -22,6 +22,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -182,33 +183,7 @@ class PettyController extends Controller
     {
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        $subDepartmentIds = $user?->subDepartments()->pluck('departments.id')->all() ?? [];
-
-        if (empty($subDepartmentIds) && $user?->department_id) {
-            $primaryDepartment = Department::find($user->department_id);
-            if ($primaryDepartment) {
-                $subDepartmentIds = $primaryDepartment->parent_id ? [$primaryDepartment->id] : $primaryDepartment->children()->pluck('id')->all();
-            }
-        }
-
-        $planActivities = collect();
-        if (! empty($subDepartmentIds)) {
-            $planActivities = YearPlanActivity::query()
-                ->with(['department', 'yearPlan'])
-                ->whereIn('department_id', $subDepartmentIds)
-                ->join('year_plans', 'year_plans.id', '=', 'year_plan_activities.year_plan_id')
-                ->orderByDesc('year_plans.year')
-                ->orderBy('year_plan_activities.sort_order')
-                ->select('year_plan_activities.*')
-                ->get()
-                ->map(fn (YearPlanActivity $activity) => [
-                    'id' => (string) $activity->id,
-                    'code' => $activity->displayCode(),
-                    'description' => $activity->description,
-                    'department_id' => (string) $activity->department_id,
-                    'year' => $activity->yearPlan?->year,
-                ]);
-        }
+        $planActivities = $this->requisitionPlanActivitiesForUser($user);
 
         return view('requests.requisition.create', compact('planActivities'));
     }
@@ -548,8 +523,11 @@ class PettyController extends Controller
         }
 
         $request = $petty->load(['requisitionDetails', 'requisitionItems']);
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        $planActivities = $this->requisitionPlanActivitiesForUser($user);
 
-        return view('requests.requisition.edit', compact('request'));
+        return view('requests.requisition.edit', compact('request', 'planActivities'));
     }
 
     public function requisitionUpdate(Request $request, FinanceRequest $petty)
@@ -565,6 +543,7 @@ class PettyController extends Controller
             'activity_code' => 'required|string|max:255',
             'activity_title' => 'required|string|max:255',
             'budget_code' => 'required|string|max:255',
+            'department_id' => ['nullable', 'string', 'ulid', 'exists:departments,id'],
             'date_of_request' => 'nullable|date',
             'date_of_requirement' => 'nullable|date',
             'reason' => 'nullable|string|max:1000',
@@ -573,6 +552,10 @@ class PettyController extends Controller
             'items.*.unit' => 'nullable|string|max:255',
             'items.*.cost' => 'required|numeric|min:0',
         ]);
+
+        if (! empty($validated['department_id'])) {
+            $petty->update(['department_id' => $validated['department_id']]);
+        }
 
         $petty->requisitionDetails()->update([
             'project_program' => $validated['project_program'],
@@ -643,6 +626,60 @@ class PettyController extends Controller
         $petty->delete();
 
         return redirect()->back()->with('success', 'Request deleted successfully.');
+    }
+
+    /**
+     * Sub-department IDs under the user's parent department (all units in that department).
+     *
+     * @return list<string>
+     */
+    private function departmentSubDepartmentIdsForUser(?User $user): array
+    {
+        if (! $user?->department_id) {
+            return [];
+        }
+
+        $department = Department::find($user->department_id);
+        if (! $department) {
+            return [];
+        }
+
+        $parentDepartment = $department->parent_id
+            ? Department::find($department->parent_id)
+            : $department;
+
+        if (! $parentDepartment) {
+            return [(string) $department->id];
+        }
+
+        $subDepartmentIds = $parentDepartment->children()->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        return $subDepartmentIds !== [] ? $subDepartmentIds : [(string) $parentDepartment->id];
+    }
+
+    private function requisitionPlanActivitiesForUser(?User $user): Collection
+    {
+        $subDepartmentIds = $this->departmentSubDepartmentIdsForUser($user);
+
+        if ($subDepartmentIds === []) {
+            return collect();
+        }
+
+        return YearPlanActivity::query()
+            ->with(['department', 'yearPlan'])
+            ->whereIn('department_id', $subDepartmentIds)
+            ->join('year_plans', 'year_plans.id', '=', 'year_plan_activities.year_plan_id')
+            ->orderByDesc('year_plans.year')
+            ->orderBy('year_plan_activities.sort_order')
+            ->select('year_plan_activities.*')
+            ->get()
+            ->map(fn (YearPlanActivity $activity) => [
+                'id' => (string) $activity->id,
+                'code' => $activity->displayCode(),
+                'description' => $activity->description,
+                'department_id' => (string) $activity->department_id,
+                'year' => $activity->yearPlan?->year,
+            ]);
     }
 
     private function resolveDepartmentScopeIds(?string $departmentId): array

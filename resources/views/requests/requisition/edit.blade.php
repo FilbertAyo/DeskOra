@@ -10,28 +10,60 @@
         </div>
     </div>
 
+    @php
+        $requisitionDetails = $request->requisitionDetails;
+        $selectedActivityCode = old('activity_code', $requisitionDetails?->activity_code);
+        $activityCodes = collect($planActivities ?? [])->pluck('code')->all();
+    @endphp
+
     <form method="POST" action="{{ route('requisition.update', $request->id) }}">
         @csrf
         @method('PUT')
+        <input type="hidden" name="department_id" id="department_id" value="{{ old('department_id', $request->department_id) }}">
         <div class="card shadow-none border">
             <div class="card-header"><div class="card-title">Requisition Details</div></div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6 mt-2">
                         <label class="form-label">Project / Program</label>
-                        <input type="text" class="form-control" name="project_program" value="{{ old('project_program', $request->project_program) }}" required>
+                        <input type="text" class="form-control" name="project_program" value="{{ old('project_program', $requisitionDetails?->project_program) }}" required>
                     </div>
                     <div class="col-md-3 mt-2">
                         <label class="form-label">Activity Code</label>
-                        <input type="text" class="form-control" name="activity_code" value="{{ old('activity_code', $request->activity_code) }}" required>
+                        <select class="form-control" name="activity_code" id="activity_code" required>
+                            <option value="" disabled {{ $selectedActivityCode ? '' : 'selected' }}>Select activity code</option>
+                            @if ($selectedActivityCode && ! in_array($selectedActivityCode, $activityCodes, true))
+                                <option
+                                    value="{{ $selectedActivityCode }}"
+                                    data-description="{{ old('activity_title', $requisitionDetails?->activity_title) }}"
+                                    data-year="{{ old('budget_code', $requisitionDetails?->budget_code) }}"
+                                    data-department-id="{{ old('department_id', $request->department_id) }}"
+                                    selected>
+                                    {{ $selectedActivityCode }} (saved)
+                                </option>
+                            @endif
+                            @foreach (($planActivities ?? collect()) as $activity)
+                                <option
+                                    value="{{ $activity['code'] }}"
+                                    data-description="{{ $activity['description'] }}"
+                                    data-year="{{ $activity['year'] }}"
+                                    data-department-id="{{ $activity['department_id'] }}"
+                                    {{ $selectedActivityCode === $activity['code'] ? 'selected' : '' }}>
+                                    {{ $activity['code'] }} - {{ \Illuminate\Support\Str::limit($activity['description'], 90) }} @if($activity['year']) ({{ $activity['year'] }}) @endif
+                                </option>
+                            @endforeach
+                        </select>
+                        @if (($planActivities ?? collect())->isEmpty())
+                            <small class="text-danger">No year plan activities found for your department.</small>
+                        @endif
                     </div>
                     <div class="col-md-3 mt-2">
                         <label class="form-label">Budget Code</label>
-                        <input type="text" class="form-control" name="budget_code" value="{{ old('budget_code', $request->budget_code) }}" required>
+                        <input type="text" class="form-control" id="budget_code" name="budget_code" value="{{ old('budget_code', $requisitionDetails?->budget_code) }}" required readonly>
                     </div>
                     <div class="col-md-6 mt-2">
                         <label class="form-label">Activity Title</label>
-                        <input type="text" class="form-control" name="activity_title" value="{{ old('activity_title', $request->activity_title) }}" required>
+                        <input type="text" class="form-control" id="activity_title" name="activity_title" value="{{ old('activity_title', $requisitionDetails?->activity_title) }}" required readonly>
                     </div>
                     <div class="col-md-3 mt-2">
                         <label class="form-label">Date of Request</label>
@@ -84,6 +116,10 @@
         const tableBody = document.querySelector('#itemsTable tbody');
         const addRowBtn = document.getElementById('addItemRow');
         const totalField = document.getElementById('requisitionTotal');
+        const activityCodeField = document.getElementById('activity_code');
+        const budgetCodeField = document.getElementById('budget_code');
+        const activityTitleField = document.getElementById('activity_title');
+        const departmentField = document.getElementById('department_id');
         function recalc() {
             let total = 0;
             document.querySelectorAll('.item-cost').forEach((input) => total += parseFloat(input.value || 0));
@@ -118,6 +154,20 @@
         tableBody?.addEventListener('input', (e) => {
             if (e.target.classList.contains('item-cost')) recalc();
         });
+        activityCodeField?.addEventListener('change', () => {
+            const selected = activityCodeField.options[activityCodeField.selectedIndex];
+            if (selected) {
+                if (budgetCodeField) budgetCodeField.value = selected.dataset.year || '';
+                if (activityTitleField) activityTitleField.value = selected.dataset.description || '';
+                if (departmentField) departmentField.value = selected.dataset.departmentId || departmentField.value;
+            }
+        });
+        if (activityCodeField && activityCodeField.selectedIndex > 0) {
+            const selected = activityCodeField.options[activityCodeField.selectedIndex];
+            if (budgetCodeField) budgetCodeField.value = selected?.dataset.year || budgetCodeField.value;
+            if (activityTitleField) activityTitleField.value = selected?.dataset.description || activityTitleField.value;
+            if (departmentField) departmentField.value = selected?.dataset.departmentId || departmentField.value;
+        }
         recalc();
     })();
     </script>
