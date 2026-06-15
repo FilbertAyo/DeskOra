@@ -119,7 +119,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_manager_cannot_cancel_task_without_reason(): void
+    public function test_manager_can_cancel_task_without_separate_reason(): void
     {
         /** @var User $manager */
         $manager = User::factory()->create();
@@ -149,10 +149,14 @@ class ActionLogPanelCorrectionsTest extends TestCase
             ],
         ]);
 
-        $response->assertSessionHas('error', 'Please provide a cancellation reason for every cancelled action log task.');
+        $response->assertSessionHas('success');
+        $document->refresh();
+        $task = $document->content['tasks'][0] ?? [];
+
+        $this->assertSame('Cancelled', $task['progress'] ?? null);
     }
 
-    public function test_assigned_staff_cannot_set_cancelled_status(): void
+    public function test_assigned_staff_can_set_cancelled_status(): void
     {
         /** @var User $manager */
         $manager = User::factory()->create();
@@ -179,7 +183,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             'action' => 'draft',
             'content' => [
                 'tasks' => [
-                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Cancelled', null, null, 'Trying to cancel', 'No reason'),
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Cancelled', null, null, 'No longer needed'),
                 ],
             ],
         ]);
@@ -188,7 +192,8 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $document->refresh();
         $task = $document->content['tasks'][0] ?? [];
 
-        $this->assertSame('Not Started', $task['progress'] ?? null);
+        $this->assertSame('Cancelled', $task['progress'] ?? null);
+        $this->assertSame('No longer needed', $task['notes_progress'] ?? null);
     }
 
     public function test_staff_progress_updates_append_history_timeline_entries(): void

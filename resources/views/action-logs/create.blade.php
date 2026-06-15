@@ -51,7 +51,6 @@
                 'due_date' => '',
                 'compilation_date' => '',
                 'notes_progress' => '',
-                'status_reason' => '',
             ]];
         }
         $tasksForJson = collect($taskRows)->map(function ($row) {
@@ -65,7 +64,6 @@
                 'due_date' => $row['due_date'] ? (string) $row['due_date'] : '',
                 'compilation_date' => $row['compilation_date'] ? (string) $row['compilation_date'] : '',
                 'notes_progress' => (string) ($row['notes_progress'] ?? ''),
-                'status_reason' => (string) ($row['status_reason'] ?? ''),
                 'can_edit' => true,
             ];
         })->values()->all();
@@ -185,7 +183,7 @@
 
             const isManager = true;
             const progressOptionsManager = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
-            const progressOptionsStaff = ['Not Started', 'In Progress', 'Done'];
+            const progressOptionsStaff = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
 
             let tasks = [];
             let editingIndex = null;
@@ -206,7 +204,6 @@
                     due_date: '',
                     compilation_date: '',
                     notes_progress: '',
-                    status_reason: '',
                     can_edit: true,
                 };
             }
@@ -234,7 +231,6 @@
                     due_date: t.due_date ? String(t.due_date) : '',
                     compilation_date: t.compilation_date ? String(t.compilation_date) : '',
                     notes_progress: String(t.notes_progress || ''),
-                    status_reason: String(t.status_reason || ''),
                     can_edit: t.can_edit !== false,
                 };
             }
@@ -281,7 +277,6 @@
                 document.getElementById('actionLogModalDueDate').value = '';
                 document.getElementById('actionLogModalCompilationDate').value = '';
                 document.getElementById('actionLogModalNotes').value = '';
-                document.getElementById('actionLogModalStatusReason').value = '';
                 fillProgressSelect('Not Started');
                 cloneUserOptionsIntoModal([]);
             }
@@ -297,7 +292,6 @@
                     due_date: document.getElementById('actionLogModalDueDate').value,
                     compilation_date: document.getElementById('actionLogModalCompilationDate').value,
                     notes_progress: document.getElementById('actionLogModalNotes').value,
-                    status_reason: isManager ? document.getElementById('actionLogModalStatusReason').value : '',
                 };
             }
 
@@ -307,7 +301,6 @@
                 document.getElementById('actionLogModalDueDate').value = task.due_date || '';
                 document.getElementById('actionLogModalCompilationDate').value = task.compilation_date || '';
                 document.getElementById('actionLogModalNotes').value = task.notes_progress || '';
-                document.getElementById('actionLogModalStatusReason').value = task.status_reason || '';
                 fillProgressSelect(task.progress || 'Not Started');
                 cloneUserOptionsIntoModal(task.responsible_user_ids || []);
             }
@@ -348,7 +341,7 @@
                         taskRowsBody.appendChild(hi);
                     });
 
-                    ['progress', 'due_date', 'compilation_date', 'notes_progress', 'status_reason'].forEach(function(key) {
+                    ['progress', 'due_date', 'compilation_date', 'notes_progress'].forEach(function(key) {
                         const inp = document.createElement('input');
                         inp.type = 'hidden';
                         inp.name = 'content[tasks][' + i + '][' + key + ']';

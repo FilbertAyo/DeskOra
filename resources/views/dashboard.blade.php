@@ -561,6 +561,7 @@
                                 <option value="Not Started">Not Started</option>
                                 <option value="In Progress">In Progress</option>
                                 <option value="Done">Done</option>
+                                <option value="Cancelled">Cancelled</option>
                             </select>
                         </div>
                         <div class="mb-0">

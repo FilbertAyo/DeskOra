@@ -30,14 +30,9 @@
                         <input type="date" class="form-control" id="actionLogModalCompilationDate">
                     </div>
                 </div>
-                <div class="mb-3">
+                <div class="mb-0">
                     <label for="actionLogModalNotes" class="form-label">Notes / progress update</label>
                     <textarea class="form-control action-log-textarea-md" id="actionLogModalNotes" rows="4" placeholder="Weekly updates, blockers, or context"></textarea>
-                </div>
-                <div class="mb-0 action-log-modal-manager-only">
-                    <label for="actionLogModalStatusReason" class="form-label">Cancellation reason</label>
-                    <small class="d-block text-muted mb-1">Required only if progress is <strong>Cancelled</strong>.</small>
-                    <textarea class="form-control action-log-textarea-sm" id="actionLogModalStatusReason" rows="3" placeholder="Why was this task cancelled?"></textarea>
                 </div>
             </div>
             <div class="modal-footer">

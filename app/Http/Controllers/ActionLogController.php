@@ -39,6 +39,7 @@ class ActionLogController extends Controller
         self::PROGRESS_NOT_STARTED,
         self::PROGRESS_IN_PROGRESS,
         self::PROGRESS_DONE,
+        self::PROGRESS_CANCELLED,
     ];
 
     /**
@@ -206,13 +207,6 @@ class ActionLogController extends Controller
                     ->withInput()
                     ->with('error', 'Action log must contain at least one task.');
             }
-            $cancelledReasonError = $this->validateCancelledTasks($finalTasks, true);
-            if ($cancelledReasonError) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', $cancelledReasonError);
-            }
-
             $nextState = $existingDocument->isSubmitted()
                 ? Document::STATE_SUBMITTED
                 : $state;
@@ -231,12 +225,6 @@ class ActionLogController extends Controller
                 $period,
                 (string) $user->id
             );
-            $cancelledReasonError = $this->validateCancelledTasks($initialTasks, true);
-            if ($cancelledReasonError) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', $cancelledReasonError);
-            }
             // Create new document
             $document = Document::create([
                 'user_id' => $user->id,
@@ -446,13 +434,6 @@ class ActionLogController extends Controller
                 ->withInput()
                 ->with('error', 'Action log must contain at least one task.');
         }
-        $cancelledReasonError = $this->validateCancelledTasks($finalTasks, $isManager);
-        if ($cancelledReasonError) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', $cancelledReasonError);
-        }
-
         $updateData = [
             'content' => ['tasks' => $this->renumberTasks($finalTasks)],
             'title' => $this->buildActionLogTitle($period),
@@ -500,7 +481,7 @@ class ActionLogController extends Controller
 
         $validated = $request->validate([
             'task_uid' => ['required', 'string', 'max:80'],
-            'progress' => ['required', 'string', 'in:Not Started,In Progress,Done'],
+            'progress' => ['required', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
             'notes_progress' => ['nullable', 'string', 'max:4000'],
         ]);
 
@@ -643,7 +624,6 @@ class ActionLogController extends Controller
             $compilationDate = trim((string) ($task['compilation_date'] ?? ''));
             $notesProgress = trim((string) ($task['notes_progress'] ?? ''));
             $taskUid = trim((string) ($task['task_uid'] ?? ''));
-            $statusReason = trim((string) ($task['status_reason'] ?? ''));
 
             $responsibleIds = $task['responsible_user_ids'] ?? [];
             if (! is_array($responsibleIds)) {
@@ -672,10 +652,6 @@ class ActionLogController extends Controller
             }
             $history = array_values(array_filter($history, static fn ($entry) => is_array($entry)));
 
-            if ($progress !== self::PROGRESS_CANCELLED) {
-                $statusReason = '';
-            }
-
             $normalized[] = [
                 'task_uid' => $taskUid !== '' ? $taskUid : ('task_'.uniqid()),
                 'task_no' => $taskNo > 0 ? $taskNo : (count($normalized) + 1),
@@ -685,7 +661,7 @@ class ActionLogController extends Controller
                 'due_date' => $dueDate !== '' ? $dueDate : null,
                 'compilation_date' => $compilationDate !== '' ? $compilationDate : null,
                 'notes_progress' => $notesProgress,
-                'status_reason' => $statusReason !== '' ? $statusReason : null,
+                'status_reason' => null,
                 'history' => $history,
             ];
         }
@@ -883,42 +859,10 @@ class ActionLogController extends Controller
             $progress = self::PROGRESS_NOT_STARTED;
         }
 
-        if (! $isManager && $progress === self::PROGRESS_CANCELLED) {
-            $progress = trim((string) ($task['existing_progress'] ?? self::PROGRESS_NOT_STARTED));
-            if (! in_array($progress, self::STAFF_PROGRESS_OPTIONS, true)) {
-                $progress = self::PROGRESS_NOT_STARTED;
-            }
-        }
-
         $task['progress'] = $progress;
-        if ($progress !== self::PROGRESS_CANCELLED) {
-            $task['status_reason'] = null;
-        }
+        $task['status_reason'] = null;
 
         return $task;
-    }
-
-    private function validateCancelledTasks(array $tasks, bool $isManager): ?string
-    {
-        foreach ($tasks as $task) {
-            if (! is_array($task)) {
-                continue;
-            }
-            $progress = trim((string) ($task['progress'] ?? ''));
-            if ($progress !== self::PROGRESS_CANCELLED) {
-                continue;
-            }
-            if (! $isManager) {
-                return 'Only authorized personnel can cancel an action log task.';
-            }
-
-            $reason = trim((string) ($task['status_reason'] ?? ''));
-            if ($reason === '') {
-                return 'Please provide a cancellation reason for every cancelled action log task.';
-            }
-        }
-
-        return null;
     }
 
     private function buildActionLogTitle(WorkPeriod $period): string
