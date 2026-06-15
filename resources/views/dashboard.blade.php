@@ -369,7 +369,7 @@
             </div>
         </div>
 
-        <div class="col-xl-6 col-md-6 col-12">
+        <div class="col-xl-8 col-md-8 col-12">
             <div class="card shadow-none border h-100">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Weekly Activities</h5>
@@ -463,7 +463,7 @@
         </div>
 
 
-        <div class="col-xl-6 col-md-6 col-12">
+        <div class="col-xl-4 col-md-4 col-12">
             <div class="card shadow-none border h-100">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
