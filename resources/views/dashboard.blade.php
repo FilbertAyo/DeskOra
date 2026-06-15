@@ -369,12 +369,6 @@
             </div>
         </div>
 
-        @if($assignedWeeklyActivityCount > 0 && $currentPeriod)
-            @include('documents.partials.weekly-assigned-activities-card', [
-                'assignmentPeriod' => $currentPeriod,
-            ])
-        @endif
-
         <div class="col-xl-6 col-md-6 col-12">
             <div class="card shadow-none border h-100">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
@@ -382,6 +376,13 @@
                     <small class="text-muted">Revisions and drafts</small>
                 </div>
                 <div class="card-body">
+                    @if($assignedWeeklyActivityCount > 0 && $currentPeriod)
+                        @include('documents.partials.weekly-assigned-activities-card', [
+                            'assignmentPeriod' => $currentPeriod,
+                            'embedded' => true,
+                        ])
+                    @endif
+
                     @if($returnedDocs->count() > 0)
                         <div class="mb-3">
                             <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>

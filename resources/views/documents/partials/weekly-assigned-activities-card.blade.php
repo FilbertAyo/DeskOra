@@ -28,13 +28,18 @@
 @endphp
 
 @if($assignedRows->isNotEmpty())
-    <div class="col-12 mb-3">
-        <div class="card border-info-subtle">
-            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="ti ti-clipboard-list me-2"></i>{{ $assignmentTitle }}</h6>
-                <small class="text-muted">{{ $assignmentSubtitle }}</small>
-            </div>
-            <div class="card-body">
+    <div class="{{ ($embedded ?? false) ? 'mb-3' : 'col-12 mb-3' }}">
+        @if($embedded ?? false)
+            <h6 class="text-info mb-2"><i class="ti ti-clipboard-list me-1"></i>{{ $assignmentTitle }}</h6>
+            <small class="text-muted d-block mb-2">{{ $assignmentSubtitle }}</small>
+        @else
+            <div class="card border-info-subtle">
+                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="ti ti-clipboard-list me-2"></i>{{ $assignmentTitle }}</h6>
+                    <small class="text-muted">{{ $assignmentSubtitle }}</small>
+                </div>
+                <div class="card-body">
+        @endif
                 <div class="table-responsive">
                     <table class="table table-bordered table-striped align-middle mb-0">
                         <thead class="wh-thead-weekly-plan">
@@ -80,7 +85,9 @@
                         </tbody>
                     </table>
                 </div>
+        @unless($embedded ?? false)
+                </div>
             </div>
-        </div>
+        @endunless
     </div>
 @endif
