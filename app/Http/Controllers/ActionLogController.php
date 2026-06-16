@@ -138,13 +138,13 @@ class ActionLogController extends Controller
         $this->authorize('createType', [Document::class, Document::TYPE_ACTION_LOG]);
 
         $request->validate([
-            'period_id' => ['required', 'string', 'ulid', 'exists:work_periods,id'],
+            'period_id' => ['required', 'string', 'short_id', 'exists:work_periods,id'],
             'content' => ['nullable', 'array'],
             'content.tasks' => ['nullable', 'array'],
             'content.tasks.*.task_no' => ['nullable', 'integer', 'min:1'],
             'content.tasks.*.task' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.responsible_user_ids' => ['nullable', 'array'],
-            'content.tasks.*.responsible_user_ids.*' => ['nullable', 'string', 'ulid', 'exists:users,id'],
+            'content.tasks.*.responsible_user_ids.*' => ['nullable', 'string', 'short_id', 'exists:users,id'],
             'content.tasks.*.progress' => ['nullable', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
             'content.tasks.*.due_date' => ['nullable', 'date'],
             'content.tasks.*.compilation_date' => ['nullable', 'date'],
@@ -380,14 +380,14 @@ class ActionLogController extends Controller
         }
 
         $request->validate([
-            'period_id' => ['required', 'string', 'ulid', 'exists:work_periods,id'],
+            'period_id' => ['required', 'string', 'short_id', 'exists:work_periods,id'],
             'content' => ['nullable', 'array'],
             'content.tasks' => ['nullable', 'array'],
             'content.tasks.*.task_uid' => ['nullable', 'string', 'max:80'],
             'content.tasks.*.task_no' => ['nullable', 'integer', 'min:1'],
             'content.tasks.*.task' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.responsible_user_ids' => ['nullable', 'array'],
-            'content.tasks.*.responsible_user_ids.*' => ['nullable', 'string', 'ulid', 'exists:users,id'],
+            'content.tasks.*.responsible_user_ids.*' => ['nullable', 'string', 'short_id', 'exists:users,id'],
             'content.tasks.*.progress' => ['nullable', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
             'content.tasks.*.due_date' => ['nullable', 'date'],
             'content.tasks.*.compilation_date' => ['nullable', 'date'],

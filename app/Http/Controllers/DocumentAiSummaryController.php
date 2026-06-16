@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
-use App\Rules\DocumentShortId;
+use App\Rules\ShortId as ShortIdRule;
 use App\Services\AiAssistService;
 use App\Services\DocumentAiSummaryBuilder;
 use App\Services\DocumentAiSummaryCache;
@@ -22,8 +22,8 @@ class DocumentAiSummaryController extends Controller
     public function summarize(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'plan_id' => ['nullable', 'string', new DocumentShortId, 'exists:documents,id'],
-            'report_id' => ['nullable', 'string', new DocumentShortId, 'exists:documents,id'],
+            'plan_id' => ['nullable', 'string', new ShortIdRule, 'exists:documents,id'],
+            'report_id' => ['nullable', 'string', new ShortIdRule, 'exists:documents,id'],
         ]);
 
         try {
@@ -61,8 +61,8 @@ class DocumentAiSummaryController extends Controller
     public function ask(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'plan_id' => ['nullable', 'string', new DocumentShortId, 'exists:documents,id'],
-            'report_id' => ['nullable', 'string', new DocumentShortId, 'exists:documents,id'],
+            'plan_id' => ['nullable', 'string', new ShortIdRule, 'exists:documents,id'],
+            'report_id' => ['nullable', 'string', new ShortIdRule, 'exists:documents,id'],
             'question' => ['required', 'string', 'max:500'],
             'summary' => ['nullable', 'string', 'max:5000'],
         ]);

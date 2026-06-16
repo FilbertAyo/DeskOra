@@ -5,7 +5,7 @@ namespace Tests\Unit;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
-use App\Services\Documents\DocumentShortIdGenerator;
+use App\Support\ShortId;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -44,13 +44,13 @@ class DocumentShortIdGeneratorTest extends TestCase
             'content' => [],
         ]);
 
-        $this->assertTrue(DocumentShortIdGenerator::isShortId((string) $document->id));
+        $this->assertTrue(ShortId::is((string) $document->id));
         $this->assertSame(4, strlen((string) $document->id));
     }
 
     public function test_generated_ids_are_globally_unique_across_document_types(): void
     {
-        $generator = app(DocumentShortIdGenerator::class);
+        $generator = app(\App\Services\ShortIdGenerator::class);
         $period = WorkPeriod::create([
             'year' => 2026,
             'week_number' => 17,

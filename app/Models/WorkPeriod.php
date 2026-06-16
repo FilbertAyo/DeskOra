@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
+use App\Concerns\HasShortId;
+
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,7 +14,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class WorkPeriod extends Model
 {
-    use HasFactory, HasUlids, LogsActivity, SoftDeletes;
+    use HasFactory, HasShortId, LogsActivity, SoftDeletes;
 
     public function getActivitylogOptions(): LogOptions
     {

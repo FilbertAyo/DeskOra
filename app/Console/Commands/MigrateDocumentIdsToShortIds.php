@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Documents\DocumentShortIdMigrator;
+use App\Services\ShortIdMigrator;
 use Illuminate\Console\Command;
 
 class MigrateDocumentIdsToShortIds extends Command
@@ -12,7 +12,7 @@ class MigrateDocumentIdsToShortIds extends Command
 
     protected $description = 'Convert document domain primary keys from ULIDs to 4-character ids';
 
-    public function handle(DocumentShortIdMigrator $migrator): int
+    public function handle(ShortIdMigrator $migrator): int
     {
         if (! $this->option('force') && ! $migrator->needsMigration()) {
             $this->info('Document ids already use the short format. Nothing to do.');

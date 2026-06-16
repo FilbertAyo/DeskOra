@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Concerns\HasShortId;
+
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class Department extends Model
 {
-    use HasUlids, LogsActivity;
+    use HasShortId, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {

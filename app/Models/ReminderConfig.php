@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Concerns\HasShortId;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ReminderConfig extends Model
 {
     use HasFactory;
-    use HasUlids;
+    use HasShortId;
 
     public const KEY_WEEKLY_PLAN_REPORT = 'weekly_plan_report_followup';
 

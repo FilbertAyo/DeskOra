@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Concerns\HasShortId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MonthlyReportOffPlanItem extends Model
 {
-    use HasUlids;
+    use HasShortId;
 
     protected $fillable = [
         'monthly_report_id',

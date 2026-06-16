@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use App\Concerns\HasDocumentShortId;
+use App\Concerns\HasShortId;
 use App\Models\Builders\DocumentBuilder;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Services\Documents\DocumentDomainSyncService;
-use App\Services\Documents\DocumentShortIdGenerator;
+use App\Services\ShortIdGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,7 +20,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Document extends Model
 {
-    use HasDocumentShortId, HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, HasShortId, LogsActivity, SoftDeletes;
 
     private static function supportsBinaryComparison(): bool
     {
@@ -1627,7 +1627,7 @@ class Document extends Model
         }
 
         if (! $this->id) {
-            $this->id = app(DocumentShortIdGenerator::class)->generateUnique();
+            $this->id = app(ShortIdGenerator::class)->generateUnique();
         }
 
         if ($this->fireModelEvent('saving') === false) {

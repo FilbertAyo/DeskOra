@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Concerns\HasShortId;
+
 use Illuminate\Database\Eloquent\Model;
 
 class ApprovalLog extends Model
 {
-    use HasUlids;
+    use HasShortId;
 
     protected $fillable = ['petty_id', 'replenishment_id', 'item_id', 'user_id', 'action', 'comment'];
 

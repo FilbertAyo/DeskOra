@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Concerns\HasShortId;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class RequestApproval extends Model
 {
-    use HasFactory, HasUlids;
+    use HasFactory, HasShortId;
 
     protected $fillable = [
         'request_id',

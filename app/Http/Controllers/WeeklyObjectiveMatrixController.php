@@ -68,8 +68,8 @@ class WeeklyObjectiveMatrixController extends Controller
         $parentDepartmentIds = $this->parentDepartmentIdsForUser($user);
 
         $validated = $request->validate([
-            'department_id' => ['required', 'string', 'ulid', Rule::in($parentDepartmentIds)],
-            'period_id' => ['required', 'string', 'ulid', 'exists:work_periods,id'],
+            'department_id' => ['required', 'string', 'short_id', Rule::in($parentDepartmentIds)],
+            'period_id' => ['required', 'string', 'short_id', 'exists:work_periods,id'],
         ]);
 
         $parentDepartment = Department::query()
@@ -179,7 +179,7 @@ class WeeklyObjectiveMatrixController extends Controller
             'entries.*.activity_key' => ['required', 'string'],
             'entries.*.input' => ['required', 'string', 'max:2000'],
             'entries.*.impact_year_plan_activity_ids' => ['required', 'array', 'min:1'],
-            'entries.*.impact_year_plan_activity_ids.*' => ['required', 'string', 'ulid'],
+            'entries.*.impact_year_plan_activity_ids.*' => ['required', 'string', 'short_id'],
         ]);
 
         $subDepartmentIds = $this->subDepartmentIdsForParent((string) $matrix->department_id);

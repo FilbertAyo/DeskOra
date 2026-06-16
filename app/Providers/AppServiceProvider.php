@@ -8,11 +8,13 @@ use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
 use App\Services\WeeklySubmissionReminderService;
+use App\Support\ShortId;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Validator::extend('short_id', static function (string $attribute, mixed $value): bool {
+            return is_string($value) && ShortId::is($value);
+        });
+
         $this->ensureDocumentsUnionView();
         $this->configureSessionAndUrl();
 

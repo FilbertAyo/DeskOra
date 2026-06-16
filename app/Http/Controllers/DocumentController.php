@@ -395,13 +395,13 @@ class DocumentController extends Controller
 
         // Make period_id required for weekly plans and reports
         if (in_array($request->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
-            $validationRules['period_id'] = ['required', 'string', 'ulid', 'exists:work_periods,id'];
+            $validationRules['period_id'] = ['required', 'string', 'short_id', 'exists:work_periods,id'];
             if ($request->type === Document::TYPE_WEEKLY_PLAN) {
                 $validationRules['shared_user_ids'] = ['nullable', 'array'];
-                $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+                $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             }
         } else {
-            $validationRules['period_id'] = ['nullable', 'string', 'ulid', 'exists:work_periods,id'];
+            $validationRules['period_id'] = ['nullable', 'string', 'short_id', 'exists:work_periods,id'];
         }
 
         // Add validation for monthly reports
@@ -438,14 +438,14 @@ class DocumentController extends Controller
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
-            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
@@ -470,7 +470,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
@@ -1147,14 +1147,14 @@ class DocumentController extends Controller
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
-            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -1182,7 +1182,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
             $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
@@ -1208,7 +1208,7 @@ class DocumentController extends Controller
 
         if ($document->type === Document::TYPE_WEEKLY_PLAN) {
             $validationRules['shared_user_ids'] = ['nullable', 'array'];
-            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'ulid', 'exists:users,id'];
+            $validationRules['shared_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
         }
 
         $request->validate($validationRules);

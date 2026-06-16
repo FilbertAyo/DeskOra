@@ -149,7 +149,7 @@ class YearPlanController extends Controller
         });
 
         $rules = [
-            'department_id' => ['required', 'string', 'ulid', $subDeptRule],
+            'department_id' => ['required', 'string', 'short_id', $subDeptRule],
             'description' => ['required', 'string', 'max:65535'],
             'frequency' => ['required', 'numeric', 'min:0'],
             'unit_count' => ['required', 'numeric', 'min:0'],

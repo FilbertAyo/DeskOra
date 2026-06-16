@@ -191,8 +191,8 @@ class PettyController extends Controller
     public function store(Request $request)
     {
         $baseRules = [
-            'user_id' => ['required', 'string', 'ulid', 'exists:users,id'],
-            'department_id' => ['required', 'string', 'ulid', 'exists:departments,id'],
+            'user_id' => ['required', 'string', 'short_id', 'exists:users,id'],
+            'department_id' => ['required', 'string', 'short_id', 'exists:departments,id'],
             'request_type' => 'required|string|in:Petty Cash,Reimbursement,Staff Requisition',
         ];
         $requestType = (string) $request->input('request_type');
@@ -543,7 +543,7 @@ class PettyController extends Controller
             'activity_code' => 'required|string|max:255',
             'activity_title' => 'required|string|max:255',
             'budget_code' => 'required|string|max:255',
-            'department_id' => ['nullable', 'string', 'ulid', 'exists:departments,id'],
+            'department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
             'date_of_request' => 'nullable|date',
             'date_of_requirement' => 'nullable|date',
             'reason' => 'nullable|string|max:1000',
