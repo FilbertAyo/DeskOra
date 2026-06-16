@@ -314,7 +314,6 @@ class WeeklyPlanScreeningHardeningTest extends TestCase
         $response->assertRedirect();
         $location = (string) $response->headers->get('Location');
         $this->assertStringContainsString('/documents/'.$existing->id.'/edit', $location);
-        $this->assertStringContainsString('return_to=', $location);
     }
 
     public function test_store_weekly_plan_reports_duplicate_validation_for_submitted_plan(): void

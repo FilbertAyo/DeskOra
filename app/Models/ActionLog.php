@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Concerns\HasDocumentShortId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ActionLog extends Model
 {
-    use HasUlids, SoftDeletes;
+    use HasDocumentShortId, SoftDeletes;
 
     protected $fillable = [
         'user_id',

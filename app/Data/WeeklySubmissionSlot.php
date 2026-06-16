@@ -45,23 +45,19 @@ final readonly class WeeklySubmissionSlot
         return $this->canCreateNew() || $this->canContinueDraft();
     }
 
-    public function actionUrl(string $documentType, ?string $returnTo = null): ?string
+    public function actionUrl(string $documentType): ?string
     {
         if (! $this->showAction()) {
             return null;
         }
 
         if ($this->document) {
-            return route('documents.edit', [
-                'document' => $this->document->id,
-                'return_to' => $returnTo,
-            ]);
+            return route('documents.edit', $this->document->id);
         }
 
         return route('documents.create', [
             'type' => $documentType,
             'period_id' => $this->period->id,
-            'return_to' => $returnTo,
         ]);
     }
 

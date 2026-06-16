@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         \App\Console\Commands\BackfillDocumentDomainTables::class,
         \App\Console\Commands\VerifyDocumentDomainParity::class,
+        \App\Console\Commands\MigrateDocumentIdsToShortIds::class,
     ])
     ->withMiddleware(function (Middleware $middleware) {
         // Required when the app sits behind HTTPS reverse proxies (nginx, Cloudflare, Render, etc.).

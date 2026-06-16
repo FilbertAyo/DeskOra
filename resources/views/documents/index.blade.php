@@ -112,7 +112,7 @@
                                 <a href="{{ route('year-plan.index') }}">year plan</a>
                                 for your sub-departments and the month you select. Report progress on those lines and add anything done outside the plan.
                             </div>
-                            <a href="{{ route('documents.create', ['type' => 'monthly_report', 'return_to' => request()->fullUrl()]) }}" class="btn btn-primary btn-sm text-nowrap">
+                            <a href="{{ route('documents.create', ['type' => 'monthly_report']) }}" class="btn btn-primary btn-sm text-nowrap">
                                 <i class="ti ti-plus-circle me-1"></i> New monthly report
                             </a>
                         </div>
@@ -226,12 +226,12 @@
     </button>
     @endif
     @if($planDoc)
-    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $planDoc->id, 'return_to' => request()->fullUrl()]) }}">
+    <a class="dropdown-item" href="{{ route('documents.show', $planDoc->id) }}">
     <i class="ti ti-target me-2"></i> View Plan
     </a>
     @endif
     @if($reportDoc)
-    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $reportDoc->id, 'return_to' => request()->fullUrl()]) }}">
+    <a class="dropdown-item" href="{{ route('documents.show', $reportDoc->id) }}">
     <i class="ti ti-activity me-2"></i> View Report
     </a>
     @endif

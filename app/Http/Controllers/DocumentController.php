@@ -4147,10 +4147,8 @@ class DocumentController extends Controller
                 ->with('info', $this->existingWeeklyDocumentMessage($existing));
         }
 
-        return redirect()->route('documents.edit', [
-            'document' => $existing->id,
-            'return_to' => $request->fullUrl(),
-        ])->with('info', 'You already have a draft '.$existing->type_name.' for this work period. Continue editing it below.');
+        return redirect()->route('documents.edit', $existing->id)
+            ->with('info', 'You already have a draft '.$existing->type_name.' for this work period. Continue editing it below.');
     }
 
     private function existingWeeklyDocumentMessage(Document $document): string

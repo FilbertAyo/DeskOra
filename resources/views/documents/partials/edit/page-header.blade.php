@@ -15,12 +15,12 @@
                         <ul class="breadcrumb">
                             <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                             <li class="breadcrumb-item"><a href="{{ $resolvedBackUrl }}">Documents</a></li>
-                            <li class="breadcrumb-item"><a href="{{ route('documents.show', ['document' => $document->id, 'return_to' => $resolvedBackUrl]) }}">View</a></li>
+                            <li class="breadcrumb-item"><a href="{{ route('documents.show', $document->id) }}">View</a></li>
                             <li class="breadcrumb-item" aria-current="page">Edit</li>
                         </ul>
                     </div>
                     <div class="col-auto d-flex align-items-center gap-2">
-                        <a href="{{ route('documents.show', ['document' => $document->id, 'return_to' => $resolvedBackUrl]) }}" class="btn btn-sm btn-info text-white">
+                        <a href="{{ route('documents.show', $document->id) }}" class="btn btn-sm btn-info text-white">
                             <i class="ti ti-eye me-1"></i> View Document
                         </a>
                         <a href="{{ $resolvedBackUrl }}" class="btn btn-sm btn-light">

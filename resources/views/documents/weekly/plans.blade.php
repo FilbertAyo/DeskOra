@@ -193,11 +193,11 @@
                                             </td>
                                             <td class="text-center">
                                                 <x-table-action-dropdown>
-    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
+    <a class="dropdown-item" href="{{ route('documents.show', $document->id) }}">
     <i class="ti ti-eye me-2"></i> View
     </a>
     @if($document->canBeEdited())
-    <a class="dropdown-item" href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => request()->fullUrl()]) }}">
+    <a class="dropdown-item" href="{{ route('documents.edit', $document->id) }}">
     <i class="ti ti-edit me-2"></i> Edit
     </a>
     @endif
@@ -206,7 +206,7 @@
     $relatedReport = $document->relatedWeeklyDocument();
     @endphp
     @if($relatedReport)
-    <a class="dropdown-item" href="{{ route('documents.show', ['document' => $relatedReport->id, 'return_to' => request()->fullUrl()]) }}">
+    <a class="dropdown-item" href="{{ route('documents.show', $relatedReport->id) }}">
     <i class="ti ti-activity me-2"></i> View Related Report
     </a>
     @endif

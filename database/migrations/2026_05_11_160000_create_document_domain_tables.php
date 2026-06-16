@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('title')->nullable();
             $table->enum('state', ['draft', 'submitted'])->default('draft');
             $table->text('main_target')->nullable();
+            $table->text('objective_reflection_progress')->nullable();
             $table->text('review_rejection_reason')->nullable();
             $table->enum('budget_review_status', ['pending', 'approved', 'rejected'])->nullable();
             $table->foreignUlid('budget_reviewed_by')->nullable()->constrained('users')->nullOnDelete();

@@ -49,7 +49,7 @@ echo "==> Running database migrations..."
 "$PHP_BIN" artisan migrate --force
 
 echo "==> Ensuring documents union view exists..."
-"$PHP_BIN" artisan documents:ensure-union-view
+"$PHP_BIN" artisan documents:ensure-union-view --force
 
 if [ "$RUN_DOMAIN_BACKFILL" = "1" ]; then
   echo "==> Running documents domain backfill..."

@@ -169,16 +169,12 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function ensureDocumentsUnionView(): void
     {
-        if (DB::connection()->getDriverName() !== 'mysql') {
-            return;
-        }
-
         if (! Schema::hasTable('weekly_plans')) {
             return;
         }
 
         if (! DocumentsUnionView::exists()) {
-            DocumentsUnionView::recreate();
+            DocumentsUnionView::recreate(DB::connection()->getDriverName() === 'mysql');
         }
     }
 

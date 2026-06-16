@@ -317,7 +317,7 @@ class WeeklyGracePeriodNotificationDispatcher
         WorkPeriod $period,
         Carbon $cutoff,
     ): array {
-        $actionUrl = $slot->actionUrl($documentType, route('dashboard'));
+        $actionUrl = $slot->actionUrl($documentType);
         $periodLabel = "Week {$period->week_number} of {$period->year}";
 
         try {

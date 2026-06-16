@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use App\Concerns\HasDocumentShortId;
 use App\Models\Builders\DocumentBuilder;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Services\Documents\DocumentDomainSyncService;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Services\Documents\DocumentShortIdGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +20,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Document extends Model
 {
-    use HasFactory, HasUlids, LogsActivity, SoftDeletes;
+    use HasDocumentShortId, HasFactory, LogsActivity, SoftDeletes;
 
     private static function supportsBinaryComparison(): bool
     {
@@ -894,9 +895,6 @@ class Document extends Model
         }
 
         $request = app('request');
-        $returnTo = $request instanceof \Illuminate\Http\Request
-            ? $request->fullUrl()
-            : route('documents.index');
 
         if ($this->type === self::TYPE_WEEKLY_PLAN
             && self::canUserCreateType($user, self::TYPE_WEEKLY_REPORT, $this->period)) {
@@ -906,7 +904,6 @@ class Document extends Model
                 'route' => route('documents.create', [
                     'type' => self::TYPE_WEEKLY_REPORT,
                     'period_id' => $this->period_id,
-                    'return_to' => $returnTo,
                 ]),
                 'description' => 'Weekly report is due on '.$this->period->getReportDeadlineCutoff()->format('M d, Y H:i'),
             ];
@@ -920,7 +917,6 @@ class Document extends Model
                 'route' => route('documents.create', [
                     'type' => self::TYPE_WEEKLY_PLAN,
                     'period_id' => $this->period_id,
-                    'return_to' => $returnTo,
                 ]),
                 'description' => 'Weekly plan should outline goals for this week.',
             ];
@@ -1631,11 +1627,7 @@ class Document extends Model
         }
 
         if (! $this->id) {
-            // Lowercase to match the `HasUlids` convention used by the domain
-            // tables (weekly_plans, weekly_reports, ...). Keeping the same casing
-            // ensures the Document id resolves the persisted domain row on
-            // case-sensitive databases.
-            $this->id = Str::lower((string) Str::ulid());
+            $this->id = app(DocumentShortIdGenerator::class)->generateUnique();
         }
 
         if ($this->fireModelEvent('saving') === false) {

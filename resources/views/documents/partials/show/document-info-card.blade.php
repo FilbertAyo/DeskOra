@@ -77,7 +77,7 @@
                         @endif
 
                         @if($document->canBeEdited())
-                            <a href="{{ route('documents.edit', ['document' => $document->id, 'return_to' => (request('return_to') ?: request()->fullUrl())]) }}" class="btn btn-primary btn-sm">
+                            <a href="{{ route('documents.edit', $document->id) }}" class="btn btn-primary btn-sm">
                                 Edit
                             </a>
                         @endif
