@@ -114,12 +114,17 @@ class ShortIdMigrator
             }
 
             foreach ($mapping as $oldId => $newId) {
-                if ($oldId === $newId) {
+                $oldId = (string) $oldId;
+                $newId = (string) $newId;
+
+                if (! $this->shouldRewriteId($oldId, $newId)) {
                     continue;
                 }
 
-                DB::table($table)
-                    ->where($column, $oldId)
+                $this->queryTable($table)
+                    ->where(function ($query) use ($column, $oldId): void {
+                        $this->applyExactIdMatch($query, $column, $oldId);
+                    })
                     ->update([$column => $newId]);
             }
         }
@@ -157,7 +162,7 @@ class ShortIdMigrator
             }
 
             $userId = $session->user_id;
-            if (is_string($userId) && isset($mapping[$userId])) {
+            if (is_string($userId) && ShortId::isLegacyUlid($userId) && isset($mapping[$userId])) {
                 $updates['user_id'] = $mapping[$userId];
             }
 
@@ -172,14 +177,16 @@ class ShortIdMigrator
      */
     private function replaceMappedIdsInValue(mixed $value, array $mapping): mixed
     {
-        if (is_string($value) && isset($mapping[$value])) {
+        if (is_string($value) && ShortId::isLegacyUlid($value) && isset($mapping[$value])) {
             return $mapping[$value];
         }
 
         if (is_array($value)) {
             $result = [];
             foreach ($value as $key => $item) {
-                $newKey = is_string($key) && isset($mapping[$key]) ? $mapping[$key] : $key;
+                $newKey = is_string($key) && ShortId::isLegacyUlid($key) && isset($mapping[$key])
+                    ? $mapping[$key]
+                    : $key;
                 $result[$newKey] = $this->replaceMappedIdsInValue($item, $mapping);
             }
 
@@ -268,12 +275,17 @@ class ShortIdMigrator
             }
 
             foreach ($mapping as $oldId => $newId) {
-                if ($oldId === $newId) {
+                $oldId = (string) $oldId;
+                $newId = (string) $newId;
+
+                if (! $this->shouldRewriteId($oldId, $newId)) {
                     continue;
                 }
 
-                DB::table($table)
-                    ->where($column, $oldId)
+                $this->queryTable($table)
+                    ->where(function ($query) use ($column, $oldId): void {
+                        $this->applyExactIdMatch($query, $column, $oldId);
+                    })
                     ->update([$column => $newId]);
             }
         }
@@ -285,7 +297,10 @@ class ShortIdMigrator
     private function updatePrimaryKeys(array $mapping): void
     {
         foreach ($mapping as $oldId => $newId) {
-            if ($oldId === $newId) {
+            $oldId = (string) $oldId;
+            $newId = (string) $newId;
+
+            if (! $this->shouldRewriteId($oldId, $newId)) {
                 continue;
             }
 
@@ -294,7 +309,11 @@ class ShortIdMigrator
                     continue;
                 }
 
-                $updated = DB::table($table)->where('id', $oldId)->update(['id' => $newId]);
+                $updated = $this->queryTable($table)
+                    ->where(function ($query) use ($oldId): void {
+                        $this->applyExactIdMatch($query, 'id', $oldId);
+                    })
+                    ->update(['id' => $newId]);
                 if ($updated > 0) {
                     break;
                 }
@@ -329,7 +348,7 @@ class ShortIdMigrator
                     if ($field === 'impact_year_plan_activity_ids' && isset($entry[$field]) && is_array($entry[$field])) {
                         foreach ($entry[$field] as $activityIndex => $activityId) {
                             $current = (string) $activityId;
-                            if ($current !== '' && isset($mapping[$current]) && $mapping[$current] !== $current) {
+                            if ($this->shouldRewriteId($current, $mapping[$current] ?? $current)) {
                                 $entries[$index][$field][$activityIndex] = $mapping[$current];
                                 $changed = true;
                             }
@@ -343,7 +362,7 @@ class ShortIdMigrator
                     }
 
                     $current = (string) ($entry[$field] ?? '');
-                    if ($current !== '' && isset($mapping[$current]) && $mapping[$current] !== $current) {
+                    if ($this->shouldRewriteId($current, $mapping[$current] ?? $current)) {
                         $entries[$index][$field] = $mapping[$current];
                         $changed = true;
                     }
@@ -570,6 +589,30 @@ class ShortIdMigrator
         } else {
             DB::statement('PRAGMA foreign_keys = OFF');
         }
+    }
+
+    private function shouldRewriteId(string $oldId, string $newId): bool
+    {
+        return $oldId !== $newId && ShortId::isLegacyUlid($oldId);
+    }
+
+    private function queryTable(string $table): \Illuminate\Database\Query\Builder
+    {
+        return DB::table($table);
+    }
+
+    private function applyExactIdMatch(\Illuminate\Database\Query\Builder $query, string $column, string $value): void
+    {
+        $value = (string) $value;
+
+        if (DB::connection()->getDriverName() === 'mysql') {
+            $wrapped = DB::getQueryGrammar()->wrap($column);
+            $query->whereRaw("BINARY {$wrapped} = ?", [$value]);
+
+            return;
+        }
+
+        $query->where($column, $value);
     }
 
     private function enableForeignKeys(): void
