@@ -54,7 +54,7 @@ class DocumentDomainSyncService
      *
      * `updateOrCreate(['id' => $id], $values)` cannot be used here: the domain
      * models do not list `id` as fillable, so the matching attribute is dropped
-     * when a new instance is built and the `HasDocumentShortId` trait then assigns a fresh
+     * when a new instance is built and the `HasShortId` trait then assigns a fresh
      * (different) id. That mismatch makes the saved row unreachable by the
      * Document id and surfaces as "page not found" right after saving.
      *
