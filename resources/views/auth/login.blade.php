@@ -44,14 +44,7 @@
                     @enderror
                 </div>
 
-                @if (Route::has('password.request'))
-                    <div class="text-end">
-                        <a href="{{ route('password.request') }}" class="text-secondary text-decoration-none small">
-                            Forgot Password?
-                        </a>
-                    </div>
-                @endif
-
+           
                 <div class="d-grid mt-4">
                     <button type="submit" class="btn btn-primary">
                         Login
@@ -59,11 +52,12 @@
                 </div>
             </form>
 
-            <div class="text-center mt-4 small text-muted">
-                Facing issues?
-                <a href="https://wa.me/255741400900" target="_blank" class="text-primary">
-                    Contact Admin
-                </a>
+            <div class="text-center mt-3 small text-muted">
+            @if (Route::has('password.request'))
+                <a href="{{ route('password.request') }}" class="text-secondary text-decoration-none">
+                            Forgot Password?
+                        </a>
+                    @endif
             </div>
         </div>
     </div>
