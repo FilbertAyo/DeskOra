@@ -22,6 +22,20 @@ Route::middleware(['guest', 'prevent.auth.cache'])->group(function () {
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
+    Route::get('login/verify-otp', [AuthenticatedSessionController::class, 'showVerifyOtp'])
+                ->name('login.verify-otp');
+
+    Route::post('login/verify-otp', [AuthenticatedSessionController::class, 'verifyOtp'])
+                ->middleware('throttle:5,1')
+                ->name('login.verify-otp.store');
+
+    Route::post('login/verify-otp/resend', [AuthenticatedSessionController::class, 'resendOtp'])
+                ->middleware('throttle:3,10')
+                ->name('login.verify-otp.resend');
+
+    Route::get('login/verify-otp/cancel', [AuthenticatedSessionController::class, 'cancelVerifyOtp'])
+                ->name('login.verify-otp.cancel');
+
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
                 ->name('password.request');
 

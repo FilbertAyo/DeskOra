@@ -112,4 +112,16 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login OTP Inactivity Threshold
+    |--------------------------------------------------------------------------
+    |
+    | Number of hours since the last successful login before email OTP is
+    | required on the next sign-in attempt.
+    |
+    */
+
+    'login_otp_inactivity_hours' => env('LOGIN_OTP_INACTIVITY_HOURS', 24),
+
 ];

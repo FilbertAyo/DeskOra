@@ -19,7 +19,7 @@ return [
     | Number of characters of OTP
     |
     */
-    'length' => env('OTP_LENGTH', 6),
+    'length' => env('OTP_LENGTH', 4),
 
     /*
     |--------------------------------------------------------------------------
@@ -29,7 +29,7 @@ return [
     | Number of minutes before OTP expires
     |
     */
-    'expires' => env('OTP_EXPIRES', 15),
+    'expires' => env('OTP_EXPIRES', 10),
 
     /*
     |--------------------------------------------------------------------------

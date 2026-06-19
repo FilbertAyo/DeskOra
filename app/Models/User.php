@@ -45,6 +45,7 @@ class User extends Authenticatable
         'phone',
         'status',
         'notification_channel',
+        'last_login_at',
     ];
 
     public function department()
@@ -111,6 +112,29 @@ class User extends Authenticatable
         return $this->status === 'active' && filled(trim((string) $this->email));
     }
 
+    public function requiresLoginOtp(?int $hours = null): bool
+    {
+        $hours ??= (int) config('auth.login_otp_inactivity_hours', 24);
+
+        return $this->last_login_at === null
+            || $this->last_login_at->lt(now()->subHours($hours));
+    }
+
+    public function maskedEmail(): string
+    {
+        $email = trim((string) $this->email);
+
+        if (! str_contains($email, '@')) {
+            return $email;
+        }
+
+        [$local, $domain] = explode('@', $email, 2);
+        $visible = substr($local, 0, 1);
+        $hidden = max(strlen($local) - 1, 2);
+
+        return $visible.str_repeat('*', $hidden).'@'.$domain;
+    }
+
     /**
      * Relationship: User has many Documents
      *
@@ -140,6 +164,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

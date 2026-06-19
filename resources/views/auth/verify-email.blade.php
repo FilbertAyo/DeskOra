@@ -1,39 +1,34 @@
 <x-guest-layout>
-
-
-<div class="card my-5">
-    <div class="card-body">
-
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you? If you didn\'t receive the email, we will gladly send you another.') }}
-    </div>
-
-    @if (session('status') == 'verification-link-sent')
-        <div class="mb-4 font-medium text-sm text-green-600">
-            {{ __('A new verification link has been sent to the email address you provided during registration.') }}
-        </div>
-    @endif
-
-    <div class="mt-4 flex items-center justify-between">
-        <form method="POST" action="{{ route('verification.send') }}">
-            @csrf
-
-            <div>
-                <x-primary-button>
-                    {{ __('Resend Verification Email') }}
-                </x-primary-button>
+    <div class="card auth-card">
+        <div class="card-body">
+            <div class="mb-4">
+                <h3 class="mb-1"><b>Verify Email</b></h3>
+                <p class="text-muted mb-0">
+                    Thanks for signing up! Before getting started, verify your email address by clicking the link we sent you. If you didn't receive it, we can send another.
+                </p>
             </div>
-        </form>
 
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
+            @if (session('status') == 'verification-link-sent')
+                <div class="alert alert-success small mb-4">
+                    A new verification link has been sent to the email address you provided during registration.
+                </div>
+            @endif
 
-            <button type="submit" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                {{ __('Log Out') }}
-            </button>
-        </form>
+            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-stretch align-items-sm-center">
+                <form method="POST" action="{{ route('verification.send') }}" class="flex-grow-1">
+                    @csrf
+                    <button type="submit" class="btn btn-primary w-100">
+                        {{ __('Resend Verification Email') }}
+                    </button>
+                </form>
+
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="btn btn-link text-secondary text-decoration-none w-100">
+                        {{ __('Log Out') }}
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
-
-    </div>
-</div>
 </x-guest-layout>
