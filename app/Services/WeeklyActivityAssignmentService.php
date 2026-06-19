@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\WeeklyPlan;
 use App\Models\WeeklyActivityAssignment;
 use App\Services\Documents\DocumentContentAssembler;
+use App\Services\ShortIdGenerator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -75,13 +76,33 @@ class WeeklyActivityAssignmentService
             })
             ->values();
 
+        $existingRows = WeeklyActivityAssignment::query()
+            ->where('source_weekly_plan_id', $sourceWeeklyPlanId)
+            ->get(['id', 'assignee_user_id', 'activity_uid']);
+
+        $existingIdsByKey = $existingRows
+            ->mapWithKeys(function (WeeklyActivityAssignment $assignment): array {
+                $key = (string) $assignment->assignee_user_id.'|'.(string) $assignment->activity_uid;
+
+                return [$key => (string) $assignment->id];
+            })
+            ->all();
+
+        /** @var array<string, true> $reservedIds */
+        $reservedIds = array_fill_keys(array_values($existingIdsByKey), true);
+
         $desiredRows = [];
         foreach ($activities as $activity) {
             $assigneeIds = collect($activity['team_member_ids'])
                 ->values();
 
             foreach ($assigneeIds as $assigneeId) {
+                $rowKey = (string) $assigneeId.'|'.(string) $activity['activity_uid'];
+                $rowId = $existingIdsByKey[$rowKey] ?? app(ShortIdGenerator::class)->generateUnique($reservedIds);
+                $reservedIds[$rowId] = true;
+
                 $desiredRows[] = [
+                    'id' => $rowId,
                     'source_weekly_plan_id' => $sourceWeeklyPlanId,
                     'source_user_id' => $weeklyPlan->user_id,
                     'assignee_user_id' => (string) $assigneeId,
@@ -107,10 +128,6 @@ class WeeklyActivityAssignmentService
             ->map(fn ($row) => $row['assignee_user_id'].'|'.$row['activity_uid'])
             ->unique()
             ->all();
-
-        $existingRows = WeeklyActivityAssignment::query()
-            ->where('source_weekly_plan_id', $sourceWeeklyPlanId)
-            ->get(['id', 'assignee_user_id', 'activity_uid']);
 
         $staleIds = $existingRows
             ->filter(function (WeeklyActivityAssignment $assignment) use ($desiredKeys) {

@@ -323,7 +323,7 @@ class DocumentController extends Controller
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
             if (Document::canUserCreateType($user, $selectedType)) {
-                $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+                $teamUsers = $this->teamUsersForSelection();
                 $shareableUsers = $this->shareableDepartmentUsersFor($user);
 
                 return view('documents.create', compact(
@@ -348,7 +348,7 @@ class DocumentController extends Controller
             }
         }
 
-        $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+        $teamUsers = $this->teamUsersForSelection();
         $shareableUsers = $this->shareableDepartmentUsersFor($user);
         $assignedWeeklyActivities = collect();
         if ($selectedType === Document::TYPE_WEEKLY_PLAN && $defaultPeriodId) {
@@ -438,14 +438,14 @@ class DocumentController extends Controller
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
-            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'short_id', $this->activeUserIdRule()];
             $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', $this->activeUserIdRule()];
             $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
@@ -470,7 +470,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', $this->activeUserIdRule()];
             $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
@@ -989,7 +989,7 @@ class DocumentController extends Controller
 
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
 
-        $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
+        $teamUsers = $this->teamUsersForSelection();
 
         return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
     }
@@ -1026,7 +1026,7 @@ class DocumentController extends Controller
 
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
 
-        $teamUsers = User::query()->select('id', 'name')->orderBy('name')->get();
+        $teamUsers = $this->teamUsersForSelection();
 
         return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
     }
@@ -1088,7 +1088,7 @@ class DocumentController extends Controller
             );
         }
 
-        $teamUsers = User::select('id', 'name')->orderBy('name')->get();
+        $teamUsers = $this->teamUsersForSelection();
         $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
         $reportMeetingRows = [];
@@ -1147,14 +1147,14 @@ class DocumentController extends Controller
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
-            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
+            $validationRules['content.planned_activities.*.team_member_ids.*'] = ['nullable', 'string', 'short_id', $this->activeUserIdRule()];
             $validationRules['content.planned_activities.*.notes_inclusion'] = ['nullable', 'string', 'max:4000'];
 
             $validationRules['content.key_meetings'] = ['nullable', 'array'];
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', $this->activeUserIdRule()];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
 
@@ -1182,7 +1182,7 @@ class DocumentController extends Controller
             $validationRules['content.key_meetings.*.date'] = ['nullable', 'date'];
             $validationRules['content.key_meetings.*.meeting'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.participant_user_ids'] = ['nullable', 'array'];
-            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', 'exists:users,id'];
+            $validationRules['content.key_meetings.*.participant_user_ids.*'] = ['nullable', 'string', 'short_id', $this->activeUserIdRule()];
             $validationRules['content.key_meetings.*.status'] = ['nullable', 'string', 'in:Done,Not done'];
             $validationRules['content.key_meetings.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.key_meetings.*.reactions_notes'] = ['nullable', 'string', 'max:4000'];
@@ -2689,11 +2689,26 @@ class DocumentController extends Controller
         }
 
         return User::query()
+            ->active()
             ->select('id', 'name')
             ->where('department_id', $owner->department_id)
             ->where('id', '!=', $owner->id)
             ->orderBy('name')
             ->get();
+    }
+
+    private function teamUsersForSelection()
+    {
+        return User::query()
+            ->active()
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function activeUserIdRule(): \Illuminate\Validation\Rules\Exists
+    {
+        return Rule::exists('users', 'id')->where(static fn ($query) => $query->where('status', 'active'));
     }
 
     /**

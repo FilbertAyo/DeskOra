@@ -48,6 +48,11 @@ class User extends Authenticatable
         'last_login_at',
     ];
 
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
     public function department()
     {
         return $this->belongsTo(Department::class);
