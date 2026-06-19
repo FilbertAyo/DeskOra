@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
+use App\Services\ActionLogCarryForwardService;
+use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
@@ -23,6 +25,8 @@ class DashboardController extends Controller
     public function __construct(
         private readonly WorkPeriodService $workPeriodService,
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
+        private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
+        private readonly DocumentDomainSyncService $documentDomainSyncService,
     ) {}
 
     public function redirect()
@@ -456,6 +460,8 @@ class DashboardController extends Controller
 
     private function buildActionLogProgressForUser(User $user): array
     {
+        $this->syncCurrentPeriodActionLogIfNeeded();
+
         $canManageActionLogs = $user->hasPermissionTo('manage action logs');
         $documentsQuery = Document::with('period')
             ->actionLogs()
@@ -493,6 +499,9 @@ class DashboardController extends Controller
             ->values();
 
         $currentPeriod = WorkPeriod::getCurrent();
+        $priorResponsibleMap = $currentPeriod
+            ? $this->actionLogCarryForwardService->buildPriorResponsibleMap($currentPeriod)
+            : [];
         $currentDraftDoc = $currentPeriod
             ? $selectedByPeriod->first(fn ($doc) => $doc->period_id === $currentPeriod->id && $doc->isDraft())
             : null;
@@ -532,6 +541,10 @@ class DashboardController extends Controller
                     $responsibleIds = [];
                 }
                 $responsibleIds = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
+                $taskUid = trim((string) ($task['task_uid'] ?? ''));
+                if ($responsibleIds === [] && $taskUid !== '' && isset($priorResponsibleMap[$taskUid])) {
+                    $responsibleIds = $priorResponsibleMap[$taskUid];
+                }
                 if (! in_array((string) $user->id, $responsibleIds, true)) {
                     continue;
                 }
@@ -541,7 +554,14 @@ class DashboardController extends Controller
                     continue;
                 }
 
-                $taskUid = trim((string) ($task['task_uid'] ?? ''));
+                $hasRealUpdateThisPeriod = $currentPeriod
+                    && (string) $document->period_id === (string) $currentPeriod->id
+                    && $this->taskHasRealUpdateInPeriod($task, (string) $currentPeriod->id);
+                $carriedFromLabel = null;
+                if ($taskUid !== '' && $currentPeriod && (string) $document->period_id === (string) $currentPeriod->id) {
+                    $carriedFromLabel = $this->findLatestPriorPeriodLabelForTask($taskUid, $selectedByPeriod, $currentPeriod);
+                }
+
                 $taskKey = $taskUid !== '' ? $taskUid : md5($taskLabel.'|'.implode(',', $responsibleIds));
 
                 $taskTimeline[$taskKey]['task'] = $taskLabel;
@@ -556,12 +576,14 @@ class DashboardController extends Controller
                     'is_current_period' => $currentPeriod && $document->period_id === $currentPeriod->id,
                     'period_open' => (bool) $document->period->isOpen(),
                     'document_id' => $document->id,
+                    'has_real_update' => $hasRealUpdateThisPeriod,
+                    'carried_from_period_label' => $carriedFromLabel,
                 ];
             }
         }
 
         $activeTasks = collect($taskTimeline)
-            ->map(function ($taskData) {
+            ->map(function ($taskData) use ($currentPeriod) {
                 $history = collect($taskData['history'] ?? [])->values();
                 $latest = $history->last();
                 if (! $latest) {
@@ -570,18 +592,33 @@ class DashboardController extends Controller
 
                 $taskUid = trim((string) ($taskData['task_uid'] ?? ''));
                 $documentId = $latest['document_id'] ?? null;
+                $periodOpen = (bool) ($latest['period_open'] ?? false);
+                $isCurrentPeriod = (bool) ($latest['is_current_period'] ?? false);
+                $hasRealUpdate = (bool) ($latest['has_real_update'] ?? false);
+                $needsUpdate = $isCurrentPeriod && $periodOpen && ! $hasRealUpdate;
                 $editable = $taskUid !== ''
                     && ! empty($documentId)
-                    && (bool) ($latest['period_open'] ?? false);
+                    && $periodOpen;
+
+                $latestProgress = $latest['progress'] ?? 'Not Started';
+                if ($needsUpdate && $history->count() > 1) {
+                    $prior = $history->slice(0, -1)->last();
+                    $priorProgress = trim((string) ($prior['progress'] ?? ''));
+                    if ($priorProgress !== '' && ! in_array($priorProgress, ['Done', 'Cancelled'], true)) {
+                        $latestProgress = $priorProgress;
+                    }
+                }
 
                 return [
                     'task' => $taskData['task'] ?? '',
                     'task_uid' => $taskUid,
                     'document_id' => $documentId,
                     'period_label' => $latest['period_label'] ?? '',
-                    'latest_progress' => $latest['progress'] ?? 'Not Started',
+                    'latest_progress' => $latestProgress,
                     'latest_notes' => (string) ($latest['notes_progress'] ?? ''),
                     'editable' => $editable,
+                    'needs_update' => $needsUpdate,
+                    'carried_from_period_label' => $latest['carried_from_period_label'] ?? null,
                     'history' => $history->all(),
                 ];
             })
@@ -603,6 +640,107 @@ class DashboardController extends Controller
             'currentDraftId' => $canManageActionLogs ? $currentDraftDoc?->id : null,
             'showNotifications' => ! empty($activeTasks),
         ];
+    }
+
+    private function syncCurrentPeriodActionLogIfNeeded(): void
+    {
+        $currentPeriod = WorkPeriod::getCurrent();
+        if (! $currentPeriod || ! $currentPeriod->isOpen()) {
+            return;
+        }
+
+        $currentDoc = Document::query()
+            ->actionLogs()
+            ->where('period_id', $currentPeriod->id)
+            ->latest('id')
+            ->first();
+
+        if (! $currentDoc) {
+            return;
+        }
+
+        $sync = $this->actionLogCarryForwardService->syncMissingCarriedTasks($currentDoc, $currentPeriod);
+        if (! $sync['changed']) {
+            return;
+        }
+
+        $currentDoc->update([
+            'content' => ['tasks' => $sync['tasks']],
+        ]);
+        $this->documentDomainSyncService->syncFromDocument($currentDoc->fresh());
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Document>  $documentsByPeriod
+     */
+    private function findLatestPriorPeriodLabelForTask(
+        string $taskUid,
+        $documentsByPeriod,
+        WorkPeriod $currentPeriod
+    ): ?string {
+        $label = null;
+        foreach ($documentsByPeriod as $document) {
+            if (! $document->period || $document->period_id === $currentPeriod->id) {
+                continue;
+            }
+            if ($document->period->week_start_date >= $currentPeriod->week_start_date) {
+                continue;
+            }
+
+            $content = is_array($document->content) ? $document->content : [];
+            $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+            foreach ($tasks as $task) {
+                if (! is_array($task)) {
+                    continue;
+                }
+                if (trim((string) ($task['task_uid'] ?? '')) !== $taskUid) {
+                    continue;
+                }
+
+                $label = 'Week '.$document->period->week_number.' of '.$document->period->year;
+            }
+        }
+
+        return $label;
+    }
+
+    /**
+     * @param  array<string, mixed>  $task
+     */
+    private function taskHasRealUpdateInPeriod(array $task, string $periodId): bool
+    {
+        $history = is_array($task['history'] ?? null) ? $task['history'] : [];
+        foreach ($history as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            if (trim((string) ($entry['period_id'] ?? '')) !== $periodId) {
+                continue;
+            }
+
+            $source = trim((string) ($entry['source'] ?? ''));
+            if ($source === 'auto_init') {
+                continue;
+            }
+            if ($source === 'update') {
+                return true;
+            }
+
+            $notes = trim((string) ($entry['notes_progress'] ?? ''));
+            $reason = trim((string) ($entry['status_reason'] ?? ''));
+            if ($notes !== '' || $reason !== '') {
+                return true;
+            }
+
+            $fromProgress = trim((string) ($entry['from_progress'] ?? ''));
+            $toProgress = trim((string) ($entry['to_progress'] ?? ''));
+
+            if ($fromProgress !== '' && $toProgress !== '' && $fromProgress !== $toProgress) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isUserAssignedToActionLog(User $user, Document $document): bool

@@ -260,6 +260,7 @@ class Document extends Model
 
         $currentPeriod = $periodId !== null ? WorkPeriod::query()->find($periodId) : null;
         $otherActionLogDocs = null;
+        $priorResponsibleMap = [];
         if ($currentPeriod) {
             $otherActionLogDocs = self::query()
                 ->ofType(self::TYPE_ACTION_LOG)
@@ -269,6 +270,9 @@ class Document extends Model
                 })
                 ->with('period')
                 ->get();
+
+            $priorResponsibleMap = app(\App\Services\ActionLogCarryForwardService::class)
+                ->buildPriorResponsibleMap($currentPeriod);
         }
 
         $result = [];
@@ -313,6 +317,13 @@ class Document extends Model
             } else {
                 $task['display_notes_progress'] = '';
                 $task['display_progress'] = null;
+            }
+
+            $responsibleIds = is_array($task['responsible_user_ids'] ?? null)
+                ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $task['responsible_user_ids'])))
+                : [];
+            if ($responsibleIds === [] && $taskUid !== '' && isset($priorResponsibleMap[$taskUid])) {
+                $task['responsible_user_ids'] = $priorResponsibleMap[$taskUid];
             }
 
             $result[] = $task;

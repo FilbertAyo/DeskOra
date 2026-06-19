@@ -6,18 +6,20 @@ use App\Models\Document;
 use App\Models\ActionLogTask;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\ActionLogCarryForwardService;
 use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\WorkflowEmailNotificationService;
+use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 
 class ActionLogController extends Controller
 {
     public function __construct(
         private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
         private readonly DocumentDomainSyncService $documentDomainSyncService,
+        private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
     ) {}
 
     private const PROGRESS_NOT_STARTED = 'Not Started';
@@ -115,7 +117,9 @@ class ActionLogController extends Controller
             }
         }
 
-        $carryForwardTasks = $currentPeriod ? $this->getCarryForwardTasks($currentPeriod) : [];
+        $carryForwardTasks = $currentPeriod
+            ? $this->actionLogCarryForwardService->getIncompleteTasksFromPriorPeriods($currentPeriod)
+            : [];
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
 
         return view('action-logs.create', compact('workPeriods', 'defaultPeriodId', 'currentPeriod', 'carryForwardTasks', 'teamUsers', 'isManager'));
@@ -189,6 +193,9 @@ class ActionLogController extends Controller
 
         // If document exists, merge new rows into the same weekly log.
         if ($existingDocument) {
+            $this->persistCarriedTaskSyncIfNeeded($existingDocument, $period);
+            $existingDocument->refresh();
+
             // If submitting, authorize submit action
             if ($action === 'submit' && ! $existingDocument->isSubmitted()) {
                 $this->authorize('submit', $existingDocument);
@@ -348,6 +355,11 @@ class ActionLogController extends Controller
         // Authorize update action
         $this->authorize('update', $document);
 
+        if ($document->period && $document->period->isOpen()) {
+            $this->persistCarriedTaskSyncIfNeeded($document, $document->period);
+            $document->refresh();
+        }
+
         // Get all work periods for dropdown
         $workPeriods = WorkPeriod::orderBy('year', 'desc')
             ->orderBy('week_number', 'desc')
@@ -420,6 +432,9 @@ class ActionLogController extends Controller
         }
 
         $isManager = $this->isActionLogManager(Auth::user());
+        $this->persistCarriedTaskSyncIfNeeded($document, $period);
+        $document->refresh();
+
         $normalizedContent = $this->normalizeActionLogContent($request->input('content', []));
         $existingTasks = $this->extractTasks($document->content);
         $incomingTasks = $normalizedContent['tasks'] ?? [];
@@ -567,6 +582,24 @@ class ActionLogController extends Controller
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
+    private function persistCarriedTaskSyncIfNeeded(Document $document, WorkPeriod $period): void
+    {
+        $currentPeriod = WorkPeriod::getCurrent();
+        if (! $currentPeriod || (string) $document->period_id !== (string) $currentPeriod->id || ! $period->isOpen()) {
+            return;
+        }
+
+        $sync = $this->actionLogCarryForwardService->syncMissingCarriedTasks($document, $period);
+        if (! $sync['changed']) {
+            return;
+        }
+
+        $document->update([
+            'content' => ['tasks' => $sync['tasks']],
+        ]);
+        $this->documentDomainSyncService->syncFromDocument($document->fresh());
+    }
+
     private function orderActionLogsByWorkPeriodDesc($query)
     {
         return $query
@@ -575,40 +608,6 @@ class ActionLogController extends Controller
             ->orderByDesc('work_periods.week_number')
             ->orderByDesc('documents.updated_at')
             ->select('documents.*');
-    }
-
-    private function getCarryForwardTasks(WorkPeriod $period): array
-    {
-        $previousPeriod = $period->getPreviousPeriod();
-        if (! $previousPeriod) {
-            return [];
-        }
-
-        $previousLog = Document::where('type', Document::TYPE_ACTION_LOG)
-            ->where('period_id', $previousPeriod->id)
-            ->orderByRaw('CASE WHEN state = ? THEN 0 ELSE 1 END', [Document::STATE_SUBMITTED])
-            ->latest('id')
-            ->first();
-
-        if (! $previousLog) {
-            return [];
-        }
-
-        $tasks = $this->extractTasks($previousLog->content);
-        $tasks = array_values(array_filter($tasks, function (array $task) {
-            $progress = trim((string) ($task['progress'] ?? ''));
-
-            return ! in_array($progress, [self::PROGRESS_DONE, self::PROGRESS_CANCELLED], true);
-        }));
-
-        $tasks = array_map(function (array $task): array {
-            $task['notes_progress'] = '';
-            $task['history'] = [];
-
-            return $task;
-        }, $tasks);
-
-        return $this->renumberTasks($tasks);
     }
 
     private function normalizeActionLogContent(array $content): array
@@ -625,18 +624,7 @@ class ActionLogController extends Controller
             $notesProgress = trim((string) ($task['notes_progress'] ?? ''));
             $taskUid = trim((string) ($task['task_uid'] ?? ''));
 
-            $responsibleIds = $task['responsible_user_ids'] ?? [];
-            if (! is_array($responsibleIds)) {
-                $responsibleIds = [];
-            }
-            $filtered = [];
-            foreach ($responsibleIds as $rid) {
-                $sid = trim((string) $rid);
-                if ($sid !== '' && Str::isUlid($sid)) {
-                    $filtered[] = $sid;
-                }
-            }
-            $responsibleIds = array_values(array_unique($filtered));
+            $responsibleIds = $this->normalizeResponsibleIds($task['responsible_user_ids'] ?? []);
 
             if ($taskText === '' && empty($responsibleIds) && $progress === '' && $dueDate === '' && $compilationDate === '' && $notesProgress === '') {
                 continue;
@@ -783,6 +771,7 @@ class ActionLogController extends Controller
         }
 
         $merged = [];
+        $incomingUids = [];
         foreach ($incomingTasks as $incomingTask) {
             if (! is_array($incomingTask)) {
                 continue;
@@ -790,11 +779,58 @@ class ActionLogController extends Controller
             $task = $this->applyCancelledTaskRules($incomingTask, true);
             $uid = trim((string) ($task['task_uid'] ?? ''));
             $existing = $uid !== '' ? ($existingByUid[$uid] ?? null) : null;
+
+            if ($existing) {
+                $incomingResponsible = is_array($task['responsible_user_ids'] ?? null)
+                    ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $task['responsible_user_ids'])))
+                    : [];
+                $existingResponsible = is_array($existing['responsible_user_ids'] ?? null)
+                    ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $existing['responsible_user_ids'])))
+                    : [];
+                if ($incomingResponsible === [] && $existingResponsible !== []) {
+                    $task['responsible_user_ids'] = $existingResponsible;
+                }
+            }
+
             $task = $this->appendTaskHistoryIfChanged($existing, $task, $period, $actorUserId);
             $merged[] = $task;
+            if ($uid !== '') {
+                $incomingUids[$uid] = true;
+            }
+        }
+
+        foreach ($existingTasks as $existingTask) {
+            if (! is_array($existingTask)) {
+                continue;
+            }
+            $uid = trim((string) ($existingTask['task_uid'] ?? ''));
+            if ($uid !== '' && ! isset($incomingUids[$uid])) {
+                $merged[] = $existingTask;
+            }
         }
 
         return $merged;
+    }
+
+    /**
+     * @param  mixed  $responsibleIds
+     * @return list<string>
+     */
+    private function normalizeResponsibleIds($responsibleIds): array
+    {
+        if (! is_array($responsibleIds)) {
+            return [];
+        }
+
+        $filtered = [];
+        foreach ($responsibleIds as $rid) {
+            $sid = trim((string) $rid);
+            if ($sid !== '' && (ShortId::is($sid) || ShortId::isLegacyUlid($sid))) {
+                $filtered[] = $sid;
+            }
+        }
+
+        return array_values(array_unique($filtered));
     }
 
     private function initializeTaskHistoryEntries(array $tasks, WorkPeriod $period, string $actorUserId): array

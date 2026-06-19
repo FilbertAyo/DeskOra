@@ -499,7 +499,15 @@
                                                 @if(!empty($task['period_label']))
                                                     <span class="badge bg-light-light text-dark">{{ $task['period_label'] }}</span>
                                                 @endif
+                                                @if(!empty($task['needs_update']))
+                                                    <span class="badge bg-light-warning text-dark">Carried forward</span>
+                                                @endif
                                             </div>
+                                            @if(!empty($task['needs_update']) && !empty($task['carried_from_period_label']))
+                                                <div class="text-muted small mt-1">
+                                                    From {{ $task['carried_from_period_label'] }} — no update this week yet.
+                                                </div>
+                                            @endif
                                         </div>
                                         <div class="flex-shrink-0">
                                             @if(!empty($task['editable']))

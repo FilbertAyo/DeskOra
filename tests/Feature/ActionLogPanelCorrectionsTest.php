@@ -170,7 +170,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             'period_id' => $period->id,
             'type' => Document::TYPE_ACTION_LOG,
             'title' => 'Action Log - Week 14 of 2026',
-            'state' => Document::STATE_DRAFT,
+            'state' => Document::STATE_SUBMITTED,
             'content' => [
                 'tasks' => [
                     $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Not Started'),
@@ -473,6 +473,308 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $document->refresh();
         $this->assertSame($period->id, $document->period_id);
         $this->assertSame('Updated task text', $document->content['tasks'][0]['task'] ?? null);
+    }
+
+    public function test_carry_forward_collects_incomplete_tasks_across_multi_week_gap(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 15, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+
+            $week21 = $this->createOpenPeriod(2026, 21, '2026-05-18', '2026-05-24');
+            $this->createOpenPeriod(2026, 22, '2026-05-25', '2026-05-31');
+            $week23 = $this->createOpenPeriod(2026, 23, '2026-06-01', '2026-06-07');
+            $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week21->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 21 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_old', 'Stale week 21 task', [], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week23->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 23 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_recent', 'Week 23 only task', [], 'Not Started'),
+                    ],
+                ],
+            ]);
+
+            $response = $this->actingAs($manager)->get(route('action-logs.create'));
+
+            $response->assertOk();
+            $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
+                $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
+
+                return in_array('Stale week 21 task', $texts, true)
+                    && in_array('Week 23 only task', $texts, true);
+            });
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_edit_syncs_missing_carried_tasks_into_current_week_log(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 19, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $week25 = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_carry', 'Task to carry', [], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            $week25Doc = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week25->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 25 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_local', 'Week 25 local task'),
+                    ],
+                ],
+            ]);
+
+            $response = $this->actingAs($manager)->get(route('action-logs.edit', $week25Doc));
+
+            $response->assertOk();
+
+            $week25Doc->refresh();
+            $taskTexts = collect($week25Doc->content['tasks'] ?? [])->pluck('task')->all();
+
+            $this->assertContains('Task to carry', $taskTexts);
+            $this->assertContains('Week 25 local task', $taskTexts);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_manager_update_preserves_responsible_when_form_omits_assignees(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $assignee */
+        $assignee = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 25 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned carry task', [$assignee->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_uid' => 'task_a',
+                        'task' => 'Assigned carry task',
+                        'progress' => 'In Progress',
+                        'notes_progress' => 'Still in progress',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHas('success');
+        $document->refresh();
+        $task = $document->content['tasks'][0] ?? [];
+
+        $this->assertSame([(string) $assignee->id], $task['responsible_user_ids'] ?? null);
+    }
+
+    public function test_show_page_displays_responsible_from_prior_week_when_current_row_empty(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        /** @var User $assignee */
+        $assignee = User::factory()->create();
+
+        $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+        $week25 = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+        Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $week24->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 24 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Shared task', [$assignee->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $week25Doc = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $week25->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 25 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Shared task', [], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $tasks = $week25Doc->getActionLogTasksForPeriodDisplay();
+        $row = $tasks[0] ?? [];
+
+        $this->assertSame([(string) $assignee->id], $row['responsible_user_ids'] ?? null);
+    }
+
+    public function test_staff_can_quick_update_carried_task_after_edit_sync(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 19, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+            /** @var User $staff */
+            $staff = User::factory()->create();
+
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $week25 = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_carry', 'Carried dashboard task', [$staff->id], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            $week25Doc = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week25->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 25 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_local', 'Local week 25 task', [$staff->id]),
+                    ],
+                ],
+            ]);
+
+            $this->actingAs($manager)->get(route('action-logs.edit', $week25Doc))->assertOk();
+
+            $week25Doc->refresh();
+            $this->assertTrue(
+                collect($week25Doc->content['tasks'] ?? [])->contains(fn ($task) => ($task['task'] ?? null) === 'Carried dashboard task')
+            );
+
+            $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $week25Doc), [
+                'task_uid' => 'task_carry',
+                'progress' => 'In Progress',
+                'notes_progress' => 'Updated in week 25',
+            ]);
+
+            $response->assertRedirect();
+            $response->assertSessionHas('success');
+
+            $week25Doc->refresh();
+            $carried = collect($week25Doc->content['tasks'] ?? [])->firstWhere('task_uid', 'task_carry');
+            $this->assertSame('Updated in week 25', $carried['notes_progress'] ?? null);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_sync_carried_tasks_command_reports_and_applies_changes(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 19, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $week25 = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_cmd', 'Command carry task', [], 'Not Started'),
+                    ],
+                ],
+            ]);
+
+            $week25Doc = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week25->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 25 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [],
+                ],
+            ]);
+
+            $this->artisan('action-logs:sync-carried-tasks', ['--period' => $week25->id])
+                ->assertSuccessful();
+
+            $week25Doc->refresh();
+            $taskTexts = collect($week25Doc->content['tasks'] ?? [])->pluck('task')->all();
+            $this->assertContains('Command carry task', $taskTexts);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     private function taskRow(
