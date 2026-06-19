@@ -74,6 +74,7 @@
                                     'resubmission' => 'danger',
                                     default => 'success',
                                 };
+                                $statusTextClass = 'text-'.$statusClass;
                                 $canAct = isset($stage) && $item->userCanActAtStage(auth()->user(), $stage);
                                 $hasCompleted = isset($stage) && $item->userHasCompletedStage(auth()->user(), $stage);
                                 $actionLabel = isset($stage) ? \App\Models\Request::stageLabel($stage) : 'View';
@@ -86,7 +87,7 @@
                                 <td>{{ $item->user->name ?? 'N/A' }}</td>
                                 <td>{{ $isStaffRequisition ? ($item->activity_title ?: $item->request_for) : $item->request_for }}</td>
                                 <td>
-                                    <span class="badge {{ $isStaffRequisition ? 'bg-light-info' : 'bg-light-primary' }}">
+                                    <span class="badge {{ $isStaffRequisition ? 'bg-light-info text-info' : 'bg-light-primary text-primary' }}">
                                         {{ $item->request_type }}
                                     </span>
                                 </td>
@@ -102,7 +103,7 @@
                                 <td>{{ number_format($item->amount, 2) }}</td>
                                 <td>{{ $item->created_at->format('d M, Y') }}</td>
                                 <td>
-                                    <span class="badge bg-light-{{ $statusClass }} text-white">{{ $item->status }}</span>
+                                    <span class="badge bg-light-{{ $statusClass }} {{ $statusTextClass }}">{{ $item->status }}</span>
                                 </td>
                                 <td>
                                     <x-table-action-dropdown>

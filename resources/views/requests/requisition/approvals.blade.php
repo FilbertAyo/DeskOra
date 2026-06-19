@@ -25,7 +25,7 @@
                             <td>{{ $item->user->name ?? 'N/A' }}</td>
                             <td>{{ $item->activity_title ?: $item->request_for }}</td>
                             <td>{{ number_format($item->amount, 2) }}</td>
-                            <td><span class="badge bg-light-info">{{ $item->status }}</span></td>
+                            <td><span class="badge bg-light-info text-info">{{ $item->status }}</span></td>
                             <td>
                                 <x-table-action-dropdown>
     <a class="dropdown-item" href="{{ route('petty.details', $item->id) }}">
