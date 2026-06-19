@@ -92,11 +92,11 @@
                                 </td>
                                 <td>
                                     @if ($canAct)
-                                        <span class="badge bg-light-warning text-dark">Pending</span>
+                                        <span class="badge bg-light-warning text-warning">Pending</span>
                                     @elseif ($hasCompleted)
-                                        <span class="badge bg-light-success">Completed</span>
+                                        <span class="badge bg-light-success text-success">Completed</span>
                                     @else
-                                        <span class="badge bg-light-secondary">—</span>
+                                        <span class="badge bg-light-secondary text-secondary">—</span>
                                     @endif
                                 </td>
                                 <td>{{ number_format($item->amount, 2) }}</td>
