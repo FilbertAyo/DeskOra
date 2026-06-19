@@ -45,11 +45,7 @@
                 </div>
 
            
-                <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-primary">
-                        Login
-                    </button>
-                </div>
+                <x-primary-button label="Login" class="w-100 mt-4" />
             </form>
 
             <div class="text-center mt-3 small text-muted">

@@ -17,16 +17,12 @@
             <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-stretch align-items-sm-center">
                 <form method="POST" action="{{ route('verification.send') }}" class="flex-grow-1">
                     @csrf
-                    <button type="submit" class="btn btn-primary w-100">
-                        {{ __('Resend Verification Email') }}
-                    </button>
+                    <x-primary-button :label="__('Resend Verification Email')" class="w-100" />
                 </form>
 
-                <form method="POST" action="{{ route('logout') }}">
+                <form method="POST" action="{{ route('logout') }}" class="flex-grow-1">
                     @csrf
-                    <button type="submit" class="btn btn-link text-secondary text-decoration-none w-100">
-                        {{ __('Log Out') }}
-                    </button>
+                    <x-primary-button :label="__('Log Out')" class="w-100" />
                 </form>
             </div>
         </div>

@@ -27,11 +27,7 @@
                     @enderror
                 </div>
 
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary">
-                        {{ __('Confirm') }}
-                    </button>
-                </div>
+                <x-primary-button :label="__('Confirm')" class="w-100" />
             </form>
         </div>
     </div>

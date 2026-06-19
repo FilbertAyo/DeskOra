@@ -33,19 +33,13 @@
                     @enderror
                 </div>
 
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary">
-                        Verify & Sign In
-                    </button>
-                </div>
+                <x-primary-button label="Verify & Sign In" class="w-100" />
             </form>
 
-            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 mt-4">
-                <form method="POST" action="{{ route('login.verify-otp.resend') }}">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mt-4">
+                <form method="POST" action="{{ route('login.verify-otp.resend') }}" class="flex-grow-1">
                     @csrf
-                    <button type="submit" class="btn btn-link text-secondary text-decoration-none p-0 small">
-                        Resend code
-                    </button>
+                    <x-primary-button label="Resend code" class="w-100" />
                 </form>
 
                 <a href="{{ route('login.verify-otp.cancel') }}" class="text-secondary text-decoration-none small">
