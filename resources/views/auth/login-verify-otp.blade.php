@@ -37,9 +37,9 @@
             </form>
 
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 mt-4">
-                <form method="POST" action="{{ route('login.verify-otp.resend') }}">
+                <form method="POST" action="{{ route('login.verify-otp.resend') }}" class="m-0">
                     @csrf
-                    <button type="submit" class="text-secondary text-decoration-none small border-0 bg-transparent p-0">
+                    <button type="submit" class="btn btn-link text-secondary text-decoration-none p-0 small border-0">
                         Resend code
                     </button>
                 </form>
