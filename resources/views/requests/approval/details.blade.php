@@ -35,10 +35,7 @@
                             <a href="{{ route('petty.list', ['stage' => $returnStage ?? 'review']) }}" class="btn btn-sm btn-light">
                                 <i class="ti ti-arrow-left me-1"></i> Back
                             </a>
-                            <button type="button" class="btn btn-sm btn-light" onclick="reloadPage()"
-                                title="Refresh">
-                                <i class="ti ti-refresh"></i>
-                            </button>
+                          
                             @include('requests.approval.logs')
                             @if ($canActOnRequest ?? false)
                         <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
@@ -55,7 +52,7 @@
                         $request->authorized_at &&
                         (auth()->user()->can('approve pettycash payments') || auth()->user()->can('authorize staff requisition')))
                     <a href="{{ route('petty.requisition.download', $request->id) }}"
-                        class="btn btn-outline-secondary d-flex align-items-center shadow-sm">
+                        class="btn btn-danger btn-sm d-flex align-items-center">
                         <i class="ti ti-download me-2"></i>
                         <span>Download</span>
                     </a>
@@ -82,52 +79,43 @@
         </div>
     @endif
 
-  
-    <!-- Alert Messages -->
-    @if ($approval == 'approved')
-        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none"
-            role="alert">
-            <div class="d-flex align-items-center">
-                <div class="alert-icon me-3">
-                    <i class="ti ti-check-circle fs-3"></i>
+    @php
+        $actionFeedback = match (true) {
+            session()->has('success') => [
+                'variant' => 'success',
+                'icon' => 'ti-circle-check',
+                'title' => 'Action recorded',
+                'message' => session('success'),
+            ],
+            session()->has('error') => [
+                'variant' => 'danger',
+                'icon' => 'ti-alert-circle',
+                'title' => 'Action not completed',
+                'message' => session('error'),
+            ],
+            session()->has('warning') => [
+                'variant' => 'warning',
+                'icon' => 'ti-alert-triangle',
+                'title' => 'Please review',
+                'message' => session('warning'),
+            ],
+            default => null,
+        };
+    @endphp
+
+    @if ($actionFeedback)
+        <div class="alert alert-{{ $actionFeedback['variant'] }} alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+            <div class="d-flex align-items-start gap-3">
+                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light-{{ $actionFeedback['variant'] }} text-{{ $actionFeedback['variant'] }} flex-shrink-0"
+                    style="width: 2.5rem; height: 2.5rem;">
+                    <i class="ti {{ $actionFeedback['icon'] }} fs-5"></i>
+                </span>
+                <div class="flex-grow-1 pe-2">
+                    <h6 class="alert-heading mb-1">{{ $actionFeedback['title'] }}</h6>
+                    <p class="mb-0 small">{{ $actionFeedback['message'] }}</p>
                 </div>
-                <div>
-                    <h6 class="alert-heading mb-1">Request Approved</h6>
-                    <p class="mb-0">You have successfully approved this request.</p>
-                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
-                    aria-hidden="true">&times;</span></button>
-        </div>
-    @elseif($approval == 'rejected')
-        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none"
-            role="alert">
-            <div class="d-flex align-items-center">
-                <div class="alert-icon me-3">
-                    <i class="ti ti-x-circle fs-3"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading mb-1">Request Rejected</h6>
-                    <p class="mb-0">You have rejected this request.</p>
-                </div>
-            </div>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
-                    aria-hidden="true">&times;</span></button>
-        </div>
-    @elseif($approval == 'paid')
-        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none"
-            role="alert">
-            <div class="d-flex align-items-center">
-                <div class="alert-icon me-3">
-                    <i class="ti ti-check-circle fs-3"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading mb-1">Payment Completed</h6>
-                    <p class="mb-0">You have successfully paid this request.</p>
-                </div>
-            </div>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
-                    aria-hidden="true">&times;</span></button>
         </div>
     @endif
 
@@ -188,7 +176,7 @@
                                     ];
                                 @endphp
                                 <span
-                                    class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">
+                                    class="badge bg-light-{{ $statusInfo['class'] }} text-{{ $statusInfo['class'] }} d-inline-flex align-items-center">
                                     <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
                                     {{ ucfirst($request->status) }}
                                 </span>
