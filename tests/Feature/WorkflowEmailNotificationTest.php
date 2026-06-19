@@ -9,6 +9,7 @@ use App\Models\WorkPeriod;
 use App\Notifications\WorkPeriodOpenedNotification;
 use App\Notifications\WeeklyActionLogSubmittedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
+use App\Notifications\WeeklyDocumentDepartmentHeadNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
 use App\Notifications\WeeklyDocumentSubmittedNotification;
 use Carbon\Carbon;
@@ -301,6 +302,136 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertNotSentTo($missingEmail, WorkPeriodOpenedNotification::class);
     }
 
+    public function test_weekly_report_submission_notifies_department_head_with_email_channel(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        [$department, $head, $staff] = $this->createDepartmentStaffAndHead('email', 'both');
+
+        $staff->givePermissionTo('create weekly report');
+
+        $document = Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly report draft',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Draft summary'],
+        ]);
+
+        $this->actingAs($staff)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertSentTo($head, WeeklyDocumentDepartmentHeadNotification::class);
+    }
+
+    public function test_weekly_plan_submission_notifies_department_head(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        [$department, $head, $staff] = $this->createDepartmentStaffAndHead('email', 'email');
+
+        $staff->givePermissionTo('create weekly plan');
+
+        $document = Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Weekly plan draft',
+            'state' => Document::STATE_DRAFT,
+            'main_target' => 'Target',
+            'content' => [],
+        ]);
+
+        $this->actingAs($staff)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertSentTo($head, WeeklyDocumentDepartmentHeadNotification::class);
+    }
+
+    public function test_department_head_with_sms_only_does_not_receive_submission_email(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        [$department, $head, $staff] = $this->createDepartmentStaffAndHead('sms', 'email');
+
+        $staff->givePermissionTo('create weekly report');
+
+        $document = Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly report draft',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Draft summary'],
+        ]);
+
+        $this->actingAs($staff)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertNotSentTo($head, WeeklyDocumentDepartmentHeadNotification::class);
+    }
+
+    public function test_submission_without_department_head_does_not_send_department_head_notification(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        $department = Department::create(['name' => 'Unassigned Head Dept', 'status' => 'active']);
+        $staff = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'notification_channel' => 'email',
+        ]);
+        $staff->givePermissionTo('create weekly report');
+
+        $document = Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly report draft',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Draft summary'],
+        ]);
+
+        $this->actingAs($staff)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_department_head_does_not_receive_self_notification_when_submitting_own_document(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+        $department = Department::create(['name' => 'Self Submit Dept', 'status' => 'active']);
+        $head = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'notification_channel' => 'email',
+        ]);
+        $department->update(['head_user_id' => $head->id]);
+        $head->givePermissionTo('create weekly report');
+
+        $document = Document::create([
+            'user_id' => $head->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Head weekly report',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Draft summary'],
+        ]);
+
+        $this->actingAs($head)->post(route('documents.submit', $document))
+            ->assertRedirect();
+
+        Notification::assertNotSentTo($head, WeeklyDocumentDepartmentHeadNotification::class);
+    }
+
     private function createOpenPeriod(): WorkPeriod
     {
         return WorkPeriod::create([
@@ -323,5 +454,26 @@ class WorkflowEmailNotificationTest extends TestCase
             'status' => 'active',
             'notification_channel' => $channel,
         ]);
+    }
+
+    /**
+     * @return array{0: Department, 1: User, 2: User}
+     */
+    private function createDepartmentStaffAndHead(string $headChannel, string $staffChannel): array
+    {
+        $department = Department::create(['name' => 'Programs', 'status' => 'active']);
+        $head = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'notification_channel' => $headChannel,
+        ]);
+        $department->update(['head_user_id' => $head->id]);
+        $staff = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'notification_channel' => $staffChannel,
+        ]);
+
+        return [$department, $head, $staff];
     }
 }

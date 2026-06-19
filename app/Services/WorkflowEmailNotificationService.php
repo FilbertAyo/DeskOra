@@ -8,6 +8,7 @@ use App\Models\WorkPeriod;
 use App\Notifications\WorkPeriodOpenedNotification;
 use App\Notifications\WeeklyActionLogSubmittedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
+use App\Notifications\WeeklyDocumentDepartmentHeadNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
 use App\Notifications\WeeklyDocumentSubmittedNotification;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,11 +49,49 @@ class WorkflowEmailNotificationService
 
         if ($recipients->isEmpty()) {
             $this->logMissingRecipients('weekly_document_submitted', $document, $permission);
+        } else {
+            Notification::send($recipients, new WeeklyDocumentSubmittedNotification($document, $submittedBy));
+        }
+
+        $this->notifyDepartmentHeadWeeklyDocumentSubmitted($document, $submittedBy);
+    }
+
+    /**
+     * Notify the parent department head when a staff member submits a weekly plan/report.
+     */
+    public function notifyDepartmentHeadWeeklyDocumentSubmitted(Document $document, User $submittedBy): void
+    {
+        if (! config('workflow_notifications.weekly_document_submitted.notify_department_head', true)) {
+            return;
+        }
+
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true) || ! $document->isSubmitted()) {
+            return;
+        }
+
+        $document->loadMissing('period', 'user');
+        $owner = $document->user;
+        if (! $owner instanceof User) {
+            return;
+        }
+
+        $owner->loadMissing('department.head');
+        $head = $owner->department?->head;
+        if (! $head instanceof User) {
+            $this->logMissingDepartmentHead($document, $owner);
 
             return;
         }
 
-        Notification::send($recipients, new WeeklyDocumentSubmittedNotification($document, $submittedBy));
+        if ((string) $head->id === (string) $submittedBy->id) {
+            return;
+        }
+
+        if (! $head->receivesEmailNotifications()) {
+            return;
+        }
+
+        $head->notify(new WeeklyDocumentDepartmentHeadNotification($document, $submittedBy, $owner));
     }
 
     /**
@@ -156,6 +195,22 @@ class WorkflowEmailNotificationService
             'document_type' => $document->type,
             'period_id' => $document->period_id,
             'permission' => $permission,
+        ]);
+    }
+
+    private function logMissingDepartmentHead(Document $document, User $owner): void
+    {
+        if (! config('workflow_notifications.log_missing_recipients', true)) {
+            return;
+        }
+
+        Log::warning('Workflow email notification skipped: no department head assigned.', [
+            'event' => 'weekly_document_department_head',
+            'document_id' => $document->id,
+            'document_type' => $document->type,
+            'period_id' => $document->period_id,
+            'owner_id' => $owner->id,
+            'department_id' => $owner->department_id,
         ]);
     }
 }

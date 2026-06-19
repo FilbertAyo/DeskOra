@@ -16,6 +16,7 @@ return [
 
     'weekly_document_submitted' => [
         'permission' => 'approve documents',
+        'notify_department_head' => env('WORKFLOW_NOTIFY_DEPT_HEAD_ON_SUBMIT', true),
     ],
 
     'weekly_budget_submitted' => [
