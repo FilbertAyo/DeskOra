@@ -18,6 +18,7 @@ use App\Models\RequisitionRequest;
 use App\Models\User;
 use App\Models\YearPlanActivity;
 use App\Services\NotificationService;
+use App\Services\RequisitionNotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -30,6 +31,10 @@ use NumberToWords\NumberToWords;
 
 class PettyController extends Controller
 {
+    public function __construct(
+        private readonly RequisitionNotificationService $requisitionNotifications,
+    ) {}
+
     private function buildRequestMailArgs(FinanceRequest $request): array
     {
         $requester = User::find($request->user_id);
@@ -293,10 +298,16 @@ class PettyController extends Controller
                 'acted_at' => now(),
             ]);
 
-            [$name, $reason, $encodedId] = $this->buildRequestMailArgs($requestRow->fresh(['pettyDetails', 'requisitionDetails']));
-            $permission = $requestType === 'Staff Requisition' ? 'review staff requisition' : 'first pettycash approval';
-            $sms = "New request from {$name} for {$reason}. Ref: {$encodedId}";
-            $this->notifyApprovers($permission, $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
+            if ($requestType === 'Staff Requisition') {
+                $this->requisitionNotifications->notifyStageApprovers(
+                    $requestRow->fresh(['user', 'department', 'requisitionDetails']),
+                    'submitted'
+                );
+            } else {
+                [$name, $reason, $encodedId] = $this->buildRequestMailArgs($requestRow->fresh(['pettyDetails', 'requisitionDetails']));
+                $sms = "New request from {$name} for {$reason}. Ref: {$encodedId}";
+                $this->notifyApprovers('first pettycash approval', $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
+            }
         });
 
         return redirect()->route($requestType === 'Staff Requisition' ? 'requisition.index' : 'petty.index')->with('success', 'Request created successfully!');
@@ -395,10 +406,10 @@ class PettyController extends Controller
         $this->createApproval($petty, 'review', 'approved');
         $petty->update(['status' => 'processing']);
 
-        [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
         if ($petty->request_type === 'Staff Requisition') {
-            $this->notifyApprovers('approve staff requisition', $petty->department_id, new FirstApprovalMail($name, $reason, $encodedId), "Staff requisition {$encodedId} has been reviewed and is awaiting approval.");
+            $this->requisitionNotifications->notifyStageApprovers($petty, 'reviewed');
         } else {
+            [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
             $this->notifyApprovers('last pettycash approval', $petty->department_id, new FirstApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been reviewed and is awaiting approval.");
         }
 
@@ -417,10 +428,10 @@ class PettyController extends Controller
         $this->createApproval($petty, 'approve', 'approved');
         $petty->update(['status' => 'processing']);
 
-        [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
         if ($petty->request_type === 'Staff Requisition') {
-            $this->notifyApprovers('authorize staff requisition', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Staff requisition {$encodedId} has been approved and is awaiting authorization.");
+            $this->requisitionNotifications->notifyStageApprovers($petty, 'approved');
         } else {
+            [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
             $this->notifyApprovers('authorize requests', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been approved and is awaiting authorization.");
         }
 
@@ -439,7 +450,9 @@ class PettyController extends Controller
         $this->createApproval($petty, 'authorize', 'approved');
         $petty->update(['status' => 'approved', 'approved_at' => now()]);
 
-        if ($petty->request_type !== 'Staff Requisition') {
+        if ($petty->request_type === 'Staff Requisition') {
+            $this->requisitionNotifications->notifyRequester($petty, 'authorized', Auth::user());
+        } else {
             [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
             $this->notifyApprovers('approve pettycash payments', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} authorized. Awaiting payment.");
         }
@@ -500,6 +513,17 @@ class PettyController extends Controller
 
         $this->createApproval($petty, 'system', $validated['action'], $validated['comment']);
         $petty->update(['status' => $validated['action']]);
+
+        if ($petty->request_type === 'Staff Requisition') {
+            $event = $validated['action'] === 'rejected' ? 'rejected' : 'resubmission_requested';
+            $this->requisitionNotifications->notifyRequester($petty, $event, Auth::user(), $validated['comment']);
+
+            $message = $validated['action'] === 'rejected'
+                ? 'This request was rejected and feedback sent successfully.'
+                : 'Request updated and feedback sent successfully.';
+
+            return redirect()->back()->with('success', $message);
+        }
 
         [$name, $reason, $publicId] = $this->buildRequestMailArgs($petty);
         $requester = User::find($petty->user_id);
