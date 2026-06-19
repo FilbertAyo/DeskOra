@@ -16,7 +16,7 @@
         $activityCodes = collect($planActivities ?? [])->pluck('code')->all();
     @endphp
 
-    <form method="POST" action="{{ route('requisition.update', $request->id) }}">
+    <form method="POST" action="{{ route('requisition.update', $request->id) }}" novalidate>
         @csrf
         @method('PUT')
         <input type="hidden" name="department_id" id="department_id" value="{{ old('department_id', $request->department_id) }}">
@@ -83,6 +83,9 @@
                     <div class="table-responsive">
                         @php
                             $defaultItems = $request->requisitionItems->map(fn($i) => ['description' => $i->description, 'unit' => $i->unit, 'cost' => $i->cost])->toArray();
+                            if ($defaultItems === []) {
+                                $defaultItems = [['description' => '', 'unit' => '', 'cost' => '']];
+                            }
                             $oldItems = old('items', $defaultItems);
                         @endphp
                         <table class="table table-bordered table-striped" id="itemsTable">
@@ -105,8 +108,16 @@
                     </div>
                 </div>
             </div>
-            <div class="card-action m-3">
-                <x-primary-button label="Update Requisition" />
+            <div class="card-action m-3 d-flex flex-wrap gap-2">
+                @if ($request->status === 'draft')
+                    <button type="submit" name="action" value="draft" class="btn btn-outline-secondary lh-1">
+                        <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
+                        <span class="btn-label">Save as Draft</span>
+                    </button>
+                    <x-primary-button label="Submit Requisition" name="action" value="submit" />
+                @else
+                    <x-primary-button label="Update Requisition" />
+                @endif
             </div>
         </div>
     </form>

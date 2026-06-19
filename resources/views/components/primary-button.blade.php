@@ -60,6 +60,7 @@
                     'submit': 'Submitting...',
                     'submit requisition': 'Submitting...',
                     'update requisition': 'Updating...',
+                    'save as draft': 'Saving...',
                     'save changes': 'Saving Changes...',
                     'login': 'Logging in...',
                     'sign in': 'Signing in...',

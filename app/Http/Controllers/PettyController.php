@@ -222,34 +222,25 @@ class PettyController extends Controller
 
     public function store(Request $request)
     {
+        $requestType = (string) $request->input('request_type');
+
+        if ($requestType === 'Staff Requisition') {
+            return $this->storeStaffRequisition($request);
+        }
+
         $baseRules = [
             'user_id' => ['required', 'string', 'short_id', 'exists:users,id'],
             'department_id' => ['required', 'string', 'short_id', 'exists:departments,id'],
             'request_type' => 'required|string|in:Petty Cash,Reimbursement,Staff Requisition',
         ];
-        $requestType = (string) $request->input('request_type');
-        $rules = $requestType === 'Staff Requisition'
-            ? array_merge($baseRules, [
-                'project_program' => 'required|string|max:255',
-                'activity_code' => 'required|string|max:255',
-                'activity_title' => 'required|string|max:255',
-                'budget_code' => 'required|string|max:255',
-                'date_of_request' => 'nullable|date',
-                'date_of_requirement' => 'nullable|date',
-                'reason' => 'nullable|string|max:1000',
-                'items' => 'required|array|min:1',
-                'items.*.description' => 'required|string|max:255',
-                'items.*.unit' => 'nullable|string|max:255',
-                'items.*.cost' => 'required|numeric|min:0',
-            ])
-            : array_merge($baseRules, [
-                'request_for' => 'required|string|in:Sales Delivery,Transport,Office Supplies',
-                'amount' => 'required|numeric|min:0',
-                'reason' => 'required|string|max:1000',
-            ]);
+        $rules = array_merge($baseRules, [
+            'request_for' => 'required|string|in:Sales Delivery,Transport,Office Supplies',
+            'amount' => 'required|numeric|min:0',
+            'reason' => 'required|string|max:1000',
+        ]);
         $validated = $request->validate($rules);
 
-        DB::transaction(function () use ($requestType, $validated, $request) {
+        DB::transaction(function () use ($requestType, $validated) {
             $requestRow = FinanceRequest::create([
                 'request_no' => $this->generateUniqueRequestNo(),
                 'request_type' => $requestType,
@@ -259,36 +250,12 @@ class PettyController extends Controller
                 'submitted_at' => now(),
             ]);
 
-            if ($requestType === 'Staff Requisition') {
-                $amount = collect($request->input('items', []))->sum(fn ($item) => (float) ($item['cost'] ?? 0));
-                RequisitionRequest::create([
-                    'request_id' => $requestRow->id,
-                    'project_program' => $validated['project_program'],
-                    'activity_code' => $validated['activity_code'],
-                    'activity_title' => $validated['activity_title'],
-                    'budget_code' => $validated['budget_code'],
-                    'date_of_request' => $validated['date_of_request'] ?? null,
-                    'date_of_requirement' => $validated['date_of_requirement'] ?? null,
-                    'reason' => $validated['reason'] ?? null,
-                    'amount' => $amount,
-                ]);
-                foreach ($request->input('items', []) as $index => $item) {
-                    RequisitionItem::create([
-                        'request_id' => $requestRow->id,
-                        'serial_no' => $index + 1,
-                        'description' => $item['description'],
-                        'unit' => $item['unit'] ?? null,
-                        'cost' => $item['cost'],
-                    ]);
-                }
-            } else {
-                PettyRequest::create([
-                    'request_id' => $requestRow->id,
-                    'request_for' => $validated['request_for'],
-                    'amount' => $validated['amount'],
-                    'reason' => $validated['reason'],
-                ]);
-            }
+            PettyRequest::create([
+                'request_id' => $requestRow->id,
+                'request_for' => $validated['request_for'],
+                'amount' => $validated['amount'],
+                'reason' => $validated['reason'],
+            ]);
 
             RequestApproval::create([
                 'request_id' => $requestRow->id,
@@ -298,19 +265,62 @@ class PettyController extends Controller
                 'acted_at' => now(),
             ]);
 
-            if ($requestType === 'Staff Requisition') {
-                $this->requisitionNotifications->notifyStageApprovers(
-                    $requestRow->fresh(['user', 'department', 'requisitionDetails']),
-                    'submitted'
-                );
-            } else {
-                [$name, $reason, $encodedId] = $this->buildRequestMailArgs($requestRow->fresh(['pettyDetails', 'requisitionDetails']));
-                $sms = "New request from {$name} for {$reason}. Ref: {$encodedId}";
-                $this->notifyApprovers('first pettycash approval', $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
-            }
+            [$name, $reason, $encodedId] = $this->buildRequestMailArgs($requestRow->fresh(['pettyDetails', 'requisitionDetails']));
+            $sms = "New request from {$name} for {$reason}. Ref: {$encodedId}";
+            $this->notifyApprovers('first pettycash approval', $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
         });
 
-        return redirect()->route($requestType === 'Staff Requisition' ? 'requisition.index' : 'petty.index')->with('success', 'Request created successfully!');
+        return redirect()->route('petty.index')->with('success', 'Request created successfully!');
+    }
+
+    private function storeStaffRequisition(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $isDraft = $this->isRequisitionDraftAction($request);
+        $baseRules = [
+            'user_id' => ['required', 'string', 'short_id', 'exists:users,id'],
+            'department_id' => ['required', 'string', 'short_id', 'exists:departments,id'],
+            'request_type' => 'required|string|in:Staff Requisition',
+            'action' => 'nullable|string|in:draft,submit',
+        ];
+        $validated = $request->validate(array_merge(
+            $baseRules,
+            $isDraft ? $this->requisitionDraftValidationRules() : $this->requisitionSubmitValidationRules()
+        ));
+
+        $items = $this->normalizeRequisitionItems($request->input('items', []));
+
+        if (! $isDraft && $items === []) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Add at least one line item before submitting.',
+            ]);
+        }
+
+        $requestRow = DB::transaction(function () use ($validated, $items, $isDraft) {
+            $requestRow = FinanceRequest::create([
+                'request_no' => $this->generateUniqueRequestNo(),
+                'request_type' => 'Staff Requisition',
+                'user_id' => $validated['user_id'],
+                'department_id' => $validated['department_id'],
+                'status' => $isDraft ? 'draft' : 'pending',
+                'submitted_at' => $isDraft ? null : now(),
+            ]);
+
+            $this->syncRequisitionDetails($requestRow, $validated, $items);
+
+            if (! $isDraft) {
+                $this->finalizeRequisitionSubmission($requestRow);
+            }
+
+            return $requestRow;
+        });
+
+        if ($isDraft) {
+            return redirect()
+                ->route('requisition.edit', $requestRow)
+                ->with('success', 'Draft saved. You can continue editing and submit when ready.');
+        }
+
+        return redirect()->route('requisition.index')->with('success', 'Requisition submitted successfully!');
     }
 
     public function show(FinanceRequest $petty)
@@ -579,8 +589,8 @@ class PettyController extends Controller
     {
         abort_unless($petty->request_type === 'Staff Requisition', 404);
         abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
-        if (! in_array($petty->status, ['pending', 'resubmission'])) {
-            return redirect()->route('requisition.show', $petty)->with('error', 'Only pending or resubmission requisitions can be edited.');
+        if (! in_array($petty->status, ['draft', 'pending', 'resubmission'])) {
+            return redirect()->route('requisition.show', $petty)->with('error', 'Only draft, pending, or resubmission requisitions can be edited.');
         }
 
         $request = $petty->load(['requisitionDetails', 'requisitionItems']);
@@ -595,51 +605,48 @@ class PettyController extends Controller
     {
         abort_unless($petty->request_type === 'Staff Requisition', 404);
         abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
-        if (! in_array($petty->status, ['pending', 'resubmission'])) {
-            return redirect()->route('requisition.show', $petty)->with('error', 'Only pending or resubmission requisitions can be updated.');
+        if (! in_array($petty->status, ['draft', 'pending', 'resubmission'])) {
+            return redirect()->route('requisition.show', $petty)->with('error', 'Only draft, pending, or resubmission requisitions can be updated.');
         }
 
-        $validated = $request->validate([
-            'project_program' => 'required|string|max:255',
-            'activity_code' => 'required|string|max:255',
-            'activity_title' => 'required|string|max:255',
-            'budget_code' => 'required|string|max:255',
+        $isDraft = $petty->status === 'draft';
+        $saveAsDraft = $isDraft && $this->isRequisitionDraftAction($request);
+        $submitDraft = $isDraft && $this->isRequisitionSubmitAction($request);
+
+        $rules = $saveAsDraft
+            ? $this->requisitionDraftValidationRules()
+            : $this->requisitionSubmitValidationRules();
+
+        $validated = $request->validate(array_merge([
             'department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
-            'date_of_request' => 'nullable|date',
-            'date_of_requirement' => 'nullable|date',
-            'reason' => 'nullable|string|max:1000',
-            'items' => 'required|array|min:1',
-            'items.*.description' => 'required|string|max:255',
-            'items.*.unit' => 'nullable|string|max:255',
-            'items.*.cost' => 'required|numeric|min:0',
-        ]);
+            'action' => 'nullable|string|in:draft,submit',
+        ], $rules));
+
+        $items = $this->normalizeRequisitionItems($request->input('items', []));
+
+        if (! $saveAsDraft && $items === []) {
+            return redirect()->back()->withInput()->withErrors([
+                'items' => 'Add at least one line item before submitting.',
+            ]);
+        }
 
         if (! empty($validated['department_id'])) {
             $petty->update(['department_id' => $validated['department_id']]);
         }
 
-        $petty->requisitionDetails()->update([
-            'project_program' => $validated['project_program'],
-            'activity_code' => $validated['activity_code'],
-            'activity_title' => $validated['activity_title'],
-            'budget_code' => $validated['budget_code'],
-            'date_of_request' => $validated['date_of_request'] ?? null,
-            'date_of_requirement' => $validated['date_of_requirement'] ?? null,
-            'reason' => $validated['reason'] ?? null,
-            'amount' => collect($validated['items'])->sum(fn ($item) => (float) $item['cost']),
-        ]);
-        $petty->update(['status' => 'pending']);
+        $this->syncRequisitionDetails($petty, $validated, $items);
 
-        RequisitionItem::where('request_id', $petty->id)->delete();
-        foreach ($validated['items'] as $index => $item) {
-            RequisitionItem::create([
-                'request_id' => $petty->id,
-                'serial_no' => $index + 1,
-                'description' => $item['description'],
-                'unit' => $item['unit'] ?? null,
-                'cost' => $item['cost'],
-            ]);
+        if ($submitDraft) {
+            $this->finalizeRequisitionSubmission($petty->fresh(['user', 'department', 'requisitionDetails']));
+
+            return redirect()->route('requisition.index')->with('success', 'Requisition submitted successfully!');
         }
+
+        if ($isDraft) {
+            return redirect()->route('requisition.edit', $petty)->with('success', 'Draft saved.');
+        }
+
+        $petty->update(['status' => 'pending']);
 
         return redirect()->route('requisition.show', $petty)->with('success', 'Requisition updated successfully.');
     }
@@ -676,8 +683,8 @@ class PettyController extends Controller
     public function destroy(FinanceRequest $petty)
     {
         abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
-        if (! in_array($petty->status, ['pending', 'resubmission', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only pending, resubmission, or rejected requests can be deleted.');
+        if (! in_array($petty->status, ['draft', 'pending', 'resubmission', 'rejected'])) {
+            return redirect()->back()->with('error', 'Only draft, pending, resubmission, or rejected requests can be deleted.');
         }
         $petty->delete();
 
@@ -749,5 +756,133 @@ class PettyController extends Controller
         }
 
         return $department->selfAndDescendantIds();
+    }
+
+    private function isRequisitionDraftAction(Request $request): bool
+    {
+        return $request->input('action') === 'draft';
+    }
+
+    private function isRequisitionSubmitAction(Request $request): bool
+    {
+        return $request->input('action', 'submit') === 'submit';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function requisitionDraftValidationRules(): array
+    {
+        return [
+            'project_program' => 'nullable|string|max:255',
+            'activity_code' => 'nullable|string|max:255',
+            'activity_title' => 'nullable|string|max:255',
+            'budget_code' => 'nullable|string|max:255',
+            'date_of_request' => 'nullable|date',
+            'date_of_requirement' => 'nullable|date',
+            'reason' => 'nullable|string|max:1000',
+            'items' => 'nullable|array',
+            'items.*.description' => 'nullable|string|max:255',
+            'items.*.unit' => 'nullable|string|max:255',
+            'items.*.cost' => 'nullable|numeric|min:0',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function requisitionSubmitValidationRules(): array
+    {
+        return [
+            'project_program' => 'required|string|max:255',
+            'activity_code' => 'required|string|max:255',
+            'activity_title' => 'required|string|max:255',
+            'budget_code' => 'required|string|max:255',
+            'date_of_request' => 'nullable|date',
+            'date_of_requirement' => 'nullable|date',
+            'reason' => 'nullable|string|max:1000',
+            'items' => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:255',
+            'items.*.unit' => 'nullable|string|max:255',
+            'items.*.cost' => 'required|numeric|min:0',
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeRequisitionItems(array $items): array
+    {
+        return collect($items)
+            ->filter(function ($item) {
+                return filled($item['description'] ?? null)
+                    || filled($item['unit'] ?? null)
+                    || filled($item['cost'] ?? null);
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function syncRequisitionDetails(FinanceRequest $requestRow, array $validated, array $items): void
+    {
+        $amount = collect($items)->sum(fn ($item) => (float) ($item['cost'] ?? 0));
+
+        RequisitionRequest::updateOrCreate(
+            ['request_id' => $requestRow->id],
+            [
+                'project_program' => $validated['project_program'] ?? null,
+                'activity_code' => $validated['activity_code'] ?? null,
+                'activity_title' => $validated['activity_title'] ?? null,
+                'budget_code' => $validated['budget_code'] ?? null,
+                'date_of_request' => $validated['date_of_request'] ?? null,
+                'date_of_requirement' => $validated['date_of_requirement'] ?? null,
+                'reason' => $validated['reason'] ?? null,
+                'amount' => $amount,
+            ]
+        );
+
+        RequisitionItem::where('request_id', $requestRow->id)->delete();
+        foreach ($items as $index => $item) {
+            RequisitionItem::create([
+                'request_id' => $requestRow->id,
+                'serial_no' => $index + 1,
+                'description' => $item['description'] ?? '',
+                'unit' => $item['unit'] ?? null,
+                'cost' => $item['cost'] ?? 0,
+            ]);
+        }
+    }
+
+    private function finalizeRequisitionSubmission(FinanceRequest $requestRow): void
+    {
+        $requestRow->update([
+            'status' => 'pending',
+            'submitted_at' => $requestRow->submitted_at ?? now(),
+        ]);
+
+        $hasCreatedLog = $requestRow->approvals()
+            ->where('step', 'system')
+            ->where('action', 'created')
+            ->exists();
+
+        if (! $hasCreatedLog) {
+            RequestApproval::create([
+                'request_id' => $requestRow->id,
+                'step' => 'system',
+                'action' => 'created',
+                'actor_id' => $requestRow->user_id,
+                'acted_at' => now(),
+            ]);
+        }
+
+        $this->requisitionNotifications->notifyStageApprovers(
+            $requestRow->fresh(['user', 'department', 'requisitionDetails']),
+            'submitted'
+        );
     }
 }

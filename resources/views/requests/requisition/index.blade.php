@@ -52,7 +52,9 @@
                             <td>{{ number_format($item->amount, 2) }}</td>
                             <td>{{ $item->created_at->format('d M, Y') }}</td>
                             <td>
-                                @if ($item->status == 'pending')
+                                @if ($item->status == 'draft')
+                                    <span class="badge bg-light-warning text-warning">Draft</span>
+                                @elseif ($item->status == 'pending')
                                     <span class="badge bg-light-danger text-danger">{{ $item->status }}</span>
                                 @elseif ($item->status == 'processing')
                                     <span class="badge bg-light-primary text-primary">{{ $item->status }}</span>
@@ -69,6 +71,11 @@
     <a class="dropdown-item" href="{{ route('requisition.show', $item->id) }}">
     <i class="ti ti-eye me-2"></i> View
     </a>
+    @if ($item->status === 'draft')
+    <a class="dropdown-item" href="{{ route('requisition.edit', $item->id) }}">
+    <i class="ti ti-edit me-2"></i> Continue Draft
+    </a>
+    @endif
 </x-table-action-dropdown>
                             </td>
                         </tr>

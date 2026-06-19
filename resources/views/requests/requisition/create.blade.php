@@ -23,7 +23,7 @@
     </div>
 </div>
 
-<form method="POST" action="{{ route('requisition.store') }}" id="requisitionForm">
+<form method="POST" action="{{ route('requisition.store') }}" id="requisitionForm" novalidate>
     @csrf
     <input type="hidden" name="user_id" value="{{ Auth::user()->id }}">
     <input type="hidden" name="department_id" id="department_id" value="{{ old('department_id', Auth::user()->department_id) }}">
@@ -114,8 +114,12 @@
                 </div>
             </div>
         </div>
-        <div class="card-action m-3">
-            <x-primary-button label="Submit Requisition" />
+        <div class="card-action m-3 d-flex flex-wrap gap-2">
+            <button type="submit" name="action" value="draft" class="btn btn-outline-secondary lh-1">
+                <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
+                <span class="btn-label">Save as Draft</span>
+            </button>
+            <x-primary-button label="Submit Requisition" name="action" value="submit" />
         </div>
     </div>
 </form>

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->enum('request_type', ['Petty Cash', 'Reimbursement', 'Staff Requisition', 'Letter']);
             $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUlid('department_id')->nullable()->constrained('departments')->nullOnDelete();
-            $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'resubmission', 'resubmitted', 'paid'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'resubmission', 'resubmitted', 'paid', 'draft'])->default('pending');
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->timestamp('paid_at')->nullable();

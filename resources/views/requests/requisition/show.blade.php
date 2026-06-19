@@ -22,9 +22,9 @@
                             <a href="{{ route('requisition.index') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="ti ti-arrow-left me-1"></i>Back
             </a>
-            @if (in_array($request->status, ['pending', 'resubmission']))
+            @if (in_array($request->status, ['draft', 'pending', 'resubmission']))
                 <a href="{{ route('requisition.edit', $request->id) }}" class="btn btn-primary btn-sm text-white">
-                    <i class="ti ti-edit me-1"></i>Edit
+                    <i class="ti ti-edit me-1"></i>{{ $request->status === 'draft' ? 'Continue Draft' : 'Edit' }}
                 </a>
             @endif
                         </div>
@@ -36,6 +36,13 @@
 
 
 
+
+    @if ($request->status === 'draft')
+        <div class="alert alert-warning border-warning mb-4">
+            <strong>Draft</strong> — this requisition has not been submitted for approval yet.
+            <a href="{{ route('requisition.edit', $request->id) }}" class="alert-link">Continue editing</a> when you are ready to submit.
+        </div>
+    @endif
 
     @include('requests.requisition.partials.form-preview')
 
