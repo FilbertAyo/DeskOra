@@ -45,7 +45,7 @@
                 </div>
 
            
-                <x-primary-button label="Login" class="w-100 mt-4" />
+                <x-primary-button label="Login" class="w-100 mt-3" />
             </form>
 
             <div class="text-center mt-3 small text-muted">

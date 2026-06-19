@@ -36,10 +36,12 @@
                 <x-primary-button label="Verify & Sign In" class="w-100" />
             </form>
 
-            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mt-4">
-                <form method="POST" action="{{ route('login.verify-otp.resend') }}" class="flex-grow-1">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 mt-4">
+                <form method="POST" action="{{ route('login.verify-otp.resend') }}">
                     @csrf
-                    <x-primary-button label="Resend code" class="w-100" />
+                    <button type="submit" class="text-secondary text-decoration-none small border-0 bg-transparent p-0">
+                        Resend code
+                    </button>
                 </form>
 
                 <a href="{{ route('login.verify-otp.cancel') }}" class="text-secondary text-decoration-none small">
