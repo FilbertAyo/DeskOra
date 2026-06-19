@@ -143,29 +143,69 @@
                     <i class="ti ti-file-text"></i>
                 </li>
 
-                <li class="pc-item {{ Request::routeIs('requisition.*') ? 'active' : '' }}">
-                    <a href="{{ route('requisition.index') }}" class="pc-link">
-                         <span class="pc-micon"><i class="ti ti-file"></i></span>
-                        <span class="pc-mtext">Staff Requisitions</span>
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('requisition.*', 'petty.index') ? 'active pc-trigger' : '' }}">
+                    <a href="javascript:void(0);" class="pc-link">
+                        <span class="pc-micon"><i class="ti ti-file"></i></span>
+                        <span class="pc-mtext">Requests</span>
+                        <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                     </a>
+                    <ul class="pc-submenu">
+                        <li class="{{ Request::routeIs('requisition.*') ? 'active' : '' }}">
+                            <a href="{{ route('requisition.index') }}" class="pc-link">
+                                <span class="pc-mtext">Staff Requisitions</span>
+                            </a>
+                        </li>
+                        <li class="{{ Request::routeIs('petty.index') ? 'active' : '' }}">
+                            <a href="{{ route('petty.index') }}" class="pc-link">
+                                <span class="pc-mtext">Petty Cash</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
-
-                <li class="pc-item {{ Request::routeIs('petty.index') ? 'active' : '' }}">
-                    <a href="{{ route('petty.index') }}" class="pc-link">
-                        <span class="pc-micon"><i class="ti ti-file-text"></i></span>
-                        <span class="pc-mtext">Petty Cash Requests</span>
-                    </a>
-                </li>
+           
 
                 @canany(['first pettycash approval', 'last pettycash approval', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'review requests', 'approve requests', 'authorize requests'])
-                    <li class="pc-item">
-                        <a href="{{ route('petty.list') }}" class="pc-link">
+                    <li class="pc-item pc-hasmenu {{ Request::routeIs('petty.list') ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-users"></i></span>
                             <span class="pc-mtext">Approvals</span>
-                            @if ($pendingPettiesCount > 0)
-                                <span class="badge bg-light-danger">{{ $pendingPettiesCount }}</span>
+                            @if (($approvalsTotalCount ?? 0) > 0)
+                                <span class="badge bg-light-danger">{{ $approvalsTotalCount }}</span>
                             @endif
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
+                        <ul class="pc-submenu">
+                            @canany(['first pettycash approval', 'review staff requisition', 'review requests'])
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'review']) }}" class="pc-link">
+                                        <span class="pc-mtext">Review</span>
+                                        @if (($approvalsReviewCount ?? 0) > 0)
+                                            <span class="badge bg-light-warning ms-2">{{ $approvalsReviewCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcanany
+                            @canany(['last pettycash approval', 'approve staff requisition', 'approve requests'])
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'approve']) }}" class="pc-link">
+                                        <span class="pc-mtext">Approve</span>
+                                        @if (($approvalsApproveCount ?? 0) > 0)
+                                            <span class="badge bg-light-primary ms-2">{{ $approvalsApproveCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcanany
+                            @canany(['authorize requests', 'authorize staff requisition'])
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'authorize' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'authorize']) }}" class="pc-link">
+                                        <span class="pc-mtext">Authorize</span>
+                                        @if (($approvalsAuthorizeCount ?? 0) > 0)
+                                            <span class="badge bg-light-secondary ms-2">{{ $approvalsAuthorizeCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcanany
+                        </ul>
                     </li>
                 @endcanany
 

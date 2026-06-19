@@ -7,6 +7,7 @@ use App\Database\DocumentsUnionView;
 use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
+use App\Services\RequestApprovalNavService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Support\ShortId;
 use Illuminate\Support\Facades\Auth;
@@ -41,24 +42,27 @@ class AppServiceProvider extends ServiceProvider
         $this->configureSessionAndUrl();
 
         View::composer('*', function ($view) {
-            $pendingCount = 0;
             $approvedCount = 0;
             $processingCount = 0;
+            $approvalsReviewCount = 0;
+            $approvalsApproveCount = 0;
+            $approvalsAuthorizeCount = 0;
+            $approvalsTotalCount = 0;
 
             if (Auth::check() && Schema::hasTable('requests')) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
-                $counts = Cache::remember('petty-nav-counts-user-'.$user->id, now()->addSeconds(45), function () use ($user) {
-                    return FinanceRequest::query()
-                        ->whereIn('department_id', $user->departmentScopeIds())
-                        ->whereIn('status', ['pending', 'approved'])
-                        ->selectRaw('status, COUNT(*) as total')
-                        ->groupBy('status')
-                        ->pluck('total', 'status');
-                });
+                $approvalCounts = app(RequestApprovalNavService::class)->countsFor($user);
 
-                $pendingCount = (int) ($counts['pending'] ?? 0);
-                $approvedCount = (int) ($counts['approved'] ?? 0);
+                $approvalsReviewCount = (int) ($approvalCounts['review'] ?? 0);
+                $approvalsApproveCount = (int) ($approvalCounts['approve'] ?? 0);
+                $approvalsAuthorizeCount = (int) ($approvalCounts['authorize'] ?? 0);
+                $approvalsTotalCount = (int) ($approvalCounts['total'] ?? 0);
+
+                $approvedCount = (int) FinanceRequest::query()
+                    ->whereIn('department_id', $user->departmentScopeIds())
+                    ->where('status', 'approved')
+                    ->count();
             }
 
             if (Schema::hasTable('requests')) {
@@ -68,7 +72,10 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $view->with([
-                'pendingPettiesCount' => $pendingCount,
+                'approvalsReviewCount' => $approvalsReviewCount,
+                'approvalsApproveCount' => $approvalsApproveCount,
+                'approvalsAuthorizeCount' => $approvalsAuthorizeCount,
+                'approvalsTotalCount' => $approvalsTotalCount,
                 'processingPettiesCount' => $processingCount,
                 'approvedPettiesCount' => $approvedCount,
             ]);

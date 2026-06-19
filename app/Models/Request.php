@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\HasShortId;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -204,5 +205,182 @@ class Request extends Model
         $approval = $this->approvals()->with('actor')->where('step', $step)->where('action', 'approved')->orderByDesc('acted_at')->first();
 
         return $approval?->actor;
+    }
+
+    public const APPROVAL_STAGES = ['review', 'approve', 'authorize'];
+
+    public const REQUEST_TYPES = ['Petty Cash', 'Reimbursement', 'Staff Requisition'];
+
+    public function scopeInDepartmentScope(Builder $query, User $user): Builder
+    {
+        $scopeIds = $user->departmentScopeIds();
+        $parentScopeIds = Department::query()
+            ->whereIn('id', $scopeIds)
+            ->pluck('parent_id')
+            ->filter()
+            ->values()
+            ->all();
+        $allScopeIds = array_values(array_unique(array_merge($scopeIds, $parentScopeIds)));
+
+        return $query->whereIn('department_id', $allScopeIds);
+    }
+
+    public function scopeAwaitingApprovalStage(Builder $query, string $stage): Builder
+    {
+        return match ($stage) {
+            'review' => $query
+                ->whereIn('status', ['pending', 'processing', 'resubmitted'])
+                ->whereDoesntHave('approvals', fn (Builder $q) => $q
+                    ->where('step', 'review')
+                    ->where('action', 'approved')),
+            'approve' => $query
+                ->whereHas('approvals', fn (Builder $q) => $q
+                    ->where('step', 'review')
+                    ->where('action', 'approved'))
+                ->whereDoesntHave('approvals', fn (Builder $q) => $q
+                    ->where('step', 'approve')
+                    ->where('action', 'approved')),
+            'authorize' => $query
+                ->whereHas('approvals', fn (Builder $q) => $q
+                    ->where('step', 'approve')
+                    ->where('action', 'approved'))
+                ->whereDoesntHave('approvals', fn (Builder $q) => $q
+                    ->where('step', 'authorize')
+                    ->where('action', 'approved')),
+            default => $query,
+        };
+    }
+
+    public function scopeActionableForUserAtStage(Builder $query, User $user, string $stage): Builder
+    {
+        $types = self::requestTypesUserCanActOnAtStage($user, $stage);
+
+        return $query
+            ->inDepartmentScope($user)
+            ->awaitingApprovalStage($stage)
+            ->whereIn('request_type', $types);
+    }
+
+    public function approvalStage(): string
+    {
+        if ($this->authorized_at !== null) {
+            return 'completed';
+        }
+
+        if ($this->approved_at !== null) {
+            return 'authorize';
+        }
+
+        if ($this->reviewed_at !== null) {
+            return 'approve';
+        }
+
+        return 'review';
+    }
+
+    public function userCanActAtStage(User $user, string $stage): bool
+    {
+        if ($this->approvalStage() !== $stage) {
+            return false;
+        }
+
+        return $user->canAny(self::stagePermissionsForRequestType($this->request_type, $stage));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function stagePermissionsForRequestType(string $requestType, string $stage): array
+    {
+        if ($requestType === 'Staff Requisition') {
+            return match ($stage) {
+                'review' => ['review staff requisition', 'review requests'],
+                'approve' => ['approve staff requisition', 'approve requests'],
+                'authorize' => ['authorize staff requisition'],
+                default => [],
+            };
+        }
+
+        return match ($stage) {
+            'review' => ['first pettycash approval', 'review requests'],
+            'approve' => ['last pettycash approval', 'approve requests'],
+            'authorize' => ['authorize requests'],
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function permissionsForStage(string $stage): array
+    {
+        return match ($stage) {
+            'review' => ['first pettycash approval', 'review staff requisition', 'review requests'],
+            'approve' => ['last pettycash approval', 'approve staff requisition', 'approve requests'],
+            'authorize' => ['authorize requests', 'authorize staff requisition'],
+            default => [],
+        };
+    }
+
+    public static function userCanAccessStage(User $user, string $stage): bool
+    {
+        return $user->canAny(self::permissionsForStage($stage));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function accessibleStagesFor(User $user): array
+    {
+        return array_values(array_filter(
+            self::APPROVAL_STAGES,
+            fn (string $stage) => self::userCanAccessStage($user, $stage)
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function requestTypesUserCanActOnAtStage(User $user, string $stage): array
+    {
+        $types = [];
+
+        foreach (self::REQUEST_TYPES as $type) {
+            if ($user->canAny(self::stagePermissionsForRequestType($type, $stage))) {
+                $types[] = $type;
+            }
+        }
+
+        return $types;
+    }
+
+    public static function stageLabel(string $stage): string
+    {
+        return match ($stage) {
+            'review' => 'Review',
+            'approve' => 'Approve',
+            'authorize' => 'Authorize',
+            default => ucfirst($stage),
+        };
+    }
+
+    public static function stageQueueTitle(string $stage): string
+    {
+        return match ($stage) {
+            'review' => 'Review Queue',
+            'approve' => 'Approve Queue',
+            'authorize' => 'Authorize Queue',
+            default => 'Requests Approval',
+        };
+    }
+
+    public static function stageEmptyMessage(string $stage): string
+    {
+        return match ($stage) {
+            'review' => 'No requests waiting for review.',
+            'approve' => 'No requests waiting for approval.',
+            'authorize' => 'No requests waiting for authorization.',
+            default => 'No approval requests found.',
+        };
     }
 }

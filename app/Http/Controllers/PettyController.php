@@ -120,25 +120,46 @@ class PettyController extends Controller
     {
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        if (! $user) {
-            return false;
+
+        return $user && $request->userCanActAtStage($user, $stage);
+    }
+
+    private function firstAccessibleApprovalStage(\App\Models\User $user): string
+    {
+        $stages = FinanceRequest::accessibleStagesFor($user);
+
+        abort_if($stages === [], 403, 'You are not allowed to access approvals.');
+
+        return $stages[0];
+    }
+
+    public function requests_list(\Illuminate\Http\Request $httpRequest)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $stage = $httpRequest->query('stage');
+
+        if (! is_string($stage) || $stage === '') {
+            return redirect()->route('petty.list', ['stage' => $this->firstAccessibleApprovalStage($user)]);
         }
 
-        $reviewPermission = $request->request_type === 'Staff Requisition' ? 'review staff requisition' : 'first pettycash approval';
-        $approvePermission = $request->request_type === 'Staff Requisition' ? 'approve staff requisition' : 'last pettycash approval';
-        $authorizePermission = $request->request_type === 'Staff Requisition' ? 'authorize staff requisition' : 'authorize requests';
-
-        if ($stage === 'review') {
-            return $user->can($reviewPermission) && $request->reviewed_at === null;
-        }
-        if ($stage === 'approve') {
-            return $user->can($approvePermission) && $request->reviewed_at !== null && $request->approved_at === null;
-        }
-        if ($stage === 'authorize') {
-            return $user->can($authorizePermission) && $request->approved_at !== null && $request->authorized_at === null;
+        if (! in_array($stage, FinanceRequest::APPROVAL_STAGES, true)) {
+            abort(404);
         }
 
-        return false;
+        if (! FinanceRequest::userCanAccessStage($user, $stage)) {
+            abort(403, 'You are not allowed to access this approval stage.');
+        }
+
+        $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails', 'approvals.actor'])
+            ->actionableForUserAtStage($user, $stage)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $accessibleStages = FinanceRequest::accessibleStagesFor($user);
+        $stageLabel = FinanceRequest::stageLabel($stage);
+
+        return view('requests.approval.index', compact('requests', 'stage', 'stageLabel', 'accessibleStages'));
     }
 
     private function isRequisitionFullySigned(FinanceRequest $request): bool
@@ -291,20 +312,6 @@ class PettyController extends Controller
         return view('requests.petty.view', compact('request', 'amountInWords', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
     }
 
-    public function requests_list()
-    {
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-        $scopeIds = $user->departmentScopeIds();
-        $parentScopeIds = Department::whereIn('id', $scopeIds)->pluck('parent_id')->filter()->values()->all();
-        $allScopeIds = array_values(array_unique(array_merge($scopeIds, $parentScopeIds)));
-        $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails'])
-            ->whereIn('department_id', $allScopeIds)
-            ->orderByDesc('created_at')
-            ->get();
-
-        return view('requests.approval.index', compact('requests'));
-    }
 
     public function requestsCashier()
     {
@@ -331,7 +338,7 @@ class PettyController extends Controller
         return view('requests.approval.index', compact('requests'));
     }
 
-    public function request_show(FinanceRequest $petty)
+    public function request_show(\Illuminate\Http\Request $httpRequest, FinanceRequest $petty)
     {
         $request = $petty->load(['user', 'department', 'pettyDetails', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
         $latest = $request->approvals()->where('actor_id', Auth::id())->latest('acted_at')->first();
@@ -346,7 +353,28 @@ class PettyController extends Controller
         $amountWords = ucwords($numberTransformer->toWords($request->amount));
         $amountInWords = 'TZS '.$amountWords;
 
-        return view('requests.approval.details', compact('request', 'amountInWords', 'approval', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
+        $returnStage = $httpRequest->query('stage');
+        if (! is_string($returnStage) || ! in_array($returnStage, FinanceRequest::APPROVAL_STAGES, true)) {
+            $returnStage = in_array($request->approvalStage(), FinanceRequest::APPROVAL_STAGES, true)
+                ? $request->approvalStage()
+                : 'review';
+        }
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $canActOnRequest = $request->userCanActAtStage($user, $request->approvalStage());
+
+        return view('requests.approval.details', compact(
+            'request',
+            'amountInWords',
+            'approval',
+            'approval_logs',
+            'verifiedBy',
+            'approvedBy',
+            'gm',
+            'returnStage',
+            'canActOnRequest'
+        ));
     }
 
     public function f_approve(FinanceRequest $petty)
@@ -587,14 +615,9 @@ class PettyController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $scopeIds = $user->departmentScopeIds();
-        $requests = FinanceRequest::with(['user', 'requisitionDetails'])
-            ->where('request_type', 'Staff Requisition')
-            ->whereIn('department_id', $scopeIds)
-            ->orderByDesc('created_at')
-            ->get();
+        $stage = FinanceRequest::userCanAccessStage($user, 'review') ? 'review' : $this->firstAccessibleApprovalStage($user);
 
-        return view('requests.requisition.approvals', compact('requests'));
+        return redirect()->route('petty.list', ['stage' => $stage]);
     }
 
     public function downloadRequisition(FinanceRequest $petty)

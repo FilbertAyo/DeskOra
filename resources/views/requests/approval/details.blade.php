@@ -2,9 +2,16 @@
 
 @php
     $isStaffRequisition = $request->request_type === 'Staff Requisition';
-    $reviewPermission = $isStaffRequisition ? 'review staff requisition' : 'first pettycash approval';
-    $approvePermission = $isStaffRequisition ? 'approve staff requisition' : 'last pettycash approval';
-    $authorizePermission = $isStaffRequisition ? 'authorize staff requisition' : 'authorize requests';
+    $currentStage = $request->approvalStage();
+    $currentStageLabel = \App\Models\Request::stageLabel(
+        in_array($currentStage, \App\Models\Request::APPROVAL_STAGES, true) ? $currentStage : 'review'
+    );
+    $actionLabel = match ($currentStage) {
+        'review' => 'Review Request',
+        'approve' => 'Approve Request',
+        'authorize' => 'Authorize Request',
+        default => 'Take Action',
+    };
 @endphp
 
 
@@ -17,44 +24,27 @@
                                 <h5 class="m-b-10">Request Details</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                              <li class="breadcrumb-item" aria-current="page">Request Details</li>
-                              <li class="breadcrumb-item" aria-current="page">Request by <strong>{{ $request->user->name }}</strong></li>
+                                <li class="breadcrumb-item">
+                                    <a href="{{ route('petty.list', ['stage' => $returnStage ?? 'review']) }}">Approvals</a>
+                                </li>
+                                <li class="breadcrumb-item" aria-current="page">Request by <strong>{{ $request->user->name }}</strong></li>
                             </ul>
                         </div>
 
                         <div class="col-auto d-flex align-items-center gap-2">
+                            <a href="{{ route('petty.list', ['stage' => $returnStage ?? 'review']) }}" class="btn btn-sm btn-light">
+                                <i class="ti ti-arrow-left me-1"></i> Back
+                            </a>
                             <button type="button" class="btn btn-sm btn-light" onclick="reloadPage()"
                                 title="Refresh">
                                 <i class="ti ti-refresh"></i>
                             </button>
-                            @if ($request->status == 'pending' && !$request->reviewed_at)
-                    @if (auth()->user()->can($reviewPermission))
+                            @if ($canActOnRequest ?? false)
                         <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
                             data-toggle="modal" data-target="#approvalModal" data-bs-toggle="modal" data-bs-target="#approvalModal">
                             <i class="ti ti-check-circle me-2"></i>
-                            <span>Review Request</span>
+                            <span>{{ $actionLabel }}</span>
                         </button>
-                    @endif
-                @endif
-
-                @if ($request->status == 'processing' && $request->reviewed_at && !$request->approved_at)
-                    @if (auth()->user()->can($approvePermission))
-                        <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
-                            data-toggle="modal" data-target="#approvalModal" data-bs-toggle="modal" data-bs-target="#approvalModal">
-                            <i class="ti ti-check-circle me-2"></i>
-                            <span>Approve Request</span>
-                        </button>
-                    @endif
-                @endif
-
-                @if ($request->status == 'processing' && $request->approved_at && !$request->authorized_at)
-                    @if (auth()->user()->can($authorizePermission))
-                        <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
-                            data-toggle="modal" data-target="#approvalModal" data-bs-toggle="modal" data-bs-target="#approvalModal">
-                            <i class="ti ti-check-circle me-2"></i>
-                            <span>Authorize Request</span>
-                        </button>
-                    @endif
                 @endif
 
                 @if (
@@ -76,8 +66,22 @@
         </div>
     </div>
 
-  
+    @if (! ($canActOnRequest ?? false) && $currentStage !== 'completed')
+        <div class="alert alert-light border mb-4">
+            <div class="d-flex align-items-start gap-2">
+                <i class="ti ti-info-circle text-primary mt-1"></i>
+                <div>
+                    <strong>View only</strong>
+                    <p class="mb-0 small text-muted">
+                        This request is currently awaiting <strong>{{ strtolower($currentStageLabel) }}</strong>.
+                        You can review the details below, but you cannot take action at this stage.
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
 
+  
     <!-- Alert Messages -->
     @if ($approval == 'approved')
         <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 borde shadow-none"
@@ -248,6 +252,8 @@
         </div>
     </div>
 
+
+    @include('requests.approval.timeline')
 
     @include('requests.approval.logs')
 
