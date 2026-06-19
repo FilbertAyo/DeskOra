@@ -1,5 +1,5 @@
 <div class="card border shadow mt-3">
-    <div class="card-body">
+    <div class="card-body p-4">
         <div class="text-center mb-4">
             <img src="{{ asset('assets/images/logo.png') }}" alt="Logo" style="height: 56px;">
             <h4 class="mt-2 mb-0">FUND REQUISITION FORM</h4>
