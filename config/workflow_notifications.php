@@ -29,6 +29,9 @@ return [
         'document_approver',
         'budget_operator',
         'superadmin',
+        'requisition_reviewer',
+        'requisition_approver',
+        'requisition_authorizer',
     ],
 
 ];

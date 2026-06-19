@@ -3,14 +3,11 @@
 namespace App\Notifications;
 
 use App\Data\RequisitionMailContext;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class RequisitionWorkflowNotification extends Notification implements ShouldQueue
+class RequisitionWorkflowNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         private readonly RequisitionMailContext $context,
