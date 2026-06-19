@@ -106,6 +106,41 @@ class RequestApprovalStageTest extends TestCase
         $response->assertRedirect(route('petty.list', ['stage' => 'review']));
     }
 
+    public function test_reviewer_sees_completed_reviews_they_handled(): void
+    {
+        $department = $this->createDepartment();
+        $requester = $this->createRequester($department);
+        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+
+        $completed = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 60000);
+        $this->addStageApproval($completed, 'review', $reviewer);
+
+        $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'review']));
+
+        $response->assertOk();
+        $response->assertSee('60,000.00');
+        $response->assertSee('Completed', false);
+    }
+
+    public function test_actionable_requests_are_listed_before_completed_ones(): void
+    {
+        $department = $this->createDepartment();
+        $requester = $this->createRequester($department);
+        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+
+        $completed = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 60000);
+        $this->addStageApproval($completed, 'review', $reviewer);
+
+        $pending = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'pending', 50000);
+
+        $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'review']));
+
+        $response->assertOk();
+        $this->assertTrue(
+            strpos($response->getContent(), '50,000.00') < strpos($response->getContent(), '60,000.00')
+        );
+    }
+
     public function test_reviewer_sees_only_pending_review_items(): void
     {
         $department = $this->createDepartment();
@@ -203,8 +238,7 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('View only', false);
-        $response->assertDontSee('Authorize Request', false);
-        $response->assertDontSee('Review Request', false);
+        $response->assertDontSee('data-bs-target="#approvalModal"', false);
     }
 
     public function test_requisition_approvals_route_redirects_to_review_queue(): void

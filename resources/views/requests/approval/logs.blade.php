@@ -1,29 +1,45 @@
 
 @php
-    // Keep a stable id since this partial is used once per request details page.
     $offcanvasId = 'approvalTimelineOffcanvas';
     $offcanvasLabelId = $offcanvasId.'Label';
+    $showTrigger = $showTrigger ?? true;
 @endphp
 
-<button class="btn btn-light-secondary btn-sm" type="button"
-    data-bs-toggle="offcanvas" data-bs-target="#{{ $offcanvasId }}" aria-controls="{{ $offcanvasId }}">
-    <i class="ti ti-list me-2"></i> Approval Timeline
-</button>
+@if ($showTrigger)
+    <button
+        class="btn btn-sm btn-light d-inline-flex align-items-center"
+        type="button"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#{{ $offcanvasId }}"
+        aria-controls="{{ $offcanvasId }}"
+    >
+        <i class="ti ti-timeline me-1"></i>
+        View Timeline
+    </button>
+@endif
 
-<div class="offcanvas offcanvas-end" tabindex="-1" id="{{ $offcanvasId }}" aria-labelledby="{{ $offcanvasLabelId }}">
-    <div class="offcanvas-header">
-        <h5 id="{{ $offcanvasLabelId }}">Approval</h5>
-        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"
-            aria-label="Close"></button>
-    </div>
+@once
+    <div
+        class="offcanvas offcanvas-end"
+        tabindex="-1"
+        id="{{ $offcanvasId }}"
+        aria-labelledby="{{ $offcanvasLabelId }}"
+        style="width: min(480px, 100vw);"
+    >
+        <div class="offcanvas-header border-bottom">
+            <div>
+                <h5 class="offcanvas-title mb-1" id="{{ $offcanvasLabelId }}">Approval Timeline</h5>
+                <p class="text-muted small mb-0">Track each step of this request.</p>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
 
-    <div class="offcanvas-body">
-        @include('requests.approval.timeline')
-
-        <div class="text-end mt-3">
-            <button class="btn btn-light-danger btn-sm" type="button" data-bs-dismiss="offcanvas">
-                Close
-            </button>
+        <div class="offcanvas-body">
+            @isset($request, $approval_logs)
+                @include('requests.approval.timeline')
+            @else
+                <p class="text-muted small mb-0">Timeline is unavailable.</p>
+            @endisset
         </div>
     </div>
-</div>
+@endonce

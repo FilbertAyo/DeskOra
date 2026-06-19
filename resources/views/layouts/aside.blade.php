@@ -178,7 +178,7 @@
                             @canany(['first pettycash approval', 'review staff requisition', 'review requests'])
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' ? 'active' : '' }}">
                                     <a href="{{ route('petty.list', ['stage' => 'review']) }}" class="pc-link">
-                                        <span class="pc-mtext">Review</span>
+                                        <span class="pc-mtext">Review Requests</span>
                                         @if (($approvalsReviewCount ?? 0) > 0)
                                             <span class="badge bg-light-warning ms-2">{{ $approvalsReviewCount }}</span>
                                         @endif
@@ -188,7 +188,7 @@
                             @canany(['last pettycash approval', 'approve staff requisition', 'approve requests'])
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' ? 'active' : '' }}">
                                     <a href="{{ route('petty.list', ['stage' => 'approve']) }}" class="pc-link">
-                                        <span class="pc-mtext">Approve</span>
+                                        <span class="pc-mtext">Approve Requests</span>
                                         @if (($approvalsApproveCount ?? 0) > 0)
                                             <span class="badge bg-light-primary ms-2">{{ $approvalsApproveCount }}</span>
                                         @endif
@@ -198,7 +198,7 @@
                             @canany(['authorize requests', 'authorize staff requisition'])
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'authorize' ? 'active' : '' }}">
                                     <a href="{{ route('petty.list', ['stage' => 'authorize']) }}" class="pc-link">
-                                        <span class="pc-mtext">Authorize</span>
+                                        <span class="pc-mtext">Authorize Requests</span>
                                         @if (($approvalsAuthorizeCount ?? 0) > 0)
                                             <span class="badge bg-light-secondary ms-2">{{ $approvalsAuthorizeCount }}</span>
                                         @endif

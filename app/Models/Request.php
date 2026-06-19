@@ -374,12 +374,46 @@ class Request extends Model
         };
     }
 
+    public function scopeVisibleForUserAtStage(Builder $query, User $user, string $stage): Builder
+    {
+        $types = self::requestTypesUserCanActOnAtStage($user, $stage);
+
+        return $query
+            ->inDepartmentScope($user)
+            ->whereIn('request_type', $types)
+            ->where(function (Builder $q) use ($user, $stage) {
+                $q->where(function (Builder $awaiting) use ($stage) {
+                    $awaiting->awaitingApprovalStage($stage);
+                })->orWhereHas('approvals', fn (Builder $approval) => $approval
+                    ->where('step', $stage)
+                    ->where('action', 'approved')
+                    ->where('actor_id', $user->id));
+            });
+    }
+
+    public function userHasCompletedStage(User $user, string $stage): bool
+    {
+        if ($this->relationLoaded('approvals')) {
+            return $this->approvals
+                ->where('step', $stage)
+                ->where('action', 'approved')
+                ->where('actor_id', $user->id)
+                ->isNotEmpty();
+        }
+
+        return $this->approvals()
+            ->where('step', $stage)
+            ->where('action', 'approved')
+            ->where('actor_id', $user->id)
+            ->exists();
+    }
+
     public static function stageEmptyMessage(string $stage): string
     {
         return match ($stage) {
-            'review' => 'No requests waiting for review.',
-            'approve' => 'No requests waiting for approval.',
-            'authorize' => 'No requests waiting for authorization.',
+            'review' => 'No review requests found.',
+            'approve' => 'No approval requests found.',
+            'authorize' => 'No authorization requests found.',
             default => 'No approval requests found.',
         };
     }

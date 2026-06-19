@@ -29,39 +29,6 @@
     </div>
 </div>
 
-@if (isset($stage, $accessibleStages) && count($accessibleStages) > 0)
-    <div class="alert alert-light border mb-3 py-2">
-        <small class="mb-0 d-block">
-            <strong>How it works:</strong> Requests move through Review, Approve, then Authorize.
-            This page shows only items waiting for <strong>your</strong> action at the <strong>{{ strtolower($stageLabel) }}</strong> step.
-        </small>
-    </div>
-
-    <ul class="nav nav-pills mb-3 gap-2">
-        @foreach ($accessibleStages as $accessibleStage)
-            <li class="nav-item">
-                <a
-                    href="{{ route('petty.list', ['stage' => $accessibleStage]) }}"
-                    @class(['nav-link', 'active' => $accessibleStage === $stage])
-                >
-                    {{ \App\Models\Request::stageLabel($accessibleStage) }}
-                    @php
-                        $stageCount = match ($accessibleStage) {
-                            'review' => $approvalsReviewCount ?? 0,
-                            'approve' => $approvalsApproveCount ?? 0,
-                            'authorize' => $approvalsAuthorizeCount ?? 0,
-                            default => 0,
-                        };
-                    @endphp
-                    @if ($stageCount > 0)
-                        <span class="badge bg-light-danger ms-1">{{ $stageCount }}</span>
-                    @endif
-                </a>
-            </li>
-        @endforeach
-    </ul>
-@endif
-
 <div class="row my-2">
     <div class="col-md-12">
         <div class="card shadow-none border">
@@ -73,6 +40,7 @@
                             <th>Request By</th>
                             <th>Request For / Activity</th>
                             <th>Request Type</th>
+                            <th>Your Action</th>
                             <th>Amount</th>
                             <th>Date Requested</th>
                             <th>Status</th>
@@ -95,9 +63,13 @@
                                     default => 'success',
                                 };
                                 $canAct = isset($stage) && $item->userCanActAtStage(auth()->user(), $stage);
+                                $hasCompleted = isset($stage) && $item->userHasCompletedStage(auth()->user(), $stage);
                                 $actionLabel = isset($stage) ? \App\Models\Request::stageLabel($stage) : 'View';
                             @endphp
-                            <tr class="{{ $isPettyMissingAttachment ? 'alert alert-danger' : '' }}">
+                            <tr @class([
+                                'table-warning' => $canAct,
+                                'alert alert-danger' => $isPettyMissingAttachment,
+                            ])>
                                 <td>{{ $loop->iteration }}</td>
                                 <td>{{ $item->user->name ?? 'N/A' }}</td>
                                 <td>{{ $isStaffRequisition ? ($item->activity_title ?: $item->request_for) : $item->request_for }}</td>
@@ -105,6 +77,15 @@
                                     <span class="badge {{ $isStaffRequisition ? 'bg-light-info' : 'bg-light-primary' }}">
                                         {{ $item->request_type }}
                                     </span>
+                                </td>
+                                <td>
+                                    @if ($canAct)
+                                        <span class="badge bg-light-warning text-dark">Pending</span>
+                                    @elseif ($hasCompleted)
+                                        <span class="badge bg-light-success">Completed</span>
+                                    @else
+                                        <span class="badge bg-light-secondary">—</span>
+                                    @endif
                                 </td>
                                 <td>{{ number_format($item->amount, 2) }}</td>
                                 <td>{{ $item->created_at->format('d M, Y') }}</td>
@@ -125,7 +106,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted">
+                                <td colspan="9" class="text-center text-muted">
                                     {{ isset($stage) ? \App\Models\Request::stageEmptyMessage($stage) : 'No approval requests found.' }}
                                 </td>
                             </tr>

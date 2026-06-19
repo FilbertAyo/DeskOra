@@ -152,14 +152,15 @@ class PettyController extends Controller
         }
 
         $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails', 'approvals.actor'])
-            ->actionableForUserAtStage($user, $stage)
+            ->visibleForUserAtStage($user, $stage)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->sortByDesc(fn (FinanceRequest $request) => $request->userCanActAtStage($user, $stage) ? 1 : 0)
+            ->values();
 
-        $accessibleStages = FinanceRequest::accessibleStagesFor($user);
         $stageLabel = FinanceRequest::stageLabel($stage);
 
-        return view('requests.approval.index', compact('requests', 'stage', 'stageLabel', 'accessibleStages'));
+        return view('requests.approval.index', compact('requests', 'stage', 'stageLabel'));
     }
 
     private function isRequisitionFullySigned(FinanceRequest $request): bool

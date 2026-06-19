@@ -39,6 +39,7 @@
                                 title="Refresh">
                                 <i class="ti ti-refresh"></i>
                             </button>
+                            @include('requests.approval.logs')
                             @if ($canActOnRequest ?? false)
                         <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
                             data-toggle="modal" data-target="#approvalModal" data-bs-toggle="modal" data-bs-target="#approvalModal">
@@ -251,13 +252,6 @@
             </div>
         </div>
     </div>
-
-
-    @include('requests.approval.timeline')
-
-    @include('requests.approval.logs')
-
-
 
     @php
         if ($request->status === 'processing' && $request->approved_at && ! $request->authorized_at) {
