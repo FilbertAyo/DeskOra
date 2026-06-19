@@ -1,13 +1,13 @@
 <?php
 
 use App\Http\Controllers\ActionLogController;
-use App\Http\Controllers\AiAssistController;
-use App\Http\Controllers\DocumentAiSummaryController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AiAssistController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DepositController;
+use App\Http\Controllers\DocumentAiSummaryController;
 use App\Http\Controllers\DocumentBudgetReviewController;
 use App\Http\Controllers\DocumentCrudController;
 use App\Http\Controllers\DocumentDashboardController;
@@ -220,6 +220,11 @@ Route::middleware(['auth', 'permission:view cashflow movements'])->group(functio
     Route::get('/pettycash/flow', [DepositController::class, 'cashflow'])->name('cashflow.index');
     Route::get('/cashflow/download', [DepositController::class, 'download'])->name('cashflow.download');
     Route::get('pettycash/requests/payments/list', [PettyController::class, 'requestsCashier'])->name('petty.cashier');
+});
+
+Route::middleware(['auth', 'permission:view cashflow movements|review staff requisition|approve staff requisition|authorize staff requisition|download staff requisition'])->group(function () {
+    Route::get('/requisitions/records', [DepositController::class, 'requisitionRecords'])->name('requisition.records');
+    Route::get('/requisitions/records/download', [DepositController::class, 'downloadRequisitionRecords'])->name('requisition.records.download');
 });
 
 Route::middleware(['auth', 'permission:view reports'])->group(function () {

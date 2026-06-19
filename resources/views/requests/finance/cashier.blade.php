@@ -1,5 +1,35 @@
 <x-app-layout>
 
+<div class="page-header">
+    <div class="page-block">
+        <div class="row align-items-center">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="page-header-title">
+                        <h5 class="m-b-10">Cash Management</h5>
+                        <ul class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                            <li class="breadcrumb-item">Finance & Transactions</li>
+                            <li class="breadcrumb-item" aria-current="page">Cash Management</li>
+                        </ul>
+                    </div>
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-light" onclick="reloadPage()" title="Refresh">
+                            <i class="ti ti-refresh"></i>
+                        </button>
+                        @can('approve pettycash payments')
+                            <button type="button" class="btn btn-primary btn-sm"
+                                data-toggle="modal" data-target="#staticBackdrop"
+                                onclick="openNewDepositModal()">
+                                <i class="ti ti-plus me-1"></i> New Deposit
+                            </button>
+                        @endcan
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
                 <div class="row align-items-center mb-3 border-bottom no-gutters">
                     <div class="col">
@@ -9,18 +39,6 @@
                                     aria-controls="home" aria-selected="true">Deposits</a>
                             </li>
                         </ul>
-                    </div>
-                    <div class="col-auto">
-                        <button type="button" class="btn btn-sm" onclick="reloadPage()">
-                            <i class="ti ti-16 fe-refresh-ccw text-muted"></i>
-                        </button>
-                        @can('approve pettycash payments')
-                            <button type="button" class="btn mb-2 btn-primary btn-sm"
-                                data-toggle="modal" data-target="#staticBackdrop"
-                                onclick="openNewDepositModal()">
-                                New deposit<span class="ti ti-plus fe-16 ml-2"></span>
-                            </button>
-                        @endcan
                     </div>
                 </div>
 

@@ -1,5 +1,33 @@
 <x-app-layout>
 
+<div class="page-header">
+    <div class="page-block">
+        <div class="row align-items-center">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="page-header-title">
+                        <h5 class="m-b-10">Petty Cash Flow</h5>
+                        <ul class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                            <li class="breadcrumb-item">Finance & Transactions</li>
+                            <li class="breadcrumb-item" aria-current="page">Petty Cash Flow</li>
+                        </ul>
+                    </div>
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <a href="{{ route('cashflow.download', ['format' => 'pdf', 'filter_type' => request('filter_type')]) }}"
+                            class="btn btn-danger btn-sm">
+                            <i class="ti ti-download me-1"></i> PDF
+                        </a>
+                        <a href="{{ route('cashflow.download', ['format' => 'excel', 'filter_type' => request('filter_type')]) }}"
+                            class="btn btn-primary btn-sm">
+                            <i class="ti ti-download me-1"></i> Excel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
     <div class="row align-items-center mb-3 border-bottom no-gutters">
         <div class="col">
@@ -8,19 +36,7 @@
                     <a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab"
                         aria-controls="home" aria-selected="true">Running Balance Report</a>
                 </li>
-
             </ul>
-        </div>
-        <div class="col-auto">
-
-            <a href="{{ route('cashflow.download', ['format' => 'pdf', 'filter_type' => request('filter_type')]) }}"
-                class="btn mb-2 btn-danger btn-sm">
-                Download PDF
-            </a>
-            <a href="{{ route('cashflow.download', ['format' => 'excel', 'filter_type' => request('filter_type')]) }}"
-                class="btn mb-2 btn-primary btn-sm">
-                Download Excel
-            </a>
         </div>
     </div>
 

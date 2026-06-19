@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Concerns\HasShortId;
-
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -211,6 +210,18 @@ class Request extends Model
 
     public const REQUEST_TYPES = ['Petty Cash', 'Reimbursement', 'Staff Requisition'];
 
+    /**
+     * @return list<string>|null
+     */
+    public static function requestTypesForFilter(?string $filter): ?array
+    {
+        return match ($filter) {
+            'petty' => ['Petty Cash', 'Reimbursement'],
+            'requisition' => ['Staff Requisition'],
+            default => null,
+        };
+    }
+
     public function scopeInDepartmentScope(Builder $query, User $user): Builder
     {
         $scopeIds = $user->departmentScopeIds();
@@ -294,8 +305,8 @@ class Request extends Model
     {
         if ($requestType === 'Staff Requisition') {
             return match ($stage) {
-                'review' => ['review staff requisition', 'review requests'],
-                'approve' => ['approve staff requisition', 'approve requests'],
+                'review' => ['review staff requisition'],
+                'approve' => ['approve staff requisition'],
                 'authorize' => ['authorize staff requisition'],
                 default => [],
             };

@@ -6,11 +6,23 @@
             <div class="col-md-12">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="page-header-title">
-                        <h5 class="m-b-10">{{ isset($stage) ? \App\Models\Request::stageQueueTitle($stage) : 'Requests Approval' }}</h5>
+                        <h5 class="m-b-10">
+                            @if (isset($stage))
+                                @if (($typeFilter ?? null) === 'petty')
+                                    {{ \App\Models\Request::stageLabel($stage) }} Petty Cash
+                                @elseif (($typeFilter ?? null) === 'requisition')
+                                    {{ \App\Models\Request::stageLabel($stage) }} Requisitions
+                                @else
+                                    {{ \App\Models\Request::stageQueueTitle($stage) }}
+                                @endif
+                            @else
+                                Requests Approval
+                            @endif
+                        </h5>
                         <ul class="breadcrumb">
                             <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                             @if (isset($stage))
-                                <li class="breadcrumb-item"><a href="{{ route('petty.list', ['stage' => $stage]) }}">Approvals</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('petty.list', array_filter(['stage' => $stage, 'type' => $typeFilter ?? null])) }}">Approvals</a></li>
                                 <li class="breadcrumb-item" aria-current="page">{{ $stageLabel ?? ucfirst($stage) }}</li>
                             @else
                                 <li class="breadcrumb-item" aria-current="page">Requests Approval</li>
@@ -96,7 +108,7 @@
                                     <x-table-action-dropdown>
                                         <a
                                             class="dropdown-item"
-                                            href="{{ route('petty.details', ['petty' => $item->id, 'stage' => $stage ?? null]) }}"
+                                            href="{{ route('petty.details', array_filter(['petty' => $item->id, 'stage' => $stage ?? null, 'type' => $typeFilter ?? null])) }}"
                                         >
                                             <i class="ti ti-{{ $canAct ? 'check' : 'eye' }} me-2"></i>
                                             {{ $canAct ? $actionLabel : 'View' }}

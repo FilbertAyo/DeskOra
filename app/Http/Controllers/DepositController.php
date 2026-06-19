@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\RequisitionRecordsExport;
 use App\Exports\RunningBalanceExport;
 use App\Models\Deposit;
 use App\Models\Request as FinanceRequest;
@@ -163,6 +164,116 @@ class DepositController extends Controller
             return Excel::download(
                 new RunningBalanceExport(collect($transactions), $department, $isFiltered),
                 'running_balance_report.xlsx'
+            );
+        }
+
+        return back()->with('error', 'Invalid format requested.');
+    }
+
+    private function getRequisitionRecordTransactions(?string $filterType): array
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $departmentIds = $user->departmentScopeIds();
+
+        $requisitions = FinanceRequest::with(['user', 'requisitionDetails', 'department', 'approvals.actor'])
+            ->whereIn('department_id', $departmentIds)
+            ->where('request_type', 'Staff Requisition')
+            ->where('status', 'approved')
+            ->whereHas('approvals', fn ($query) => $query->where('step', 'authorize')->where('action', 'approved'))
+            ->get()
+            ->sortBy(fn (FinanceRequest $request) => $request->authorized_at)
+            ->values();
+
+        $rows = $requisitions->map(function (FinanceRequest $request) {
+            return [
+                'date' => $request->authorized_at,
+                'request_id' => $request->id,
+                'reference' => $request->code,
+                'requester' => optional($request->user)->name ?? 'Unknown',
+                'activity' => $request->activity_title ?: $request->request_for,
+                'project' => $request->project_program ?? '-',
+                'budget_code' => $request->budget_code ?? '-',
+                'amount' => (float) $request->amount,
+                'authorized_by' => optional($request->authorized_by)->name ?? '-',
+            ];
+        });
+
+        if (in_array($filterType, ['daily', 'monthly'], true)) {
+            $grouped = $rows->groupBy(function (array $row) use ($filterType) {
+                return $filterType === 'daily'
+                    ? \Carbon\Carbon::parse($row['date'])->toDateString()
+                    : \Carbon\Carbon::parse($row['date'])->format('F Y');
+            });
+
+            $cumulative = 0;
+            $groupedData = [];
+
+            foreach ($grouped as $key => $group) {
+                $periodTotal = $group->sum('amount');
+                $cumulative += $periodTotal;
+                $groupedData[] = [
+                    'label' => $key,
+                    'amount' => $periodTotal,
+                    'cumulative' => $cumulative,
+                    'count' => $group->count(),
+                ];
+            }
+
+            return [
+                'transactions' => $groupedData,
+                'isFiltered' => true,
+                'filterType' => $filterType,
+            ];
+        }
+
+        $cumulative = 0;
+        $transactions = $rows->map(function (array $row) use (&$cumulative) {
+            $cumulative += $row['amount'];
+            $row['cumulative'] = $cumulative;
+
+            return $row;
+        });
+
+        return [
+            'transactions' => $transactions,
+            'isFiltered' => false,
+            'filterType' => null,
+        ];
+    }
+
+    public function requisitionRecords(Request $request)
+    {
+        $filterType = $request->input('filter_type');
+        $data = $this->getRequisitionRecordTransactions($filterType);
+
+        return view('requests.finance.requisition-records', $data);
+    }
+
+    public function downloadRequisitionRecords(Request $request)
+    {
+        $format = $request->get('format');
+        $filterType = $request->get('filter_type');
+        $data = $this->getRequisitionRecordTransactions($filterType);
+        $transactions = $data['transactions'];
+        $department = strtoupper(optional(Auth::user()->department)->name ?? 'DEPARTMENT');
+        $isFiltered = in_array($filterType, ['daily', 'monthly'], true);
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('requests.finance.requisition-records_pdf', [
+                'transactions' => $transactions,
+                'department' => $department,
+                'filterType' => $filterType,
+                'isFiltered' => $isFiltered,
+            ]);
+
+            return $pdf->download('requisition_records_report.pdf');
+        }
+
+        if ($format === 'excel') {
+            return Excel::download(
+                new RequisitionRecordsExport(collect($transactions), $isFiltered),
+                'requisition_records_report.xlsx'
             );
         }
 

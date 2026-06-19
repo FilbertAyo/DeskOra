@@ -11,18 +11,18 @@ use App\Mail\SuccessPayment;
 use App\Models\Department;
 use App\Models\Deposit;
 use App\Models\PettyRequest;
-use App\Models\RequisitionItem;
-use App\Models\RequisitionRequest;
 use App\Models\Request as FinanceRequest;
 use App\Models\RequestApproval;
+use App\Models\RequisitionItem;
+use App\Models\RequisitionRequest;
 use App\Models\User;
 use App\Models\YearPlanActivity;
 use App\Services\NotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -153,14 +153,19 @@ class PettyController extends Controller
 
         $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails', 'approvals.actor'])
             ->visibleForUserAtStage($user, $stage)
+            ->when(
+                is_string($typeFilter = $httpRequest->query('type')) && FinanceRequest::requestTypesForFilter($typeFilter) !== null,
+                fn ($query) => $query->whereIn('request_type', FinanceRequest::requestTypesForFilter($typeFilter))
+            )
             ->orderByDesc('created_at')
             ->get()
             ->sortByDesc(fn (FinanceRequest $request) => $request->userCanActAtStage($user, $stage) ? 1 : 0)
             ->values();
 
         $stageLabel = FinanceRequest::stageLabel($stage);
+        $typeFilter = $httpRequest->query('type');
 
-        return view('requests.approval.index', compact('requests', 'stage', 'stageLabel'));
+        return view('requests.approval.index', compact('requests', 'stage', 'stageLabel', 'typeFilter'));
     }
 
     private function isRequisitionFullySigned(FinanceRequest $request): bool
@@ -313,7 +318,6 @@ class PettyController extends Controller
         return view('requests.petty.view', compact('request', 'amountInWords', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
     }
 
-
     public function requestsCashier()
     {
         /** @var \App\Models\User $user */
@@ -321,13 +325,14 @@ class PettyController extends Controller
         $scopeIds = $user->departmentScopeIds();
         $parentScopeIds = Department::whereIn('id', $scopeIds)->pluck('parent_id')->filter()->values()->all();
         $allScopeIds = array_values(array_unique(array_merge($scopeIds, $parentScopeIds)));
-        $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails'])
+        $requests = FinanceRequest::with(['user', 'pettyDetails'])
             ->whereIn('department_id', $allScopeIds)
+            ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
             ->whereIn('status', ['approved', 'paid'])
             ->orderByDesc('created_at')
             ->get();
 
-        return view('requests.approval.index', compact('requests'));
+        return view('requests.finance.payments', compact('requests'));
     }
 
     public function all_requests()
@@ -444,6 +449,9 @@ class PettyController extends Controller
 
     public function c_approve(FinanceRequest $petty)
     {
+        if ($petty->request_type === 'Staff Requisition') {
+            return redirect()->back()->with('error', 'Staff requisitions are not paid through petty cash.');
+        }
         if ($petty->authorized_at === null) {
             return redirect()->back()->with('error', 'This request must be authorized before payment.');
         }
@@ -631,7 +639,7 @@ class PettyController extends Controller
         }
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        if (! $user || (! $user->can('approve pettycash payments') && ! $user->can('authorize staff requisition'))) {
+        if (! $user || ! $user->canAny(['approve pettycash payments', 'authorize staff requisition', 'download staff requisition'])) {
             abort(403);
         }
 

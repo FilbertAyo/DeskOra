@@ -25,14 +25,14 @@
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item">
-                                    <a href="{{ route('petty.list', ['stage' => $returnStage ?? 'review']) }}">Approvals</a>
+                                    <a href="{{ route('petty.list', array_filter(['stage' => $returnStage ?? 'review', 'type' => request('type')])) }}">Approvals</a>
                                 </li>
                                 <li class="breadcrumb-item" aria-current="page">Request by <strong>{{ $request->user->name }}</strong></li>
                             </ul>
                         </div>
 
                         <div class="col-auto d-flex align-items-center gap-2">
-                            <a href="{{ route('petty.list', ['stage' => $returnStage ?? 'review']) }}" class="btn btn-sm btn-light">
+                            <a href="{{ route('petty.list', array_filter(['stage' => $returnStage ?? 'review', 'type' => request('type')])) }}" class="btn btn-sm btn-light">
                                 <i class="ti ti-arrow-left me-1"></i> Back
                             </a>
                           
@@ -50,12 +50,24 @@
                     $request->reviewed_at &&
                         $request->approved_at &&
                         $request->authorized_at &&
-                        (auth()->user()->can('approve pettycash payments') || auth()->user()->can('authorize staff requisition')))
+                        (auth()->user()->can('approve pettycash payments') || auth()->user()->can('authorize staff requisition') || auth()->user()->can('download staff requisition')))
                     <a href="{{ route('petty.requisition.download', $request->id) }}"
                         class="btn btn-danger btn-sm d-flex align-items-center">
                         <i class="ti ti-download me-2"></i>
                         <span>Download</span>
                     </a>
+                @endif
+
+                @if (
+                    ! $isStaffRequisition
+                    && $request->status === 'approved'
+                    && $request->authorized_at
+                    && ! $request->approvals->where('action', 'paid')->count()
+                    && auth()->user()->can('approve pettycash payments'))
+                    <form action="{{ route('c_approve.approve', $request->id) }}" method="POST" class="d-inline">
+                        @csrf
+                        <x-primary-button label="Pay Now" class="btn-sm d-flex align-items-center" />
+                    </form>
                 @endif
                        </div>
                     </div>

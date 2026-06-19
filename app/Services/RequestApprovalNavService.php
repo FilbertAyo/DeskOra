@@ -49,4 +49,25 @@ class RequestApprovalNavService
             }
         );
     }
+
+    public function countForStageAndTypes(User $user, string $stage, ?array $types = null): int
+    {
+        if (! FinanceRequest::userCanAccessStage($user, $stage)) {
+            return 0;
+        }
+
+        $actionableTypes = FinanceRequest::requestTypesUserCanActOnAtStage($user, $stage);
+        if ($types !== null) {
+            $actionableTypes = array_values(array_intersect($actionableTypes, $types));
+        }
+
+        if ($actionableTypes === []) {
+            return 0;
+        }
+
+        return FinanceRequest::query()
+            ->actionableForUserAtStage($user, $stage)
+            ->whereIn('request_type', $actionableTypes)
+            ->count();
+    }
 }

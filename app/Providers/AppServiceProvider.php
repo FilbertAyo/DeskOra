@@ -61,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
 
                 $approvedCount = (int) FinanceRequest::query()
                     ->whereIn('department_id', $user->departmentScopeIds())
+                    ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
                     ->where('status', 'approved')
                     ->count();
             }

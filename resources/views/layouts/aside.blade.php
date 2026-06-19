@@ -175,71 +175,116 @@
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
-                            @canany(['first pettycash approval', 'review staff requisition', 'review requests'])
-                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' ? 'active' : '' }}">
-                                    <a href="{{ route('petty.list', ['stage' => 'review']) }}" class="pc-link">
-                                        <span class="pc-mtext">Review Requests</span>
-                                        @if (($approvalsReviewCount ?? 0) > 0)
-                                            <span class="badge bg-light-warning ms-2">{{ $approvalsReviewCount }}</span>
+                            @canany(['first pettycash approval', 'review requests'])
+                                @php $pettyReviewCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'review', ['Petty Cash', 'Reimbursement']); @endphp
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' && request('type') === 'petty' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'review', 'type' => 'petty']) }}" class="pc-link">
+                                        <span class="pc-mtext">Review Petty Cash</span>
+                                        @if ($pettyReviewCount > 0)
+                                            <span class="badge bg-light-warning ms-2">{{ $pettyReviewCount }}</span>
                                         @endif
                                     </a>
                                 </li>
                             @endcanany
-                            @canany(['last pettycash approval', 'approve staff requisition', 'approve requests'])
-                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' ? 'active' : '' }}">
-                                    <a href="{{ route('petty.list', ['stage' => 'approve']) }}" class="pc-link">
-                                        <span class="pc-mtext">Approve Requests</span>
-                                        @if (($approvalsApproveCount ?? 0) > 0)
-                                            <span class="badge bg-light-primary ms-2">{{ $approvalsApproveCount }}</span>
+                            @can('review staff requisition')
+                                @php $requisitionReviewCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'review', ['Staff Requisition']); @endphp
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' && request('type') === 'requisition' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'review', 'type' => 'requisition']) }}" class="pc-link">
+                                        <span class="pc-mtext">Review Requisitions</span>
+                                        @if ($requisitionReviewCount > 0)
+                                            <span class="badge bg-light-warning ms-2">{{ $requisitionReviewCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcan
+                            @canany(['last pettycash approval', 'approve requests'])
+                                @php $pettyApproveCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'approve', ['Petty Cash', 'Reimbursement']); @endphp
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' && request('type') === 'petty' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'approve', 'type' => 'petty']) }}" class="pc-link">
+                                        <span class="pc-mtext">Approve Petty Cash</span>
+                                        @if ($pettyApproveCount > 0)
+                                            <span class="badge bg-light-primary ms-2">{{ $pettyApproveCount }}</span>
                                         @endif
                                     </a>
                                 </li>
                             @endcanany
-                            @canany(['authorize requests', 'authorize staff requisition'])
-                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'authorize' ? 'active' : '' }}">
-                                    <a href="{{ route('petty.list', ['stage' => 'authorize']) }}" class="pc-link">
-                                        <span class="pc-mtext">Authorize Requests</span>
-                                        @if (($approvalsAuthorizeCount ?? 0) > 0)
-                                            <span class="badge bg-light-secondary ms-2">{{ $approvalsAuthorizeCount }}</span>
+                            @can('approve staff requisition')
+                                @php $requisitionApproveCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'approve', ['Staff Requisition']); @endphp
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' && request('type') === 'requisition' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'approve', 'type' => 'requisition']) }}" class="pc-link">
+                                        <span class="pc-mtext">Approve Requisitions</span>
+                                        @if ($requisitionApproveCount > 0)
+                                            <span class="badge bg-light-primary ms-2">{{ $requisitionApproveCount }}</span>
                                         @endif
                                     </a>
                                 </li>
-                            @endcanany
+                            @endcan
+                            @can('authorize requests')
+                                @php $pettyAuthorizeCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'authorize', ['Petty Cash', 'Reimbursement']); @endphp
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'authorize' && request('type') === 'petty' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'authorize', 'type' => 'petty']) }}" class="pc-link">
+                                        <span class="pc-mtext">Authorize Petty Cash</span>
+                                        @if ($pettyAuthorizeCount > 0)
+                                            <span class="badge bg-light-secondary ms-2">{{ $pettyAuthorizeCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcan
+                            @can('authorize staff requisition')
+                                @php $requisitionAuthorizeCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'authorize', ['Staff Requisition']); @endphp
+                                <li class="{{ Request::routeIs('petty.list') && request('stage') === 'authorize' && request('type') === 'requisition' ? 'active' : '' }}">
+                                    <a href="{{ route('petty.list', ['stage' => 'authorize', 'type' => 'requisition']) }}" class="pc-link">
+                                        <span class="pc-mtext">Authorize Requisitions</span>
+                                        @if ($requisitionAuthorizeCount > 0)
+                                            <span class="badge bg-light-secondary ms-2">{{ $requisitionAuthorizeCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endcan
                         </ul>
                     </li>
                 @endcanany
 
                 <!-- Finance & Transactions -->
-                @can('view cashflow movements')
+                @canany(['view cashflow movements', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'download staff requisition'])
                     <li
-                        class="pc-item pc-hasmenu {{ Request::routeIs('petty.cashier') || Request::routeIs('deposit.index') || Request::routeIs('cashflow.index') ? 'pc-triggered' : '' }}">
+                        class="pc-item pc-hasmenu {{ Request::routeIs('petty.cashier', 'deposit.*', 'cashflow.*', 'requisition.records') ? 'pc-triggered' : '' }}">
                         <a href="#!" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-credit-card"></i></span>
                             <span class="pc-mtext">Finance & Transactions</span>
                             <span class="pc-arrow"><i data-feather="chevron-right"></i></span>
                         </a>
                         <ul class="pc-submenu">
-                            <li class="pc-item">
-                                <a href="{{ route('petty.cashier') }}" class="pc-link">
-                                    <span class="pc-mtext">Payments</span>
-                                    @if ($approvedPettiesCount > 0)
-                                        <span class="badge bg-light-success">{{ $approvedPettiesCount }}</span>
-                                    @endif
-                                </a>
-                            </li>
-                            <li class="pc-item">
-                                <a href="{{ route('deposit.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Cash Management</span>
-                                </a>
-                            </li>
-                            <li class="pc-item">
-                                <a href="{{ route('cashflow.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Cash Flow</span>
-                                </a>
-                            </li>
+                            @can('view cashflow movements')
+                                <li class="pc-item {{ Request::routeIs('petty.cashier') ? 'active' : '' }}">
+                                    <a href="{{ route('petty.cashier') }}" class="pc-link">
+                                        <span class="pc-mtext">Petty Cash Payments</span>
+                                        @if ($approvedPettiesCount > 0)
+                                            <span class="badge bg-light-success">{{ $approvedPettiesCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                                <li class="pc-item {{ Request::routeIs('deposit.index') ? 'active' : '' }}">
+                                    <a href="{{ route('deposit.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Cash Management</span>
+                                    </a>
+                                </li>
+                                <li class="pc-item {{ Request::routeIs('cashflow.index') ? 'active' : '' }}">
+                                    <a href="{{ route('cashflow.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Petty Cash Flow</span>
+                                    </a>
+                                </li>
+                            @endcan
+                            @canany(['view cashflow movements', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'download staff requisition'])
+                                <li class="pc-item {{ Request::routeIs('requisition.records') ? 'active' : '' }}">
+                                    <a href="{{ route('requisition.records') }}" class="pc-link">
+                                        <span class="pc-mtext">Requisition Records</span>
+                                    </a>
+                                </li>
+                            @endcanany
                         </ul>
                     </li>
-                @endcan
+                @endcanany
 
                 <!-- Reports and Settings -->
                 <li class="pc-item pc-caption">

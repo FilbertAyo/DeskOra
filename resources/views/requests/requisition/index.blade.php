@@ -53,15 +53,15 @@
                             <td>{{ $item->created_at->format('d M, Y') }}</td>
                             <td>
                                 @if ($item->status == 'pending')
-                                    <span class="badge bg-light-danger">{{ $item->status }}</span>
+                                    <span class="badge bg-light-danger text-danger">{{ $item->status }}</span>
                                 @elseif ($item->status == 'processing')
-                                    <span class="badge bg-light-primary">{{ $item->status }}</span>
+                                    <span class="badge bg-light-primary text-primary">{{ $item->status }}</span>
                                 @elseif ($item->status == 'rejected')
-                                    <span class="badge bg-light-secondary">{{ $item->status }}</span>
+                                    <span class="badge bg-light-secondary text-secondary">{{ $item->status }}</span>
                                 @elseif ($item->status == 'resubmission')
-                                    <span class="badge bg-light-danger">{{ $item->status }}</span>
+                                    <span class="badge bg-light-danger text-danger">{{ $item->status }}</span>
                                 @else
-                                    <span class="badge bg-light-success">{{ $item->status }}</span>
+                                    <span class="badge bg-light-success text-success">{{ $item->status }}</span>
                                 @endif
                             </td>
                             <td>
