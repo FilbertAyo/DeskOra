@@ -16,6 +16,8 @@ class WeeklyPlanBudgetReview extends Model
         'decision',
         'approval_stage',
         'provided_amount',
+        'review_provided_amount',
+        'approve_provided_amount',
         'note',
         'reviewed_by',
         'reviewed_at',
@@ -29,6 +31,8 @@ class WeeklyPlanBudgetReview extends Model
     {
         return [
             'provided_amount' => 'decimal:2',
+            'review_provided_amount' => 'decimal:2',
+            'approve_provided_amount' => 'decimal:2',
             'reviewed_at' => 'datetime',
             'approved_at' => 'datetime',
             'authorized_at' => 'datetime',

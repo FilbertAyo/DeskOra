@@ -2290,9 +2290,12 @@ class DocumentController extends Controller
                     if ($actionStage === 'review') {
                         $review['review_stage_by'] = $user->id;
                         $review['review_stage_at'] = $now->toIso8601String();
+                        $review['review_provided_amount'] = $providedAmount;
                     } elseif ($actionStage === 'approve') {
                         $review['approve_stage_by'] = $user->id;
                         $review['approve_stage_at'] = $now->toIso8601String();
+                        $review['review_provided_amount'] = $review['review_provided_amount'] ?? (float) ($review['provided_amount'] ?? 0);
+                        $review['approve_provided_amount'] = $providedAmount;
                     } else {
                         // Final approval can bypass earlier steps and auto-complete them.
                         if ($decision === Document::BUDGET_REVIEW_APPROVED) {
@@ -2300,6 +2303,8 @@ class DocumentController extends Controller
                             $review['review_stage_at'] = $review['review_stage_at'] ?? $now->toIso8601String();
                             $review['approve_stage_by'] = $review['approve_stage_by'] ?? $user->id;
                             $review['approve_stage_at'] = $review['approve_stage_at'] ?? $now->toIso8601String();
+                            $review['review_provided_amount'] = $review['review_provided_amount'] ?? $providedAmount;
+                            $review['approve_provided_amount'] = $review['approve_provided_amount'] ?? $providedAmount;
                         }
                         $review['authorize_stage_by'] = $user->id;
                         $review['authorize_stage_at'] = $now->toIso8601String();
@@ -2317,7 +2322,19 @@ class DocumentController extends Controller
                         ->with('error', 'You are not allowed to process this item at its current approval stage.');
                 }
                 $newStage = $this->stageAfterAction($actionStage, $decision);
-                $existingReviews[] = [
+                $stageAmounts = [
+                    'review_provided_amount' => null,
+                    'approve_provided_amount' => null,
+                ];
+                if ($actionStage === 'review') {
+                    $stageAmounts['review_provided_amount'] = $providedAmount;
+                } elseif ($actionStage === 'approve') {
+                    $stageAmounts['approve_provided_amount'] = $providedAmount;
+                } elseif ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED) {
+                    $stageAmounts['review_provided_amount'] = $providedAmount;
+                    $stageAmounts['approve_provided_amount'] = $providedAmount;
+                }
+                $existingReviews[] = array_merge([
                     'budget_uid' => $budgetUid,
                     'decision' => $decision,
                     'approval_stage' => $newStage,
@@ -2331,7 +2348,7 @@ class DocumentController extends Controller
                     'approve_stage_at' => ($actionStage === 'approve' || ($actionStage === 'authorize' && $decision === Document::BUDGET_REVIEW_APPROVED)) ? $now->toIso8601String() : null,
                     'authorize_stage_by' => $actionStage === 'authorize' ? $user->id : null,
                     'authorize_stage_at' => $actionStage === 'authorize' ? $now->toIso8601String() : null,
-                ];
+                ], $stageAmounts);
             }
 
             $document->budget_review_items = $existingReviews;
@@ -2385,15 +2402,20 @@ class DocumentController extends Controller
         if ($actionStage === 'review') {
             $updatePayload['reviewed_by'] = $user->id;
             $updatePayload['reviewed_at'] = $now;
+            $updatePayload['review_provided_amount'] = $providedAmount;
         } elseif ($actionStage === 'approve') {
             $updatePayload['approved_by'] = $user->id;
             $updatePayload['approved_at'] = $now;
+            $updatePayload['review_provided_amount'] = $existingReview?->review_provided_amount ?? $existingReview?->provided_amount;
+            $updatePayload['approve_provided_amount'] = $providedAmount;
         } else {
             if ($decision === Document::BUDGET_REVIEW_APPROVED) {
                 $updatePayload['reviewed_by'] = $existingReview?->reviewed_by ?? $user->id;
                 $updatePayload['reviewed_at'] = $existingReview?->reviewed_at ?? $now;
                 $updatePayload['approved_by'] = $existingReview?->approved_by ?? $user->id;
                 $updatePayload['approved_at'] = $existingReview?->approved_at ?? $now;
+                $updatePayload['review_provided_amount'] = $existingReview?->review_provided_amount ?? $providedAmount;
+                $updatePayload['approve_provided_amount'] = $existingReview?->approve_provided_amount ?? $providedAmount;
             }
             $updatePayload['authorized_by'] = $user->id;
             $updatePayload['authorized_at'] = $now;

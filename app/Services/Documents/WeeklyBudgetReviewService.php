@@ -137,6 +137,7 @@ class WeeklyBudgetReviewService
     public function groupBudgetDocumentsByDepartment(Collection $documents): array
     {
         $grouped = [];
+        $actorIds = [];
 
         foreach ($documents as $document) {
             $departmentName = $document->user?->department?->name ?? 'No Department';
@@ -172,6 +173,13 @@ class WeeklyBudgetReviewService
                 $review = $reviewsByUid[$uid] ?? null;
                 $amountNumeric = (float) ($item['amount_numeric'] ?? 0);
                 $providedAmount = (float) ($review['provided_amount'] ?? 0);
+                $approvalStage = $review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING;
+
+                foreach (['review_stage_by', 'approve_stage_by', 'authorize_stage_by'] as $actorKey) {
+                    if (! empty($review[$actorKey])) {
+                        $actorIds[] = (string) $review[$actorKey];
+                    }
+                }
 
                 $grouped[$departmentId]['staff'][$userId]['items'][] = [
                     'budget_uid' => $uid,
@@ -180,20 +188,47 @@ class WeeklyBudgetReviewService
                     'amount' => $item['amount'],
                     'amount_numeric' => $amountNumeric,
                     'decision' => $review['decision'] ?? Document::BUDGET_REVIEW_PENDING,
-                    'approval_stage' => $review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING,
+                    'approval_stage' => $approvalStage,
                     'provided_amount' => $providedAmount,
+                    'review_provided_amount' => $review['review_provided_amount'] ?? null,
+                    'approve_provided_amount' => $review['approve_provided_amount'] ?? null,
                     'note' => $review['note'] ?? null,
                     'reviewed_by' => $review['reviewed_by'] ?? null,
                     'reviewed_at' => $review['reviewed_at'] ?? null,
+                    'review_stage_by' => $review['review_stage_by'] ?? null,
+                    'review_stage_at' => $review['review_stage_at'] ?? null,
+                    'approve_stage_by' => $review['approve_stage_by'] ?? null,
+                    'approve_stage_at' => $review['approve_stage_at'] ?? null,
+                    'authorize_stage_by' => $review['authorize_stage_by'] ?? null,
+                    'authorize_stage_at' => $review['authorize_stage_at'] ?? null,
                     'document_id' => $document->id,
                 ];
 
                 $grouped[$departmentId]['staff'][$userId]['requested_total'] += $amountNumeric;
-                $grouped[$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
+                if ($approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED) {
+                    $grouped[$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
+                    $grouped[$departmentId]['provided_total'] += $providedAmount;
+                }
                 $grouped[$departmentId]['requested_total'] += $amountNumeric;
-                $grouped[$departmentId]['provided_total'] += $providedAmount;
             }
         }
+
+        $actorNames = User::query()
+            ->whereIn('id', array_values(array_unique($actorIds)))
+            ->pluck('name', 'id');
+
+        foreach ($grouped as &$department) {
+            foreach ($department['staff'] as &$staffData) {
+                foreach ($staffData['items'] as &$item) {
+                    $item['review_stage_by_name'] = $actorNames[(string) ($item['review_stage_by'] ?? '')] ?? null;
+                    $item['approve_stage_by_name'] = $actorNames[(string) ($item['approve_stage_by'] ?? '')] ?? null;
+                    $item['authorize_stage_by_name'] = $actorNames[(string) ($item['authorize_stage_by'] ?? '')] ?? null;
+                }
+                unset($item);
+            }
+            unset($staffData);
+        }
+        unset($department);
 
         uasort($grouped, fn ($a, $b) => strcasecmp($a['department_name'], $b['department_name']));
 

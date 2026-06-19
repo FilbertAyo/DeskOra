@@ -200,6 +200,12 @@ class DocumentDomainSyncService
                 'decision' => $decision,
                 'approval_stage' => $approvalStage,
                 'provided_amount' => (float) ($review['provided_amount'] ?? 0),
+                'review_provided_amount' => is_array($review) && array_key_exists('review_provided_amount', $review) && $review['review_provided_amount'] !== null
+                    ? (float) $review['review_provided_amount']
+                    : null,
+                'approve_provided_amount' => is_array($review) && array_key_exists('approve_provided_amount', $review) && $review['approve_provided_amount'] !== null
+                    ? (float) $review['approve_provided_amount']
+                    : null,
                 'note' => isset($review['note']) ? trim((string) $review['note']) : null,
                 'reviewed_by' => $review['reviewed_by'] ?? null,
                 'reviewed_at' => isset($review['reviewed_at']) && trim((string) $review['reviewed_at']) !== ''

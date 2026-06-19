@@ -1426,6 +1426,12 @@ class Document extends Model
                     'decision' => $decision,
                     'approval_stage' => $approvalStage,
                     'provided_amount' => (float) ($review?->provided_amount ?? 0),
+                    'review_provided_amount' => $review?->review_provided_amount !== null
+                        ? (float) $review->review_provided_amount
+                        : null,
+                    'approve_provided_amount' => $review?->approve_provided_amount !== null
+                        ? (float) $review->approve_provided_amount
+                        : null,
                     'note' => $review?->note,
                     'reviewed_by' => $latestActor,
                     'reviewed_at' => optional($latestActionAt)->toIso8601String(),
@@ -1476,6 +1482,12 @@ class Document extends Model
                 'decision' => $decision,
                 'approval_stage' => $approvalStage,
                 'provided_amount' => (float) ($row['provided_amount'] ?? 0),
+                'review_provided_amount' => array_key_exists('review_provided_amount', $row) && $row['review_provided_amount'] !== null
+                    ? (float) $row['review_provided_amount']
+                    : null,
+                'approve_provided_amount' => array_key_exists('approve_provided_amount', $row) && $row['approve_provided_amount'] !== null
+                    ? (float) $row['approve_provided_amount']
+                    : null,
                 'note' => isset($row['note']) ? trim((string) $row['note']) : null,
                 'reviewed_by' => $row['reviewed_by'] ?? null,
                 'reviewed_at' => isset($row['reviewed_at']) && $row['reviewed_at'] !== '' ? (string) $row['reviewed_at'] : null,
