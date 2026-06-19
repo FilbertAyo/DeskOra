@@ -40,18 +40,18 @@ class RequisitionEmailNotificationTest extends TestCase
         $reviewerEmail = $this->userWithPermissions(['review staff requisition'], $department, 'email');
         $reviewerBoth = $this->userWithPermissions(['review staff requisition'], $department, 'both');
         $reviewerSmsOnly = $this->userWithPermissions(['review staff requisition'], $department, 'sms');
-        $wrongDepartmentReviewer = $this->userWithPermissions(['review staff requisition'], $this->createDepartment('Finance'), 'email');
+        $crossDepartmentReviewer = $this->userWithPermissions(['review staff requisition'], $this->createDepartment('Finance'), 'email');
 
         app(RequisitionNotificationService::class)->notifyStageApprovers($requisition, 'submitted');
 
         Notification::assertSentTo($reviewerEmail, RequisitionWorkflowNotification::class);
         Notification::assertSentTo($reviewerBoth, RequisitionWorkflowNotification::class);
+        Notification::assertSentTo($crossDepartmentReviewer, RequisitionWorkflowNotification::class);
         Notification::assertNotSentTo($reviewerSmsOnly, RequisitionWorkflowNotification::class);
-        Notification::assertNotSentTo($wrongDepartmentReviewer, RequisitionWorkflowNotification::class);
         Notification::assertNotSentTo($requester, RequisitionWorkflowNotification::class);
     }
 
-    public function test_reviewed_notifies_approvers_in_department_scope(): void
+    public function test_reviewed_notifies_approvers_across_departments(): void
     {
         Notification::fake();
 
@@ -67,7 +67,7 @@ class RequisitionEmailNotificationTest extends TestCase
             'acted_at' => now(),
         ]);
 
-        $approver = $this->userWithPermissions(['approve staff requisition'], $department, 'email');
+        $approver = $this->userWithPermissions(['approve staff requisition'], $this->createDepartment('Finance'), 'email');
 
         app(RequisitionNotificationService::class)->notifyStageApprovers($requisition->fresh(), 'reviewed');
 

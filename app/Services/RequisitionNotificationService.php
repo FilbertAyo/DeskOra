@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Data\RequisitionMailContext;
-use App\Models\Department;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
 use App\Notifications\RequisitionWorkflowNotification;
@@ -27,7 +26,7 @@ class RequisitionNotificationService
 
         $request->loadMissing(['user', 'department', 'requisitionDetails']);
         $context = $this->buildContext($request, $event);
-        $recipients = $this->recipientsForPermission($permission, $request->department_id);
+        $recipients = $this->recipientsForPermission($permission);
 
         if ($recipients->isEmpty()) {
             $this->logMissingRecipients($event, $request, $permission);
@@ -117,37 +116,16 @@ class RequisitionNotificationService
     }
 
     /**
+     * Requisition reviewer/approver/authorizer permissions are org-wide, not department-scoped.
+     *
      * @return Collection<int, User>
      */
-    private function recipientsForPermission(string $permission, ?string $departmentId): Collection
+    private function recipientsForPermission(string $permission): Collection
     {
-        $scopeIds = $this->resolveDepartmentScopeIds($departmentId);
-        if ($scopeIds === []) {
-            return collect();
-        }
-
         return User::query()
             ->where('status', 'active')
             ->permission($permission)
-            ->whereIn('department_id', $scopeIds)
             ->get();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function resolveDepartmentScopeIds(?string $departmentId): array
-    {
-        if ($departmentId === null || $departmentId === '') {
-            return [];
-        }
-
-        $department = Department::find($departmentId);
-        if (! $department) {
-            return [$departmentId];
-        }
-
-        return $department->selfAndDescendantIds();
     }
 
     /**
