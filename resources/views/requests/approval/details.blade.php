@@ -324,10 +324,7 @@
                             </button>
                             <form action="{{ $modalApprovalRoute }}" method="POST" class="order-1 order-sm-2 d-grid d-sm-inline">
                                 @csrf
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="ti ti-check me-1"></i>
-                                    {{ $modalApprovalLabel }}
-                                </button>
+                                <x-primary-button :label="$modalApprovalLabel" />
                             </form>
                         </div>
                     </div>

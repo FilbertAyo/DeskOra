@@ -106,7 +106,7 @@
                 </div>
             </div>
             <div class="card-action m-3">
-                <button class="btn btn-primary" type="submit">Update Requisition</button>
+                <x-primary-button label="Update Requisition" />
             </div>
         </div>
     </form>
