@@ -143,19 +143,44 @@
                     <i class="ti ti-file-text"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('requisition.*', 'petty.index') ? 'active pc-trigger' : '' }}">
+                @php
+                    $isStaffRequisitionRequestRoute = Request::routeIs(
+                        'requisition.index',
+                        'requisition.create',
+                        'requisition.show',
+                        'requisition.edit'
+                    );
+                    $isPettyCashRequestRoute = Request::routeIs('petty.index', 'petty.create', 'petty.show');
+                    $isRequestsMenuOpen = $isStaffRequisitionRequestRoute || $isPettyCashRequestRoute;
+                    $isFinanceMenuOpen = Request::routeIs(
+                        'petty.cashier',
+                        'deposit.*',
+                        'cashflow.*',
+                        'requisition.records',
+                        'requisition.records.download'
+                    );
+                    $isSettingsMenuOpen = Request::routeIs(
+                        'admin.*',
+                        'roles.*',
+                        'departments',
+                        'activity-log.*',
+                        'settings.*'
+                    );
+                @endphp
+
+                <li class="pc-item pc-hasmenu {{ $isRequestsMenuOpen ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-file"></i></span>
                         <span class="pc-mtext">Requests</span>
                         <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                     </a>
                     <ul class="pc-submenu">
-                        <li class="{{ Request::routeIs('requisition.*') ? 'active' : '' }}">
+                        <li class="{{ $isStaffRequisitionRequestRoute ? 'active' : '' }}">
                             <a href="{{ route('requisition.index') }}" class="pc-link">
                                 <span class="pc-mtext">Staff Requisitions</span>
                             </a>
                         </li>
-                        <li class="{{ Request::routeIs('petty.index') ? 'active' : '' }}">
+                        <li class="{{ $isPettyCashRequestRoute ? 'active' : '' }}">
                             <a href="{{ route('petty.index') }}" class="pc-link">
                                 <span class="pc-mtext">Petty Cash</span>
                             </a>
@@ -247,16 +272,15 @@
 
                 <!-- Finance & Transactions -->
                 @canany(['view cashflow movements', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'download staff requisition'])
-                    <li
-                        class="pc-item pc-hasmenu {{ Request::routeIs('petty.cashier', 'deposit.*', 'cashflow.*', 'requisition.records') ? 'pc-triggered' : '' }}">
-                        <a href="#!" class="pc-link">
+                    <li class="pc-item pc-hasmenu {{ $isFinanceMenuOpen ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-credit-card"></i></span>
                             <span class="pc-mtext">Finance & Transactions</span>
-                            <span class="pc-arrow"><i data-feather="chevron-right"></i></span>
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
                             @can('view cashflow movements')
-                                <li class="pc-item {{ Request::routeIs('petty.cashier') ? 'active' : '' }}">
+                                <li class="{{ Request::routeIs('petty.cashier') ? 'active' : '' }}">
                                     <a href="{{ route('petty.cashier') }}" class="pc-link">
                                         <span class="pc-mtext">Petty Cash Payments</span>
                                         @if ($approvedPettiesCount > 0)
@@ -264,19 +288,19 @@
                                         @endif
                                     </a>
                                 </li>
-                                <li class="pc-item {{ Request::routeIs('deposit.index') ? 'active' : '' }}">
+                                <li class="{{ Request::routeIs('deposit.*') ? 'active' : '' }}">
                                     <a href="{{ route('deposit.index') }}" class="pc-link">
                                         <span class="pc-mtext">Cash Management</span>
                                     </a>
                                 </li>
-                                <li class="pc-item {{ Request::routeIs('cashflow.index') ? 'active' : '' }}">
+                                <li class="{{ Request::routeIs('cashflow.*') ? 'active' : '' }}">
                                     <a href="{{ route('cashflow.index') }}" class="pc-link">
                                         <span class="pc-mtext">Petty Cash Flow</span>
                                     </a>
                                 </li>
                             @endcan
                             @canany(['view cashflow movements', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'download staff requisition'])
-                                <li class="pc-item {{ Request::routeIs('requisition.records') ? 'active' : '' }}">
+                                <li class="{{ Request::routeIs('requisition.records', 'requisition.records.download') ? 'active' : '' }}">
                                     <a href="{{ route('requisition.records') }}" class="pc-link">
                                         <span class="pc-mtext">Requisition Records</span>
                                     </a>
@@ -308,22 +332,21 @@
                         </a>
                     </li>
              
-                    <li
-                        class="pc-item pc-hasmenu {{ Request::routeIs('admin.*') || Request::routeIs('roles.*') || Request::routeIs('departments') || Request::routeIs('activity-log.*') || Request::routeIs('settings.*') ? 'pc-triggered' : '' }}">
-                        <a href="#!" class="pc-link">
+                    <li class="pc-item pc-hasmenu {{ $isSettingsMenuOpen ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-settings"></i></span>
                             <span class="pc-mtext">Settings</span>
-                            <span class="pc-arrow"><i data-feather="chevron-right"></i></span>
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
-                            <li class="pc-item {{ Request::routeIs('admin.index') ? 'active' : '' }}">
+                            <li class="{{ Request::routeIs('admin.index') ? 'active' : '' }}">
                                 <a href="{{ route('admin.index') }}" class="pc-link">
                                     <span class="pc-mtext">Users</span>
                                 </a>
                             </li>
                            
                             @can('manage roles and permissions')
-                            <li class="pc-item {{ Request::routeIs('roles.*') ? 'active' : '' }}">
+                            <li class="{{ Request::routeIs('roles.*') ? 'active' : '' }}">
                                 <a href="{{ route('roles.index') }}" class="pc-link">
                                     <span class="pc-mtext">Roles</span>
                                 </a>
@@ -331,7 +354,7 @@
                             @endcan
 
                             @can('manage departments')
-                                <li class="pc-item {{ Request::routeIs('departments') ? 'active' : '' }}">
+                                <li class="{{ Request::routeIs('departments') ? 'active' : '' }}">
                                     <a href="{{ route('departments') }}" class="pc-link">
                                         <span class="pc-mtext">Departments</span>
                                     </a>
@@ -340,7 +363,7 @@
                            
                          
                             @can('view activity log')
-                                <li class="pc-item {{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
+                                <li class="{{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
                                     <a href="{{ route('activity-log.index') }}" class="pc-link">
                                         <span class="pc-mtext">Activity log</span>
                                     </a>
