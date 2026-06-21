@@ -151,10 +151,18 @@
                                             </td>
                                             <td>
                                                 @if($document->user)
-                                                    <div class="d-flex align-items-center">
-                
-                                                        <span class="fw-semibold">{{ $document->user->name }}</span> <br>
-                                                        <span class="text-muted small">Collaborators: @include('documents.partials.weekly-shared-names-cell', ['document' => $document])</span>
+                                                    @php
+                                                        $sharedUsersForDisplay = $document->relationLoaded('effectiveSharedUsers')
+                                                            ? $document->getRelation('effectiveSharedUsers')
+                                                            : $document->sharedUsers;
+                                                    @endphp
+                                                    <div>
+                                                        <span class="fw-semibold">{{ $document->user->name }}</span>
+                                                        @if($sharedUsersForDisplay->isNotEmpty())
+                                                            <div class="small text-body-secondary mt-1">
+                                                                {{ $sharedUsersForDisplay->pluck('name')->join(', ') }}
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                 @else
                                                     <span class="text-muted">-</span>
