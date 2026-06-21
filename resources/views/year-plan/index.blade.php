@@ -34,7 +34,7 @@
                                 <tr>
                                     <th>Year</th>
                                     <th class="text-center">Activities</th>
-                                    <th>Period</th>
+                                    <th class="text-center">Period</th>
                                     <th class="text-center" style="width: 140px;">Action</th>
                                 </tr>
                             </thead>
@@ -51,7 +51,7 @@
                                     <tr>
                                         <td class="fw-semibold">{{ $plan->year }}</td>
                                         <td class="text-center">{{ $plan->activities_count }}</td>
-                                        <td>
+                                        <td class="text-center">
                                             <div class="d-flex flex-wrap gap-1">
                                                 @foreach ($monthLabels as $monthNum => $monthLabel)
                                                     @php
