@@ -48,7 +48,7 @@
                                         <td class="fw-semibold">{{ $plan->year }}</td>
                                         <td class="text-center">{{ $plan->activities_count }}</td>
                                         <td class="text-center">
-                                        <td><a href="{{ route('year-plan.show', $plan->year) }}" class="btn btn-sm btn-outline-primary">
+                                       <a href="{{ route('year-plan.show', $plan->year) }}" class="btn btn-sm btn-outline-primary">
                                                     <i class="ti ti-external-link me-1"></i> Open
                                                 </a>
                                             </td>
