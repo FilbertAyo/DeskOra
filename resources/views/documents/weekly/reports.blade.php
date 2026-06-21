@@ -117,8 +117,7 @@
                                         <th class="text-center" style="width: 50px;">No.</th>
                                         <th>Title</th>
                                         <th>Week Period</th>
-                                        <th>Author</th>
-                                        <th>Collaborators</th>
+                                        <th>Name</th>
                                         <th>Created</th>
                                         <th>Last Updated</th>
                                         <th class="text-center" style="width: 120px;">Status</th>
@@ -157,15 +156,17 @@
                                             </td>
                                             <td>
                                                 @if($document->user)
-                                                    <div class="d-flex align-items-center">
-                                                        <span>{{ $document->user->name }}</span>
+                                                    <div>
+                                                        <span class="fw-semibold">{{ $document->user->name }}</span>
+                                                        @if($sharedUsersForDisplay->isNotEmpty())
+                                                            <div class="small text-body-secondary mt-1">
+                                                                {{ $sharedUsersForDisplay->pluck('name')->join(', ') }}
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                 @else
                                                     <span class="text-muted">-</span>
                                                 @endif
-                                            </td>
-                                            <td>
-                                                @include('documents.partials.weekly-shared-names-cell', ['document' => $document])
                                             </td>
                                             <td>
                                                 <small class="text-muted">
@@ -190,7 +191,7 @@
                                                         </span>
                                                     @endif
                                                 @else
-                                                    <span class="badge bg-light-success">
+                                                    <span class="badge bg-light-success border border-success">
                                                         <i class="ti ti-circle-check me-1"></i>Submitted
                                                     </span>
                                                 @endif
