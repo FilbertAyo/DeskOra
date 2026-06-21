@@ -102,10 +102,10 @@
                                         $rowNum = ($items->firstItem() ?? 0) + $loop->index;
                                         $statusLabel = str_replace('_', ' ', ucfirst($row->status));
                                         $statusClass = match ($row->status) {
-                                            \App\Models\AnonymousFeedback::STATUS_NEW => 'bg-light-warning text-dark',
-                                            \App\Models\AnonymousFeedback::STATUS_IN_PROGRESS => 'bg-light-info text-dark',
-                                            \App\Models\AnonymousFeedback::STATUS_RESOLVED => 'bg-light-success',
-                                            default => 'bg-light-secondary',
+                                            \App\Models\AnonymousFeedback::STATUS_NEW => 'bg-light-warning border border-warning text-dark',
+                                            \App\Models\AnonymousFeedback::STATUS_IN_PROGRESS => 'bg-light-info border border-info text-dark',
+                                            \App\Models\AnonymousFeedback::STATUS_RESOLVED => 'bg-light-success border border-success',
+                                            default => 'bg-light-secondary border border-secondary',
                                         };
                                     @endphp
                                     <tr>

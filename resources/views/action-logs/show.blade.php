@@ -48,9 +48,9 @@
                         <div class="card-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
                             <h6 class="mb-0"><i class="ti ti-info-circle me-2"></i>Action Log Information</h6>
                             @if($document->state === 'draft')
-                                <span class="badge bg-light-warning"><i class="ti ti-edit me-1"></i>Draft</span>
+                                <span class="badge bg-light-warning border border-warning">Draft</span>
                             @else
-                                <span class="badge bg-light-success"><i class="ti ti-check-circle me-1"></i>Submitted</span>
+                                <span class="badge bg-light-success border border-success">Submitted</span>
                             @endif
                         </div>
                         <div class="card-body py-3">
@@ -89,12 +89,12 @@
                                         aria-valuenow="{{ $completionPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
                                 <div class="mt-2 d-flex flex-wrap gap-2">
-                                    <span class="badge bg-light-light text-dark">{{ $taskTotal }} Total</span>
-                                    <span class="badge bg-light-success">{{ $doneTasks }} Done</span>
-                                    <span class="badge bg-light-info">{{ $inProgressTasks }} In Progress</span>
-                                    <span class="badge bg-light-secondary">{{ $notStartedTasks }} Not Started</span>
+                                    <span class="badge bg-light-light border border-light text-dark">{{ $taskTotal }} Total</span>
+                                    <span class="badge bg-light-success border border-success">{{ $doneTasks }} Done</span>
+                                    <span class="badge bg-light-info border border-info">{{ $inProgressTasks }} In Progress</span>
+                                    <span class="badge bg-light-secondary border border-secondary">{{ $notStartedTasks }} Not Started</span>
                                     @if($cancelledTasks > 0)
-                                        <span class="badge bg-light-danger">{{ $cancelledTasks }} Cancelled</span>
+                                        <span class="badge bg-light-danger border border-danger">{{ $cancelledTasks }} Cancelled</span>
                                     @endif
                                 </div>
                             </div>
@@ -199,13 +199,13 @@
                                                 @if($displayProgress === null)
                                                     <span class="text-muted">—</span>
                                                 @elseif($displayProgress === 'Done')
-                                                    <span class="badge bg-light-success">{{ $displayProgress }}</span>
+                                                    <span class="badge bg-light-success border border-success">{{ $displayProgress }}</span>
                                                 @elseif($displayProgress === 'Cancelled')
-                                                    <span class="badge bg-light-danger">{{ $displayProgress }}</span>
+                                                    <span class="badge bg-light-danger border border-danger">{{ $displayProgress }}</span>
                                                 @elseif($displayProgress === 'In Progress')
-                                                    <span class="badge bg-light-info">{{ $displayProgress }}</span>
+                                                    <span class="badge bg-light-info border border-info">{{ $displayProgress }}</span>
                                                 @else
-                                                    <span class="badge bg-light-secondary">{{ $displayProgress }}</span>
+                                                    <span class="badge bg-light-secondary border border-secondary">{{ $displayProgress }}</span>
                                                 @endif
                                             </td>
                                             <td class="small">{{ $row['due_date'] ?? '-' }}</td>
@@ -220,7 +220,7 @@
                                                         aria-expanded="false"
                                                         aria-controls="{{ $timelineId }}">
                                                         <i class="ti ti-timeline-event me-1"></i>View Timeline
-                                                        <span class="badge bg-light-primary ms-1">{{ $realHistory->count() }}</span>
+                                                        <span class="badge bg-light-primary border border-primary ms-1">{{ $realHistory->count() }}</span>
                                                     </button>
                                                 @else
                                                     <span class="text-muted small">No updates yet</span>
@@ -258,10 +258,10 @@
                                                                         </div>
                                                                         <div class="mb-1">
                                                                             @if($fromProgress)
-                                                                                <span class="badge bg-light-light text-dark">{{ $fromProgress }}</span>
+                                                                                <span class="badge bg-light-light border border-light text-dark">{{ $fromProgress }}</span>
                                                                                 <i class="ti ti-arrow-right text-muted mx-1"></i>
                                                                             @endif
-                                                                            <span class="badge {{ $dotClass === 'al-dot-success' ? 'bg-light-success' : ($dotClass === 'al-dot-danger' ? 'bg-light-danger' : ($dotClass === 'al-dot-info' ? 'bg-light-info' : 'bg-light-secondary')) }}">{{ $toProgress }}</span>
+                                                                            <span class="badge {{ $dotClass === 'al-dot-success' ? 'bg-light-success border border-success' : ($dotClass === 'al-dot-danger' ? 'bg-light-danger border border-danger' : ($dotClass === 'al-dot-info' ? 'bg-light-info border border-info' : 'bg-light-secondary border border-secondary')) }}">{{ $toProgress }}</span>
                                                                         </div>
                                                                         @if(!empty($entry['notes_progress']))
                                                                             <div class="small text-dark"><i class="ti ti-note me-1 text-muted"></i>{{ $entry['notes_progress'] }}</div>

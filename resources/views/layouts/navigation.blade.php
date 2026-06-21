@@ -40,7 +40,7 @@
                     <span class="small">
                         Week {{ $currentPeriod->week_number }} • {{ $currentPeriod->date_range }}
                     </span>
-                    <span class="badge bg-light-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }} ml-2">
+                    <span class="badge bg-light-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }} border border-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }} ml-2">
                         {{ ucfirst($currentPeriod->status) }}
                     </span>
                 </div>
@@ -93,7 +93,7 @@
                        title="Alerts">
                         <i class="ti ti-bell"></i>
                         @if($unreadNotificationCount > 0)
-                            <span class="badge bg-light-danger rounded-pill position-absolute" style="margin-left:-8px; margin-top:-8px;">
+                            <span class="badge bg-light-danger border border-danger rounded-pill position-absolute" style="margin-left:-8px; margin-top:-8px;">
                                 {{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}
                             </span>
                         @endif

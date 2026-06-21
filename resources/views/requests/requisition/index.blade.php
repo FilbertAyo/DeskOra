@@ -53,17 +53,17 @@
                             <td>{{ $item->created_at->format('d M, Y') }}</td>
                             <td>
                                 @if ($item->status == 'draft')
-                                    <span class="badge bg-light-warning text-warning">Draft</span>
+                                    <span class="badge bg-light-warning border border-warning text-warning">Draft</span>
                                 @elseif ($item->status == 'pending')
-                                    <span class="badge bg-light-danger text-danger">{{ $item->status }}</span>
+                                    <span class="badge bg-light-danger border border-danger text-danger">{{ $item->status }}</span>
                                 @elseif ($item->status == 'processing')
-                                    <span class="badge bg-light-primary text-primary">{{ $item->status }}</span>
+                                    <span class="badge bg-light-primary border border-primary text-primary">{{ $item->status }}</span>
                                 @elseif ($item->status == 'rejected')
-                                    <span class="badge bg-light-secondary text-secondary">{{ $item->status }}</span>
+                                    <span class="badge bg-light-secondary border border-secondary text-secondary">{{ $item->status }}</span>
                                 @elseif ($item->status == 'resubmission')
-                                    <span class="badge bg-light-danger text-danger">{{ $item->status }}</span>
+                                    <span class="badge bg-light-danger border border-danger text-danger">{{ $item->status }}</span>
                                 @else
-                                    <span class="badge bg-light-success text-success">{{ $item->status }}</span>
+                                    <span class="badge bg-light-success border border-success text-success">{{ $item->status }}</span>
                                 @endif
                             </td>
                             <td>

@@ -87,23 +87,23 @@
                                 <td>{{ $item->user->name ?? 'N/A' }}</td>
                                 <td>{{ $isStaffRequisition ? ($item->activity_title ?: $item->request_for) : $item->request_for }}</td>
                                 <td>
-                                    <span class="badge {{ $isStaffRequisition ? 'bg-light-info text-info' : 'bg-light-primary text-primary' }}">
+                                    <span class="badge {{ $isStaffRequisition ? 'bg-light-info border border-info text-info' : 'bg-light-primary border border-primary text-primary' }}">
                                         {{ $item->request_type }}
                                     </span>
                                 </td>
                                 <td>
                                     @if ($canAct)
-                                        <span class="badge bg-light-warning text-warning">Pending</span>
+                                        <span class="badge bg-light-warning border border-warning text-warning">Pending</span>
                                     @elseif ($hasCompleted)
-                                        <span class="badge bg-light-success text-success">Completed</span>
+                                        <span class="badge bg-light-success border border-success text-success">Completed</span>
                                     @else
-                                        <span class="badge bg-light-secondary text-secondary">—</span>
+                                        <span class="badge bg-light-secondary border border-secondary text-secondary">—</span>
                                     @endif
                                 </td>
                                 <td>{{ number_format($item->amount, 2) }}</td>
                                 <td>{{ $item->created_at->format('d M, Y') }}</td>
                                 <td>
-                                    <span class="badge bg-light-{{ $statusClass }} {{ $statusTextClass }}">{{ $item->status }}</span>
+                                    <span class="badge bg-light-{{ $statusClass }} border border-{{ $statusClass }} {{ $statusTextClass }}">{{ $item->status }}</span>
                                 </td>
                                 <td>
                                     <x-table-action-dropdown>

@@ -109,15 +109,11 @@
                                             Edit & Resubmit
                                         </a>
                                     @else
-                                        <span class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
-                                            <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
-                                            {{ $statusInfo['text'] }}
+                                        <span class="badge bg-light-{{ $statusInfo['class'] }} border border-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">{{ $statusInfo['text'] }}
                                         </span>
                                     @endif
                                 @else
-                                    <span class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">
-                                        <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
-                                        {{ $statusInfo['text'] }}
+                                    <span class="badge bg-light-{{ $statusInfo['class'] }} border border-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center fs-6">{{ $statusInfo['text'] }}
                                     </span>
                                 @endif
                             </div>

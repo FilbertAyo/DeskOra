@@ -118,7 +118,7 @@
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-bell me-2"></i>Insights</h5>
-                    <span class="badge bg-light-primary">
+                    <span class="badge bg-light-primary border border-primary">
                         {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount + $assignedWeeklyActivityCount }}
                     </span>
                 </div>
@@ -469,7 +469,7 @@
                     <h5 class="mb-0">
                         <i class="ti ti-bolt me-2"></i>My Action Tasks
                         @if($activeActionTaskCount > 0)
-                            <span class="badge bg-light-primary ms-1">{{ $activeActionTaskCount }}</span>
+                            <span class="badge bg-light-primary border border-primary ms-1">{{ $activeActionTaskCount }}</span>
                         @endif
                     </h5>
                     <a href="{{ route('action-logs.index') }}" class="small text-decoration-none">View all</a>
@@ -484,10 +484,10 @@
                                 @php
                                     $tProgress = $task['latest_progress'] ?? 'Not Started';
                                     $badgeClass = match($tProgress) {
-                                        'Done' => 'bg-light-success',
-                                        'Cancelled' => 'bg-light-danger',
-                                        'In Progress' => 'bg-light-info',
-                                        default => 'bg-light-secondary',
+                                        'Done' => 'bg-light-success border border-success',
+                                        'Cancelled' => 'bg-light-danger border border-danger',
+                                        'In Progress' => 'bg-light-info border border-info',
+                                        default => 'bg-light-secondary border border-secondary',
                                     };
                                 @endphp
                                 <div class="list-group-item px-2 py-2">
@@ -497,10 +497,10 @@
                                             <div class="mt-1">
                                                 <span class="badge {{ $badgeClass }}">{{ $tProgress }}</span>
                                                 @if(!empty($task['period_label']))
-                                                    <span class="badge bg-light-light text-dark">{{ $task['period_label'] }}</span>
+                                                    <span class="badge bg-light-light border border-light text-dark">{{ $task['period_label'] }}</span>
                                                 @endif
                                                 @if(!empty($task['needs_update']))
-                                                    <span class="badge bg-light-warning text-dark">Carried forward</span>
+                                                    <span class="badge bg-light-warning border border-warning text-dark">Carried forward</span>
                                                 @endif
                                             </div>
                                             @if(!empty($task['needs_update']) && !empty($task['carried_from_period_label']))

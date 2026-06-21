@@ -148,7 +148,7 @@
                     <h5 class="mb-0">
                         <i class="ti ti-calendar-stats me-2 text-info"></i>
                         Weekly Plan + Report 
-                        <span class="badge bg-light-info ml-2">{{ $mergedWeeklyRows->count() }}</span>
+                        <span class="badge bg-light-info border border-info ml-2">{{ $mergedWeeklyRows->count() }}</span>
                     </h5>
                 </div>
                 <div class="card-body">
@@ -200,7 +200,7 @@
                                                         @php
                                                             $planSharedNames = $planSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
                                                         @endphp
-                                                        <span class="badge bg-light-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
+                                                        <span class="badge bg-light-info border border-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
                                                             {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
                                                         </span>
                                                     @endif
@@ -216,7 +216,7 @@
                                                         @php
                                                             $reportSharedNames = $reportSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
                                                         @endphp
-                                                        <span class="badge bg-light-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
+                                                        <span class="badge bg-light-info border border-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
                                                             {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
                                                         </span>
                                                     @endif
@@ -275,7 +275,7 @@
                                 <h5 class="mb-0">
                                     <i class="{{ $typeLabels[$type]['icon'] }} me-2 text-{{ $typeLabels[$type]['color'] }}"></i>
                                     {{ $typeLabels[$type]['name'] }}
-                                    <span class="badge bg-light-{{ $typeLabels[$type]['color'] }} ml-2">{{ $documents->count() }}</span>
+                                    <span class="badge bg-light-{{ $typeLabels[$type]['color'] }} border border-{{ $typeLabels[$type]['color'] }} ml-2">{{ $documents->count() }}</span>
                                 </h5>
                             </div>
                         </div>

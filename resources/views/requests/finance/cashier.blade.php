@@ -49,11 +49,11 @@
                             <div class="card-header mb-1" style="display: flex;justify-content: space-between;">
                                 <h4 class="h3 mb-3">
                                     @if ($remaining < 0)
-                                        <div class="fs-5 bg-light-danger badge">Remaining Amount:
+                                        <div class="fs-5 bg-light-danger border border-danger badge">Remaining Amount:
                                             <strong>{{ number_format($remaining, 0, '.', ',') }}/=</strong>
                                         </div>
                                     @else
-                                        <div class="fs-5 bg-light-success badge">Remaining Amount:
+                                        <div class="fs-5 bg-light-success border border-success badge">Remaining Amount:
                                             <strong>{{ number_format($remaining, 0, '.', ',') }}/=</strong>
                                         </div>
                                     @endif

@@ -85,7 +85,7 @@
                                     </h6>
                                     <p class="mb-0">
                                         <strong>{{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}</strong>
-                                        <span class="badge bg-light-danger {{ $deadlineStatuses['report_badge'] }} ml-2">
+                                        <span class="badge bg-light-danger border border-danger {{ $deadlineStatuses['report_badge'] }} ml-2">
                                             {{ $deadlineStatuses['report_text'] }}
                                         </span>
                                     </p>
@@ -138,9 +138,9 @@
                                                 @if($sharedUsersForDisplay->isNotEmpty())
                                                     <div class="mt-1">
                                                         @if((string) auth()->id() === (string) $document->user_id)
-                                                            <span class="badge bg-light-primary text-primary">Owner (Shared)</span>
+                                                            <span class="badge bg-light-primary border border-primary text-primary">Owner (Shared)</span>
                                                         @else
-                                                            <span class="badge bg-light-info text-info">Shared With You</span>
+                                                            <span class="badge bg-light-info border border-info text-info">Shared With You</span>
                                                         @endif
                                                     </div>
                                                 @endif
@@ -182,17 +182,14 @@
                                             </td>
                                             <td class="text-center">
                                                 @if($document->state === 'draft')
-                                                    <span class="badge bg-light-warning">
-                                                        <i class="ti ti-edit me-1"></i>Draft
+                                                    <span class="badge bg-light-warning border border-warning">Draft
                                                     </span>
                                                     @if(isset($returnedDocumentMap[$document->id]))
-                                                        <span class="badge bg-light-danger mt-1">
-                                                            <i class="ti ti-arrow-back-up me-1"></i>Returned
+                                                        <span class="badge bg-light-danger border border-danger mt-1">Returned
                                                         </span>
                                                     @endif
                                                 @else
-                                                    <span class="badge bg-light-success border border-success">
-                                                        <i class="ti ti-circle-check me-1"></i>Submitted
+                                                    <span class="badge bg-light-success border border-success">Submitted
                                                     </span>
                                                 @endif
                                             </td>

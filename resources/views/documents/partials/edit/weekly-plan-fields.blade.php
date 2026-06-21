@@ -82,7 +82,7 @@
                                                 Drafts can be saved without activities. For any activity row you fill in, please provide both a Day and Activity text.
                                             </small>
                                             <div class="mb-2">
-                                                <small class="text-muted">Activities marked with this badge were carried from previous week: <span class="badge bg-light-info text-info">Carried</span></small>
+                                                <small class="text-muted">Activities marked with this badge were carried from previous week: <span class="badge bg-light-info border border-info text-info">Carried</span></small>
                                             </div>
                                             <div class="table-responsive">
                                                 <table class="table table-bordered table-striped align-middle mb-0">
@@ -133,7 +133,7 @@
                                                                         trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) !== ''
                                                                         || trim((string) ($row['carry_over_source_report_id'] ?? '')) !== ''
                                                                     )
-                                                                        <small class="badge bg-light-info text-info mt-1">Carried</small>
+                                                                        <small class="badge bg-light-info border border-info text-info mt-1">Carried</small>
                                                                     @endif
                                                                 </td>
                                                                 <td>
@@ -256,7 +256,7 @@
                                                                         value="{{ old("content.key_meetings.$i.meeting", $row['meeting'] ?? '') }}"
                                                                         placeholder="e.g., MIT Engagement ...">
                                                                     @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
-                                                                        <small class="badge bg-light-info text-info mt-1">From another participant plan</small>
+                                                                        <small class="badge bg-light-info border border-info text-info mt-1">From another participant plan</small>
                                                                     @endif
                                                                 </td>
                                                                 <td>

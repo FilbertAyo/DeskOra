@@ -271,7 +271,7 @@
                                                                                 trim((string) ($row['carry_over_source_weekly_report_id'] ?? '')) !== ''
                                                                                 || trim((string) ($row['carry_over_source_report_id'] ?? '')) !== ''
                                                                             )
-                                                                                <div><small class="badge bg-light-info text-info mt-1">Carried from previous week</small></div>
+                                                                                <div><small class="badge bg-light-info border border-info text-info mt-1">Carried from previous week</small></div>
                                                                             @endif
                                                                         </td>
                                                                     </tr>
@@ -341,7 +341,7 @@
                                                                         <td>
                                                                             {{ $row['reactions_notes'] ?? '' }}
                                                                             @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
-                                                                                <div><small class="badge bg-light-info text-info mt-1">From another participant plan</small></div>
+                                                                                <div><small class="badge bg-light-info border border-info text-info mt-1">From another participant plan</small></div>
                                                                             @endif
                                                                         </td>
                                                                     </tr>

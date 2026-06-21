@@ -17,7 +17,7 @@
         <div class="approval-content">
             <div class="d-flex justify-content-between align-items-start gap-2">
                 <h6 class="mb-1">Request Created</h6>
-                <span class="badge bg-light-primary text-primary">Created</span>
+                <span class="badge bg-light-primary border border-primary text-primary">Created</span>
             </div>
             <p class="mb-1 text-muted small">{{ $request->request_for }}</p>
             <small class="text-muted">
@@ -38,7 +38,7 @@
             <div class="approval-content">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <h6 class="mb-1">{{ $style['text'] }}</h6>
-                    <span class="badge bg-light-{{ $style['class'] }} text-{{ $style['class'] }}">{{ $style['text'] }}</span>
+                    <span class="badge bg-light-{{ $style['class'] }} border border-{{ $style['class'] }} text-{{ $style['class'] }}">{{ $style['text'] }}</span>
                 </div>
                 <p class="mb-1 small text-muted">
                     <i class="ti ti-user me-1"></i>{{ $approval->user->name ?? 'System' }}

@@ -55,15 +55,15 @@
                                 <td>{{ $item->user->name ?? 'N/A' }}</td>
                                 <td>{{ $item->request_for }}</td>
                                 <td>
-                                    <span class="badge bg-light-primary">{{ $item->request_type }}</span>
+                                    <span class="badge bg-light-primary border border-primary">{{ $item->request_type }}</span>
                                 </td>
                                 <td>{{ number_format($item->amount, 2) }}</td>
                                 <td>{{ $item->created_at->format('d M, Y') }}</td>
                                 <td>
                                     @if ($isPaid)
-                                        <span class="badge bg-light-success text-success">Paid</span>
+                                        <span class="badge bg-light-success border border-success text-success">Paid</span>
                                     @else
-                                        <span class="badge bg-light-warning text-warning">Awaiting Payment</span>
+                                        <span class="badge bg-light-warning border border-warning text-warning">Awaiting Payment</span>
                                     @endif
                                 </td>
                                 <td>

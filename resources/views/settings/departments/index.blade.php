@@ -77,7 +77,7 @@
                                             {{ $department->users_count }}
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge {{ $department->status == 'active' ? 'bg-light-success' : 'bg-light-secondary' }}">
+                                            <span class="badge {{ $department->status == 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary border border-secondary' }}">
                                                 <i class="ti {{ $department->status == 'active' ? 'ti-circle-check' : 'ti-circle-x' }} me-1"></i>
                                                 {{ ucfirst($department->status) }}
                                             </span>

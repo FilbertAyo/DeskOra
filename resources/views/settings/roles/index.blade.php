@@ -47,15 +47,15 @@
                                     <tr>
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
-                                            <span class="badge bg-light-primary">
+                                            <span class="badge bg-light-primary border border-primary">
                                                 {{ ucwords(str_replace('_', ' ', $role->name)) }}
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-info">{{ $role->permissions_count }}</span>
+                                            <span class="badge bg-light-info border border-info">{{ $role->permissions_count }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-secondary">{{ $role->users_count }}</span>
+                                            <span class="badge bg-light-secondary border border-secondary">{{ $role->users_count }}</span>
                                         </td>
                                         <td class="text-center">
                                             <x-table-action-dropdown>

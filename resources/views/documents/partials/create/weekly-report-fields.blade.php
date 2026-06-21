@@ -315,7 +315,7 @@
                                         placeholder="Meeting / engagement"
                                         @if($isReadonlyMeeting) disabled @endif>
                                     @if($isReadonlyMeeting)
-                                        <small class="badge bg-light-warning text-warning mt-1">Assigned (View only)</small>
+                                        <small class="badge bg-light-warning border border-warning text-warning mt-1">Assigned (View only)</small>
                                     @endif
                                 </td>
                                 <td>
@@ -505,11 +505,11 @@
                                     </td>
                                     <td class="text-center">
                                         @if($reviewDecision === 'approved')
-                                            <span class="badge bg-light-success">Approved</span>
+                                            <span class="badge bg-light-success border border-success">Approved</span>
                                         @elseif($reviewDecision === 'rejected')
-                                            <span class="badge bg-light-danger">Rejected</span>
+                                            <span class="badge bg-light-danger border border-danger">Rejected</span>
                                         @elseif($reviewDecision === 'pending')
-                                            <span class="badge bg-light-warning">Pending</span>
+                                            <span class="badge bg-light-warning border border-warning">Pending</span>
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif

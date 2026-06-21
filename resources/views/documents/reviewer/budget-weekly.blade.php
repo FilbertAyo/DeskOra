@@ -143,8 +143,8 @@
                                 <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
                             </h6>
                             <div class="text-end">
-                                <span class="badge bg-light-light text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
-                                <span class="badge bg-light-light text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
+                                <span class="badge bg-light-light border border-light text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
+                                <span class="badge bg-light-light border border-light text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -171,13 +171,13 @@
                                     <div class="text-end">
                 
                                         @if($staffSummary['pending'] > 0)
-                                            <span class="badge bg-light-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
+                                            <span class="badge bg-light-warning border border-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
                                         @endif
                                         @if($staffSummary['approved'] > 0)
-                                            <span class="badge bg-light-success">{{ $staffSummary['approved'] }} approved</span>
+                                            <span class="badge bg-light-success border border-success">{{ $staffSummary['approved'] }} approved</span>
                                         @endif
                                         @if($staffSummary['rejected'] > 0)
-                                            <span class="badge bg-light-danger">{{ $staffSummary['rejected'] }} rejected</span>
+                                            <span class="badge bg-light-danger border border-danger">{{ $staffSummary['rejected'] }} rejected</span>
                                         @endif
                                     </div>
                                 </div>
@@ -263,15 +263,15 @@
                                                     </td>
                                                     <td>
                                                         @if($isFinalApproved)
-                                                            <span class="badge bg-light-success">Approved</span>
+                                                            <span class="badge bg-light-success border border-success">Approved</span>
                                                         @elseif($isRejected)
-                                                            <span class="badge bg-light-danger">Rejected</span>
+                                                            <span class="badge bg-light-danger border border-danger">Rejected</span>
                                                         @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
-                                                            <span class="badge bg-light-primary">Pending Authorization</span>
+                                                            <span class="badge bg-light-primary border border-primary">Pending Authorization</span>
                                                         @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED)
-                                                            <span class="badge bg-light-success">Reviewed</span>
+                                                            <span class="badge bg-light-success border border-success">Reviewed</span>
                                                         @else
-                                                            <span class="badge bg-light-warning text-dark">Pending Review</span>
+                                                            <span class="badge bg-light-warning border border-warning text-dark">Pending Review</span>
                                                         @endif
                                                     </td>
                                                     <!-- <td>
@@ -288,11 +288,11 @@
                                                                 </button>
                                                             </x-table-action-dropdown>
                                                         @elseif($awaitingLabel)
-                                                            <span class="badge bg-light-info text-dark">{{ $awaitingLabel }}</span>
+                                                            <span class="badge bg-light-info border border-info text-dark">{{ $awaitingLabel }}</span>
                                                         @elseif($isFinalApproved)
-                                                            <span class="badge bg-light-success">Complete</span>
+                                                            <span class="badge bg-light-success border border-success">Complete</span>
                                                         @elseif($isRejected)
-                                                            <span class="badge bg-light-danger">Closed</span>
+                                                            <span class="badge bg-light-danger border border-danger">Closed</span>
                                                         @else
                                                             <span class="text-muted">—</span>
                                                         @endif
@@ -394,7 +394,7 @@
                                                                 <small class="text-muted d-block">{{ $item['description_purpose'] }}</small>
                                                             @endif
                                                             <div class="mt-2">
-                                                                <span class="badge bg-light-warning text-dark">Requested: {{ $item['amount'] }}</span>
+                                                                <span class="badge bg-light-warning border border-warning text-dark">Requested: {{ $item['amount'] }}</span>
                                                             </div>
                                                         </div>
 
@@ -403,7 +403,7 @@
                                                                 <small class="text-muted d-block mb-1">Previous review</small>
                                                                 <div class="fw-semibold">
                                                                     Provided amount:
-                                                                    <span class="badge bg-light-success">{{ number_format($reviewAmount, 2) }}</span>
+                                                                    <span class="badge bg-light-success border border-success">{{ number_format($reviewAmount, 2) }}</span>
                                                                 </div>
                                                                 @if(! empty($item['review_stage_by_name']))
                                                                     <small class="text-muted d-block mt-1">
@@ -422,7 +422,7 @@
                                                                 @if($reviewAmount !== null)
                                                                     <div class="mb-1">
                                                                         Review amount:
-                                                                        <span class="badge bg-light-success">{{ number_format($reviewAmount, 2) }}</span>
+                                                                        <span class="badge bg-light-success border border-success">{{ number_format($reviewAmount, 2) }}</span>
                                                                         @if(! empty($item['review_stage_by_name']))
                                                                             <small class="text-muted">by {{ $item['review_stage_by_name'] }}</small>
                                                                         @endif
@@ -431,7 +431,7 @@
                                                                 @if($approveAmount !== null)
                                                                     <div>
                                                                         Approval amount:
-                                                                        <span class="badge bg-light-success">{{ number_format($approveAmount, 2) }}</span>
+                                                                        <span class="badge bg-light-success border border-success">{{ number_format($approveAmount, 2) }}</span>
                                                                         @if(! empty($item['approve_stage_by_name']))
                                                                             <small class="text-muted">by {{ $item['approve_stage_by_name'] }}</small>
                                                                         @endif

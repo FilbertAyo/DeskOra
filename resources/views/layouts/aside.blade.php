@@ -111,7 +111,7 @@
                                     <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
                                         <span class="pc-mtext">Submissions</span>
                                         @if($reviewActivitiesSubmittedCount > 0)
-                                            <span class="badge bg-light-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
+                                            <span class="badge bg-light-primary border border-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -121,7 +121,7 @@
                                     <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
                                         <span class="pc-mtext">Weekly Budget</span>
                                         @if($reviewActivitiesPendingBudgetCount > 0)
-                                            <span class="badge bg-light-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
+                                            <span class="badge bg-light-warning border border-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -188,7 +188,7 @@
                             <span class="pc-micon"><i class="ti ti-users"></i></span>
                             <span class="pc-mtext">Approvals</span>
                             @if (($approvalsTotalCount ?? 0) > 0)
-                                <span class="badge bg-light-danger">{{ $approvalsTotalCount }}</span>
+                                <span class="badge bg-light-danger border border-danger">{{ $approvalsTotalCount }}</span>
                             @endif
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
@@ -199,7 +199,7 @@
                                     <a href="{{ route('petty.list', ['stage' => 'review', 'type' => 'petty']) }}" class="pc-link">
                                         <span class="pc-mtext">Review Petty Cash</span>
                                         @if ($pettyReviewCount > 0)
-                                            <span class="badge bg-light-warning ms-2">{{ $pettyReviewCount }}</span>
+                                            <span class="badge bg-light-warning border border-warning ms-2">{{ $pettyReviewCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -210,7 +210,7 @@
                                     <a href="{{ route('petty.list', ['stage' => 'review', 'type' => 'requisition']) }}" class="pc-link">
                                         <span class="pc-mtext">Review Requisitions</span>
                                         @if ($requisitionReviewCount > 0)
-                                            <span class="badge bg-light-warning ms-2">{{ $requisitionReviewCount }}</span>
+                                            <span class="badge bg-light-warning border border-warning ms-2">{{ $requisitionReviewCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -221,7 +221,7 @@
                                     <a href="{{ route('petty.list', ['stage' => 'approve', 'type' => 'petty']) }}" class="pc-link">
                                         <span class="pc-mtext">Approve Petty Cash</span>
                                         @if ($pettyApproveCount > 0)
-                                            <span class="badge bg-light-primary ms-2">{{ $pettyApproveCount }}</span>
+                                            <span class="badge bg-light-primary border border-primary ms-2">{{ $pettyApproveCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -232,7 +232,7 @@
                                     <a href="{{ route('petty.list', ['stage' => 'approve', 'type' => 'requisition']) }}" class="pc-link">
                                         <span class="pc-mtext">Approve Requisitions</span>
                                         @if ($requisitionApproveCount > 0)
-                                            <span class="badge bg-light-primary ms-2">{{ $requisitionApproveCount }}</span>
+                                            <span class="badge bg-light-primary border border-primary ms-2">{{ $requisitionApproveCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -243,7 +243,7 @@
                                     <a href="{{ route('petty.list', ['stage' => 'authorize', 'type' => 'petty']) }}" class="pc-link">
                                         <span class="pc-mtext">Authorize Petty Cash</span>
                                         @if ($pettyAuthorizeCount > 0)
-                                            <span class="badge bg-light-secondary ms-2">{{ $pettyAuthorizeCount }}</span>
+                                            <span class="badge bg-light-secondary border border-secondary ms-2">{{ $pettyAuthorizeCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -254,7 +254,7 @@
                                     <a href="{{ route('petty.list', ['stage' => 'authorize', 'type' => 'requisition']) }}" class="pc-link">
                                         <span class="pc-mtext">Authorize Requisitions</span>
                                         @if ($requisitionAuthorizeCount > 0)
-                                            <span class="badge bg-light-secondary ms-2">{{ $requisitionAuthorizeCount }}</span>
+                                            <span class="badge bg-light-secondary border border-secondary ms-2">{{ $requisitionAuthorizeCount }}</span>
                                         @endif
                                     </a>
                                 </li>
@@ -277,7 +277,7 @@
                                     <a href="{{ route('petty.cashier') }}" class="pc-link">
                                         <span class="pc-mtext">Petty Cash Payments</span>
                                         @if ($approvedPettiesCount > 0)
-                                            <span class="badge bg-light-success">{{ $approvedPettiesCount }}</span>
+                                            <span class="badge bg-light-success border border-success">{{ $approvedPettiesCount }}</span>
                                         @endif
                                     </a>
                                 </li>

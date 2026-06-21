@@ -171,13 +171,13 @@
                                                             @php
                                                                 $planSharedNames = $planSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
                                                             @endphp
-                                                            <span class="badge bg-light-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
+                                                            <span class="badge bg-light-info border border-info text-info mt-1" title="{{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}">
                                                                 {{ $planSharedNames !== '' ? 'Shared with: '.$planSharedNames : 'Shared' }}
                                                             </span>
                                                         @endif
                                                       
                                                         @if(isset($returnedDocumentMap[$planDoc->id]))
-                                                            <span class="badge bg-light-danger mt-1">Returned for Revision</span>
+                                                            <span class="badge bg-light-danger border border-danger mt-1">Returned for Revision</span>
                                                         @endif
                                                     @else
                                                         <span class="text-muted">Not created</span>
@@ -191,13 +191,13 @@
                                                             @php
                                                                 $reportSharedNames = $reportSharedUsers->pluck('name')->filter()->unique()->values()->implode(', ');
                                                             @endphp
-                                                            <span class="badge bg-light-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
+                                                            <span class="badge bg-light-info border border-info text-info mt-1" title="{{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}">
                                                                 {{ $reportSharedNames !== '' ? 'Shared with: '.$reportSharedNames : 'Shared' }}
                                                             </span>
                                                         @endif
                                                      
                                                         @if(isset($returnedDocumentMap[$reportDoc->id]))
-                                                            <span class="badge bg-light-danger mt-1">Returned for Revision</span>
+                                                            <span class="badge bg-light-danger border border-danger mt-1">Returned for Revision</span>
                                                         @endif
                                                     @else
                                                         <span class="text-muted">Not created</span>

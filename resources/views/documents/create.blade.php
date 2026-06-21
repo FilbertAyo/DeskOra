@@ -729,7 +729,7 @@
                         </td>
                         <td>
                             <input class="form-control" name="content[key_meetings][${idx}][meeting]" value="${escapeHtml(row.meeting || '')}" placeholder="Meeting / engagement" ${isReadonly ? 'disabled' : ''}>
-                            ${isReadonly ? '<small class="badge bg-light-warning text-warning mt-1">Assigned (View only)</small>' : ''}
+                            ${isReadonly ? '<small class="badge bg-light-warning border border-warning text-warning mt-1">Assigned (View only)</small>' : ''}
                         </td>
                         <td>
                             <select class="form-select" multiple name="content[key_meetings][${idx}][participant_user_ids][]" ${isReadonly ? 'disabled' : ''}>
@@ -859,11 +859,11 @@
                                     const reviewDecision = item.review_decision ?? null;
                                     let reviewBadge = '<span class="text-muted">-</span>';
                                     if (reviewDecision === 'approved') {
-                                        reviewBadge = '<span class="badge bg-light-success">Approved</span>';
+                                        reviewBadge = '<span class="badge bg-light-success border border-success">Approved</span>';
                                     } else if (reviewDecision === 'rejected') {
-                                        reviewBadge = '<span class="badge bg-light-danger">Rejected</span>';
+                                        reviewBadge = '<span class="badge bg-light-danger border border-danger">Rejected</span>';
                                     } else if (reviewDecision === 'pending') {
-                                        reviewBadge = '<span class="badge bg-light-warning">Pending</span>';
+                                        reviewBadge = '<span class="badge bg-light-warning border border-warning">Pending</span>';
                                     }
 
                                     return `

@@ -90,11 +90,11 @@
                                         </td>
 
                                         <td>
-                                            <span class="badge bg-light-light text-dark">
+                                            <span class="badge bg-light-light border border-light text-dark">
                                                 {{ $u->department->name ?? 'N/A' }}
                                             </span>
                                             @if(optional($u->department)->head_user_id === $u->id)
-                                                <span class="badge bg-light-warning text-dark ms-1">HOD</span>
+                                                <span class="badge bg-light-warning border border-warning text-dark ms-1">HOD</span>
                                             @endif
                                         </td>
                                         <td>
@@ -107,9 +107,7 @@
                                         <td>
                                             @if($u->roles->count() > 0)
                                                 @foreach($u->roles as $role)
-                                                    <span class="badge bg-light-primary mb-1 me-1 small">
-                                                        <i class="ti ti-shield me-1"></i>
-                                                        {{ ucwords(str_replace('_', ' ', $role->name)) }}
+                                                    <span class="badge bg-light-primary border border-primary mb-1 me-1 small">{{ ucwords(str_replace('_', ' ', $role->name)) }}
                                                     </span>
                                                 @endforeach
                                             @else
@@ -120,7 +118,7 @@
                                             @endif
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge {{ $u->status === 'active' ? 'bg-light-success' : 'bg-light-danger' }}">
+                                            <span class="badge {{ $u->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-danger border border-danger' }}">
                                                 <i class="ti {{ $u->status === 'active' ? 'ti-circle-check' : 'ti-circle-x' }} me-1"></i>
                                                 {{ ucfirst($u->status) }}
                                             </span>

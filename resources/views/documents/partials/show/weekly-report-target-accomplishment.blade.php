@@ -42,16 +42,13 @@
                             <label class="form-label text-muted font-weight-bold">Accomplishment Status:</label>
                             <div>
                                 @if($targetStatus === 'completed')
-                                    <span class="badge bg-light-success rounded-pill px-3 py-2">
-                                        <i class="ti ti-check-circle me-1"></i>Completed
+                                    <span class="badge bg-light-success border border-success rounded-pill px-3 py-2">Completed
                                     </span>
                                 @elseif($targetStatus === 'partially_completed')
-                                    <span class="badge bg-light-warning rounded-pill px-3 py-2 text-dark">
-                                        <i class="ti ti-progress-check me-1"></i>Partially completed
+                                    <span class="badge bg-light-warning border border-warning rounded-pill px-3 py-2 text-dark">Partially completed
                                     </span>
                                 @else
-                                    <span class="badge bg-light-danger rounded-pill px-3 py-2">
-                                        <i class="ti ti-x-circle me-1"></i>Not completed
+                                    <span class="badge bg-light-danger border border-danger rounded-pill px-3 py-2">Not completed
                                     </span>
                                 @endif
                             </div>

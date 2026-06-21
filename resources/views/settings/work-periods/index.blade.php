@@ -23,7 +23,7 @@
                                 <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#reopenAndResetModal">
                                     <i class="ti ti-rotate-clockwise me-1"></i> Reopen + Reset Docs
                                 </button>
-                                <span class="badge bg-light-primary text-primary" id="selectedPeriodsBadge">0 selected</span>
+                                <span class="badge bg-light-primary border border-primary text-primary" id="selectedPeriodsBadge">0 selected</span>
                                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createWorkPeriodModal">
                                     <i class="ti ti-plus-circle me-1"></i> Add Work Period
                                 </button>
@@ -49,7 +49,7 @@
                             </h5>
                             <p class="mb-0 text-muted">
                                 {{ $currentPeriod->date_range }} |
-                                Status: <span class="badge bg-light-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }}">{{ ucfirst($currentPeriod->status) }}</span>
+                                Status: <span class="badge bg-light-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }} border border-{{ $currentPeriod->status === 'open' ? 'success' : 'secondary' }}">{{ ucfirst($currentPeriod->status) }}</span>
                             </p>
                         </div>
                         <div class="text-right d-flex gap-2">
@@ -151,40 +151,37 @@
                                             <td>
                                                 <small>{{ $period->getPlanDeadlineCutoff()->format('M d, Y H:i') }}</small>
                                                 @if($period->isPlanDeadlineToday())
-                                                    <span class="badge bg-light-warning ml-1">Today</span>
+                                                    <span class="badge bg-light-warning border border-warning ml-1">Today</span>
                                                 @elseif($period->isPlanDeadlinePassed())
-                                                    <span class="badge bg-light-secondary ml-1">Passed</span>
+                                                    <span class="badge bg-light-secondary border border-secondary ml-1">Passed</span>
                                                 @else
-                                                    <span class="badge bg-light-info ml-1">{{ $period->getDaysUntilPlanDeadline() }} days</span>
+                                                    <span class="badge bg-light-info border border-info ml-1">{{ $period->getDaysUntilPlanDeadline() }} days</span>
                                                 @endif
                                             </td>
                                             <td>
                                                 <small>{{ $period->getReportDeadlineCutoff()->format('M d, Y H:i') }}</small>
                                                 @if($period->isReportDeadlineToday())
-                                                    <span class="badge bg-light-warning ml-1">Today</span>
+                                                    <span class="badge bg-light-warning border border-warning ml-1">Today</span>
                                                 @elseif($period->isReportDeadlinePassed())
-                                                    <span class="badge bg-light-secondary ml-1">Passed</span>
+                                                    <span class="badge bg-light-secondary border border-secondary ml-1">Passed</span>
                                                 @else
-                                                    <span class="badge bg-light-info ml-1">{{ $period->getDaysUntilReportDeadline() }} days</span>
+                                                    <span class="badge bg-light-info border border-info ml-1">{{ $period->getDaysUntilReportDeadline() }} days</span>
                                                 @endif
                                             </td>
                                             <td class="text-center">
                                                 @if($period->status === 'open')
-                                                    <span class="badge  bg-light-success">
-                                                        <i class="ti ti-circle-check me-1"></i>Open
+                                                    <span class="badge  bg-light-success border border-success">Open
                                                     </span>
                                                 @elseif($period->status === 'closed')
-                                                    <span class="badge  bg-light-secondary">
-                                                        <i class="ti ti-lock me-1"></i>Closed
+                                                    <span class="badge  bg-light-secondary border border-secondary">Closed
                                                     </span>
                                                 @else
-                                                    <span class="badge  bg-light-dark">
-                                                        <i class="ti ti-archive me-1"></i>Archived
+                                                    <span class="badge  bg-light-dark border border-dark">Archived
                                                     </span>
                                                 @endif
                                             </td>
                                             <td class="text-center">
-                                                <span class="badge bg-light-primary">{{ $period->documents()->count() }}</span>
+                                                <span class="badge bg-light-primary border border-primary">{{ $period->documents()->count() }}</span>
                                             </td>
                                             <td class="text-center">
                                                 <x-table-action-dropdown>

@@ -43,7 +43,7 @@
                                         class="rounded-circle shadow"
                                         style="width: 150px; height: 150px; object-fit: cover;">
                                 @else
-                                    <div class="rounded-circle bg-light-primary d-inline-flex align-items-center justify-content-center shadow"
+                                    <div class="rounded-circle bg-light-primary border border-primary d-inline-flex align-items-center justify-content-center shadow"
                                         style="width: 150px; height: 150px; font-size: 60px; font-weight: 600;">
                                         {{ strtoupper(substr($user->name, 0, 2)) }}
                                     </div>
@@ -55,7 +55,7 @@
 
                             <div class="mb-3">
                                 <span
-                                    class="badge bg-light-{{ $user->status === 'active' ? 'success' : 'danger' }}">
+                                    class="badge bg-light-{{ $user->status === 'active' ? 'success' : 'danger' }} border border-{{ $user->status === 'active' ? 'success' : 'danger' }}">
                                     <i
                                         class="ti ti-{{ $user->status === 'active' ? 'circle-check' : 'circle-x' }} me-1"></i>
                                     {{ ucfirst($user->status) }}
@@ -165,7 +165,7 @@
                                     <div class="d-flex align-items-center flex-wrap gap-1">
                                         @if ($user->subDepartments->isNotEmpty())
                                             @foreach ($user->subDepartments as $subDepartment)
-                                                <span class="badge bg-light-secondary border">{{ $subDepartment->name }}</span>
+                                                <span class="badge bg-light-secondary border border-secondary border">{{ $subDepartment->name }}</span>
                                             @endforeach
                                         @else
                                             <span class="text-muted">
@@ -189,9 +189,7 @@
                                     <div class="d-flex align-items-center flex-wrap">
                                         @if($user->roles->count() > 0)
                                             @foreach($user->roles as $role)
-                                                <span class="badge bg-light-primary rounded-pill me-2 mb-1">
-                                                    <i class="ti ti-shield me-1"></i>
-                                                    {{ ucwords(str_replace('_', ' ', $role->name)) }}
+                                                <span class="badge bg-light-primary border border-primary rounded-pill me-2 mb-1">{{ ucwords(str_replace('_', ' ', $role->name)) }}
                                                 </span>
                                             @endforeach
                                         @else
@@ -215,7 +213,7 @@
                         <div
                             class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="ti ti-shield me-2"></i>Current Permissions</h5>
-                            <span class="badge bg-light-primary">{{ $effectivePermissions->count() }}
+                            <span class="badge bg-light-primary border border-primary">{{ $effectivePermissions->count() }}
                                 Active</span>
                         </div>
                         <div class="card-body">
@@ -223,7 +221,7 @@
                                 <div class="row">
                                     @foreach ($effectivePermissions as $permission)
                                         <div class="col-md-6 mb-2">
-                                            <span class="badge bg-light-secondary border px-3 py-2">
+                                            <span class="badge bg-light-secondary border border-secondary border px-3 py-2">
                                                 {{ ucwords(str_replace('_', ' ', $permission->name)) }}
                                             </span>
                                         </div>

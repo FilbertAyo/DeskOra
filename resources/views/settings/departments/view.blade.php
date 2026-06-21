@@ -71,7 +71,7 @@
                                         <td class="text-center text-muted">{{ $child->plan_section_number ?? '—' }}</td>
                                         <td class="text-center">{{ $child->users_count }}</td>
                                         <td class="text-center">
-                                            <span class="badge {{ $child->status === 'active' ? 'bg-light-success' : 'bg-light-secondary' }}">
+                                            <span class="badge {{ $child->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary border border-secondary' }}">
                                                 {{ ucfirst($child->status) }}
                                             </span>
                                         </td>
@@ -168,7 +168,7 @@
                                         <td>{{ $user->email }}</td>
                                         <td>{{ $user->phone }}</td>
                                         <td>
-                                            <span class="badge {{ $user->status === 'active' ? 'bg-light-success' : 'bg-light-secondary' }}">
+                                            <span class="badge {{ $user->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary border border-secondary' }}">
                                                 {{ ucfirst($user->status) }}
                                             </span>
                                         </td>

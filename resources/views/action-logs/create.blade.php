@@ -381,7 +381,7 @@
                     const meta = document.createElement('div');
                     meta.className = 'mt-2';
                     const badge = document.createElement('span');
-                    badge.className = 'badge bg-light-secondary';
+                    badge.className = 'badge bg-light-secondary border border-secondary';
                     badge.textContent = task.progress || 'Not Started';
                     meta.appendChild(badge);
                     left.appendChild(title);

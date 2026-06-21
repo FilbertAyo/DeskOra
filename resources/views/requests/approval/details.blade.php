@@ -118,7 +118,7 @@
     @if ($actionFeedback)
         <div class="alert alert-{{ $actionFeedback['variant'] }} alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
             <div class="d-flex align-items-start gap-3">
-                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light-{{ $actionFeedback['variant'] }} text-{{ $actionFeedback['variant'] }} flex-shrink-0"
+                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light-{{ $actionFeedback['variant'] }} border border-{{ $actionFeedback['variant'] }} text-{{ $actionFeedback['variant'] }} flex-shrink-0"
                     style="width: 2.5rem; height: 2.5rem;">
                     <i class="ti {{ $actionFeedback['icon'] }} fs-5"></i>
                 </span>
@@ -188,9 +188,7 @@
                                     ];
                                 @endphp
                                 <span
-                                    class="badge bg-light-{{ $statusInfo['class'] }} text-{{ $statusInfo['class'] }} d-inline-flex align-items-center">
-                                    <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
-                                    {{ ucfirst($request->status) }}
+                                    class="badge bg-light-{{ $statusInfo['class'] }} border border-{{ $statusInfo['class'] }} text-{{ $statusInfo['class'] }} d-inline-flex align-items-center">{{ ucfirst($request->status) }}
                                 </span>
                             </div>
                         </div>
@@ -225,9 +223,7 @@
                                         'icon' => 'fe-info',
                                     ];
                                 @endphp
-                                <span class="badge bg-light-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">
-                                    <i class="fe {{ $statusInfo['icon'] }} me-1"></i>
-                                    {{ ucfirst($request->status) }}
+                                <span class="badge bg-light-{{ $statusInfo['class'] }} border border-{{ $statusInfo['class'] }} text-white px-3 py-2 d-inline-flex align-items-center">{{ ucfirst($request->status) }}
                                 </span>
                             </div>
                         </div>
@@ -276,7 +272,7 @@
             <div class="modal-content shadow-sm border">
                 <div class="modal-header py-3 border-bottom align-items-center">
                     <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                        <span class="rounded-circle bg-light-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                        <span class="rounded-circle bg-light-primary border border-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center flex-shrink-0"
                             style="width: 40px; height: 40px;">
                             <i class="ti ti-user-check fs-5"></i>
                         </span>
@@ -308,7 +304,7 @@
                                 </div>
                                 <div class="col-sm-6">
                                     <span class="text-muted">Status</span>
-                                    <div><span class="badge bg-light-secondary">{{ $request->status }}</span></div>
+                                    <div><span class="badge bg-light-secondary border border-secondary">{{ $request->status }}</span></div>
                                 </div>
                             </div>
                         </div>

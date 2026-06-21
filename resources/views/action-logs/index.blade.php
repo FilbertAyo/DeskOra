@@ -121,7 +121,7 @@
                                     </a>
                                 </div>
                             @else
-                                <span class="badge bg-light-success">Submitted action logs only</span>
+                                <span class="badge bg-light-success border border-success">Submitted action logs only</span>
                             @endif
                         </div>
                     </div>
@@ -172,14 +172,14 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <span class="badge bg-light-light text-dark">{{ $taskTotal }} Task{{ $taskTotal === 1 ? '' : 's' }}</span>
+                                                <span class="badge bg-light-light border border-light text-dark">{{ $taskTotal }} Task{{ $taskTotal === 1 ? '' : 's' }}</span>
                                             </td>
                                             <td>
                                                 @if($taskTotal > 0)
-                                                    <span class="badge bg-light-success">{{ $doneTasks }} Done</span>
-                                                    <span class="badge bg-light-secondary">{{ $activeTasks }} Active</span>
+                                                    <span class="badge bg-light-success border border-success">{{ $doneTasks }} Done</span>
+                                                    <span class="badge bg-light-secondary border border-secondary">{{ $activeTasks }} Active</span>
                                                     @if($cancelledTasks > 0)
-                                                        <span class="badge bg-light-danger">{{ $cancelledTasks }} Cancelled</span>
+                                                        <span class="badge bg-light-danger border border-danger">{{ $cancelledTasks }} Cancelled</span>
                                                     @endif
                                                 @else
                                                     <span class="text-muted">No tasks</span>
@@ -187,12 +187,10 @@
                                             </td>
                                             <td>
                                                 @if($document->state === 'draft')
-                                                    <span class="badge bg-light-warning">
-                                                        <i class="ti ti-edit me-1"></i>Draft
+                                                    <span class="badge bg-light-warning border border-warning">Draft
                                                     </span>
                                                 @else
-                                                    <span class="badge bg-light-success">
-                                                        <i class="ti ti-check-circle me-1"></i>Submitted
+                                                    <span class="badge bg-light-success border border-success">Submitted
                                                     </span>
                                                 @endif
                                             </td>

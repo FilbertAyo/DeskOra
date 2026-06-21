@@ -336,7 +336,7 @@ class DashboardController extends Controller
                     'message' => "{$actor} {$verb} {$typeLabel}: {$title}",
                     'event_type' => $event->event_type,
                     'badge_label' => $isRemoved ? 'Removed' : 'Shared',
-                    'badge_class' => $isRemoved ? 'bg-light-secondary' : 'bg-light-success',
+                    'badge_class' => $isRemoved ? 'bg-light-secondary border border-secondary' : 'bg-light-success border border-success',
                     'created_at' => Carbon::parse($event->created_at),
                 ];
             })

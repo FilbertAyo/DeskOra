@@ -14,16 +14,16 @@
                     <div class="d-flex align-items-center flex-wrap gap-1">
                      
                         @if($document->state === 'draft')
-                            <span class="badge bg-light-warning">
+                            <span class="badge bg-light-warning border border-warning">
                                 Draft
                             </span>
                         @else
-                            <span class="badge bg-light-success">
+                            <span class="badge bg-light-success border border-success">
                                 Submitted
                             </span>
                         @endif
                         @if($document->isReturnedForRevision())
-                            <span class="badge bg-light-danger">
+                            <span class="badge bg-light-danger border border-danger">
                                 Returned for Revision
                             </span>
                         @endif

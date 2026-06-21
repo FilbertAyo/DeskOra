@@ -344,11 +344,11 @@
                                                                     <td>{{ $planRow['amount'] ?? '' }}</td>
                                                                     <td class="text-center">
                                                                         @if($reviewDecision === 'approved')
-                                                                            <span class="badge bg-light-success">Approved</span>
+                                                                            <span class="badge bg-light-success border border-success">Approved</span>
                                                                         @elseif($reviewDecision === 'rejected')
-                                                                            <span class="badge bg-light-danger">Rejected</span>
+                                                                            <span class="badge bg-light-danger border border-danger">Rejected</span>
                                                                         @elseif($reviewDecision === 'pending')
-                                                                            <span class="badge bg-light-warning">Pending</span>
+                                                                            <span class="badge bg-light-warning border border-warning">Pending</span>
                                                                         @else
                                                                             <span class="text-muted">-</span>
                                                                         @endif
