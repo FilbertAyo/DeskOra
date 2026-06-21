@@ -5,7 +5,6 @@
             'items' => [
                 ['icon' => 'ti-dashboard', 'title' => 'Dashboard', 'desc' => 'Track org-wide activity at a glance'],
                 ['icon' => 'ti-chart-line', 'title' => 'Year Plan', 'desc' => 'Annual goals and strategic planning'],
-                ['icon' => 'ti-layout-kanban', 'title' => 'Matrix Panel', 'desc' => 'Cross-team progress matrix'],
             ],
         ],
         [

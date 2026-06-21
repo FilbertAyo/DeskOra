@@ -20,7 +20,6 @@ use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
-use App\Http\Controllers\WeeklyObjectiveMatrixController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
 use Illuminate\Support\Facades\Route;
@@ -56,12 +55,6 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1')
         ->name('ai.assist');
 
-    Route::get('/matrix-report', [WeeklyObjectiveMatrixController::class, 'index'])->name('matrix-report.index');
-    Route::post('/matrix-report', [WeeklyObjectiveMatrixController::class, 'store'])->name('matrix-report.store');
-    Route::get('/matrix-report/{matrix}/edit', [WeeklyObjectiveMatrixController::class, 'edit'])->name('matrix-report.edit');
-    Route::put('/matrix-report/{matrix}', [WeeklyObjectiveMatrixController::class, 'update'])->name('matrix-report.update');
-    Route::delete('/matrix-report/{matrix}', [WeeklyObjectiveMatrixController::class, 'destroy'])->name('matrix-report.destroy');
-
     Route::get('/profile/settings', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile/settings', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -84,7 +77,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/weekly-budget-review/export/excel', [DocumentBudgetReviewController::class, 'exportWeeklyBudgetReviewExcel'])
             ->middleware('permission:view weekly budgets|approve documents|review weekly budgets|approve weekly budgets|authorize weekly budgets')
             ->name('weekly-budget-review.export.excel');
-        Route::get('/weekly-objective-matrix/download', [WeeklyObjectiveMatrixController::class, 'download'])->name('weekly-objective-matrix.download');
         Route::get('/plan-target', [DocumentDashboardController::class, 'getPlanTarget'])->name('plan-target');
         Route::get('/create', [DocumentCrudController::class, 'create'])->name('create');
         Route::post('/', [DocumentCrudController::class, 'store'])->name('store');

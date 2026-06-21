@@ -30,7 +30,6 @@
 
         @php
             $currentPeriod = $currentPeriod ?? null;
-            $matrixRows = $matrixRows ?? collect();
             $recentNotifications = Auth::user()->notifications()->latest()->limit(6)->get();
             $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
         @endphp
@@ -146,14 +145,6 @@
                     </div>
                 </li>
 
-                <li class="pc-h-item">
-                    <button type="button" class="pc-head-link border-0 bg-transparent me-0"
-                        data-bs-toggle="offcanvas" data-bs-target="#weeklyObjectiveMatrix"
-                        aria-controls="weeklyObjectiveMatrix" title="Weekly Objective Matrix">
-                        <i class="ti ti-layout-grid"></i> 
-                    </button>
-                </li>
-
                 <li class="dropdown pc-h-item header-user-profile">
                     <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
                         role="button" aria-haspopup="false" data-bs-auto-close="outside" aria-expanded="false">
@@ -201,76 +192,3 @@
         </div>
     </div>
 </header>
-
-<div class="offcanvas offcanvas-end" tabindex="-1" id="weeklyObjectiveMatrix"
-    aria-labelledby="weeklyObjectiveMatrixLabel" style="width: min(95vw, 1200px);">
-    <div class="offcanvas-header border-bottom">
-        <div>
-            <h5 class="offcanvas-title mb-1" id="weeklyObjectiveMatrixLabel">Weekly Objective Matrix</h5>
-            @if($currentPeriod)
-                <p class="text-muted mb-0 small">
-                    Week {{ $currentPeriod->week_number }} - {{ $currentPeriod->date_range }}
-                </p>
-            @else
-                <p class="text-muted mb-0 small">No active work period</p>
-            @endif
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-
-    <div class="offcanvas-body">
-        @if(!$currentPeriod)
-            <div class="alert alert-warning mb-0">
-                <i class="ti ti-alert-triangle me-1"></i>
-                There is no active work period yet.
-            </div>
-        @else
-            @php
-                $submittedCount = $matrixRows->count();
-            @endphp
-
-            @if($submittedCount === 0)
-                <div class="alert alert-info mb-0">
-                    <i class="ti ti-info-circle me-1"></i>
-                    No submitted weekly plans with a filled main objective found for this week.
-                </div>
-            @else
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    <a href="{{ route('documents.weekly-objective-matrix.download', ['orientation' => 'portrait']) }}"
-                        class="btn btn-danger btn-sm">
-                        <i class="ti ti-download me-1"></i> Download PDF 
-                    </a>
-                   
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped align-middle">
-                        <thead>
-                            <tr>
-                                <th style="width: 240px;">Staff</th>
-                                <th style="width: 220px;">Department</th>
-                                <th>Main Objective</th>
-                                <th>Progress / Reflection</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($matrixRows as $plan)
-                                @php
-                                    $planContent = is_array($plan->content ?? null) ? $plan->content : [];
-                                    $objective = is_array($planContent['objective'] ?? null) ? $planContent['objective'] : [];
-                                        $reflectionProgress = trim((string) ($objective['reflection_progress'] ?? ($plan->objective_reflection_progress ?? '')));
-                                @endphp
-                                <tr>
-                                    <td class="fw-semibold">{{ $plan->user?->name ?? 'Unknown Staff' }}</td>
-                                    <td>{{ $plan->user?->department?->name ?? 'Unknown Sub Department' }}</td>
-                                    <td>{{ $plan->main_target }}</td>
-                                    <td>{{ $reflectionProgress !== '' ? $reflectionProgress : '-' }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        @endif
-    </div>
-</div>

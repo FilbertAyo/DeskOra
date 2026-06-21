@@ -53,7 +53,6 @@ class ShortIdMigrator
                     $this->updateSessionPayloads($mapping);
                     $this->updateMorphIdColumns($mapping);
                     $this->updatePrimaryKeys($mapping);
-                    $this->updateWeeklyDepartmentMatrixEntries($mapping);
                 } finally {
                     $this->enableForeignKeys();
                 }
@@ -317,62 +316,6 @@ class ShortIdMigrator
                 if ($updated > 0) {
                     break;
                 }
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, string>  $mapping
-     */
-    private function updateWeeklyDepartmentMatrixEntries(array $mapping): void
-    {
-        if (! Schema::hasTable('weekly_department_matrices')) {
-            return;
-        }
-
-        $rows = DB::table('weekly_department_matrices')->select(['id', 'entries'])->get();
-
-        foreach ($rows as $row) {
-            $entries = json_decode((string) $row->entries, true);
-            if (! is_array($entries)) {
-                continue;
-            }
-
-            $changed = false;
-            foreach ($entries as $index => $entry) {
-                if (! is_array($entry)) {
-                    continue;
-                }
-
-                foreach (['source_document_id', 'source_weekly_plan_id', 'impact_year_plan_activity_ids'] as $field) {
-                    if ($field === 'impact_year_plan_activity_ids' && isset($entry[$field]) && is_array($entry[$field])) {
-                        foreach ($entry[$field] as $activityIndex => $activityId) {
-                            $current = (string) $activityId;
-                            if ($this->shouldRewriteId($current, $mapping[$current] ?? $current)) {
-                                $entries[$index][$field][$activityIndex] = $mapping[$current];
-                                $changed = true;
-                            }
-                        }
-
-                        continue;
-                    }
-
-                    if (! array_key_exists($field, $entry)) {
-                        continue;
-                    }
-
-                    $current = (string) ($entry[$field] ?? '');
-                    if ($this->shouldRewriteId($current, $mapping[$current] ?? $current)) {
-                        $entries[$index][$field] = $mapping[$current];
-                        $changed = true;
-                    }
-                }
-            }
-
-            if ($changed) {
-                DB::table('weekly_department_matrices')
-                    ->where('id', $row->id)
-                    ->update(['entries' => json_encode($entries)]);
             }
         }
     }

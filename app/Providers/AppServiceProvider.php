@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Data\WeeklySubmissionReminder;
 use App\Database\DocumentsUnionView;
-use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
 use App\Services\RequestApprovalNavService;
@@ -87,27 +86,8 @@ class AppServiceProvider extends ServiceProvider
                 return WorkPeriod::getCurrent();
             });
 
-            $matrixRows = collect();
-            if ($currentPeriod && Auth::check()) {
-                $matrixRows = Document::query()
-                    ->where('type', Document::TYPE_WEEKLY_PLAN)
-                    ->where('state', Document::STATE_SUBMITTED)
-                    ->where('period_id', $currentPeriod->id)
-                    ->whereNotNull('main_target')
-                    ->where('main_target', '!=', '')
-                    ->with(['user:id,name,department_id', 'user.department:id,name'])
-                    ->latest('updated_at')
-                    ->get(['user_id', 'main_target', 'content', 'updated_at'])
-                    ->groupBy('user_id')
-                    ->map(fn ($plans) => $plans->first())
-                    ->values()
-                    ->sortBy(fn ($plan) => strtolower($plan->user?->name ?? ''))
-                    ->values();
-            }
-
             $view->with([
                 'currentPeriod' => $currentPeriod,
-                'matrixRows' => $matrixRows,
             ]);
         });
 
