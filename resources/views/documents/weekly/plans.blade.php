@@ -117,8 +117,7 @@
                                         <th class="text-center" style="width: 50px;">No.</th>
                                         <th>Title</th>
                                         <th>Week Period</th>
-                                        <th>Author</th>
-                                        <th>Collaborators</th>
+                                        <th>Name</th>
                                         <th>Created</th>
                                         <th>Last Updated</th>
                                         <th class="text-center" style="width: 120px;">Status</th>
@@ -153,16 +152,15 @@
                                             <td>
                                                 @if($document->user)
                                                     <div class="d-flex align-items-center">
-                                                       
-                                                        <span>{{ $document->user->name }}</span>
+                
+                                                        <span class="fw-semibold">{{ $document->user->name }}</span> <br>
+                                                        <span class="text-muted small">Collaborators: @include('documents.partials.weekly-shared-names-cell', ['document' => $document])</span>
                                                     </div>
                                                 @else
                                                     <span class="text-muted">-</span>
                                                 @endif
                                             </td>
-                                            <td>
-                                                @include('documents.partials.weekly-shared-names-cell', ['document' => $document])
-                                            </td>
+                                           
                                             <td>
                                                 <small class="text-muted">
                                                     {{ $document->created_at->format('M d, Y') }}
