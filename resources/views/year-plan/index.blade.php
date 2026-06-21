@@ -27,12 +27,7 @@
                     <h5 class="mb-0"><i class="ti ti-chart-line me-2"></i>Plans by year</h5>
                 </div>
                 <div class="card-body">
-                    @if (session('success'))
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            {{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
+                   
                     <div class="table-responsive">
                         <table class="table table-hover table-bordered table-striped mb-0">
                             <thead class="table-light">
@@ -62,21 +57,26 @@
                                                     @php
                                                         $monthActivities = $sortedActivities
                                                             ->filter(fn ($activity) => $activity->isPlannedInMonth($monthNum))
-                                                            ->map(fn ($activity) => [
-                                                                'code' => $activity->displayCode(),
-                                                                'department' => trim(
-                                                                    ($activity->department?->parent?->name ? $activity->department->parent->name . ' › ' : '')
-                                                                    . ($activity->department?->name ?? '')
-                                                                ),
-                                                                'description' => (string) $activity->description,
-                                                                'total' => number_format((float) $activity->total_cost_tzs, 2),
-                                                            ])
+                                                            ->map(function ($activity) {
+                                                                $parentName = $activity->department?->parent?->name;
+                                                                $subName = $activity->department?->name ?? '';
+                                                                $department = $parentName && $subName
+                                                                    ? $parentName . ' - ' . $subName
+                                                                    : ($subName ?: ($parentName ?? ''));
+
+                                                                return [
+                                                                    'code' => $activity->displayCode(),
+                                                                    'department' => $department,
+                                                                    'description' => (string) $activity->description,
+                                                                    'total' => number_format((float) $activity->total_cost_tzs, 2),
+                                                                ];
+                                                            })
                                                             ->values()
                                                             ->all();
                                                         $hasActivities = count($monthActivities) > 0;
                                                     @endphp
                                                     <button type="button"
-                                                        class="badge month-activity-badge border-0 {{ $hasActivities ? 'bg-primary' : 'bg-light text-muted border' }}"
+                                                        class="btn btn-sm month-activity-btn {{ $hasActivities ? 'btn-secondary' : 'btn-outline-secondary' }}"
                                                         data-bs-toggle="modal"
                                                         data-bs-target="#monthActivitiesModal"
                                                         data-year="{{ $plan->year }}"

@@ -1,12 +1,12 @@
 <div class="modal fade" id="monthActivitiesModal" tabindex="-1" aria-labelledby="monthActivitiesModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="monthActivitiesModalLabel">Month activities</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-0">
-                <div id="monthActivitiesEmpty" class="text-center text-muted py-5 px-3 d-none">
+            <div class="modal-body">
+                <div id="monthActivitiesEmpty" class="text-center text-muted py-5 d-none">
                     No activities planned for this month.
                 </div>
                 <div class="table-responsive" id="monthActivitiesTableWrap">
@@ -48,7 +48,7 @@
 
         modalEl.addEventListener('show.bs.modal', function(event) {
             const button = event.relatedTarget;
-            if (!button || !button.classList.contains('month-activity-badge')) {
+            if (!button || !button.classList.contains('month-activity-btn')) {
                 return;
             }
 
