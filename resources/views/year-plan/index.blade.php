@@ -48,11 +48,10 @@
                                         <td class="fw-semibold">{{ $plan->year }}</td>
                                         <td class="text-center">{{ $plan->activities_count }}</td>
                                         <td class="text-center">
-                                            <x-table-action-dropdown label="Open">
-    <a class="dropdown-item" href="{{ route('year-plan.show', $plan->year) }}">
-    <i class="ti ti-eye me-2"></i> Open
-    </a>
-</x-table-action-dropdown>
+                                        <td><a href="{{ route('year-plan.show', $plan->year) }}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="ti ti-external-link me-1"></i> Open
+                                                </a>
+                                            </td>
                                         </td>
                                     </tr>
                                 @empty
