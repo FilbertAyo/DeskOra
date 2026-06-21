@@ -13,12 +13,18 @@ class YearPlanController extends Controller
 {
     public function index()
     {
+        $monthLabels = [
+            1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun',
+            7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec',
+        ];
+
         $plans = YearPlan::query()
+            ->with(['activities.department.parent'])
             ->withCount('activities')
             ->orderByDesc('year')
             ->get();
 
-        return view('year-plan.index', compact('plans'));
+        return view('year-plan.index', compact('plans', 'monthLabels'));
     }
 
     public function store(Request $request)

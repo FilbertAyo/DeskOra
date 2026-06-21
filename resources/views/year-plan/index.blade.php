@@ -39,24 +39,65 @@
                                 <tr>
                                     <th>Year</th>
                                     <th class="text-center">Activities</th>
+                                    <th>Period</th>
                                     <th class="text-center" style="width: 140px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($plans as $plan)
+                                    @php
+                                        $sortedActivities = $plan->activities->sortBy(function ($activity) {
+                                            return [
+                                                sprintf('%05d', $activity->department?->plan_section_number ?? 99999),
+                                                $activity->sort_order,
+                                            ];
+                                        })->values();
+                                    @endphp
                                     <tr>
                                         <td class="fw-semibold">{{ $plan->year }}</td>
                                         <td class="text-center">{{ $plan->activities_count }}</td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach ($monthLabels as $monthNum => $monthLabel)
+                                                    @php
+                                                        $monthActivities = $sortedActivities
+                                                            ->filter(fn ($activity) => $activity->isPlannedInMonth($monthNum))
+                                                            ->map(fn ($activity) => [
+                                                                'code' => $activity->displayCode(),
+                                                                'department' => trim(
+                                                                    ($activity->department?->parent?->name ? $activity->department->parent->name . ' › ' : '')
+                                                                    . ($activity->department?->name ?? '')
+                                                                ),
+                                                                'description' => (string) $activity->description,
+                                                                'total' => number_format((float) $activity->total_cost_tzs, 2),
+                                                            ])
+                                                            ->values()
+                                                            ->all();
+                                                        $hasActivities = count($monthActivities) > 0;
+                                                    @endphp
+                                                    <button type="button"
+                                                        class="badge month-activity-badge border-0 {{ $hasActivities ? 'bg-primary' : 'bg-light text-muted border' }}"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#monthActivitiesModal"
+                                                        data-year="{{ $plan->year }}"
+                                                        data-month="{{ $monthNum }}"
+                                                        data-month-label="{{ $monthLabel }}"
+                                                        data-show-url="{{ route('year-plan.show', $plan->year) }}"
+                                                        data-activities-b64="{{ base64_encode(json_encode($monthActivities, JSON_UNESCAPED_UNICODE)) }}">
+                                                        {{ $monthLabel }}
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        </td>
                                         <td class="text-center">
-                                       <a href="{{ route('year-plan.show', $plan->year) }}" class="btn btn-sm btn-outline-primary">
-                                                    <i class="ti ti-external-link me-1"></i> Open
-                                                </a>
-                                            </td>
+                                            <a href="{{ route('year-plan.show', $plan->year) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="ti ti-external-link me-1"></i> Open
+                                            </a>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="3" class="text-center text-muted py-4">
+                                        <td colspan="4" class="text-center text-muted py-4">
                                             No year plans yet. Create one for the current or upcoming year.
                                         </td>
                                     </tr>
@@ -95,6 +136,8 @@
             </div>
         </div>
     </div>
+
+    @include('year-plan.partials.month-activities-modal')
 
     @if ($errors->has('year'))
         <script>
