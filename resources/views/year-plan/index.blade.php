@@ -52,7 +52,7 @@
                                         <td class="fw-semibold">{{ $plan->year }}</td>
                                         <td class="text-center">{{ $plan->activities_count }}</td>
                                         <td class="text-center">
-                                            <div class="d-flex flex-wrap gap-1">
+                                            <div class="d-flex flex-wrap gap-1 justify-content-center">
                                                 @foreach ($monthLabels as $monthNum => $monthLabel)
                                                     @php
                                                         $monthActivities = $sortedActivities
