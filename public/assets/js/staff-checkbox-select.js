@@ -104,6 +104,7 @@
         const disabled = !!options.disabled;
         const groupId = options.id || ('staff-cb-' + Math.random().toString(36).slice(2, 10));
         const selectedSet = normalizeSelected(selected);
+        const colClass = options.colClass || 'col-12 col-sm-6 col-lg-4';
 
         let html = '<div class="staff-checkbox-select" data-staff-checkbox-select>';
 
@@ -118,7 +119,7 @@
             const dis = disabled ? ' disabled' : '';
             const inputId = groupId + '-' + user.id;
 
-            html += '<div class="col-12 col-sm-6 col-lg-4">';
+            html += '<div class="' + colClass + '">';
             html += '<div class="form-check staff-checkbox-select__item">';
             html += '<input class="form-check-input" type="checkbox" name="' + escapeHtml(name) + '" id="' + escapeHtml(inputId) + '" value="' + escapeHtml(user.id) + '"' + checked + dis + '>';
             html += '<label class="form-check-label" for="' + escapeHtml(inputId) + '">' + escapeHtml(user.name) + '</label>';
@@ -307,6 +308,7 @@
             name: fieldName + '__modal',
             showTitle: false,
             id: 'staff-picker-modal-grid',
+            colClass: 'col-12 col-md-6 col-xl-6',
         });
 
         if (modalInstance) {
