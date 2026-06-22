@@ -206,9 +206,11 @@
     <i class="ti ti-eye me-2"></i> View
     </a>
     @can('manageActionLogs', $document)
+        @if($document->period && $document->period->isOpen())
     <a class="dropdown-item" href="{{ route('action-logs.edit', $document->id) }}">
     <i class="ti ti-edit me-2"></i> Edit
     </a>
+        @endif
     @endcan
 </x-table-action-dropdown>
                                             </td>

@@ -130,7 +130,7 @@
                                                 <th style="width: 130px;">Progress</th>
                                                 <th style="width: 110px;">Due Date</th>
                                                 <th style="width: 120px;">Compilation</th>
-                                                <th style="min-width: 180px;">Notes</th>
+                                                <th style="min-width: 180px;">Notes/Progress</th>
                                                 <th style="width: 100px;">Actions</th>
                                             </tr>
                                         </thead>

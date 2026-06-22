@@ -110,9 +110,11 @@
                         <div class="card-body py-3">
                             <div class="d-grid gap-2">
                                 @can('manageActionLogs', $document)
+                                    @if($document->period && $document->period->isOpen())
                                     <a href="{{ route('action-logs.edit', $document->id) }}" class="btn btn-primary btn-sm">
                                         <i class="ti ti-edit me-1"></i> Update Tasks
                                     </a>
+                                    @endif
                                 @endcan
                                 <a href="{{ route('action-logs.download', $document->id) }}" class="btn btn-outline-danger btn-sm">
                                     <i class="ti ti-download me-1"></i> Download PDF
@@ -175,7 +177,7 @@
                                         <th style="width: 150px;">Progress</th>
                                         <th style="width: 120px;">Due Date</th>
                                         <th style="width: 130px;">Compilation</th>
-                                        <th style="min-width: 240px;">Latest Notes</th>
+                                        <th style="min-width: 240px;">Notes/Progress</th>
                                         <th style="width: 140px;">Timeline</th>
                                     </tr>
                                 </thead>
