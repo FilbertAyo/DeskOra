@@ -140,24 +140,6 @@
                         </div>
                     @endif
 
-
-        <div class="col-sm-6 col-md-3">
-            <a href="{{ route('reports.users') }}" class="text-decoration-none">
-                <div class="card card-stats card-light card-round shadow-none border">
-                    <div class="card-body">
-                        <div class="row">
-
-                            <div class="col-12 col-stats">
-                                <div class="numbers">
-                                    <div class="h5">Users List</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </a>
-        </div>
-
     </div>
 
 

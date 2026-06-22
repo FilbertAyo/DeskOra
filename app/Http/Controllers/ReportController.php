@@ -2,14 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\UserExport;
 use App\Models\OrganizationReport;
-use App\Models\User;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
@@ -145,7 +140,7 @@ class ReportController extends Controller
 
         if ($extension === 'pdf' && class_exists($imagickClass)) {
             try {
-                $imagick = new $imagickClass();
+                $imagick = new $imagickClass;
                 $imagick->setResolution(150, 150);
                 $imagick->readImage($filePath.'[0]');
                 $imagick->setImageFormat('png');
@@ -183,46 +178,4 @@ SVG;
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
         ]);
     }
-
-    public function usersReport(Request $request)
-    {
-        $query = User::where('status', 'active');
-
-        if ($request->filled('from') && $request->filled('to')) {
-            $from = Carbon::parse($request->from)->startOfDay();
-            $to = Carbon::parse($request->to)->endOfDay();
-
-            $query->whereBetween('created_at', [$from, $to]);
-        }
-        $users = $query->latest()->get();
-
-        return view('reports.users.list', compact('users'));
-    }
-
-    public function downloadUsers(Request $request, $type)
-    {
-        $query = User::where('status', 'active');
-
-        if ($request->filled('from') && $request->filled('to')) {
-            $from = Carbon::parse($request->from)->startOfDay();
-            $to = Carbon::parse($request->to)->endOfDay();
-
-            $query->whereBetween('created_at', [$from, $to]);
-        }
-
-        $users = $query->latest()->get();
-
-        if ($type === 'pdf') {
-            $pdf = Pdf::loadView('reports.users.pdf', compact('users'));
-
-            return $pdf->download('USERS_LIST.pdf');
-        }
-
-        if (in_array($type, ['excel', 'csv'])) {
-            return Excel::download(new UserExport($request->from, $request->to), 'USERS_LIST.'.($type === 'csv' ? 'csv' : 'xlsx'));
-        }
-
-        return back();
-    }
-
 }

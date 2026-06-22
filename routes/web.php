@@ -233,8 +233,6 @@ Route::middleware(['auth', 'permission:view reports'])->group(function () {
         ->name('reports.organization-documents.update');
     Route::delete('reports/organization-documents/{organizationReport}', [ReportController::class, 'destroyOrganizationDocument'])
         ->name('reports.organization-documents.destroy');
-    Route::get('reports/users', [ReportController::class, 'usersReport'])->name('reports.users');
-    Route::get('/reports/users/download/{type}', [ReportController::class, 'downloadUsers'])->name('reports.users.download');
     Route::get('/reports/routes/download', [ReportController::class, 'downloadRouteReport'])->name('reports.route.download');
 });
 
