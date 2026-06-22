@@ -11,6 +11,7 @@ use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\WorkflowEmailNotificationService;
 use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -145,6 +146,7 @@ class ActionLogController extends Controller
             'period_id' => ['required', 'string', 'short_id', 'exists:work_periods,id'],
             'content' => ['nullable', 'array'],
             'content.tasks' => ['nullable', 'array'],
+            'content.tasks.*.task_uid' => ['nullable', 'string', 'max:80'],
             'content.tasks.*.task_no' => ['nullable', 'integer', 'min:1'],
             'content.tasks.*.task' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.responsible_user_ids' => ['nullable', 'array'],
@@ -159,16 +161,11 @@ class ActionLogController extends Controller
         // Get period
         $period = WorkPeriod::find($request->period_id);
         if (! $period) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Selected work period not found.');
+            return $this->actionLogErrorResponse($request, 'Selected work period not found.');
         }
 
-        // Check if period is open
         if (! $period->isOpen()) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'This work period is closed. Please contact your administrator.');
+            return $this->actionLogErrorResponse($request, 'This work period is closed. Please contact your administrator.');
         }
 
         // Shared action log per week period.
@@ -186,9 +183,7 @@ class ActionLogController extends Controller
         $normalizedContent = $this->normalizeActionLogContent($request->input('content', []));
 
         if (empty($normalizedContent['tasks']) && ! $existingDocument) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Please add at least one action log task.');
+            return $this->actionLogErrorResponse($request, 'Please add at least one action log task.');
         }
 
         // If document exists, merge new rows into the same weekly log.
@@ -210,13 +205,9 @@ class ActionLogController extends Controller
             );
 
             if (empty($finalTasks)) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', 'Action log must contain at least one task.');
+                return $this->actionLogErrorResponse($request, 'Action log must contain at least one task.');
             }
-            $nextState = $existingDocument->isSubmitted()
-                ? Document::STATE_SUBMITTED
-                : $state;
+            $nextState = $this->resolveActionLogStateAfterSave($action, $wasSubmitted);
 
             $existingDocument->update([
                 'title' => $title,
@@ -250,6 +241,10 @@ class ActionLogController extends Controller
         if ($action === 'submit' && ! $wasSubmitted) {
             $document->loadMissing('period');
             $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $user);
+        }
+
+        if ($request->wantsJson()) {
+            return $this->actionLogAutosaveJsonResponse($document, $message);
         }
 
         return redirect()->route('action-logs.show', $document)
@@ -407,23 +402,16 @@ class ActionLogController extends Controller
         // Get period
         $period = WorkPeriod::find($request->period_id);
         if (! $period) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Selected work period not found.');
+            return $this->actionLogErrorResponse($request, 'Selected work period not found.');
         }
 
-        // Check if period is open
         if (! $period->isOpen()) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'This work period is closed. Please contact your administrator.');
+            return $this->actionLogErrorResponse($request, 'This work period is closed. Please contact your administrator.');
         }
 
-        // Determine state based on action
         $action = $request->input('action', 'draft');
         $wasSubmitted = $document->isSubmitted();
 
-        // If submitting, authorize submit action
         if ($action === 'submit' && ! $document->isSubmitted()) {
             $this->authorize('submit', $document);
         }
@@ -438,9 +426,7 @@ class ActionLogController extends Controller
         $finalTasks = $this->mergeManagerTaskUpdates($existingTasks, $incomingTasks, $period, (string) Auth::id());
 
         if (empty($finalTasks)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Action log must contain at least one task.');
+            return $this->actionLogErrorResponse($request, 'Action log must contain at least one task.');
         }
         $updateData = [
             'content' => ['tasks' => $this->renumberTasks($finalTasks)],
@@ -448,9 +434,10 @@ class ActionLogController extends Controller
             'period_id' => $period->id,
         ];
 
-        // Update state if submitting
         if ($action === 'submit') {
             $updateData['state'] = Document::STATE_SUBMITTED;
+        } elseif ($wasSubmitted) {
+            $updateData['state'] = Document::STATE_DRAFT;
         }
 
         $document->update($updateData);
@@ -462,6 +449,10 @@ class ActionLogController extends Controller
         if ($action === 'submit' && ! $wasSubmitted) {
             $document->loadMissing('period');
             $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $actingUser);
+        }
+
+        if ($request->wantsJson()) {
+            return $this->actionLogAutosaveJsonResponse($document, $message);
         }
 
         return redirect()->route('action-logs.show', $document)
@@ -880,5 +871,82 @@ class ActionLogController extends Controller
         }
 
         return false;
+    }
+
+    private function resolveActionLogStateAfterSave(string $action, bool $wasSubmitted): string
+    {
+        if ($action === 'submit') {
+            return Document::STATE_SUBMITTED;
+        }
+
+        if ($wasSubmitted) {
+            return Document::STATE_DRAFT;
+        }
+
+        return Document::STATE_DRAFT;
+    }
+
+    /**
+     * @return \Illuminate\Http\RedirectResponse|JsonResponse
+     */
+    private function actionLogErrorResponse(Request $request, string $message, int $status = 422)
+    {
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], $status);
+        }
+
+        return redirect()->back()
+            ->withInput()
+            ->with('error', $message);
+    }
+
+    private function actionLogAutosaveJsonResponse(Document $document, string $message): JsonResponse
+    {
+        $document->refresh();
+        $tasks = $this->extractTasks($document->content);
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'state' => (string) $document->state,
+            'document_id' => (string) $document->id,
+            'edit_url' => route('action-logs.update', $document),
+            'tasks' => $this->tasksForClientResponse($tasks),
+        ]);
+    }
+
+    /**
+     * @param  array<int, mixed>  $tasks
+     * @return list<array<string, mixed>>
+     */
+    private function tasksForClientResponse(array $tasks): array
+    {
+        $normalized = [];
+
+        foreach ($tasks as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+
+            $responsibleIds = is_array($task['responsible_user_ids'] ?? null)
+                ? array_values(array_map('strval', $task['responsible_user_ids']))
+                : [];
+
+            $normalized[] = [
+                'task_uid' => (string) ($task['task_uid'] ?? ''),
+                'task_no' => (int) ($task['task_no'] ?? 0),
+                'task' => (string) ($task['task'] ?? ''),
+                'responsible_user_ids' => $responsibleIds,
+                'progress' => (string) ($task['progress'] ?? self::PROGRESS_NOT_STARTED),
+                'due_date' => ! empty($task['due_date']) ? (string) $task['due_date'] : '',
+                'compilation_date' => ! empty($task['compilation_date']) ? (string) $task['compilation_date'] : '',
+                'notes_progress' => (string) ($task['notes_progress'] ?? ''),
+            ];
+        }
+
+        return $normalized;
     }
 }

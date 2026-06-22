@@ -23,5 +23,6 @@
 @once
     @push('scripts')
         <script src="{{ asset('assets/js/staff-checkbox-select.js') }}"></script>
+        <script src="{{ asset('assets/js/action-log-task-editor.js') }}"></script>
     @endpush
 @endonce

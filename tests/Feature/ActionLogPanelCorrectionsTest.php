@@ -65,7 +65,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $document->refresh();
             $tasks = $document->content['tasks'] ?? [];
 
-            $this->assertSame(Document::STATE_SUBMITTED, $document->state);
+            $this->assertSame(Document::STATE_DRAFT, $document->state);
             $this->assertSame('Action Log - Week 14 of 2026', $document->title);
             $this->assertCount(2, $tasks);
             $this->assertSame('Initial submitted task', $tasks[0]['task'] ?? null);
@@ -830,6 +830,162 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $week25Doc->refresh();
             $taskTexts = collect($week25Doc->content['tasks'] ?? [])->pluck('task')->all();
             $this->assertContains('Command carry task', $taskTexts);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_draft_autosave_on_submitted_log_reverts_to_draft(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Submitted task'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Updated submitted task'),
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('state', Document::STATE_DRAFT);
+
+        $document->refresh();
+        $this->assertSame(Document::STATE_DRAFT, $document->state);
+    }
+
+    public function test_autosave_returns_json_tasks(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Initial task'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Updated via JSON'),
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('tasks.0.task', 'Updated via JSON');
+        $response->assertJsonPath('document_id', (string) $document->id);
+    }
+
+    public function test_submit_after_autosave_sets_submitted(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Draft task'),
+                ],
+            ],
+        ]);
+
+        $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Autosaved task'),
+                ],
+            ],
+        ])->assertOk();
+
+        $response = $this->actingAs($manager)->put(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'submit',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Autosaved task'),
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('action-logs.show', $document));
+        $document->refresh();
+        $this->assertSame(Document::STATE_SUBMITTED, $document->state);
+    }
+
+    public function test_store_json_creates_document_for_create_flow(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 12, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+            $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+            $response = $this->actingAs($manager)->postJson(route('action-logs.store'), [
+                'period_id' => $period->id,
+                'action' => 'draft',
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_new', 'First autosaved task'),
+                    ],
+                ],
+            ]);
+
+            $response->assertOk();
+            $response->assertJsonPath('success', true);
+            $response->assertJsonPath('state', Document::STATE_DRAFT);
+            $response->assertJsonPath('tasks.0.task', 'First autosaved task');
+
+            $documentId = $response->json('document_id');
+            $this->assertNotEmpty($documentId);
+
+            $document = Document::find($documentId);
+            $this->assertNotNull($document);
+            $this->assertSame(Document::TYPE_ACTION_LOG, $document->type);
+            $this->assertSame(Document::STATE_DRAFT, $document->state);
         } finally {
             Carbon::setTestNow();
         }
