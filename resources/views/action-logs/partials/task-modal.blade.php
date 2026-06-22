@@ -12,9 +12,7 @@
                     <textarea class="form-control action-log-textarea-lg" id="actionLogModalTask" rows="6" placeholder="Describe the action clearly (who, what, expected outcome)"></textarea>
                 </div>
                 <div class="mb-3 action-log-modal-manager-only">
-                    <label for="actionLogModalResponsible" class="form-label">Responsible people</label>
-                    <small class="d-block text-muted mb-1">Hold Ctrl/Cmd (Windows/Mac) to select more than one.</small>
-                    <select class="form-control action-log-select-multi" id="actionLogModalResponsible" multiple size="8"></select>
+                    <div id="actionLogModalResponsible" data-staff-checkbox-select-container></div>
                 </div>
                 <div class="row">
                     <div class="col-md-12 mb-3">

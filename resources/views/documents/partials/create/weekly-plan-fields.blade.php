@@ -8,18 +8,15 @@
                 $selectedSharedUsers = old('shared_user_ids', []);
                 if (!is_array($selectedSharedUsers)) $selectedSharedUsers = [];
             @endphp
-            <label for="shared_user_ids" class="form-label">Share this weekly plan with staff in your department</label>
-            <select class="form-select @error('shared_user_ids') is-invalid @enderror" id="shared_user_ids" name="shared_user_ids[]" multiple>
-                @foreach(($shareableUsers ?? collect()) as $shareUser)
-                    <option value="{{ $shareUser->id }}" {{ in_array((string)$shareUser->id, array_map('strval', $selectedSharedUsers), true) ? 'selected' : '' }}>
-                        {{ $shareUser->name }}
-                    </option>
-                @endforeach
-            </select>
-            @error('shared_user_ids')
-                <div class="invalid-feedback d-block">{{ $message }}</div>
-            @enderror
-            <small class="form-text text-muted">Selected staff can view, edit, and submit this weekly plan while it remains draft.</small>
+            <x-staff-checkbox-select
+                id="shared_user_ids"
+                name="shared_user_ids[]"
+                :users="$shareableUsers ?? collect()"
+                :selected="$selectedSharedUsers"
+                title="Assigned Staff"
+                hint="Selected staff can view, edit, and submit this weekly plan while it remains draft."
+                error-key="shared_user_ids"
+            />
         </div>
     </div>
 </div>
@@ -133,14 +130,13 @@
                                         $selectedTeamIds = old("content.planned_activities.$i.team_member_ids", $activityRow['team_member_ids'] ?? []);
                                         if (!is_array($selectedTeamIds)) $selectedTeamIds = [];
                                     @endphp
-                                    <select class="form-select" multiple
-                                        name="content[planned_activities][{{ $i }}][team_member_ids][]">
-                                        @foreach(($teamUsers ?? collect()) as $teamUser)
-                                            <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedTeamIds), true) ? 'selected' : '' }}>
-                                                {{ $teamUser->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                    <x-staff-checkbox-select
+                                        name="content[planned_activities][{{ $i }}][team_member_ids][]"
+                                        :users="$teamUsers ?? collect()"
+                                        :selected="$selectedTeamIds"
+                                        :show-title="false"
+                                        compact
+                                    />
                                 </td>
                                 <td>
                                     <textarea class="form-control bg-light" rows="5"
@@ -215,14 +211,13 @@
                                         $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $meetingRow['participant_user_ids'] ?? []);
                                         if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
                                     @endphp
-                                    <select class="form-select" multiple
-                                        name="content[key_meetings][{{ $i }}][participant_user_ids][]">
-                                        @foreach(($teamUsers ?? collect()) as $teamUser)
-                                            <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedParticipantIds), true) ? 'selected' : '' }}>
-                                                {{ $teamUser->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                    <x-staff-checkbox-select
+                                        name="content[key_meetings][{{ $i }}][participant_user_ids][]"
+                                        :users="$teamUsers ?? collect()"
+                                        :selected="$selectedParticipantIds"
+                                        :show-title="false"
+                                        compact
+                                    />
                                 </td>
                                 <td>
                                     <select class="form-select"
@@ -315,3 +310,5 @@
         </div>
     </div>
 </div>
+
+<x-staff-users-json :users="$teamUsers ?? collect()" />

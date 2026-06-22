@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [DocumentCrudController::class, 'index'])->name('index');
         Route::get('/weekly-plans', [DocumentDashboardController::class, 'weeklyPlans'])->name('weekly-plans');
         Route::get('/weekly-reports', [DocumentDashboardController::class, 'weeklyReports'])->name('weekly-reports');
+        Route::get('/monthly-report', [DocumentDashboardController::class, 'monthlyReports'])->name('monthly-report');
         Route::get('/weekly-budget-review', [DocumentBudgetReviewController::class, 'weeklyBudgetReviewPanel'])
             ->middleware('permission:view weekly budgets|approve documents|review weekly budgets|approve weekly budgets|authorize weekly budgets')
             ->name('weekly-budget-review');

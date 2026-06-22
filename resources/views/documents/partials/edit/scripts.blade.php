@@ -200,10 +200,21 @@
                 ? reportActivityProgressBody.querySelector('select[name^="content[activity_progress]"][name$="[activity_output]"]')
                 : null;
             window.__reportActivityOptionsHtml = reportActivityOptionsSource ? reportActivityOptionsSource.innerHTML : '<option value="">-- Select Activity --</option>';
-            if (!window.__teamUsersOptionsHtml) {
-                const teamSelect = document.querySelector('select[name^="content[planned_activities]"][name$="[team_member_ids][]"]')
-                    || document.querySelector('select[name^="content[key_meetings]"][name$="[participant_user_ids][]"]');
-                window.__teamUsersOptionsHtml = teamSelect ? teamSelect.innerHTML : '';
+
+            function buildStaffCheckboxFieldHtml(name, selectedIds, options) {
+                options = options || {};
+                if (typeof window.StaffCheckboxSelect === 'undefined') {
+                    return '';
+                }
+
+                return window.StaffCheckboxSelect.buildHtml({
+                    users: window.StaffCheckboxSelect.getTeamUsers(),
+                    name: name,
+                    selected: selectedIds || [],
+                    showTitle: false,
+                    compact: true,
+                    disabled: !!options.disabled,
+                });
             }
 
             function updateReportActivityRowNumbers() {
@@ -285,9 +296,7 @@
                             </select>
                         </td>
                         <td>
-                            <select class="form-select" multiple name="content[planned_activities][${activityIndex}][team_member_ids][]">
-                                ${(window.__teamUsersOptionsHtml || '')}
-                            </select>
+                            ${buildStaffCheckboxFieldHtml(`content[planned_activities][${activityIndex}][team_member_ids][]`)}
                         </td>
                         <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][notes_inclusion]" placeholder="Notes / inclusion"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-activity-row">&times;</button></td>
@@ -319,9 +328,7 @@
                         <td><input type="date" class="form-control" name="content[key_meetings][${meetingIndex}][date]"></td>
                         <td><input type="hidden" name="content[key_meetings][${meetingIndex}][meeting_uid]" value=""><input class="form-control" name="content[key_meetings][${meetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
                         <td>
-                            <select class="form-select" multiple name="content[key_meetings][${meetingIndex}][participant_user_ids][]">
-                                ${(window.__teamUsersOptionsHtml || '')}
-                            </select>
+                            ${buildStaffCheckboxFieldHtml(`content[key_meetings][${meetingIndex}][participant_user_ids][]`)}
                         </td>
                         <td>
                             <select class="form-select" name="content[key_meetings][${meetingIndex}][location]">
@@ -474,9 +481,7 @@
                         </td>
                         <td><input class="form-control" name="content[key_meetings][${reportMeetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
                         <td>
-                            <select class="form-select" multiple name="content[key_meetings][${reportMeetingIndex}][participant_user_ids][]">
-                                ${(window.__teamUsersOptionsHtml || '')}
-                            </select>
+                            ${buildStaffCheckboxFieldHtml(`content[key_meetings][${reportMeetingIndex}][participant_user_ids][]`)}
                         </td>
                         <td>
                             <select class="form-select" name="content[key_meetings][${reportMeetingIndex}][status]">

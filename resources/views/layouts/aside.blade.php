@@ -55,12 +55,11 @@
                 </li>
 
                 @php
-                    $isDocumentsIndex = Request::routeIs('documents.index');
-                    $isMonthlyReportsNav = $isDocumentsIndex && request('type') === 'monthly_report';
-                    $isAllDocumentsNav = $isDocumentsIndex && ! $isMonthlyReportsNav;
+                    $isMonthlyReportsNav = Request::routeIs('documents.monthly-report');
+                    $isAllDocumentsNav = Request::routeIs('documents.index');
                 @endphp
                 <li class="pc-item {{ $isMonthlyReportsNav ? 'active' : '' }}">
-                    <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="pc-link">
+                    <a href="{{ route('documents.monthly-report') }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-folder"></i></span>
                         <span class="pc-mtext">Monthly Reports </span>
                     </a>

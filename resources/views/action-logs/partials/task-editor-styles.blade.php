@@ -18,5 +18,10 @@
         min-height: 3.75rem;
         font-size: 0.95rem;
     }
-    .action-log-select-multi { font-size: 0.95rem; }
 </style>
+
+@once
+    @push('scripts')
+        <script src="{{ asset('assets/js/staff-checkbox-select.js') }}"></script>
+    @endpush
+@endonce

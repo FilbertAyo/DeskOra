@@ -16,7 +16,7 @@
                                     </div>
                                     <div class="d-flex flex-wrap gap-2">
                                         <a href="{{ route('year-plan.show', $document->year) }}" class="btn btn-sm btn-outline-primary">Year plan {{ $document->year }}</a>
-                                        <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="btn btn-sm btn-light">Monthly archive</a>
+                                        <a href="{{ route('documents.monthly-report') }}" class="btn btn-sm btn-light">Monthly archive</a>
                                     </div>
                                 </div>
 

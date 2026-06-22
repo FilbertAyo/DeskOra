@@ -157,13 +157,12 @@
         </div>
     </div>
 
-    <select id="actionLogUserOptionsSource" class="d-none" aria-hidden="true" tabindex="-1">
-        @foreach(($teamUsers ?? collect()) as $teamUser)
-            <option value="{{ $teamUser->id }}">{{ $teamUser->name }}</option>
-        @endforeach
-    </select>
+    <script type="application/json" id="actionLogUserOptionsSource">
+        @json(collect($teamUsers ?? collect())->map(fn ($teamUser) => ['id' => $teamUser->id, 'name' => $teamUser->name])->values())
+    </script>
 
     @include('action-logs.partials.task-modal', ['modalTitle' => 'Add task'])
+    @include('action-logs.partials.task-editor-styles')
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -249,10 +248,19 @@
             }
 
             function cloneUserOptionsIntoModal(selectedIds) {
-                modalResponsible.innerHTML = userOptionsSource.innerHTML;
-                const set = new Set((selectedIds || []).map(String));
-                Array.from(modalResponsible.options).forEach(function(opt) {
-                    opt.selected = set.has(String(opt.value));
+                if (typeof window.StaffCheckboxSelect === 'undefined') {
+                    modalResponsible.innerHTML = '';
+                    return;
+                }
+
+                const users = window.StaffCheckboxSelect.usersFromJsonScript(userOptionsSource);
+                modalResponsible.innerHTML = window.StaffCheckboxSelect.buildHtml({
+                    users: users,
+                    name: 'modal_responsible_user_ids[]',
+                    selected: selectedIds || [],
+                    title: 'Assigned Staff',
+                    showTitle: true,
+                    compact: false,
                 });
             }
 
@@ -286,7 +294,7 @@
                     task_uid: document.getElementById('actionLogModalTaskUid').value || genUid(),
                     task: document.getElementById('actionLogModalTask').value,
                     responsible_user_ids: isManager
-                        ? Array.from(modalResponsible.selectedOptions).map(function(o) { return o.value; })
+                        ? window.StaffCheckboxSelect.readSelected(modalResponsible)
                         : [],
                     progress: document.getElementById('actionLogModalProgress').value,
                     due_date: document.getElementById('actionLogModalDueDate').value,
@@ -509,6 +517,4 @@
             });
         });
     </script>
-
-    @include('action-logs.partials.task-editor-styles')
 </x-app-layout>

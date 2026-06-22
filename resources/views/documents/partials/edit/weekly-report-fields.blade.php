@@ -325,13 +325,14 @@
                                                                         $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $meetingRow['participant_user_ids'] ?? []);
                                                                         if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
                                                                     @endphp
-                                                                    <select class="form-select" multiple name="content[key_meetings][{{ $i }}][participant_user_ids][]" @if($isReadonlyMeeting) disabled @endif>
-                                                                        @foreach(($teamUsers ?? collect()) as $teamUser)
-                                                                            <option value="{{ $teamUser->id }}" {{ in_array((string)$teamUser->id, array_map('strval', $selectedParticipantIds), true) ? 'selected' : '' }}>
-                                                                                {{ $teamUser->name }}
-                                                                            </option>
-                                                                        @endforeach
-                                                                    </select>
+                                                                    <x-staff-checkbox-select
+                                                                        name="content[key_meetings][{{ $i }}][participant_user_ids][]"
+                                                                        :users="$teamUsers ?? collect()"
+                                                                        :selected="$selectedParticipantIds"
+                                                                        :show-title="false"
+                                                                        :disabled="$isReadonlyMeeting"
+                                                                        compact
+                                                                    />
                                                                 </td>
                                                                 <td>
                                                                     @if($isReadonlyMeeting)
@@ -561,3 +562,5 @@
                                         </div>
                                     </div>
                                 </div>
+
+<x-staff-users-json :users="$teamUsers ?? collect()" />

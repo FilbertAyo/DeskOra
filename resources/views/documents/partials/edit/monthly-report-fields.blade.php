@@ -14,7 +14,7 @@
                                 <p class="text-muted mb-0">
                                     <i class="ti ti-calendar me-1"></i><strong>Reporting period:</strong> {{ $editMonthName }}
                                     <span class="mx-2">|</span>
-                                    <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}">Monthly archive</a>
+                                    <a href="{{ route('documents.monthly-report') }}">Monthly archive</a>
                                 </p>
                             </div>
 

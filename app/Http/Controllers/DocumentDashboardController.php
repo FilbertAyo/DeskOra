@@ -21,6 +21,11 @@ class DocumentDashboardController extends DocumentController
         return parent::weeklyReports($request);
     }
 
+    public function monthlyReports(Request $request)
+    {
+        return parent::monthlyReports($request);
+    }
+
     public function getPlanTarget(Request $request)
     {
         return parent::getPlanTarget($request);

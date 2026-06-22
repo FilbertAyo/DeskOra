@@ -29,14 +29,10 @@
             <div class="card shadow-none border">
                 <div class="card-body">
                     <form method="GET" action="{{ route('documents.index') }}" id="filterForm">
-                        @if(request()->filled('type'))
-                            <input type="hidden" name="type" value="{{ request('type') }}">
-                        @endif
                         <div class="row g-2 align-items-end">
-                            @if(request('type') !== 'monthly_report')
-                                <div class="col-md-4">
-                                    <label class="form-label small text-muted">Work Period</label>
-                                    <select class="form-control form-control-sm" name="period_id" id="periodFilter">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Work Period</label>
+                                <select class="form-control form-control-sm" name="period_id" id="periodFilter">
                                         <option value="" {{ request('period_id') ? '' : 'selected' }}>Last 2 work periods</option>
                                         @foreach($periods as $period)
                                             <option value="{{ $period->id }}" {{ request('period_id') == $period->id ? 'selected' : '' }}>
@@ -45,21 +41,6 @@
                                         @endforeach
                                     </select>
                                 </div>
-                            @else
-                                <div class="col-md-4">
-                                    <label class="form-label small text-muted">Month</label>
-                                    <select class="form-control form-control-sm" name="month" id="monthFilter">
-                                        <option value="" {{ ! request()->filled('month') ? 'selected' : '' }}>All months</option>
-                                        @foreach([
-                                            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
-                                            5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-                                            9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
-                                        ] as $num => $label)
-                                            <option value="{{ $num }}" {{ (string) request('month') === (string) $num ? 'selected' : '' }}>{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            @endif
                             <div class="col-md-4">
                                 <label class="form-label small text-muted">Year</label>
                                 <select class="form-control form-control-sm" name="year" id="yearFilter">
@@ -78,11 +59,9 @@
                             </div>
                         </div>
                         @php
-                            $clearFiltersUrl = request('type') === 'monthly_report'
-                                ? route('documents.index', ['type' => 'monthly_report'])
-                                : route('documents.index');
+                            $clearFiltersUrl = route('documents.index');
                         @endphp
-                        @if(request()->hasAny(['period_id', 'year', 'review_status', 'month']))
+                        @if(request()->hasAny(['period_id', 'year', 'review_status']))
                             <div class="row mt-2">
                                 <div class="col-md-12">
                                     <a href="{{ $clearFiltersUrl }}" class="btn btn-sm btn-light">
@@ -104,21 +83,6 @@
                     <h5 class="mb-0"><i class="ti ti-list me-2"></i>Submitted documents (all staff)</h5>
                 </div>
                 <div class="card-body">
-                  
-                    @if(request('type') === 'monthly_report')
-                        <div class="alert alert-light border mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
-                            <div class="flex-grow-1">
-                                <strong>Monthly reports</strong> pull planned activities from the
-                                <a href="{{ route('year-plan.index') }}">year plan</a>
-                                for your sub-departments and the month you select. Report progress on those lines and add anything done outside the plan.
-                            </div>
-                            <a href="{{ route('documents.create', ['type' => 'monthly_report']) }}" class="btn btn-primary btn-sm text-nowrap">
-                                <i class="ti ti-plus-circle me-1"></i> New monthly report
-                            </a>
-                        </div>
-                    @endif
-              
-
                     @php
                         $weeklyRows = $weeklyRows ?? $documents;
                     @endphp

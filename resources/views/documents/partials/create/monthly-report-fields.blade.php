@@ -25,7 +25,7 @@
                         <i class="ti ti-chart-line me-1"></i> Year plans
                     </a>
                 @endif
-                <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="btn btn-sm btn-light">
+                <a href="{{ route('documents.monthly-report') }}" class="btn btn-sm btn-light">
                     <i class="ti ti-folder me-1"></i> Monthly archive
                 </a>
             </div>

@@ -423,10 +423,21 @@
                 ? reportActivityProgressBody.querySelector('select[name^="content[activity_progress]"][name$="[activity_output]"]')
                 : null;
             window.__reportActivityOptionsHtml = reportActivityOptionsSource ? reportActivityOptionsSource.innerHTML : '<option value="">-- Select Activity --</option>';
-            if (!window.__teamUsersOptionsHtml) {
-                const teamSelect = document.querySelector('select[name^="content[planned_activities]"][name$="[team_member_ids][]"]')
-                    || document.querySelector('select[name^="content[key_meetings]"][name$="[participant_user_ids][]"]');
-                window.__teamUsersOptionsHtml = teamSelect ? teamSelect.innerHTML : '';
+
+            function buildStaffCheckboxFieldHtml(name, selectedIds, options) {
+                options = options || {};
+                if (typeof window.StaffCheckboxSelect === 'undefined') {
+                    return '';
+                }
+
+                return window.StaffCheckboxSelect.buildHtml({
+                    users: window.StaffCheckboxSelect.getTeamUsers(),
+                    name: name,
+                    selected: selectedIds || [],
+                    showTitle: false,
+                    compact: true,
+                    disabled: !!options.disabled,
+                });
             }
 
             function updateReportActivityRowNumbers() {
@@ -506,9 +517,7 @@
                             </select>
                         </td>
                         <td>
-                            <select class="form-select" multiple name="content[planned_activities][${activityIndex}][team_member_ids][]">
-                                ${(window.__teamUsersOptionsHtml || '')}
-                            </select>
+                            ${buildStaffCheckboxFieldHtml(`content[planned_activities][${activityIndex}][team_member_ids][]`)}
                         </td>
                         <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][notes_inclusion]" placeholder="Notes"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-activity-row">&times;</button></td>
@@ -540,9 +549,7 @@
                         <td><input type="date" class="form-control" name="content[key_meetings][${meetingIndex}][date]"></td>
                         <td><input type="hidden" name="content[key_meetings][${meetingIndex}][meeting_uid]" value=""><input class="form-control" name="content[key_meetings][${meetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
                         <td>
-                            <select class="form-select" multiple name="content[key_meetings][${meetingIndex}][participant_user_ids][]">
-                                ${(window.__teamUsersOptionsHtml || '')}
-                            </select>
+                            ${buildStaffCheckboxFieldHtml(`content[key_meetings][${meetingIndex}][participant_user_ids][]`)}
                         </td>
                         <td>
                             <select class="form-select" name="content[key_meetings][${meetingIndex}][location]">
@@ -692,27 +699,16 @@
                 const selectedParticipants = Array.isArray(row.participant_user_ids)
                     ? row.participant_user_ids.map((id) => String(id))
                     : [];
-                const selectedSet = new Set(selectedParticipants);
                 const sourceType = row.source_type ? String(row.source_type) : 'report_manual';
                 const sourcePlanId = row.source_plan_id ? String(row.source_plan_id) : '';
                 const sourceOwnerUserId = row.source_owner_user_id ? String(row.source_owner_user_id) : (currentUserId || '');
                 const meetingUid = row.meeting_uid ? String(row.meeting_uid) : '';
 
-                let participantOptionsHtml = '';
-                if (window.__teamUsersOptionsHtml) {
-                    const container = document.createElement('div');
-                    container.innerHTML = `<select>${window.__teamUsersOptionsHtml}</select>`;
-                    const options = container.querySelectorAll('option');
-                    options.forEach((option) => {
-                        const val = String(option.value || '');
-                        if (selectedSet.has(val)) {
-                            option.setAttribute('selected', 'selected');
-                        } else {
-                            option.removeAttribute('selected');
-                        }
-                    });
-                    participantOptionsHtml = container.querySelector('select')?.innerHTML || '';
-                }
+                const participantFieldHtml = buildStaffCheckboxFieldHtml(
+                    `content[key_meetings][${idx}][participant_user_ids][]`,
+                    selectedParticipants,
+                    { disabled: isReadonly }
+                );
 
                 return `
                     <tr data-report-meeting-readonly="${isReadonly ? '1' : '0'}">
@@ -732,9 +728,7 @@
                             ${isReadonly ? '<small class="badge bg-light-warning border border-warning text-warning mt-1">Assigned (View only)</small>' : ''}
                         </td>
                         <td>
-                            <select class="form-select" multiple name="content[key_meetings][${idx}][participant_user_ids][]" ${isReadonly ? 'disabled' : ''}>
-                                ${participantOptionsHtml}
-                            </select>
+                            ${participantFieldHtml}
                         </td>
                         <td>
                             ${isReadonly ? `<input type="hidden" name="content[key_meetings][${idx}][status]" value="${escapeHtml(row.status || '')}">` : ''}

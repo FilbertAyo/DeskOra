@@ -50,6 +50,11 @@ class DocumentController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Document::class);
+
+        if ($request->input('type') === Document::TYPE_MONTHLY_REPORT) {
+            return redirect()->route('documents.monthly-report', $request->only(['year', 'month', 'review_status', 'page']));
+        }
+
         if ($request->hasSession()) {
             $request->session()->put('documents.last_listing_url', $request->fullUrl());
         }
@@ -87,17 +92,9 @@ class DocumentController extends Controller
         // Filter by year only when explicitly selected.
         $year = $request->input('year');
         if ($year) {
-            if ($request->input('type') === Document::TYPE_MONTHLY_REPORT) {
-                $query->where('year', $year);
-            } else {
-                $query->whereHas('period', function ($q) use ($year) {
-                    $q->where('year', $year);
-                });
-            }
-        }
-
-        if ($request->filled('month') && $request->input('type') === Document::TYPE_MONTHLY_REPORT) {
-            $query->where('month', (int) $request->input('month'));
+            $query->whereHas('period', function ($q) use ($year) {
+                $q->where('year', $year);
+            });
         }
 
         // Default to the latest 2 work periods unless user explicitly filters by a specific period.
@@ -164,15 +161,6 @@ class DocumentController extends Controller
         $returnedDocumentMap = $this->getReturnedDocumentMapForIds($returnedIds);
 
         $years = WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
-        if ($request->input('type') === Document::TYPE_MONTHLY_REPORT) {
-            $reportYears = Document::query()
-                ->where('type', Document::TYPE_MONTHLY_REPORT)
-                ->whereNotNull('year')
-                ->distinct()
-                ->orderByDesc('year')
-                ->pluck('year');
-            $years = $reportYears->merge($years)->unique()->sortDesc()->values();
-        }
 
         $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $deadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
@@ -1969,6 +1957,75 @@ class DocumentController extends Controller
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
             'weeklyReportSlot' => $weeklyReportSlot,
+        ]);
+    }
+
+    /**
+     * Display monthly reports page
+     */
+    public function monthlyReports(Request $request)
+    {
+        $this->authorize('viewAny', Document::class);
+        if ($request->hasSession()) {
+            $request->session()->put('documents.last_listing_url', $request->fullUrl());
+        }
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $query = Document::with(['user'])
+            ->ofType(Document::TYPE_MONTHLY_REPORT)
+            ->forUser($user->id);
+
+        $year = $request->input('year');
+        if ($year && $year !== '') {
+            $query->where('year', (int) $year);
+        }
+
+        if ($request->filled('month')) {
+            $query->where('month', (int) $request->input('month'));
+        }
+
+        if ($request->input('review_status') === 'returned') {
+            $query->where('state', Document::STATE_DRAFT)
+                ->whereNotNull('review_rejection_reason')
+                ->where('review_rejection_reason', '!=', '');
+        }
+
+        $documents = $query->orderByDesc('year')
+            ->orderByDesc('month')
+            ->orderByDesc('updated_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        $returnedDocumentMap = $this->getReturnedDocumentMapForIds(
+            $documents->getCollection()->pluck('id')->all()
+        );
+
+        $reportYears = Document::query()
+            ->where('type', Document::TYPE_MONTHLY_REPORT)
+            ->where('user_id', $user->id)
+            ->whereNotNull('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year');
+
+        $years = $reportYears
+            ->merge(collect(range((int) date('Y'), (int) date('Y') - 5)))
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $availableTypes = Document::getAvailableTypesForUser($user);
+
+        $ref = now()->startOfMonth()->subMonth();
+
+        return view('documents.monthly.reports', [
+            'documents' => $documents,
+            'years' => $years,
+            'returnedDocumentMap' => $returnedDocumentMap,
+            'availableTypes' => $availableTypes,
+            'defaultReportYear' => (int) $ref->year,
+            'defaultReportMonth' => (int) $ref->month,
         ]);
     }
 
