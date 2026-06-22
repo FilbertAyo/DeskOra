@@ -204,8 +204,20 @@
                                                     <span class="badge bg-light-secondary border border-secondary">{{ $displayProgress }}</span>
                                                 @endif
                                             </td>
-                                            <td class="small">{{ $row['due_date'] ?? '-' }}</td>
-                                            <td class="small">{{ $row['compilation_date'] ?? '-' }}</td>
+                                            <td class="small">
+                                                @if(!empty($row['due_date']))
+                                                    {{ \Carbon\Carbon::parse($row['due_date'])->format('M d, Y') }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td class="small">
+                                                @if(!empty($row['compilation_date']))
+                                                    {{ \Carbon\Carbon::parse($row['compilation_date'])->format('M d, Y') }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
                                             <td class="text-muted small">{{ $displayNotes !== '' ? $displayNotes : '—' }}</td>
                                             <td>
                                                 @if(!empty($realHistory))

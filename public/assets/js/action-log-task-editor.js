@@ -16,6 +16,35 @@
         }
     }
 
+    function dateOnlyPart(value) {
+        const str = String(value || '').trim();
+        if (!str) {
+            return '';
+        }
+        return str.split(/[T ]/)[0];
+    }
+
+    function formatDateOnly(value) {
+        const datePart = dateOnlyPart(value);
+        if (!datePart) {
+            return '—';
+        }
+        const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) {
+            return datePart;
+        }
+        const dt = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        if (isNaN(dt.getTime())) {
+            return datePart;
+        }
+        return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function toDateInputValue(value) {
+        const datePart = dateOnlyPart(value);
+        return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : '';
+    }
+
     function genUid() {
         if (window.crypto && typeof window.crypto.randomUUID === 'function') {
             return 'task_' + window.crypto.randomUUID();
@@ -32,8 +61,8 @@
                 ? task.responsible_user_ids.map(String)
                 : [],
             progress: String(task.progress || 'Not Started'),
-            due_date: task.due_date ? String(task.due_date) : '',
-            compilation_date: task.compilation_date ? String(task.compilation_date) : '',
+            due_date: toDateInputValue(task.due_date),
+            compilation_date: toDateInputValue(task.compilation_date),
             notes_progress: String(task.notes_progress || ''),
         };
     }
@@ -429,11 +458,11 @@
 
                     const dueCell = document.createElement('td');
                     dueCell.className = 'small';
-                    dueCell.textContent = task.due_date || '—';
+                    dueCell.textContent = formatDateOnly(task.due_date);
 
                     const compilationCell = document.createElement('td');
                     compilationCell.className = 'small';
-                    compilationCell.textContent = task.compilation_date || '—';
+                    compilationCell.textContent = formatDateOnly(task.compilation_date);
 
                     const notesCell = document.createElement('td');
                     notesCell.className = 'text-muted small';

@@ -43,8 +43,8 @@
                 'task' => (string) ($row['task'] ?? ''),
                 'responsible_user_ids' => array_values(array_map('strval', $selectedIds)),
                 'progress' => (string) ($row['progress'] ?? 'Not Started'),
-                'due_date' => $row['due_date'] ? (string) $row['due_date'] : '',
-                'compilation_date' => $row['compilation_date'] ? (string) $row['compilation_date'] : '',
+                'due_date' => ! empty($row['due_date']) ? \Carbon\Carbon::parse($row['due_date'])->format('Y-m-d') : '',
+                'compilation_date' => ! empty($row['compilation_date']) ? \Carbon\Carbon::parse($row['compilation_date'])->format('Y-m-d') : '',
                 'notes_progress' => (string) ($row['notes_progress'] ?? ''),
             ];
         }

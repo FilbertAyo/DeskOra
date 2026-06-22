@@ -11,6 +11,7 @@ use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\WorkflowEmailNotificationService;
 use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -627,8 +628,8 @@ class ActionLogController extends Controller
                 'task' => $taskText,
                 'responsible_user_ids' => $responsibleIds,
                 'progress' => $progress,
-                'due_date' => $dueDate !== '' ? $dueDate : null,
-                'compilation_date' => $compilationDate !== '' ? $compilationDate : null,
+                'due_date' => $dueDate !== '' ? $this->formatActionLogDateForStorage($dueDate) : null,
+                'compilation_date' => $compilationDate !== '' ? $this->formatActionLogDateForStorage($compilationDate) : null,
                 'notes_progress' => $notesProgress,
                 'status_reason' => null,
                 'history' => $history,
@@ -941,12 +942,31 @@ class ActionLogController extends Controller
                 'task' => (string) ($task['task'] ?? ''),
                 'responsible_user_ids' => $responsibleIds,
                 'progress' => (string) ($task['progress'] ?? self::PROGRESS_NOT_STARTED),
-                'due_date' => ! empty($task['due_date']) ? (string) $task['due_date'] : '',
-                'compilation_date' => ! empty($task['compilation_date']) ? (string) $task['compilation_date'] : '',
+                'due_date' => $this->formatActionLogDateForClient($task['due_date'] ?? null),
+                'compilation_date' => $this->formatActionLogDateForClient($task['compilation_date'] ?? null),
                 'notes_progress' => (string) ($task['notes_progress'] ?? ''),
             ];
         }
 
         return $normalized;
+    }
+
+    private function formatActionLogDateForStorage(string $value): string
+    {
+        return Carbon::parse($value)->format('Y-m-d');
+    }
+
+    private function formatActionLogDateForClient(mixed $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === '') {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable) {
+            return $value;
+        }
     }
 }
