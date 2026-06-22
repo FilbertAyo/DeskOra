@@ -271,8 +271,9 @@ window.addEventListener('load', function () {
 // active menu item list start
 var elem = document.querySelectorAll('.pc-sidebar .pc-navbar a');
 for (var l = 0; l < elem.length; l++) {
-  var pageUrl = window.location.href.split(/[?#]/)[0];
-  if (elem[l].href == pageUrl && elem[l].getAttribute('href') != '') {
+  var pageUrl = window.location.href.split(/[#]/)[0];
+  var linkUrl = elem[l].href.split(/[#]/)[0];
+  if (linkUrl == pageUrl && elem[l].getAttribute('href') != '') {
     elem[l].parentNode.classList.add('active');
 
     elem[l].parentNode.parentNode.parentNode.classList.add('pc-trigger');

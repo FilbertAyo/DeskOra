@@ -54,14 +54,18 @@
                     </ul>
                 </li>
 
-                <li
-                    class="pc-item {{ Request::routeIs('documents.index') && request('type') === 'monthly_report' ? 'active' : '' }}">
+                @php
+                    $isDocumentsIndex = Request::routeIs('documents.index');
+                    $isMonthlyReportsNav = $isDocumentsIndex && request('type') === 'monthly_report';
+                    $isAllDocumentsNav = $isDocumentsIndex && ! $isMonthlyReportsNav;
+                @endphp
+                <li class="pc-item {{ $isMonthlyReportsNav ? 'active' : '' }}">
                     <a href="{{ route('documents.index', ['type' => 'monthly_report']) }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-folder"></i></span>
                         <span class="pc-mtext">Monthly Reports </span>
                     </a>
                 </li>
-                <li class="pc-item {{ Request::routeIs('documents.index') && !request()->has('type') ? 'active' : '' }}">
+                <li class="pc-item {{ $isAllDocumentsNav ? 'active' : '' }}">
                     <a href="{{ route('documents.index') }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-stack"></i></span>
                         <span class="pc-mtext">All Documents</span>
