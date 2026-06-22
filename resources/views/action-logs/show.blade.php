@@ -18,18 +18,6 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
 
     @php
         $taskTotal = count($tasks);
@@ -142,7 +130,7 @@
             <div class="card shadow-none border mb-4">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0">{{ $document->display_title }}</h5>
-                    <small class="text-muted"><i class="ti ti-history me-1"></i>Click <strong>View Timeline</strong> on any task to see its full week-by-week history.</small>
+                    <small class="text-muted"><i class="ti ti-history me-1"></i>Click <strong>Progress</strong> on any task to see its full week-by-week history.</small>
                 </div>
                 <div class="card-body">
                     @php
@@ -227,7 +215,7 @@
                                                         data-bs-target="#{{ $timelineId }}"
                                                         aria-expanded="false"
                                                         aria-controls="{{ $timelineId }}">
-                                                        <i class="ti ti-timeline-event me-1"></i>View Timeline
+                                                        <i class="ti ti-timeline-event me-1"></i>Progress
                                                         <span class="badge bg-light-primary border border-primary ms-1">{{ $realHistory->count() }}</span>
                                                     </button>
                                                 @else
