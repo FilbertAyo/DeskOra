@@ -10,7 +10,6 @@
                             <h5 class="m-b-10">Petty Cash Requests</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                                <li class="breadcrumb-item"><a href="javascript: void(0)">Petty Cash</a></li>
                                 <li class="breadcrumb-item" aria-current="page">Petty Cash Requests</li>
                             </ul>
                         </div>

@@ -82,10 +82,19 @@
                                             {{ $organizationReport->created_at->format('M d, Y h:i A') }}
                                         </small>
                                         <div class="mt-auto d-flex gap-1">
-                                            <a href="{{ route('reports.organization-documents.view', $organizationReport) }}"
-                                                class="btn btn-info btn-sm text-white" target="_blank" title="View">
+                                            <button
+                                                type="button"
+                                                class="btn btn-info btn-sm text-white"
+                                                title="View"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#viewOrganizationDocumentModal"
+                                                data-view-url="{{ route('reports.organization-documents.view', $organizationReport) }}"
+                                                data-download-url="{{ route('reports.organization-documents.download', $organizationReport) }}"
+                                                data-document-name="{{ $organizationReport->name }}"
+                                                data-document-extension="{{ strtolower($fileExtension) }}"
+                                            >
                                                 <i class="ti ti-eye"></i>
-                                            </a>
+                                            </button>
                                             <a href="{{ route('reports.organization-documents.download', $organizationReport) }}"
                                                 class="btn btn-success btn-sm" title="Download">
                                                 <i class="ti ti-download"></i>
@@ -144,6 +153,40 @@
 
 
                  
+
+    <div class="modal fade" id="viewOrganizationDocumentModal" tabindex="-1"
+        aria-labelledby="viewOrganizationDocumentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-truncate pe-3" id="viewOrganizationDocumentModalLabel">View Document</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="view-organization-document-pdf" class="d-none">
+                        <iframe
+                            id="view-organization-document-iframe"
+                            title="Document preview"
+                            style="width: 100%; height: 75vh; border: none;"
+                        ></iframe>
+                    </div>
+                    <div id="view-organization-document-fallback" class="d-none text-center py-5 px-3">
+                        <i class="ti ti-file-description fs-1 text-muted d-block mb-3"></i>
+                        <p class="text-muted mb-3">This file type cannot be previewed in the browser.</p>
+                        <a id="view-organization-document-download" href="#" class="btn btn-primary">
+                            <i class="ti ti-download me-1"></i>Download to View
+                        </a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a id="view-organization-document-open" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-light btn-sm">
+                        <i class="ti ti-external-link me-1"></i>Open in New Tab
+                    </a>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     @can('upload organization reports')
         <div class="modal fade" id="uploadOrganizationDocumentModal" tabindex="-1"
@@ -254,6 +297,52 @@
             </div>
         </div>
     @endcan
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const viewModalElement = document.getElementById('viewOrganizationDocumentModal');
+            const viewPdfContainer = document.getElementById('view-organization-document-pdf');
+            const viewIframe = document.getElementById('view-organization-document-iframe');
+            const viewFallbackContainer = document.getElementById('view-organization-document-fallback');
+            const viewModalTitle = document.getElementById('viewOrganizationDocumentModalLabel');
+            const viewDownloadLink = document.getElementById('view-organization-document-download');
+            const viewOpenLink = document.getElementById('view-organization-document-open');
+
+            if (viewModalElement) {
+                viewModalElement.addEventListener('show.bs.modal', function(event) {
+                    const triggerButton = event.relatedTarget;
+                    if (!triggerButton) {
+                        return;
+                    }
+
+                    const viewUrl = triggerButton.getAttribute('data-view-url') || '#';
+                    const downloadUrl = triggerButton.getAttribute('data-download-url') || '#';
+                    const documentName = triggerButton.getAttribute('data-document-name') || 'Document';
+                    const extension = (triggerButton.getAttribute('data-document-extension') || '').toLowerCase();
+
+                    viewModalTitle.textContent = documentName;
+                    viewDownloadLink.setAttribute('href', downloadUrl);
+                    viewOpenLink.setAttribute('href', viewUrl);
+
+                    if (extension === 'pdf') {
+                        viewFallbackContainer.classList.add('d-none');
+                        viewPdfContainer.classList.remove('d-none');
+                        viewIframe.setAttribute('src', viewUrl);
+                    } else {
+                        viewPdfContainer.classList.add('d-none');
+                        viewIframe.removeAttribute('src');
+                        viewFallbackContainer.classList.remove('d-none');
+                    }
+                });
+
+                viewModalElement.addEventListener('hidden.bs.modal', function() {
+                    viewIframe.removeAttribute('src');
+                    viewPdfContainer.classList.add('d-none');
+                    viewFallbackContainer.classList.add('d-none');
+                });
+            }
+        });
+    </script>
 
     @can('upload organization reports')
         <script>
