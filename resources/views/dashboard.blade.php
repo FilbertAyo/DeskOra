@@ -72,22 +72,23 @@
         $planCoverageActionUrl = $planCoverageAlert['actionUrl'] ?? null;
     @endphp
 
+
     <div class="page-header">
         <div class="page-block">
             <div class="row align-items-center">
                 <div class="col-md-12">
-                    <div class="page-header-title">
-                        <h5 class="m-b-10">Dashboard</h5>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="page-header-title">
+                            <h5 class="m-b-10">Dashboard</h5>
+                            <x-dashboard-greeting />
+                        </div>
+                     
                     </div>
-                    <ul class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                        <li class="breadcrumb-item"><a href="javascript: void(0)">Dashboard</a></li>
-                        <li class="breadcrumb-item" aria-current="page">Dashboard</li>
-                    </ul>
                 </div>
             </div>
         </div>
     </div>
+
 
   
     <div class="row">
