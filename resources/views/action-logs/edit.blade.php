@@ -49,8 +49,6 @@
             if (! is_array($selectedIds)) {
                 $selectedIds = [];
             }
-            $isAssigned = in_array((string) auth()->id(), array_map('strval', $selectedIds), true);
-            $canEditRow = $isManager || $isAssigned;
             $tasksForJson[] = [
                 'task_uid' => (string) ($row['task_uid'] ?? ''),
                 'task' => (string) ($row['task'] ?? ''),
@@ -59,7 +57,6 @@
                 'due_date' => $row['due_date'] ? (string) $row['due_date'] : '',
                 'compilation_date' => $row['compilation_date'] ? (string) $row['compilation_date'] : '',
                 'notes_progress' => (string) ($row['notes_progress'] ?? ''),
-                'can_edit' => $canEditRow,
             ];
         }
     @endphp
@@ -142,18 +139,11 @@
                                 <div>
                                     <h6 class="mb-0"><i class="ti ti-list-check me-2"></i>Action Log Tasks</h6>
                                </div>
-                                @if($isManager)
-                                    <button type="button" class="btn btn-sm btn-primary" id="addTaskRowBtn" data-bs-toggle="modal" data-bs-target="#actionLogTaskModal">
-                                        <i class="ti ti-plus me-1"></i> Add task
-                                    </button>
-                                @endif
+                                <button type="button" class="btn btn-sm btn-primary" id="addTaskRowBtn" data-bs-toggle="modal" data-bs-target="#actionLogTaskModal">
+                                    <i class="ti ti-plus me-1"></i> Add task
+                                </button>
                             </div>
                             <div class="card-body">
-                                @if(!$isManager)
-                                    <div class="alert alert-info mb-3 py-2">
-                                        You can update only <strong>your assigned</strong> tasks. Open a task with <strong>Edit</strong> to change progress, dates, and notes.
-                                    </div>
-                                @endif
                                 <div id="taskListDisplay" class="list-group list-group-flush border rounded"></div>
                                 <p id="taskListEmpty" class="text-muted mb-0 d-none">No tasks on this log.</p>
                                 <div id="taskRowsBody" class="d-none" aria-hidden="true"></div>
@@ -170,11 +160,9 @@
                                 <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
                                     <i class="ti ti-save me-1"></i> Save Draft
                                 </button>
-                                @if($isManager)
-                                    <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn">
-                                        <i class="ti ti-send me-1"></i> Submit
-                                    </button>
-                                @endif
+                                <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn">
+                                    <i class="ti ti-send me-1"></i> Submit
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -186,14 +174,11 @@
     <script type="application/json" id="actionLogUserOptionsSource">
         @json(collect($teamUsers ?? collect())->map(fn ($teamUser) => ['id' => $teamUser->id, 'name' => $teamUser->name])->values())
     </script>
-    <input type="hidden" id="actionLogIsManagerFlag" value="{{ $isManager ? '1' : '0' }}">
-
     @include('action-logs.partials.task-modal', ['modalTitle' => 'Task'])
     @include('action-logs.partials.task-editor-styles')
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const isManager = document.getElementById('actionLogIsManagerFlag').value === '1';
             const form = document.getElementById('editActionLogForm');
             const submitBtn = document.getElementById('submitBtn');
             const saveDraftBtn = document.getElementById('saveDraftBtn');
@@ -208,8 +193,26 @@
             const userOptionsSource = document.getElementById('actionLogUserOptionsSource');
             const modalResponsible = document.getElementById('actionLogModalResponsible');
 
-            const progressOptionsManager = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
-            const progressOptionsStaff = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
+            const progressOptions = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
+            const userNameMap = (function() {
+                const map = {};
+                if (!userOptionsSource) {
+                    return map;
+                }
+                try {
+                    const users = JSON.parse(userOptionsSource.textContent);
+                    if (Array.isArray(users)) {
+                        users.forEach(function(u) {
+                            if (u && u.id) {
+                                map[String(u.id)] = String(u.name || '');
+                            }
+                        });
+                    }
+                } catch (e) {
+                    // ignore
+                }
+                return map;
+            })();
 
             let tasks = [];
             let editingIndex = null;
@@ -230,7 +233,6 @@
                     due_date: '',
                     compilation_date: '',
                     notes_progress: '',
-                    can_edit: isManager,
                 };
             }
 
@@ -257,23 +259,13 @@
                     due_date: t.due_date ? String(t.due_date) : '',
                     compilation_date: t.compilation_date ? String(t.compilation_date) : '',
                     notes_progress: String(t.notes_progress || ''),
-                    can_edit: t.can_edit === true,
                 };
             }
 
             function fillProgressSelect(selected) {
                 const sel = document.getElementById('actionLogModalProgress');
-                const opts = isManager ? progressOptionsManager : progressOptionsStaff;
                 sel.innerHTML = '';
-                if (!isManager && selected && opts.indexOf(selected) === -1) {
-                    const o = document.createElement('option');
-                    o.value = selected;
-                    o.textContent = selected + ' (current)';
-                    o.disabled = true;
-                    o.selected = true;
-                    sel.appendChild(o);
-                }
-                opts.forEach(function(label) {
+                progressOptions.forEach(function(label) {
                     const o = document.createElement('option');
                     o.value = label;
                     o.textContent = label;
@@ -301,22 +293,17 @@
                 });
             }
 
-            function setManagerOnlyVisible(show) {
+            function setManagerOnlyVisible() {
                 document.querySelectorAll('.action-log-modal-manager-only').forEach(function(el) {
-                    el.classList.toggle('d-none', !show);
+                    el.classList.remove('d-none');
                 });
                 const taskField = document.querySelector('.action-log-modal-field-task');
                 const ta = document.getElementById('actionLogModalTask');
                 const labelHtml = 'What needs to be done? <span class="text-danger">*</span>';
                 if (taskField) {
                     const lbl = taskField.querySelector('.form-label');
-                    if (!show) {
-                        ta.readOnly = true;
-                        lbl.textContent = 'Task (read only)';
-                    } else {
-                        ta.readOnly = false;
-                        lbl.innerHTML = labelHtml;
-                    }
+                    ta.readOnly = false;
+                    lbl.innerHTML = labelHtml;
                 }
             }
 
@@ -330,7 +317,7 @@
                 cloneUserOptionsIntoModal([]);
             }
 
-            function readModalManager() {
+            function readModal() {
                 return {
                     task_uid: document.getElementById('actionLogModalTaskUid').value || genUid(),
                     task: document.getElementById('actionLogModalTask').value,
@@ -342,13 +329,10 @@
                 };
             }
 
-            function readModalStaffMerge(prev) {
-                const next = Object.assign({}, prev);
-                next.progress = document.getElementById('actionLogModalProgress').value;
-                next.due_date = document.getElementById('actionLogModalDueDate').value;
-                next.compilation_date = document.getElementById('actionLogModalCompilationDate').value;
-                next.notes_progress = document.getElementById('actionLogModalNotes').value;
-                return next;
+            function assigneeLabel(task) {
+                const ids = Array.isArray(task.responsible_user_ids) ? task.responsible_user_ids : [];
+                const names = ids.map(function(id) { return userNameMap[String(id)]; }).filter(Boolean);
+                return names.length > 0 ? names.join(', ') : '';
             }
 
             function fillModal(task) {
@@ -438,39 +422,41 @@
                     const preview = document.createElement('div');
                     preview.className = 'text-muted small text-break';
                     preview.textContent = taskPreviewText(task);
+                    const assignees = document.createElement('div');
+                    assignees.className = 'mt-1 small';
+                    const assigneeNames = assigneeLabel(task);
+                    if (assigneeNames) {
+                        assignees.innerHTML = '<span class="text-muted">Assigned:</span> ' + assigneeNames;
+                    } else {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge bg-light-warning border border-warning text-dark';
+                        badge.textContent = 'Needs assignment';
+                        assignees.appendChild(badge);
+                    }
                     const meta = document.createElement('div');
                     meta.className = 'mt-2';
                     const badge = document.createElement('span');
                     badge.className = 'badge bg-light-secondary border border-secondary';
                     badge.textContent = task.progress || 'Not Started';
                     meta.appendChild(badge);
-                    if (!task.can_edit) {
-                        const lock = document.createElement('span');
-                        lock.className = 'badge bg-light-light border border-light text-dark ml-1';
-                        lock.textContent = 'View only';
-                        meta.appendChild(lock);
-                    }
                     left.appendChild(title);
                     left.appendChild(preview);
+                    left.appendChild(assignees);
                     left.appendChild(meta);
                     const actions = document.createElement('div');
                     actions.className = 'btn-group btn-group-sm flex-shrink-0';
-                    if (task.can_edit) {
-                        const editBtn = document.createElement('button');
-                        editBtn.type = 'button';
-                        editBtn.className = 'btn btn-outline-primary js-edit-task';
-                        editBtn.setAttribute('data-index', String(index));
-                        editBtn.innerHTML = '<i class="ti ti-edit"></i> Edit';
-                        actions.appendChild(editBtn);
-                    }
-                    if (isManager) {
-                        const delBtn = document.createElement('button');
-                        delBtn.type = 'button';
-                        delBtn.className = 'btn btn-outline-danger js-remove-task';
-                        delBtn.setAttribute('data-index', String(index));
-                        delBtn.innerHTML = '<i class="ti ti-trash"></i>';
-                        actions.appendChild(delBtn);
-                    }
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'btn btn-outline-primary js-edit-task';
+                    editBtn.setAttribute('data-index', String(index));
+                    editBtn.innerHTML = '<i class="ti ti-edit"></i> Edit';
+                    actions.appendChild(editBtn);
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'btn btn-outline-danger js-remove-task';
+                    delBtn.setAttribute('data-index', String(index));
+                    delBtn.innerHTML = '<i class="ti ti-trash"></i>';
+                    actions.appendChild(delBtn);
                     header.appendChild(left);
                     header.appendChild(actions);
                     item.appendChild(header);
@@ -484,7 +470,7 @@
                 if (trigger && trigger.id === 'addTaskRowBtn') {
                     editingIndex = null;
                     modalTitle.textContent = 'Add task';
-                    setManagerOnlyVisible(true);
+                    setManagerOnlyVisible();
                     clearModal();
                 }
             });
@@ -493,7 +479,7 @@
                 addTaskRowBtn.addEventListener('click', function() {
                     editingIndex = null;
                     modalTitle.textContent = 'Add task';
-                    setManagerOnlyVisible(true);
+                    setManagerOnlyVisible();
                     clearModal();
                 });
             }
@@ -508,8 +494,7 @@
                     }
                     editingIndex = idx;
                     modalTitle.textContent = 'Edit task ' + (idx + 1);
-                    const staffEditing = !isManager && tasks[idx].can_edit;
-                    setManagerOnlyVisible(!staffEditing);
+                    setManagerOnlyVisible();
                     fillModal(tasks[idx]);
                     showModal();
                     return;
@@ -533,21 +518,9 @@
 
             modalSaveBtn.addEventListener('click', function() {
                 if (editingIndex === null) {
-                    if (!isManager) {
-                        return;
-                    }
-                    const t = normalizeTask(readModalManager());
-                    t.can_edit = true;
-                    tasks.push(t);
+                    tasks.push(normalizeTask(readModal()));
                 } else {
-                    const prev = tasks[editingIndex];
-                    if (isManager) {
-                        const t = normalizeTask(readModalManager());
-                        t.can_edit = prev.can_edit;
-                        tasks[editingIndex] = t;
-                    } else {
-                        tasks[editingIndex] = normalizeTask(readModalStaffMerge(prev));
-                    }
+                    tasks[editingIndex] = normalizeTask(readModal());
                 }
                 renderTaskList();
                 hideModal();

@@ -334,26 +334,18 @@ class ActionLogController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $isManager = $this->isActionLogManager($user);
-        $isAssigned = $this->isUserAssignedToActionLog($user, $document);
 
         if ($document->period && ! $document->period->isOpen()) {
             return redirect()->route('action-logs.show', $document)
                 ->with('error', 'This action log belongs to a closed work period and cannot be edited.');
         }
 
-        if (! $isManager && ! $isAssigned) {
+        if (! $isManager) {
             return redirect()->route('action-logs.show', $document)
-                ->with('error', 'You can only edit tasks where you are assigned as responsible person.');
+                ->with('error', 'Only action log managers can edit tasks here. Use Dashboard → My Action Tasks to update your assigned tasks.');
         }
 
-        // Drafts are manager-only until submitted; regular staff cannot edit them.
-        if (! $isManager && ! $document->isSubmitted()) {
-            return redirect()->route('action-logs.index')
-                ->with('error', 'This action log has not been submitted yet. You can update your tasks once it is submitted.');
-        }
-
-        // Authorize update action
-        $this->authorize('update', $document);
+        $this->authorize('manageActionLogs', $document);
 
         if ($document->period && $document->period->isOpen()) {
             $this->persistCarriedTaskSyncIfNeeded($document, $document->period);
@@ -383,8 +375,13 @@ class ActionLogController extends Controller
             abort(404, 'Document not found.');
         }
 
-        // Authorize update action
-        $this->authorize('update', $document);
+        $isManager = $this->isActionLogManager($actingUser);
+        if (! $isManager) {
+            return redirect()->route('action-logs.show', $document)
+                ->with('error', 'Only action log managers can edit tasks here. Use Dashboard → My Action Tasks to update your assigned tasks.');
+        }
+
+        $this->authorize('manageActionLogs', $document);
 
         // Keep period stable when the UI shows a disabled work-period selector.
         if (! $request->filled('period_id') && ! empty($document->period_id)) {
@@ -431,7 +428,6 @@ class ActionLogController extends Controller
             $this->authorize('submit', $document);
         }
 
-        $isManager = $this->isActionLogManager(Auth::user());
         $this->persistCarriedTaskSyncIfNeeded($document, $period);
         $document->refresh();
 
@@ -439,10 +435,7 @@ class ActionLogController extends Controller
         $existingTasks = $this->extractTasks($document->content);
         $incomingTasks = $normalizedContent['tasks'] ?? [];
 
-        // Non-managers can only update their assigned rows and limited columns.
-        $finalTasks = $isManager
-            ? $this->mergeManagerTaskUpdates($existingTasks, $incomingTasks, $period, (string) Auth::id())
-            : $this->mergeResponsibleTaskUpdates($existingTasks, $incomingTasks, $period, (string) Auth::id());
+        $finalTasks = $this->mergeManagerTaskUpdates($existingTasks, $incomingTasks, $period, (string) Auth::id());
 
         if (empty($finalTasks)) {
             return redirect()->back()
@@ -452,11 +445,8 @@ class ActionLogController extends Controller
         $updateData = [
             'content' => ['tasks' => $this->renumberTasks($finalTasks)],
             'title' => $this->buildActionLogTitle($period),
+            'period_id' => $period->id,
         ];
-
-        if ($isManager) {
-            $updateData['period_id'] = $period->id;
-        }
 
         // Update state if submitting
         if ($action === 'submit') {
@@ -665,65 +655,6 @@ class ActionLogController extends Controller
         $tasks = $content['tasks'] ?? [];
 
         return is_array($tasks) ? $tasks : [];
-    }
-
-    private function mergeResponsibleTaskUpdates(array $existingTasks, array $incomingTasks, WorkPeriod $period, string $userId): array
-    {
-        $incomingByUid = [];
-        foreach ($incomingTasks as $task) {
-            if (! is_array($task)) {
-                continue;
-            }
-            $uid = trim((string) ($task['task_uid'] ?? ''));
-            if ($uid !== '') {
-                $incomingByUid[$uid] = $task;
-
-                continue;
-            }
-            $taskNo = (int) ($task['task_no'] ?? 0);
-            if ($taskNo > 0) {
-                $incomingByUid['no:'.$taskNo] = $task;
-            }
-        }
-
-        $merged = [];
-        foreach ($existingTasks as $existing) {
-            if (! is_array($existing)) {
-                continue;
-            }
-            $responsibleIds = $existing['responsible_user_ids'] ?? [];
-            if (! is_array($responsibleIds)) {
-                $responsibleIds = [];
-            }
-            $responsibleIds = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
-            $isAssigned = in_array($userId, $responsibleIds, true);
-
-            $keyUid = trim((string) ($existing['task_uid'] ?? ''));
-            $keyNo = (int) ($existing['task_no'] ?? 0);
-            $incoming = $keyUid !== '' ? ($incomingByUid[$keyUid] ?? null) : null;
-            if (! $incoming && $keyNo > 0) {
-                $incoming = $incomingByUid['no:'.$keyNo] ?? null;
-            }
-
-            if ($isAssigned && is_array($incoming)) {
-                $before = $existing;
-                $progress = trim((string) ($incoming['progress'] ?? ($existing['progress'] ?? self::PROGRESS_NOT_STARTED)));
-                if (! in_array($progress, self::STAFF_PROGRESS_OPTIONS, true)) {
-                    $progress = (string) ($existing['progress'] ?? self::PROGRESS_NOT_STARTED);
-                }
-
-                $existing['progress'] = $progress;
-                $existing['due_date'] = ! empty($incoming['due_date']) ? $incoming['due_date'] : null;
-                $existing['compilation_date'] = ! empty($incoming['compilation_date']) ? $incoming['compilation_date'] : null;
-                $existing['notes_progress'] = trim((string) ($incoming['notes_progress'] ?? ($existing['notes_progress'] ?? '')));
-                $existing['status_reason'] = $existing['status_reason'] ?? null;
-                $existing = $this->appendTaskHistoryIfChanged($before, $existing, $period, $userId);
-            }
-
-            $merged[] = $existing;
-        }
-
-        return $merged;
     }
 
     private function mergeManagerStoreTasks(array $existingTasks, array $incomingTasks, WorkPeriod $period, string $actorUserId): array

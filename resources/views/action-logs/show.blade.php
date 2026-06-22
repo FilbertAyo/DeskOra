@@ -109,7 +109,7 @@
                         </div>
                         <div class="card-body py-3">
                             <div class="d-grid gap-2">
-                                @can('update', $document)
+                                @can('manageActionLogs', $document)
                                     <a href="{{ route('action-logs.edit', $document->id) }}" class="btn btn-primary btn-sm">
                                         <i class="ti ti-edit me-1"></i> Update Tasks
                                     </a>
@@ -194,7 +194,13 @@
                                         <tr>
                                             <td class="text-center fw-bold">{{ $row['task_no'] ?? $loop->iteration }}</td>
                                             <td class="text-wrap">{{ $row['task'] ?? '' }}</td>
-                                            <td class="text-muted small">{{ !empty($names) ? implode(', ', $names) : '-' }}</td>
+                                            <td class="text-muted small">
+                                                @if(!empty($names))
+                                                    {{ implode(', ', $names) }}
+                                                @else
+                                                    <span class="badge bg-light-warning border border-warning text-dark">Needs assignment</span>
+                                                @endif
+                                            </td>
                                             <td>
                                                 @if($displayProgress === null)
                                                     <span class="text-muted">—</span>

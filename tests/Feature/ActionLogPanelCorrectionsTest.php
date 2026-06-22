@@ -178,14 +178,10 @@ class ActionLogPanelCorrectionsTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($staff)->put(route('action-logs.update', $document), [
-            'period_id' => $period->id,
-            'action' => 'draft',
-            'content' => [
-                'tasks' => [
-                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Cancelled', null, null, 'No longer needed'),
-                ],
-            ],
+        $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'Cancelled',
+            'notes_progress' => 'No longer needed',
         ]);
 
         $response->assertSessionHas('success');
@@ -194,6 +190,72 @@ class ActionLogPanelCorrectionsTest extends TestCase
 
         $this->assertSame('Cancelled', $task['progress'] ?? null);
         $this->assertSame('No longer needed', $task['notes_progress'] ?? null);
+    }
+
+    public function test_assigned_staff_cannot_access_edit_page(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $staff */
+        $staff = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Not Started'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('action-logs.edit', $document));
+
+        $response->assertRedirect(route('action-logs.show', $document));
+        $response->assertSessionHas('error');
+    }
+
+    public function test_assigned_staff_cannot_full_update(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $staff */
+        $staff = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Not Started'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($staff)->put(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('action-logs.show', $document));
+        $response->assertSessionHas('error');
+        $document->refresh();
+        $this->assertSame('Not Started', $document->content['tasks'][0]['progress'] ?? null);
     }
 
     public function test_staff_progress_updates_append_history_timeline_entries(): void
@@ -218,14 +280,10 @@ class ActionLogPanelCorrectionsTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($staff)->put(route('action-logs.update', $document), [
-            'period_id' => $period->id,
-            'action' => 'draft',
-            'content' => [
-                'tasks' => [
-                    $this->taskRow('task_a', 'Assigned weekly task', [$staff->id], 'In Progress', null, null, 'Week 14 progress update'),
-                ],
-            ],
+        $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'In Progress',
+            'notes_progress' => 'Week 14 progress update',
         ]);
 
         $response->assertSessionHas('success');

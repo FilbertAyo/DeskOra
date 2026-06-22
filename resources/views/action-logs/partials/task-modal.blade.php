@@ -9,7 +9,7 @@
                 <input type="hidden" id="actionLogModalTaskUid" value="">
                 <div class="mb-3 action-log-modal-field-task">
                     <label for="actionLogModalTask" class="form-label">What needs to be done? <span class="text-danger">*</span></label>
-                    <textarea class="form-control action-log-textarea-lg" id="actionLogModalTask" rows="6" placeholder="Describe the action clearly (who, what, expected outcome)"></textarea>
+                    <textarea class="form-control action-log-textarea-lg" id="actionLogModalTask" rows="3" placeholder="Describe the action clearly (who, what, expected outcome)"></textarea>
                 </div>
                 <div class="mb-3 action-log-modal-manager-only">
                     <div id="actionLogModalResponsible" data-staff-checkbox-select-container></div>

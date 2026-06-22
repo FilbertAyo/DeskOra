@@ -205,7 +205,7 @@
     <a class="dropdown-item" href="{{ route('action-logs.show', $document->id) }}">
     <i class="ti ti-eye me-2"></i> View
     </a>
-    @can('update', $document)
+    @can('manageActionLogs', $document)
     <a class="dropdown-item" href="{{ route('action-logs.edit', $document->id) }}">
     <i class="ti ti-edit me-2"></i> Edit
     </a>

@@ -5,7 +5,7 @@
         100% { transform: rotate(360deg); }
     }
     .action-log-textarea-lg {
-        min-height: 9rem;
+        min-height: 4.5rem;
         font-size: 1rem;
         line-height: 1.55;
     }
