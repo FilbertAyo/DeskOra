@@ -88,7 +88,7 @@
                                                             <th style="width: 100px;">Day</th>
                                                             <th>Activity</th>
                                                             <th style="width: 130px;">Location</th>
-                                                            <th style="width: 220px;">Staff/Team</th>
+                                                            <th style="width: 160px;">Staff/Team</th>
                                                             <th style="width: 250px;">Notes / Inclusion</th>
                                                             <th style="width: 30px;"></th>
                                                         </tr>
@@ -192,7 +192,7 @@
                                                         <tr>
                                                             <th style="width: 150px;">Date</th>
                                                             <th>Meeting / Engagement</th>
-                                                            <th style="width: 200px;">Participant(s)</th>
+                                                            <th style="width: 160px;">Participant(s)</th>
                                                             <th style="width: 180px;">Location</th>
                                                             <th>Reactions / Notes</th>
                                                             <th style="width: 30px;"></th>

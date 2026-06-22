@@ -272,7 +272,7 @@
                                                         <tr>
                                                             <th style="width: 160px;">Date</th>
                                                             <th>Meeting / Engagement</th>
-                                                            <th style="width: 220px;">Participant(s)</th>
+                                                            <th style="width: 160px;">Participant(s)</th>
                                                             <th style="width: 170px;">Status</th>
                                                             <th style="width: 50px;"></th>
                                                         </tr>
