@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActionLog;
 use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
@@ -178,6 +179,78 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertSentTo($activeBoth, WeeklyActionLogSubmittedNotification::class);
         Notification::assertNotSentTo($activeSms, WeeklyActionLogSubmittedNotification::class);
         Notification::assertNotSentTo($inactiveEmail, WeeklyActionLogSubmittedNotification::class);
+    }
+
+    public function test_action_log_resubmit_after_edit_does_not_send_email(): void
+    {
+        Notification::fake();
+
+        $period = $this->createOpenPeriod();
+
+        $manager = $this->createActiveUserWithChannel('email');
+        $manager->givePermissionTo('create action logs');
+
+        $recipient = $this->createActiveUserWithChannel('email');
+
+        $this->actingAs($manager)->post(route('action-logs.store'), [
+            'period_id' => $period->id,
+            'action' => 'submit',
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_no' => 1,
+                        'task' => 'Prepare weekly action update',
+                        'progress' => 'In Progress',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        Notification::assertSentTo($manager, WeeklyActionLogSubmittedNotification::class);
+        Notification::assertSentTo($recipient, WeeklyActionLogSubmittedNotification::class);
+
+        $document = Document::query()
+            ->where('type', Document::TYPE_ACTION_LOG)
+            ->where('period_id', $period->id)
+            ->first();
+
+        $this->assertNotNull($document);
+        $this->assertTrue((bool) ActionLog::query()->find($document->id)?->submission_email_sent);
+
+        $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_no' => 1,
+                        'task' => 'Updated task after submit',
+                        'progress' => 'In Progress',
+                    ],
+                ],
+            ],
+        ])->assertOk();
+
+        $document->refresh();
+        $this->assertSame(Document::STATE_DRAFT, $document->state);
+        $this->assertTrue((bool) ActionLog::query()->find($document->id)?->submission_email_sent);
+
+        $this->actingAs($manager)->put(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'submit',
+            'content' => [
+                'tasks' => [
+                    [
+                        'task_no' => 1,
+                        'task' => 'Updated task after submit',
+                        'progress' => 'Done',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        Notification::assertSentToTimes($manager, WeeklyActionLogSubmittedNotification::class, 1);
+        Notification::assertSentToTimes($recipient, WeeklyActionLogSubmittedNotification::class, 1);
     }
 
     public function test_document_approver_role_receives_submission_email_without_direct_permission_grant(): void

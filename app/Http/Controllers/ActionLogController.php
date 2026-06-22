@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\ActionLog;
 use App\Models\ActionLogTask;
 use App\Models\User;
 use App\Models\WorkPeriod;
@@ -210,9 +211,11 @@ class ActionLogController extends Controller
             }
             $nextState = $this->resolveActionLogStateAfterSave($action, $wasSubmitted);
 
+            $content = $this->mergeActionLogContentWithTasks($existingDocument->content, $finalTasks);
+
             $existingDocument->update([
                 'title' => $title,
-                'content' => ['tasks' => $this->renumberTasks($finalTasks)],
+                'content' => $content,
                 'state' => $nextState,
             ]);
             $this->documentDomainSyncService->syncFromDocument($existingDocument);
@@ -230,7 +233,7 @@ class ActionLogController extends Controller
                 'period_id' => $period->id,
                 'type' => Document::TYPE_ACTION_LOG,
                 'title' => $title,
-                'content' => ['tasks' => $this->renumberTasks($initialTasks)],
+                'content' => $this->mergeActionLogContentWithTasks(null, $initialTasks),
                 'state' => $state,
             ]);
             $this->documentDomainSyncService->syncFromDocument($document);
@@ -239,10 +242,7 @@ class ActionLogController extends Controller
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
             : 'Action Log saved as draft.';
-        if ($action === 'submit' && ! $wasSubmitted) {
-            $document->loadMissing('period');
-            $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $user);
-        }
+        $this->finalizeActionLogSubmitNotification($document->refresh(), $user, $action);
 
         if ($request->wantsJson()) {
             return $this->actionLogAutosaveJsonResponse($document, $message);
@@ -429,8 +429,10 @@ class ActionLogController extends Controller
         if (empty($finalTasks)) {
             return $this->actionLogErrorResponse($request, 'Action log must contain at least one task.');
         }
+
+        $content = $this->mergeActionLogContentWithTasks($document->content, $finalTasks);
         $updateData = [
-            'content' => ['tasks' => $this->renumberTasks($finalTasks)],
+            'content' => $content,
             'title' => $this->buildActionLogTitle($period),
             'period_id' => $period->id,
         ];
@@ -447,10 +449,7 @@ class ActionLogController extends Controller
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
             : 'Action Log updated successfully.';
-        if ($action === 'submit' && ! $wasSubmitted) {
-            $document->loadMissing('period');
-            $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $actingUser);
-        }
+        $this->finalizeActionLogSubmitNotification($document->refresh(), $actingUser, $action);
 
         if ($request->wantsJson()) {
             return $this->actionLogAutosaveJsonResponse($document, $message);
@@ -525,7 +524,7 @@ class ActionLogController extends Controller
         }
 
         $document->update([
-            'content' => ['tasks' => $this->renumberTasks($tasks)],
+            'content' => $this->mergeActionLogContentWithTasks($document->content, $tasks),
         ]);
         $this->documentDomainSyncService->syncFromDocument($document);
 
@@ -577,7 +576,7 @@ class ActionLogController extends Controller
         }
 
         $document->update([
-            'content' => ['tasks' => $sync['tasks']],
+            'content' => $this->mergeActionLogContentWithTasks($document->content, $sync['tasks']),
         ]);
         $this->documentDomainSyncService->syncFromDocument($document->fresh());
     }
@@ -968,5 +967,58 @@ class ActionLogController extends Controller
         } catch (\Throwable) {
             return $value;
         }
+    }
+
+    /**
+     * @param  array<int, mixed>  $tasks
+     * @return array<string, mixed>
+     */
+    private function mergeActionLogContentWithTasks(mixed $existingContent, array $tasks): array
+    {
+        $content = is_array($existingContent) ? $existingContent : [];
+        $content['tasks'] = $this->renumberTasks($tasks);
+
+        return $content;
+    }
+
+    private function shouldNotifyActionLogFirstSubmission(Document $document): bool
+    {
+        $actionLog = ActionLog::query()->find((string) $document->id);
+        if ($actionLog?->submission_email_sent) {
+            return false;
+        }
+
+        $content = is_array($document->content) ? $document->content : [];
+        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
+
+        return ! (bool) ($meta['submission_email_sent'] ?? false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    private function markActionLogSubmissionEmailSent(array $content): array
+    {
+        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
+        $meta['submission_email_sent'] = true;
+        $content['meta'] = $meta;
+
+        return $content;
+    }
+
+    private function finalizeActionLogSubmitNotification(Document $document, User $submittedBy, string $action): void
+    {
+        if ($action !== 'submit' || ! $this->shouldNotifyActionLogFirstSubmission($document)) {
+            return;
+        }
+
+        $document->loadMissing('period');
+        $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $submittedBy);
+
+        ActionLog::query()->whereKey($document->id)->update(['submission_email_sent' => true]);
+
+        $content = is_array($document->content) ? $document->content : [];
+        $document->setAttribute('content', $this->markActionLogSubmissionEmailSent($content));
     }
 }

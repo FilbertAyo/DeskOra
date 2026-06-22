@@ -383,7 +383,15 @@ class DocumentContentAssembler
             ];
         }
 
-        return ['tasks' => $tasks];
+        $meta = [];
+        if ($actionLog->submission_email_sent) {
+            $meta['submission_email_sent'] = true;
+        }
+
+        return [
+            'tasks' => $tasks,
+            'meta' => $meta,
+        ];
     }
 
     private function formatMeetingDate(mixed $date): string

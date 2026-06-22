@@ -415,11 +415,17 @@ class DocumentDomainSyncService
         $content = is_array($document->content) ? $document->content : [];
         $taskRows = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
 
+        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
+        $existingActionLog = ActionLog::query()->find((string) $document->id);
+        $submissionEmailSent = (bool) ($meta['submission_email_sent'] ?? false)
+            || (bool) ($existingActionLog?->submission_email_sent ?? false);
+
         $actionLog = $this->upsertWithId(ActionLog::class, (string) $document->id, [
             'user_id' => (string) $document->user_id,
             'period_id' => $document->period_id ? (string) $document->period_id : null,
             'title' => $document->title,
             'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
+            'submission_email_sent' => $submissionEmailSent,
         ]);
 
         $actionLog->tasks()->delete();

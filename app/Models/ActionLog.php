@@ -17,7 +17,15 @@ class ActionLog extends Model
         'period_id',
         'title',
         'state',
+        'submission_email_sent',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'submission_email_sent' => 'boolean',
+        ];
+    }
 
     public function document(): BelongsTo
     {
