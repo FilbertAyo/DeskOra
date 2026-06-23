@@ -106,6 +106,10 @@
                     </div>
                 </div>
             </form>
+
+            @if(isset($selectedType) && $selectedType === 'weekly_report')
+                @include('documents.partials.weekly-report-action-tasks-modal')
+            @endif
         </div>
     </div>
 

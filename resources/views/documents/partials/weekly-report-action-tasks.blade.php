@@ -73,7 +73,7 @@
                                 <div class="flex-shrink-0">
                                     @if(!empty($task['editable']))
                                         <button type="button"
-                                            class="btn btn-sm btn-primary js-quick-update-task @if(!empty($task['needs_update'])) js-pending-action-task @endif"
+                                            class="btn btn-sm btn-primary js-weekly-report-quick-update-task @if(!empty($task['needs_update'])) js-pending-action-task @endif"
                                             data-task="{{ $task['task'] ?? 'Task' }}"
                                             data-task-uid="{{ $task['task_uid'] }}"
                                             data-document-id="{{ $task['document_id'] }}"
@@ -101,84 +101,3 @@
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="quickActionTaskModal" tabindex="-1" aria-labelledby="quickActionTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form method="POST" id="quickActionTaskForm" data-action-template="{{ route('action-logs.quick-update', ['document' => '__DOCUMENT__']) }}">
-                @csrf
-                @method('PUT')
-                <div class="modal-header">
-                    <h5 class="modal-title" id="quickActionTaskModalLabel"><i class="ti ti-bolt me-2"></i>Quick Update</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="task_uid" id="quickTaskUid" value="">
-                    <div class="mb-3">
-                        <label class="form-label text-muted small mb-1">Task</label>
-                        <div class="border rounded bg-light px-2 py-2 small text-dark" id="quickTaskLabel"></div>
-                        <small class="text-muted" id="quickTaskPeriod"></small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="quickTaskProgress" class="form-label">Progress status <span class="text-danger">*</span></label>
-                        <select class="form-select" name="progress" id="quickTaskProgress" required>
-                            <option value="Not Started">Not Started</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Done">Done</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
-                    </div>
-                    <div class="mb-0">
-                        <label for="quickTaskNotes" class="form-label">Progress notes</label>
-                        <textarea class="form-control" name="notes_progress" id="quickTaskNotes" rows="4" maxlength="4000" placeholder="What did you do this week? Any blockers or context?"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="quickTaskSaveBtn">
-                        <i class="ti ti-check me-1"></i>Save update
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const modalEl = document.getElementById('quickActionTaskModal');
-        if (!modalEl) {
-            return;
-        }
-        const form = document.getElementById('quickActionTaskForm');
-        const actionTemplate = form.getAttribute('data-action-template');
-        const labelEl = document.getElementById('quickTaskLabel');
-        const periodEl = document.getElementById('quickTaskPeriod');
-        const uidEl = document.getElementById('quickTaskUid');
-        const progressEl = document.getElementById('quickTaskProgress');
-        const notesEl = document.getElementById('quickTaskNotes');
-        const saveBtn = document.getElementById('quickTaskSaveBtn');
-
-        document.querySelectorAll('.js-quick-update-task').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const documentId = btn.getAttribute('data-document-id') || '';
-                form.setAttribute('action', actionTemplate.replace('__DOCUMENT__', documentId));
-                labelEl.textContent = btn.getAttribute('data-task') || 'Task';
-                periodEl.textContent = btn.getAttribute('data-period') || '';
-                uidEl.value = btn.getAttribute('data-task-uid') || '';
-                progressEl.value = btn.getAttribute('data-progress') || 'Not Started';
-                notesEl.value = btn.getAttribute('data-notes') || '';
-                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
-                }
-            });
-        });
-
-        form.addEventListener('submit', function () {
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Saving...';
-            }
-        });
-    });
-</script>

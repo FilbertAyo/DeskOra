@@ -43,6 +43,10 @@
                     @include('documents.partials.edit.form-footer')
                 </div>
             </form>
+
+            @if($document->type === 'weekly_report')
+                @include('documents.partials.weekly-report-action-tasks-modal')
+            @endif
         </div>
     </div>
 
