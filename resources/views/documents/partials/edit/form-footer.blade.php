@@ -4,12 +4,21 @@
                                 <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div class="btn-group">
-                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
-                                    <i class="ti ti-save me-1"></i> Save Draft
-                                </button>
-                                <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn">
-                                    <i class="ti ti-send me-1"></i> Submit
-                                </button>
+                                @if($document->type === 'weekly_report')
+                                    <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
+                                        <i class="ti ti-save me-1"></i> Save Draft
+                                    </button>
+                                    <button type="submit" name="action" value="continue" class="btn btn-primary" id="continueBtn">
+                                        Continue <i class="ti ti-arrow-right ms-1"></i>
+                                    </button>
+                                @else
+                                    <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
+                                        <i class="ti ti-save me-1"></i> Save Draft
+                                    </button>
+                                    <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn">
+                                        <i class="ti ti-send me-1"></i> Submit
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     </div>

@@ -95,21 +95,26 @@
                                 <i class="ti ti-x me-1"></i> Cancel
                             </a>
                             <div class="btn-group">
-                                <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
-                                    <i class="ti ti-save me-1"></i> Save Draft
-                                </button>
-                                <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn" @disabled($isWeeklyWindowClosed)>
-                                    <i class="ti ti-send me-1"></i> Submit
-                                </button>
+                                @if(isset($selectedType) && $selectedType === 'weekly_report')
+                                    <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
+                                        <i class="ti ti-save me-1"></i> Save Draft
+                                    </button>
+                                    <button type="submit" name="action" value="continue" class="btn btn-primary" id="continueBtn">
+                                        Continue <i class="ti ti-arrow-right ms-1"></i>
+                                    </button>
+                                @else
+                                    <button type="submit" name="action" value="draft" class="btn btn-outline-primary" id="saveDraftBtn">
+                                        <i class="ti ti-save me-1"></i> Save Draft
+                                    </button>
+                                    <button type="submit" name="action" value="submit" class="btn btn-primary" id="submitBtn" @disabled($isWeeklyWindowClosed)>
+                                        <i class="ti ti-send me-1"></i> Submit
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     </div>
                 </div>
             </form>
-
-            @if(isset($selectedType) && $selectedType === 'weekly_report')
-                @include('documents.partials.weekly-report-action-tasks-modal')
-            @endif
         </div>
     </div>
 
@@ -981,6 +986,13 @@
                     hiddenActionInput.value = 'draft';
                 });
             }
+
+            const continueBtn = document.getElementById('continueBtn');
+            if (continueBtn && hiddenActionInput) {
+                continueBtn.addEventListener('click', function() {
+                    hiddenActionInput.value = 'continue';
+                });
+            }
             
             if (submitBtn && hiddenActionInput) {
                 submitBtn.addEventListener('click', function() {
@@ -1058,34 +1070,6 @@
                     if (yearSelect && !yearSelect.value) {
                         e.preventDefault();
                         alert('Please select a year for the monthly report.');
-                        return false;
-                    }
-                }
-
-                // Validate target accomplishment for weekly reports
-                if (selectedTypeValue === 'weekly_report' && action === 'submit') {
-                    const targetAccomplished = document.getElementById('target_accomplished_status');
-                    if (targetAccomplished && !targetAccomplished.value) {
-                        e.preventDefault();
-                        alert('Please select target accomplishment status.');
-                        return false;
-                    }
-                    
-                    // If not fully completed, explanation is required
-                    if (targetAccomplished && (targetAccomplished.value === 'not_completed' || targetAccomplished.value === 'partially_completed')) {
-                        const targetExplanation = document.getElementById('target_explanation');
-                        if (targetExplanation && !targetExplanation.value.trim()) {
-                            e.preventDefault();
-                            alert('Please explain why the target was not fully accomplished.');
-                            return false;
-                        }
-                    }
-
-                    const pendingActionTasks = document.querySelectorAll('#weeklyReportActionTasksSection .js-pending-action-task');
-                    if (pendingActionTasks.length > 0) {
-                        e.preventDefault();
-                        alert('Please update all assigned action tasks in section 7 before submitting your weekly report.');
-                        document.getElementById('weeklyReportActionTasksSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         return false;
                     }
                 }

@@ -537,6 +537,13 @@
                     hiddenActionInput.value = 'draft';
                 });
             }
+
+            const continueBtn = document.getElementById('continueBtn');
+            if (continueBtn && hiddenActionInput) {
+                continueBtn.addEventListener('click', function() {
+                    hiddenActionInput.value = 'continue';
+                });
+            }
             
             if (submitBtn && hiddenActionInput) {
                 submitBtn.addEventListener('click', function() {
@@ -564,32 +571,6 @@
                             e.preventDefault();
                             alert('Please enter the main target for this week before submitting.');
                             mainTarget.focus();
-                            return false;
-                        }
-                    }
-
-                    if (documentType === 'weekly_report') {
-                        const targetAccomplished = document.getElementById('target_accomplished_status');
-                        if (targetAccomplished && !targetAccomplished.value) {
-                            e.preventDefault();
-                            alert('Please select target accomplishment status.');
-                            targetAccomplished.focus();
-                            return false;
-                        }
-                        if (targetAccomplished && (targetAccomplished.value === 'not_completed' || targetAccomplished.value === 'partially_completed')) {
-                            const targetExplanation = document.getElementById('target_explanation');
-                            if (targetExplanation && !targetExplanation.value.trim()) {
-                                e.preventDefault();
-                                alert('Please explain why the target was not fully accomplished.');
-                                targetExplanation.focus();
-                                return false;
-                            }
-                        }
-                        const pendingActionTasks = document.querySelectorAll('#weeklyReportActionTasksSection .js-pending-action-task');
-                        if (pendingActionTasks.length > 0) {
-                            e.preventDefault();
-                            alert('Please update all assigned action tasks in section 7 before submitting your weekly report.');
-                            document.getElementById('weeklyReportActionTasksSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             return false;
                         }
                     }

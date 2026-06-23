@@ -19,7 +19,7 @@
     <div class="card border-primary">
         <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
             <h6 class="mb-0">
-                <i class="ti ti-bolt me-2"></i>7. Action Tasks (assigned to you)
+                <i class="ti ti-bolt me-2"></i>Action Tasks (assigned to you)
                 @if($pendingActionTaskCount > 0)
                     <span class="badge bg-light-warning border border-warning text-dark ms-1">{{ $pendingActionTaskCount }} pending</span>
                 @endif
@@ -27,8 +27,7 @@
         </div>
         <div class="card-body">
             <p class="text-muted small mb-3">
-                Update progress on action tasks assigned to you. You must update all pending tasks before submitting this weekly report.
-                You can still save a draft without updating them.
+                Update progress on action tasks assigned to you before you can review and submit your weekly report.
             </p>
 
             @if($pendingActionTaskCount > 0)

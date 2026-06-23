@@ -95,6 +95,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/reviewer/dashboard', [DocumentDashboardController::class, 'reviewerDashboard'])->name('reviewer-dashboard');
         Route::get('/reviewer/{document}', [DocumentWorkflowController::class, 'reviewerShow'])->name('reviewer-show');
 
+        Route::get('/{document}/weekly-report/action-tasks', [DocumentWorkflowController::class, 'weeklyReportActionTasks'])
+            ->name('weekly-report.action-tasks');
+        Route::get('/{document}/weekly-report/review', [DocumentWorkflowController::class, 'weeklyReportReview'])
+            ->name('weekly-report.review');
+
         Route::get('/{document}', [DocumentCrudController::class, 'show'])->name('show');
         Route::get('/{document}/edit', [DocumentCrudController::class, 'edit'])->name('edit');
         Route::put('/{document}', [DocumentCrudController::class, 'update'])->name('update');

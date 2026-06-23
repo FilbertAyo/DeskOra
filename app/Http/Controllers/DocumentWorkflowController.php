@@ -21,4 +21,14 @@ class DocumentWorkflowController extends DocumentController
     {
         return parent::reject($request, $document);
     }
+
+    public function weeklyReportActionTasks(Document $document)
+    {
+        return parent::weeklyReportActionTasks($document);
+    }
+
+    public function weeklyReportReview(Document $document)
+    {
+        return parent::weeklyReportReview($document);
+    }
 }

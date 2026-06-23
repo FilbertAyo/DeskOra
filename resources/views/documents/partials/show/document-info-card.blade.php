@@ -82,6 +82,22 @@
                             </a>
                         @endif
 
+                        @if($document->type === \App\Models\Document::TYPE_WEEKLY_REPORT && $document->state === 'draft' && ($weeklyReportWizardProgress ?? null))
+                            @php
+                                $hasPendingWizardTasks = collect($weeklyReportWizardProgress['activeTasks'] ?? [])
+                                    ->contains(fn ($task) => is_array($task) && ! empty($task['needs_update']));
+                            @endphp
+                            @if($hasPendingWizardTasks)
+                                <a href="{{ route('documents.weekly-report.action-tasks', $document) }}" class="btn btn-warning btn-sm text-dark">
+                                    <i class="ti ti-bolt me-1"></i> Continue: Update action tasks
+                                </a>
+                            @else
+                                <a href="{{ route('documents.weekly-report.review', $document) }}" class="btn btn-success btn-sm">
+                                    <i class="ti ti-check me-1"></i> Continue: Review &amp; submit
+                                </a>
+                            @endif
+                        @endif
+
                         @if($document->canBeDeleted())
                             <form action="{{ route('documents.destroy', $document->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this document? This action cannot be undone.');">
                                 @csrf

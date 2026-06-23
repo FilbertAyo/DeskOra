@@ -1,7 +1,13 @@
+@include('documents.partials.weekly-report-wizard-stepper', [
+    'wizardStep' => 1,
+    'document' => null,
+    'hasActionTasksStep' => true,
+])
+
 <div class="col-12 mb-3">
     <div class="card border-info">
         <div class="card-header bg-light-info">
-            <h6 class="mb-0"><i class="ti ti-target me-2"></i>Main Target Accomplishment</h6>
+            <h6 class="mb-0"><i class="ti ti-target me-2"></i>Main Target (from weekly plan)</h6>
         </div>
         <div class="card-body">
             @php
@@ -79,46 +85,7 @@
                 @endif
             </div>
 
-            <div class="mb-3">
-                <label for="target_accomplished_status" class="form-label">
-                    Target accomplishment status <span class="text-danger">*</span>
-                </label>
-                @php
-                    $targetStatus = old('target_accomplished_status');
-                    if ($targetStatus === null && old('target_accomplished') !== null) {
-                        $targetStatus = old('target_accomplished') === '1' ? 'completed' : 'not_completed';
-                    }
-                @endphp
-                <select class="form-control @error('target_accomplished_status') is-invalid @enderror"
-                    name="target_accomplished_status"
-                    id="target_accomplished_status"
-                    required>
-                    <option value="">-- Select Status --</option>
-                    <option value="completed" {{ $targetStatus === 'completed' ? 'selected' : '' }}>Completed</option>
-                    <option value="partially_completed" {{ $targetStatus === 'partially_completed' ? 'selected' : '' }}>Partially completed</option>
-                    <option value="not_completed" {{ $targetStatus === 'not_completed' ? 'selected' : '' }}>Not completed</option>
-                </select>
-                @error('target_accomplished_status')
-                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div class="mb-0" id="targetExplanationContainer" @if(!in_array($targetStatus, ['partially_completed', 'not_completed'], true)) style="display: none;" @endif>
-                <label for="target_explanation" class="form-label">
-                    Why was the target not accomplished? <span class="text-danger">*</span>
-                </label>
-                <textarea class="form-control @error('target_explanation') is-invalid @enderror"
-                    name="target_explanation"
-                    id="target_explanation"
-                    rows="5"
-                    placeholder="Please explain why the target was not accomplished...">{{ old('target_explanation') }}</textarea>
-                @error('target_explanation')
-                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                @enderror
-                <small class="form-text text-muted">
-                    Please provide a clear explanation for why the target was not accomplished.
-                </small>
-            </div>
+            <p class="text-muted small mb-0">You will confirm target accomplishment when you review and submit your report.</p>
         </div>
     </div>
 </div>
@@ -534,7 +501,5 @@
         </div>
     </div>
 </div>
-
-@include('documents.partials.weekly-report-action-tasks')
 
 <x-staff-users-json :users="$teamUsers ?? collect()" />

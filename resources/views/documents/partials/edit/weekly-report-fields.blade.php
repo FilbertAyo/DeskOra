@@ -28,103 +28,38 @@
                                         : [];
                                     $budgetStatuses = $content['budget_statuses'] ?? [];
                                     $canProcessWeeklyBudgets = auth()->user()?->can('process weekly budgets') ?? false;
-                                    $targetStatusValue = old('target_accomplished_status');
-                                    if ((! is_string($targetStatusValue) || trim($targetStatusValue) === '') && old('target_accomplished') !== null) {
-                                        $legacyTargetAccomplished = trim((string) old('target_accomplished'));
-                                        if ($legacyTargetAccomplished === '1') {
-                                            $targetStatusValue = 'completed';
-                                        } elseif ($legacyTargetAccomplished === '0') {
-                                            $targetStatusValue = 'not_completed';
-                                        }
-                                    }
-                                    if (! is_string($targetStatusValue) || trim($targetStatusValue) === '') {
-                                        $targetStatusValue = is_array($content) ? trim((string)($content['target_accomplished_status'] ?? '')) : '';
-                                    }
-                                    if ($targetStatusValue === '' || ! in_array($targetStatusValue, ['completed', 'partially_completed', 'not_completed'], true)) {
-                                        if ($document->target_accomplished === true || $document->target_accomplished === 1 || $document->target_accomplished === '1') {
-                                            $targetStatusValue = 'completed';
-                                        } elseif ($document->target_accomplished === false || $document->target_accomplished === 0 || $document->target_accomplished === '0') {
-                                            $targetStatusValue = 'not_completed';
-                                        } else {
-                                            $targetStatusValue = '';
-                                        }
-                                    }
-                                    $storedTargetStatus = is_array($content) ? trim((string) ($content['target_accomplished_status'] ?? '')) : '';
-                                    $preferLegacyBooleanOption = $storedTargetStatus === ''
-                                        && old('target_accomplished_status') === null
-                                        && ($document->target_accomplished === true
-                                            || $document->target_accomplished === false
-                                            || $document->target_accomplished === 1
-                                            || $document->target_accomplished === 0
-                                            || $document->target_accomplished === '1'
-                                            || $document->target_accomplished === '0');
                                         @endphp
 
-                                <!-- Main Target Accomplishment -->
+                                @include('documents.partials.weekly-report-wizard-stepper', [
+                                    'wizardStep' => 1,
+                                    'document' => $document,
+                                    'hasActionTasksStep' => true,
+                                ])
+
+                                <!-- Main target reference -->
                                 <div class="col-12 mb-3">
                                     <div class="card border-info">
                                         <div class="card-header bg-light-info">
-                                            <h6 class="mb-0"><i class="ti ti-target me-2"></i>Main Target Accomplishment</h6>
+                                            <h6 class="mb-0"><i class="ti ti-target me-2"></i>Main Target (from weekly plan)</h6>
                                         </div>
                                         <div class="card-body">
                                         @if($relatedPlan && $relatedPlan->main_target)
-                                            <div class="mb-3">
+                                            <div class="mb-0">
                                                 <label class="form-label text-muted">Main Target from Weekly Plan:</label>
-                                                <div class="alert alert-light border">
+                                                <div class="alert alert-light border mb-0">
                                                     <p class="mb-0"><strong>{{ $relatedPlan->main_target }}</strong></p>
                                                 </div>
                                             </div>
                                         @else
-                                            <div class="mb-3">
-                                                <div class="alert alert-warning">
-                                                    <i class="ti ti-alert-circle me-2"></i>
-                                                    No weekly plan found for this work period.
-                                                </div>
+                                            <div class="alert alert-warning mb-0">
+                                                <i class="ti ti-alert-circle me-2"></i>
+                                                No weekly plan found for this work period.
                                             </div>
                                         @endif
-
-                                        <div class="mb-3">
-                                            <label for="target_accomplished_status" class="form-label">
-                                                Target accomplishment status <span class="text-danger">*</span>
-                                            </label>
-                                            <select class="form-control @error('target_accomplished_status') is-invalid @enderror"
-                                                name="target_accomplished_status"
-                                                id="target_accomplished_status"
-                                                required>
-                                                <option value="">-- Select Status --</option>
-                                                <option value="1" {{ $preferLegacyBooleanOption && $targetStatusValue === 'completed' ? 'selected' : '' }}>Completed</option>
-                                                <option value="0" {{ $preferLegacyBooleanOption && $targetStatusValue === 'not_completed' ? 'selected' : '' }}>Not completed</option>
-                                                <option value="completed" {{ (! $preferLegacyBooleanOption) && $targetStatusValue === 'completed' ? 'selected' : '' }}>Completed</option>
-                                                <option value="partially_completed" {{ $targetStatusValue === 'partially_completed' ? 'selected' : '' }}>Partially completed</option>
-                                                <option value="not_completed" {{ (! $preferLegacyBooleanOption) && $targetStatusValue === 'not_completed' ? 'selected' : '' }}>Not completed</option>
-                                            </select>
-                                            @error('target_accomplished_status')
-                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                            @enderror
-                                        </div>
-
-                                            @php
-                                                $showTargetExplanation = in_array($targetStatusValue, ['partially_completed', 'not_completed'], true);
-                                            @endphp
-                                            <div class="mb-0" id="targetExplanationContainer" @if(!$showTargetExplanation) style="display:none;" @endif>
-                                            <label for="target_explanation" class="form-label">
-                                                Why was the target not accomplished?
-                                            </label>
-                                            <textarea class="form-control @error('target_explanation') is-invalid @enderror"
-                                                name="target_explanation"
-                                                id="target_explanation"
-                                                rows="5"
-                                                placeholder="Please explain why the target was not accomplished...">{{ old('target_explanation', $document->target_explanation) }}</textarea>
-                                            @error('target_explanation')
-                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                            @enderror
-                                            <small class="form-text text-muted">
-                                                Please provide a clear explanation for why the target was not accomplished.
-                                            </small>
+                                        <p class="text-muted small mt-3 mb-0">You will confirm target accomplishment when you review and submit your report.</p>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
                                 <!-- 1. Summary -->
                                 <div class="col-12 mb-3">
@@ -562,7 +497,5 @@
                                         </div>
                                     </div>
                                 </div>
-
-@include('documents.partials.weekly-report-action-tasks')
 
 <x-staff-users-json :users="$teamUsers ?? collect()" />

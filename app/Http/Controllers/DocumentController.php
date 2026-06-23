@@ -309,11 +309,6 @@ class DocumentController extends Controller
             return $redirect;
         }
 
-        $actionLogProgress = ['activeTasks' => [], 'currentDraftId' => null, 'showNotifications' => false];
-        if ($selectedType === Document::TYPE_WEEKLY_REPORT) {
-            $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
-        }
-
         // If type is provided in query string, pre-select it
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
@@ -338,8 +333,7 @@ class DocumentController extends Controller
                     'monthlyDefaultMonth',
                     'monthlyDefaultYear',
                     'monthlyYearChoices',
-                    'monthlyHasSubDepartments',
-                    'actionLogProgress'
+                    'monthlyHasSubDepartments'
                 ));
             }
         }
@@ -368,8 +362,7 @@ class DocumentController extends Controller
             'monthlyDefaultYear',
             'monthlyYearChoices',
             'monthlyHasSubDepartments',
-            'assignedWeeklyActivities',
-            'actionLogProgress'
+            'assignedWeeklyActivities'
         ));
     }
 
@@ -410,8 +403,14 @@ class DocumentController extends Controller
             $validationRules['content'] = ['nullable', 'array'];
         }
 
-        $action = $request->input('action', 'draft');
-        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+        $action = $this->normalizeDocumentAction($request);
+
+        // Weekly reports are submitted only from the review wizard step.
+        if ($request->type === Document::TYPE_WEEKLY_REPORT && $action === 'submit' && ! $request->boolean('wizard_review')) {
+            throw ValidationException::withMessages([
+                'action' => 'Please submit your weekly report from the review step.',
+            ]);
+        }
 
         // Main target is required when submitting; drafts may save without it.
         if ($request->type === Document::TYPE_WEEKLY_PLAN) {
@@ -871,7 +870,7 @@ class DocumentController extends Controller
                 ? 'Document updated and submitted successfully.'
                 : 'Document updated successfully.';
 
-            return $this->redirectToWeeklyDocument($existingDocument, $message);
+            return $this->redirectAfterWeeklyReportWrite($existingDocument, $action, $message, $user);
         }
 
         // Create new document
@@ -963,7 +962,7 @@ class DocumentController extends Controller
             ? 'Document submitted successfully.'
             : 'Document saved as draft.';
 
-        return $this->redirectToWeeklyDocument($document, $message);
+        return $this->redirectAfterWeeklyReportWrite($document, $action, $message, $user);
     }
 
     /**
@@ -991,7 +990,14 @@ class DocumentController extends Controller
 
         $teamUsers = $this->teamUsersForSelection();
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
+        $weeklyReportWizardProgress = null;
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->isDraft()) {
+            /** @var \App\Models\User $viewer */
+            $viewer = Auth::user();
+            $weeklyReportWizardProgress = $this->actionLogProgressService->buildForUser($viewer);
+        }
+
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers', 'weeklyReportWizardProgress'));
     }
 
     /**
@@ -1101,8 +1107,8 @@ class DocumentController extends Controller
             );
         }
 
-        $actionLogProgress = ['activeTasks' => [], 'currentDraftId' => null, 'showNotifications' => false];
-        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+        $actionLogProgress = null;
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->isDraft()) {
             $actionLogProgress = $this->actionLogProgressService->buildForUser($viewer);
         }
 
@@ -1123,8 +1129,13 @@ class DocumentController extends Controller
 
         // Resolve the intended action early so validation rules can mirror the
         // create flow: drafts may be saved incomplete, submissions are strict.
-        $action = $request->input('action', 'draft');
-        $action = in_array($action, ['submit', 'draft'], true) ? $action : 'draft';
+        $action = $this->normalizeDocumentAction($request);
+
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $action === 'submit' && ! $request->boolean('wizard_review')) {
+            throw ValidationException::withMessages([
+                'action' => 'Please submit your weekly report from the review step.',
+            ]);
+        }
 
         // Validate file upload (file is optional for updates, but if provided must be PDF)
         $validationRules = [
@@ -1440,7 +1451,62 @@ class DocumentController extends Controller
             ? 'Document submitted successfully.'
             : 'Document updated successfully.';
 
-        return $this->redirectToWeeklyDocument($document, $message);
+        return $this->redirectAfterWeeklyReportWrite($document, $action, $message, $actingUser);
+    }
+
+    /**
+     * Weekly report wizard — step 2: update assigned action tasks.
+     */
+    public function weeklyReportActionTasks(Document $document)
+    {
+        $this->ensureWeeklyReportWizardDocument($document);
+        $this->authorize('update', $document);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
+
+        if (! $this->actionLogProgressService->hasPendingUpdates($user)) {
+            return redirect()->route('documents.weekly-report.review', $document);
+        }
+
+        $document->loadMissing(['user', 'period']);
+
+        return view('documents.weekly-report.action-tasks', compact('document', 'actionLogProgress'));
+    }
+
+    /**
+     * Weekly report wizard — step 3: review and submit.
+     */
+    public function weeklyReportReview(Document $document)
+    {
+        $this->ensureWeeklyReportWizardDocument($document);
+        $this->authorize('update', $document);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if ($this->actionLogProgressService->hasPendingUpdates($user)) {
+            return redirect()->route('documents.weekly-report.action-tasks', $document)
+                ->with('error', 'Please update all assigned action tasks before reviewing your report.');
+        }
+
+        $document->loadMissing(['user', 'period', 'sharedUsers']);
+        $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
+            (string) $document->period_id,
+            (string) $document->user_id
+        );
+        $content = is_array($document->content) ? $document->content : [];
+        $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
+        $hasActionTasksStep = ! empty($actionLogProgress['activeTasks'] ?? []);
+
+        return view('documents.weekly-report.review', compact(
+            'document',
+            'relatedPlan',
+            'content',
+            'actionLogProgress',
+            'hasActionTasksStep'
+        ));
     }
 
     /**
@@ -1472,7 +1538,8 @@ class DocumentController extends Controller
         $this->authorize('submit', $document);
 
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-            $this->assertWeeklyReportActionTasksUpdated($actingUser);
+            return redirect()->route('documents.weekly-report.review', $document)
+                ->with('error', 'Please complete the review step to submit your weekly report.');
         }
 
         try {
@@ -3375,8 +3442,60 @@ class DocumentController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'action_tasks' => 'Please update all assigned action tasks in section 7 before submitting your weekly report.',
+            'action_tasks' => 'Please update all assigned action tasks before submitting your weekly report.',
         ]);
+    }
+
+    private function normalizeDocumentAction(Request $request): string
+    {
+        $action = $request->input('action', 'draft');
+
+        return in_array($action, ['submit', 'draft', 'continue'], true) ? $action : 'draft';
+    }
+
+    private function ensureWeeklyReportWizardDocument(Document $document): void
+    {
+        if ($document->type !== Document::TYPE_WEEKLY_REPORT || ! $document->isDraft()) {
+            abort(404);
+        }
+    }
+
+    private function redirectToWeeklyReportWizardNextStep(Document $document, User $user, string $successMessage = ''): RedirectResponse
+    {
+        $route = $this->actionLogProgressService->hasPendingUpdates($user)
+            ? 'documents.weekly-report.action-tasks'
+            : 'documents.weekly-report.review';
+
+        $redirect = redirect()->route($route, $document);
+        if ($successMessage !== '') {
+            $redirect->with('success', $successMessage);
+        }
+
+        return $redirect;
+    }
+
+    private function redirectAfterWeeklyReportWrite(
+        Document $document,
+        string $action,
+        string $successMessage,
+        User $user
+    ): RedirectResponse {
+        $resolved = Document::fromDomainId((string) $document->id) ?? $document;
+
+        if ($document->type !== Document::TYPE_WEEKLY_REPORT) {
+            return $this->redirectToWeeklyDocument($resolved, $successMessage);
+        }
+
+        if ($action === 'continue') {
+            return $this->redirectToWeeklyReportWizardNextStep($resolved, $user, $successMessage);
+        }
+
+        if ($action === 'draft') {
+            return redirect()->route('documents.edit', $resolved->id)
+                ->with('success', $successMessage);
+        }
+
+        return $this->redirectToWeeklyDocument($resolved, $successMessage);
     }
 
     private function resolveWeeklyReportTargetStatus(Request $request, ?Document $document = null): ?string
