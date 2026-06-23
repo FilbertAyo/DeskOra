@@ -585,6 +585,13 @@
                                 return false;
                             }
                         }
+                        const pendingActionTasks = document.querySelectorAll('#weeklyReportActionTasksSection .js-pending-action-task');
+                        if (pendingActionTasks.length > 0) {
+                            e.preventDefault();
+                            alert('Please update all assigned action tasks in section 7 before submitting your weekly report.');
+                            document.getElementById('weeklyReportActionTasksSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            return false;
+                        }
                     }
                 }
                 

@@ -9,6 +9,7 @@ use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
+use App\Services\ActionLogProgressService;
 use App\Services\Documents\DocumentListingService;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Services\Documents\DocumentDomainSyncService;
@@ -42,6 +43,7 @@ class DocumentController extends Controller
         private readonly DocumentListingService $documentListingService,
         private readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
         private readonly DocumentDomainSyncService $documentDomainSyncService,
+        private readonly ActionLogProgressService $actionLogProgressService,
     ) {}
 
     /**
@@ -307,6 +309,11 @@ class DocumentController extends Controller
             return $redirect;
         }
 
+        $actionLogProgress = ['activeTasks' => [], 'currentDraftId' => null, 'showNotifications' => false];
+        if ($selectedType === Document::TYPE_WEEKLY_REPORT) {
+            $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
+        }
+
         // If type is provided in query string, pre-select it
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
@@ -331,7 +338,8 @@ class DocumentController extends Controller
                     'monthlyDefaultMonth',
                     'monthlyDefaultYear',
                     'monthlyYearChoices',
-                    'monthlyHasSubDepartments'
+                    'monthlyHasSubDepartments',
+                    'actionLogProgress'
                 ));
             }
         }
@@ -360,7 +368,8 @@ class DocumentController extends Controller
             'monthlyDefaultYear',
             'monthlyYearChoices',
             'monthlyHasSubDepartments',
-            'assignedWeeklyActivities'
+            'assignedWeeklyActivities',
+            'actionLogProgress'
         ));
     }
 
@@ -522,6 +531,9 @@ class DocumentController extends Controller
                 throw ValidationException::withMessages([
                     'target_explanation' => 'Please explain why the target was not fully accomplished.',
                 ]);
+            }
+            if ($action === 'submit') {
+                $this->assertWeeklyReportActionTasksUpdated($user);
             }
             if ($templateContent === null) {
                 $templateContent = [];
@@ -1089,7 +1101,12 @@ class DocumentController extends Controller
             );
         }
 
-        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'reportMeetingRows'));
+        $actionLogProgress = ['activeTasks' => [], 'currentDraftId' => null, 'showNotifications' => false];
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $actionLogProgress = $this->actionLogProgressService->buildForUser($viewer);
+        }
+
+        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'reportMeetingRows', 'actionLogProgress'));
     }
 
     /**
@@ -1258,6 +1275,9 @@ class DocumentController extends Controller
                 throw ValidationException::withMessages([
                     'target_explanation' => 'Please explain why the target was not fully accomplished.',
                 ]);
+            }
+            if ($action === 'submit') {
+                $this->assertWeeklyReportActionTasksUpdated($actingUser);
             }
         }
 
@@ -1450,6 +1470,10 @@ class DocumentController extends Controller
 
         // Authorize submit action
         $this->authorize('submit', $document);
+
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            $this->assertWeeklyReportActionTasksUpdated($actingUser);
+        }
 
         try {
             DB::transaction(function () use ($document) {
@@ -3342,6 +3366,17 @@ class DocumentController extends Controller
         $content['budget_statuses'] = $incomingStatuses;
 
         return $content;
+    }
+
+    private function assertWeeklyReportActionTasksUpdated(User $user): void
+    {
+        if (! $this->actionLogProgressService->hasPendingUpdates($user)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'action_tasks' => 'Please update all assigned action tasks in section 7 before submitting your weekly report.',
+        ]);
     }
 
     private function resolveWeeklyReportTargetStatus(Request $request, ?Document $document = null): ?string

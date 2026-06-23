@@ -535,4 +535,6 @@
     </div>
 </div>
 
+@include('documents.partials.weekly-report-action-tasks')
+
 <x-staff-users-json :users="$teamUsers ?? collect()" />

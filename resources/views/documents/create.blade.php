@@ -1059,7 +1059,7 @@
                 }
 
                 // Validate target accomplishment for weekly reports
-                if (selectedTypeValue === 'weekly_report') {
+                if (selectedTypeValue === 'weekly_report' && action === 'submit') {
                     const targetAccomplished = document.getElementById('target_accomplished_status');
                     if (targetAccomplished && !targetAccomplished.value) {
                         e.preventDefault();
@@ -1075,6 +1075,14 @@
                             alert('Please explain why the target was not fully accomplished.');
                             return false;
                         }
+                    }
+
+                    const pendingActionTasks = document.querySelectorAll('#weeklyReportActionTasksSection .js-pending-action-task');
+                    if (pendingActionTasks.length > 0) {
+                        e.preventDefault();
+                        alert('Please update all assigned action tasks in section 7 before submitting your weekly report.');
+                        document.getElementById('weeklyReportActionTasksSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        return false;
                     }
                 }
 
