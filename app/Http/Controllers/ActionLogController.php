@@ -475,10 +475,14 @@ class ActionLogController extends Controller
 
         $this->authorize('update', $document);
 
+        $request->merge([
+            'notes_progress' => trim((string) $request->input('notes_progress', '')),
+        ]);
+
         $validated = $request->validate([
             'task_uid' => ['required', 'string', 'max:80'],
             'progress' => ['required', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
-            'notes_progress' => ['nullable', 'string', 'max:4000'],
+            'notes_progress' => ['required', 'string', 'max:4000'],
         ]);
 
         $document->loadMissing('period');
@@ -511,7 +515,7 @@ class ActionLogController extends Controller
 
             $before = $task;
             $task['progress'] = $validated['progress'];
-            $task['notes_progress'] = trim((string) ($validated['notes_progress'] ?? ''));
+            $task['notes_progress'] = $validated['notes_progress'];
             $task = $this->appendTaskHistoryIfChanged($before, $task, $period, (string) $user->id);
             $found = true;
             break;

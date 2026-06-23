@@ -26,8 +26,8 @@
                         </select>
                     </div>
                     <div class="mb-0">
-                        <label for="weeklyReportQuickTaskNotes" class="form-label">Progress notes</label>
-                        <textarea class="form-control" name="notes_progress" id="weeklyReportQuickTaskNotes" rows="4" maxlength="4000" placeholder="What did you do this week? Any blockers or context?"></textarea>
+                        <label for="weeklyReportQuickTaskNotes" class="form-label">Progress notes <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="notes_progress" id="weeklyReportQuickTaskNotes" rows="4" maxlength="4000" required placeholder="What did you do this week? Any blockers or context?"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -90,7 +90,13 @@
             });
         });
 
-        form.addEventListener('submit', function () {
+        form.addEventListener('submit', function (e) {
+            if (notesEl && !notesEl.value.trim()) {
+                e.preventDefault();
+                notesEl.focus();
+                return;
+            }
+
             if (saveBtn) {
                 saveBtn.disabled = true;
                 saveBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Saving...';

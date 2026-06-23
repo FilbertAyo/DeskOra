@@ -192,6 +192,37 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('No longer needed', $task['notes_progress'] ?? null);
     }
 
+    public function test_quick_update_requires_progress_notes(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
+
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $staff = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Not Started'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'In Progress',
+            'notes_progress' => '',
+        ]);
+
+        $response->assertSessionHasErrors('notes_progress');
+    }
+
     public function test_assigned_staff_cannot_access_edit_page(): void
     {
         /** @var User $manager */
