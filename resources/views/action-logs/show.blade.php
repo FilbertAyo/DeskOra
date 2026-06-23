@@ -179,7 +179,14 @@
                                             $realHistory = collect($history)->reject(fn($e) => (bool) ($e['is_empty'] ?? false))->values();
                                             $displayNotes = array_key_exists('display_notes_progress', $row) ? (string) $row['display_notes_progress'] : (string) ($row['notes_progress'] ?? '');
                                             $displayProgress = array_key_exists('display_progress', $row) ? $row['display_progress'] : ($row['progress'] ?? 'Not Started');
-                                            $historyForOffcanvas = $realHistory->map(function ($entry) use ($responsibleNameMap) {
+                                            $historyForOffcanvas = collect($history)->map(function ($entry) use ($responsibleNameMap) {
+                                                if ((bool) ($entry['is_empty'] ?? false)) {
+                                                    return [
+                                                        'period_label' => $entry['period_label'] ?? '-',
+                                                        'is_empty' => true,
+                                                    ];
+                                                }
+
                                                 $updaterId = (string) ($entry['updated_by'] ?? '');
                                                 $toProgress = $entry['to_progress'] ?? '-';
 
@@ -197,6 +204,7 @@
                                                         'In Progress' => 'al-dot-info',
                                                         default => 'al-dot-secondary',
                                                     },
+                                                    'is_empty' => false,
                                                 ];
                                             })->values()->all();
                                         @endphp
@@ -239,15 +247,15 @@
                                             </td>
                                             <td class="text-muted small">{{ $displayNotes !== '' ? $displayNotes : '—' }}</td>
                                             <td>
-                                                @if(!empty($realHistory))
+                                                @if(!empty($history))
                                                     <button type="button"
                                                         class="btn btn-sm btn-outline-primary js-view-task-timeline"
                                                         data-bs-toggle="offcanvas"
                                                         data-bs-target="#actionLogTaskTimelineOffcanvas"
-                                                        data-task-title="{{ $row['task'] ?? 'Task' }}"
-                                                        data-history="{{ e(json_encode($historyForOffcanvas, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)) }}">
+                                                        data-task-title="{{ e($row['task'] ?? 'Task') }}"
+                                                        data-history='@json($historyForOffcanvas)'>
                                                         <i class="ti ti-timeline-event me-1"></i>Progress
-                                                        <span class="badge bg-light-primary border border-primary ms-1">{{ $realHistory->count() }}</span>
+                                                        <span class="badge bg-light-primary border border-primary ms-1">{{ count($history) }}</span>
                                                     </button>
                                                 @else
                                                     <span class="text-muted small">No updates yet</span>
@@ -339,6 +347,27 @@
                     return;
                 }
 
+                let pendingTimeline = null;
+
+                document.querySelectorAll('.js-view-task-timeline').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        let history = [];
+                        const rawHistory = btn.getAttribute('data-history');
+                        if (rawHistory) {
+                            try {
+                                history = JSON.parse(rawHistory);
+                            } catch (e) {
+                                history = [];
+                            }
+                        }
+
+                        pendingTimeline = {
+                            title: btn.getAttribute('data-task-title') || 'Task',
+                            history: Array.isArray(history) ? history : [],
+                        };
+                    });
+                });
+
                 function progressBadgeClass(dotClass) {
                     if (dotClass === 'al-dot-success') return 'bg-light-success border border-success';
                     if (dotClass === 'al-dot-danger') return 'bg-light-danger border border-danger';
@@ -360,7 +389,7 @@
                         item.className = 'al-timeline-item';
 
                         const dot = document.createElement('span');
-                        dot.className = 'al-dot ' + (entry.dot_class || 'al-dot-secondary');
+                        dot.className = 'al-dot ' + (entry.is_empty ? 'al-dot-secondary' : (entry.dot_class || 'al-dot-secondary'));
 
                         const content = document.createElement('div');
                         content.className = 'al-timeline-content';
@@ -369,49 +398,57 @@
                         header.className = 'd-flex justify-content-between align-items-start flex-wrap gap-1';
                         header.innerHTML = '<strong class="text-dark"></strong><small class="text-muted"></small>';
                         header.querySelector('strong').textContent = entry.period_label || '-';
-                        header.querySelector('small').textContent = entry.changed_at || '';
-
-                        const progressRow = document.createElement('div');
-                        progressRow.className = 'mb-1';
-                        if (entry.from_progress) {
-                            const fromBadge = document.createElement('span');
-                            fromBadge.className = 'badge bg-light-light border border-light text-dark';
-                            fromBadge.textContent = entry.from_progress;
-                            progressRow.appendChild(fromBadge);
-                            progressRow.appendChild(document.createTextNode(' '));
-                            const arrow = document.createElement('i');
-                            arrow.className = 'ti ti-arrow-right text-muted mx-1';
-                            progressRow.appendChild(arrow);
-                        }
-                        const toBadge = document.createElement('span');
-                        toBadge.className = 'badge ' + progressBadgeClass(entry.dot_class);
-                        toBadge.textContent = entry.to_progress || '-';
-                        progressRow.appendChild(toBadge);
+                        header.querySelector('small').textContent = entry.is_empty ? '' : (entry.changed_at || '');
 
                         content.appendChild(header);
-                        content.appendChild(progressRow);
 
-                        if (entry.notes_progress) {
-                            const notes = document.createElement('div');
-                            notes.className = 'small text-dark';
-                            notes.innerHTML = '<i class="ti ti-note me-1 text-muted"></i>';
-                            notes.appendChild(document.createTextNode(entry.notes_progress));
-                            content.appendChild(notes);
+                        if (entry.is_empty) {
+                            const emptyStatus = document.createElement('div');
+                            emptyStatus.className = 'small text-muted fst-italic';
+                            emptyStatus.textContent = 'Not updated';
+                            content.appendChild(emptyStatus);
+                        } else {
+                            const progressRow = document.createElement('div');
+                            progressRow.className = 'mb-1';
+                            if (entry.from_progress) {
+                                const fromBadge = document.createElement('span');
+                                fromBadge.className = 'badge bg-light-light border border-light text-dark';
+                                fromBadge.textContent = entry.from_progress;
+                                progressRow.appendChild(fromBadge);
+                                progressRow.appendChild(document.createTextNode(' '));
+                                const arrow = document.createElement('i');
+                                arrow.className = 'ti ti-arrow-right text-muted mx-1';
+                                progressRow.appendChild(arrow);
+                            }
+                            const toBadge = document.createElement('span');
+                            toBadge.className = 'badge ' + progressBadgeClass(entry.dot_class);
+                            toBadge.textContent = entry.to_progress || '-';
+                            progressRow.appendChild(toBadge);
+
+                            content.appendChild(progressRow);
+
+                            if (entry.notes_progress) {
+                                const notes = document.createElement('div');
+                                notes.className = 'small text-dark';
+                                notes.innerHTML = '<i class="ti ti-note me-1 text-muted"></i>';
+                                notes.appendChild(document.createTextNode(entry.notes_progress));
+                                content.appendChild(notes);
+                            }
+
+                            if (entry.status_reason) {
+                                const reason = document.createElement('div');
+                                reason.className = 'small text-danger';
+                                reason.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>';
+                                reason.appendChild(document.createTextNode(entry.status_reason));
+                                content.appendChild(reason);
+                            }
+
+                            const updater = document.createElement('div');
+                            updater.className = 'small text-muted mt-1';
+                            updater.innerHTML = '<i class="ti ti-user me-1"></i>';
+                            updater.appendChild(document.createTextNode(entry.updater_name || '—'));
+                            content.appendChild(updater);
                         }
-
-                        if (entry.status_reason) {
-                            const reason = document.createElement('div');
-                            reason.className = 'small text-danger';
-                            reason.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>';
-                            reason.appendChild(document.createTextNode(entry.status_reason));
-                            content.appendChild(reason);
-                        }
-
-                        const updater = document.createElement('div');
-                        updater.className = 'small text-muted mt-1';
-                        updater.innerHTML = '<i class="ti ti-user me-1"></i>';
-                        updater.appendChild(document.createTextNode(entry.updater_name || '—'));
-                        content.appendChild(updater);
 
                         item.appendChild(dot);
                         item.appendChild(content);
@@ -422,23 +459,14 @@
                     bodyEl.appendChild(list);
                 }
 
-                offcanvasEl.addEventListener('show.bs.offcanvas', function (event) {
-                    const trigger = event.relatedTarget;
-                    if (!trigger) {
+                offcanvasEl.addEventListener('show.bs.offcanvas', function () {
+                    if (!pendingTimeline) {
                         return;
                     }
 
-                    const taskTitle = trigger.getAttribute('data-task-title') || 'Task';
-                    let history = [];
-                    try {
-                        history = JSON.parse(trigger.getAttribute('data-history') || '[]');
-                    } catch (e) {
-                        history = [];
-                    }
-
                     titleEl.textContent = 'Task Progress';
-                    subtitleEl.textContent = taskTitle;
-                    renderTimeline(history);
+                    subtitleEl.textContent = pendingTimeline.title;
+                    renderTimeline(pendingTimeline.history);
                 });
             });
         </script>
