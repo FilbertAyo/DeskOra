@@ -9,47 +9,53 @@
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 9pt;
-            color: #222;
+            font-family: 'Times New Roman', Times-Roman, Times, serif;
+            font-size: 10pt;
+            color: #000;
             margin: 0;
+            text-align: justify;
         }
-        h2, h4 {
-            margin: 0 0 6px 0;
+        h2 {
+            margin: 0 0 4px 0;
             text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
         }
-        .meta {
-            margin-top: 12px;
-            margin-bottom: 12px;
-            font-size: 9pt;
-        }
-        .meta-row {
-            margin-bottom: 4px;
+        .doc-subtitle {
+            margin: 0 0 14px 0;
+            text-align: center;
+            font-size: 10pt;
+            font-weight: normal;
         }
         .section-title {
             margin-top: 14px;
             margin-bottom: 6px;
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: bold;
+            text-align: left;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8.5pt;
+            font-size: 9pt;
             table-layout: fixed;
             margin-bottom: 10px;
         }
         th, td {
             border: 1px solid #000;
-            padding: 4px;
+            padding: 5px;
             text-align: left;
             vertical-align: top;
             word-wrap: break-word;
             word-break: break-word;
             overflow-wrap: anywhere;
         }
+        td {
+            text-align: justify;
+        }
         th {
             background: #f5f5f5;
+            text-align: left;
         }
         .text-end { text-align: right; }
         .fw-bold { font-weight: bold; }
@@ -273,26 +279,26 @@
             return trim((string) ($payload['activity'] ?? '')) !== '';
         })->values();
         $hasAssignedActivities = $assignedRows->isNotEmpty();
+
+        $period = $document->period;
+        $staffName = $document->user?->name ?? '';
+        $periodDates = $period?->date_range ?? '';
+        $subtitle = 'Weekly Plan';
+        if ($period) {
+            $subtitle .= ' - Week '.$period->week_number;
+            if ($periodDates !== '') {
+                $subtitle .= ' ('.$periodDates.')';
+            }
+        }
+        if ($staffName !== '') {
+            $subtitle .= ' | '.$staffName;
+        }
     @endphp
 
     <h2>Weekly Plan</h2>
-    <h4>{{ $document->display_title }}</h4>
-
-    <div class="meta">
-        <div class="meta-row"><strong>Created by:</strong> {{ $document->user?->name ?? '-' }}</div>
-        <div class="meta-row"><strong>State:</strong> {{ ucfirst((string) $document->state) }}</div>
-        <div class="meta-row"><strong>Work period:</strong>
-            @if($document->period)
-                Week {{ $document->period->week_number }} of {{ $document->period->year }}
-            @else
-                -
-            @endif
-        </div>
-        <div class="meta-row"><strong>Updated at:</strong> {{ $document->updated_at?->format('M d, Y h:i A') }}</div>
-    </div>
+    <p class="doc-subtitle">{{ $subtitle }}</p>
 
     @if($hasObjective)
-        <div class="section-title">Objective / Main Target</div>
         <table>
             <thead>
                 <tr>
