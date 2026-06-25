@@ -37,8 +37,8 @@
 
             @if($activeActionTasks->isNotEmpty())
                 <div class="table-responsive">
-                    <table class="table table-bordered table-striped align-middle mb-0">
-                        <thead class="wh-thead-weekly-report">
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead class="thead-light">
                             <tr>
                                 <th style="width: 50px;" class="text-center">No.</th>
                                 <th>Task</th>
