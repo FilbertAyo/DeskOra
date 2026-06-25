@@ -1,6 +1,8 @@
                                 @php
                                     $summary = $content['summary'] ?? '';
-                                    $activityProgress = $content['activity_progress'] ?? [];
+                                    $activityProgress = \App\Models\Document::sortWeeklyReportActivityProgress(
+                                        is_array($content['activity_progress'] ?? null) ? $content['activity_progress'] : []
+                                    );
                                     $reportMeetings = is_array($content['key_meetings'] ?? null) ? $content['key_meetings'] : [];
                                     $keyAchievements = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
                                     $challengesMitigation = $content['challenges_mitigation'] ?? [];

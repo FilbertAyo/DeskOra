@@ -70,11 +70,12 @@
     @php
         $content = is_array($document->content) ? $document->content : [];
         $summary = trim((string) ($content['summary'] ?? ''));
-        $activityProgress = $content['activity_progress'] ?? [];
+        $activityProgress = \App\Models\Document::sortWeeklyReportActivityProgress(
+            is_array($content['activity_progress'] ?? null) ? $content['activity_progress'] : []
+        );
         $reportMeetings = is_array($content['key_meetings'] ?? null) ? $content['key_meetings'] : [];
         $keyAchievements = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
         $challengesMitigation = $content['challenges_mitigation'] ?? [];
-        $budgetStatuses = $content['budget_statuses'] ?? [];
 
         $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
             $document->period_id,
@@ -168,14 +169,6 @@
                 || trim((string) ($row['description_purpose'] ?? '')) !== ''
                 || trim((string) ($row['amount'] ?? '')) !== '';
         })) : [];
-        $reviewsByUid = $relatedPlan ? $relatedPlan->budgetReviewItemsByUid() : [];
-        $statusByUid = [];
-        foreach ($budgetStatuses as $s) {
-            $sUid = is_array($s) ? trim((string) ($s['budget_uid'] ?? '')) : '';
-            if ($sUid !== '') {
-                $statusByUid[$sUid] = $s;
-            }
-        }
         $planBudgetTotal = 0.0;
         foreach ($planBudgetFiltered as $planBudgetRow) {
             $planBudgetRow = is_array($planBudgetRow) ? $planBudgetRow : [];
@@ -238,9 +231,9 @@
                 <tr>
                     <th style="width: 6%;">No.</th>
                     <th>Activity/Output</th>
-                    <th style="width: 14%;">Progress</th>
+                    <th style="width: 9%;">Progress</th>
                     <th>Remarks/Challenges</th>
-                    <th style="width: 16%;">Next Step</th>
+                    <th style="width: 22%;">Next Step</th>
                 </tr>
             </thead>
             <tbody>
@@ -403,39 +396,23 @@
                 <tr>
                     <th>Budget Item</th>
                     <th>Description / Purpose</th>
-                    <th style="width: 14%;">Amount</th>
-                    <th style="width: 12%;">Review</th>
-                    <th>Notes</th>
+                    <th style="width: 18%;">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($planBudgetFiltered as $i => $planRow)
+                @foreach($planBudgetFiltered as $planRow)
                     @php
                         $planRow = is_array($planRow) ? $planRow : [];
-                        $uid = trim((string) ($planRow['budget_uid'] ?? ''));
-                        $review = ($uid !== '' && isset($reviewsByUid[$uid])) ? $reviewsByUid[$uid] : null;
-                        $reviewDecision = is_array($review) ? ($review['decision'] ?? null) : null;
-                        $statusRow = ($uid !== '' && isset($statusByUid[$uid])) ? $statusByUid[$uid] : ($budgetStatuses[$i] ?? []);
-                        $statusRow = is_array($statusRow) ? $statusRow : [];
-                        $reviewLabel = match ($reviewDecision) {
-                            'approved' => 'Approved',
-                            'rejected' => 'Rejected',
-                            'pending' => 'Pending',
-                            default => '-',
-                        };
                     @endphp
                     <tr>
                         <td>{{ $planRow['item'] ?? '' }}</td>
                         <td>{{ $planRow['description_purpose'] ?? '' }}</td>
                         <td>{{ $planRow['amount'] ?? '' }}</td>
-                        <td>{{ $reviewLabel }}</td>
-                        <td>{{ $statusRow['notes'] ?? '' }}</td>
                     </tr>
                 @endforeach
                 <tr class="fw-bold">
                     <td colspan="2" class="text-end">Total</td>
                     <td class="text-end">{{ number_format($planBudgetTotal, 2) }}</td>
-                    <td colspan="2"></td>
                 </tr>
             </tbody>
         </table>
