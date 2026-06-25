@@ -715,6 +715,47 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame([(string) $assignee->id], $task['responsible_user_ids'] ?? null);
     }
 
+    public function test_manager_can_delete_task_via_autosave_update(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Keep this task'),
+                    $this->taskRow('task_b', 'Remove this task'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Keep this task'),
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonCount(1, 'tasks');
+        $response->assertJsonPath('tasks.0.task_uid', 'task_a');
+
+        $document->refresh();
+        $uids = collect($document->content['tasks'] ?? [])->pluck('task_uid')->all();
+        $this->assertSame(['task_a'], $uids);
+    }
+
     public function test_show_page_displays_responsible_from_prior_week_when_current_row_empty(): void
     {
         /** @var User $manager */

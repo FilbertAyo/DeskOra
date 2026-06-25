@@ -571,6 +571,7 @@
                         }
                         const previousTasks = tasks.slice();
                         tasks.splice(index, 1);
+                        renderTaskTable();
                         autosaveTasks().catch(function (error) {
                             tasks = previousTasks;
                             renderTaskTable();

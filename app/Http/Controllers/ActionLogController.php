@@ -697,7 +697,6 @@ class ActionLogController extends Controller
         }
 
         $merged = [];
-        $incomingUids = [];
         foreach ($incomingTasks as $incomingTask) {
             if (! is_array($incomingTask)) {
                 continue;
@@ -720,19 +719,6 @@ class ActionLogController extends Controller
 
             $task = $this->appendTaskHistoryIfChanged($existing, $task, $period, $actorUserId);
             $merged[] = $task;
-            if ($uid !== '') {
-                $incomingUids[$uid] = true;
-            }
-        }
-
-        foreach ($existingTasks as $existingTask) {
-            if (! is_array($existingTask)) {
-                continue;
-            }
-            $uid = trim((string) ($existingTask['task_uid'] ?? ''));
-            if ($uid !== '' && ! isset($incomingUids[$uid])) {
-                $merged[] = $existingTask;
-            }
         }
 
         return $merged;
