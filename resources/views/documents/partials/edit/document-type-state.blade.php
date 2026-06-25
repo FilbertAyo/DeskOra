@@ -9,7 +9,6 @@
                                             value="{{ $document->type_name }}"
                                             disabled>
                                     </div>
-                                    <small class="form-text text-muted">Document type cannot be changed</small>
                                 </div>
                             </div>
 
@@ -24,6 +23,5 @@
                                             value="{{ $document->state_name }}"
                                             disabled>
                                     </div>
-                                    <small class="form-text text-muted">Current document state</small>
-                                </div>
+                                 </div>
                             </div>

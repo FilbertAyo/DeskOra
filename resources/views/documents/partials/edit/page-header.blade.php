@@ -20,10 +20,10 @@
                         </ul>
                     </div>
                     <div class="col-auto d-flex align-items-center gap-2">
-                        <a href="{{ route('documents.show', $document->id) }}" class="btn btn-sm btn-info text-white">
+                        <a href="{{ route('documents.show', $document->id) }}" class="btn btn-sm btn-info text-white btn-sm">
                             <i class="ti ti-eye me-1"></i> View Document
                         </a>
-                        <a href="{{ $resolvedBackUrl }}" class="btn btn-sm btn-light">
+                        <a href="{{ $resolvedBackUrl }}" class="btn btn-sm btn-light btn-sm">
                             <i class="ti ti-arrow-left me-1"></i> Back to Documents
                         </a>
                     </div>
