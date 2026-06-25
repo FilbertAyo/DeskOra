@@ -6,11 +6,18 @@
                     <h5 class="mb-0">
                         <i class="ti ti-file-text me-2"></i>{{ $document->display_title }}
                     </h5>
-                    @if($document->file_path && $document->hasFile())
-                        <a href="{{ $document->file_url }}" target="_blank" class="btn btn-sm btn-info">
-                            <i class="ti ti-download me-1"></i> Download PDF
-                        </a>
-                    @endif
+                    <div class="d-flex gap-2">
+                        @if(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true))
+                            <a href="{{ route('documents.download', $document) }}" class="btn btn-sm btn-info">
+                                <i class="ti ti-download me-1"></i> Download PDF
+                            </a>
+                        @endif
+                        @if($document->file_path && $document->hasFile())
+                            <a href="{{ $document->file_url }}" target="_blank" class="btn btn-sm btn-info">
+                                <i class="ti ti-download me-1"></i> Download PDF
+                            </a>
+                        @endif
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     @if($document->file_path && $document->hasFile())
