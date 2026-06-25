@@ -1561,47 +1561,6 @@ class Document extends Model
         ];
     }
 
-    /**
-     * Sort weekly report activity progress rows Mon–Sat, then off-plan activities last.
-     *
-     * @param  array<int, mixed>  $rows
-     * @return array<int, mixed>
-     */
-    public static function sortWeeklyReportActivityProgress(array $rows): array
-    {
-        $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        $dayRank = array_flip($dayOrder);
-
-        return collect($rows)
-            ->values()
-            ->map(function ($row, int $index) use ($dayRank) {
-                if (! is_array($row)) {
-                    return ['row' => $row, 'sort' => 9999, 'index' => $index];
-                }
-
-                $activityOutput = trim((string) ($row['activity_output'] ?? ''));
-                $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
-
-                if ($activityOutput === '__off_plan__' || ($activityOutput === '' && $offPlanActivity !== '')) {
-                    return ['row' => $row, 'sort' => 1000, 'index' => $index];
-                }
-
-                $sort = 999;
-                if ($activityOutput !== '' && str_contains($activityOutput, ' - ')) {
-                    [$parsedDay] = array_map('trim', explode(' - ', $activityOutput, 2));
-                    if (isset($dayRank[$parsedDay])) {
-                        $sort = $dayRank[$parsedDay];
-                    }
-                }
-
-                return ['row' => $row, 'sort' => $sort, 'index' => $index];
-            })
-            ->sortBy(fn ($item) => [$item['sort'], $item['index']])
-            ->pluck('row')
-            ->values()
-            ->all();
-    }
-
     public static function parseBudgetAmount(string $rawAmount): float
     {
         $rawAmount = trim($rawAmount);

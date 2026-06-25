@@ -27,11 +27,6 @@ class DocumentCrudController extends DocumentController
         return parent::show($document);
     }
 
-    public function downloadPdf(Document $document)
-    {
-        return parent::downloadPdf($document);
-    }
-
     public function edit(Document $document)
     {
         return parent::edit($document);
