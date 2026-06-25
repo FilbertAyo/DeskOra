@@ -26,10 +26,7 @@
             </h6>
         </div>
         <div class="card-body">
-            <p class="text-muted small mb-3">
-                Update progress on action tasks assigned to you before you can review and submit your weekly report.
-            </p>
-
+    
             @if($pendingActionTaskCount > 0)
                 <div class="alert alert-warning py-2 mb-3" role="alert">
                     <i class="ti ti-alert-triangle me-1"></i>
