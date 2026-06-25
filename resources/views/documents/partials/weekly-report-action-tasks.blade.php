@@ -19,7 +19,7 @@
     <div class="card border-primary">
         <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
             <h6 class="mb-0">
-                <i class="ti ti-bolt me-2"></i>Action Tasks (assigned to you)
+                <i class="ti ti-bolt me-2"></i>Your Action Log Tasks
                 @if($pendingActionTaskCount > 0)
                     <span class="badge bg-light-warning border border-warning text-dark ms-1">{{ $pendingActionTaskCount }} pending</span>
                 @endif
