@@ -18,12 +18,14 @@ class ActionLog extends Model
         'title',
         'state',
         'submission_email_sent',
+        'removed_task_uids',
     ];
 
     protected function casts(): array
     {
         return [
             'submission_email_sent' => 'boolean',
+            'removed_task_uids' => 'array',
         ];
     }
 

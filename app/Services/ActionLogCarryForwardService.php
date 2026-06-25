@@ -72,12 +72,14 @@ class ActionLogCarryForwardService
             ->flip()
             ->all();
 
+        $removedUids = array_flip($this->extractRemovedTaskUids($document->content));
+
         $toCarry = $this->getIncompleteTasksFromPriorPeriods($period);
         $added = [];
 
         foreach ($toCarry as $carriedTask) {
             $uid = trim((string) ($carriedTask['task_uid'] ?? ''));
-            if ($uid === '' || isset($existingUids[$uid])) {
+            if ($uid === '' || isset($existingUids[$uid]) || isset($removedUids[$uid])) {
                 continue;
             }
 
@@ -154,6 +156,26 @@ class ActionLogCarryForwardService
         }
 
         return $map;
+    }
+
+    /**
+     * Task UIDs a manager explicitly removed from the current week's log — do not carry forward again.
+     *
+     * @return list<string>
+     */
+    public function extractRemovedTaskUids(mixed $content): array
+    {
+        if (! is_array($content)) {
+            return [];
+        }
+
+        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
+        $removed = is_array($meta['removed_task_uids'] ?? null) ? $meta['removed_task_uids'] : [];
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($uid) => trim((string) $uid),
+            $removed
+        ))));
     }
 
     /**

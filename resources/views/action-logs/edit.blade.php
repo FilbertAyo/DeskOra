@@ -67,21 +67,21 @@
                             <div class="col-md-4 mb-3">
                                 <div class="form-group">
                                     <label class="form-label">State</label>
-                                    <input type="text"
-                                        class="form-control"
+                                        <input type="text"
+                                            class="form-control"
                                         id="actionLogStateDisplay"
-                                        value="{{ $document->state_name }}"
-                                        disabled>
-                                </div>
+                                            value="{{ $document->state_name }}"
+                                            disabled>
+                               </div>
                             </div>
 
                             <div class="col-md-4 mb-3">
                                 <div class="form-group">
                                     <label class="form-label">Created</label>
-                                    <input type="text"
-                                        class="form-control"
-                                        value="{{ $document->created_at->format('M d, Y h:i A') }}"
-                                        disabled>
+                                        <input type="text"
+                                            class="form-control"
+                                            value="{{ $document->created_at->format('M d, Y h:i A') }}"
+                                            disabled>
                                 </div>
                             </div>
 
@@ -91,25 +91,25 @@
                                         Work Period <span class="text-danger">*</span>
                                     </label>
                                     <input type="hidden" name="period_id" value="{{ old('period_id', $document->period_id ?? '') }}">
-                                    <select class="form-control @error('period_id') is-invalid @enderror"
-                                        id="period_id"
-                                        aria-hidden="true"
-                                        tabindex="-1"
-                                        disabled>
-                                        <option value="">-- Select Work Period --</option>
-                                        @foreach($workPeriods as $workPeriod)
-                                            <option value="{{ $workPeriod->id }}"
-                                                {{ old('period_id', $document->period_id ?? '') == $workPeriod->id ? 'selected' : '' }}>
-                                                Week {{ $workPeriod->week_number }} of {{ $workPeriod->year }}
-                                                ({{ \Carbon\Carbon::parse($workPeriod->week_start_date)->format('M d') }} -
-                                                 {{ \Carbon\Carbon::parse($workPeriod->week_end_date)->format('M d, Y') }})
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                        <select class="form-control @error('period_id') is-invalid @enderror"
+                                            id="period_id"
+                                            aria-hidden="true"
+                                            tabindex="-1"
+                                            disabled>
+                                            <option value="">-- Select Work Period --</option>
+                                            @foreach($workPeriods as $workPeriod)
+                                                <option value="{{ $workPeriod->id }}"
+                                                    {{ old('period_id', $document->period_id ?? '') == $workPeriod->id ? 'selected' : '' }}>
+                                                    Week {{ $workPeriod->week_number }} of {{ $workPeriod->year }}
+                                                    ({{ \Carbon\Carbon::parse($workPeriod->week_start_date)->format('M d') }} -
+                                                     {{ \Carbon\Carbon::parse($workPeriod->week_end_date)->format('M d, Y') }})
+                                                </option>
+                                            @endforeach
+                                        </select>
                                     @error('period_id')
                                         <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
-                                </div>
+                              </div>
                             </div>
                         </div>
 
@@ -118,10 +118,10 @@
                                 <div>
                                     <h6 class="mb-0"><i class="ti ti-list-check me-2"></i>Action Log Tasks</h6>
                                     <small class="text-muted">Tasks save automatically when you add or edit them.</small>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-primary" id="addTaskRowBtn" data-bs-toggle="modal" data-bs-target="#actionLogTaskModal">
-                                    <i class="ti ti-plus me-1"></i> Add task
-                                </button>
+                               </div>
+                                    <button type="button" class="btn btn-sm btn-primary" id="addTaskRowBtn" data-bs-toggle="modal" data-bs-target="#actionLogTaskModal">
+                                        <i class="ti ti-plus me-1"></i> Add task
+                                    </button>
                             </div>
                             <div class="card-body">
                                 <div id="actionLogAutosaveAlert"></div>
@@ -141,7 +141,7 @@
                                         </thead>
                                         <tbody id="taskTableBody"></tbody>
                                     </table>
-                                </div>
+                                    </div>
                                 <p id="taskListEmpty" class="text-muted mb-0 {{ empty($tasksForJson) ? '' : 'd-none' }}">No tasks yet. Click <strong>Add task</strong> to get started.</p>
                                 <div id="taskRowsBody" class="d-none" aria-hidden="true"></div>
                             </div>
@@ -158,8 +158,8 @@
                                 value="submit"
                                 class="btn btn-primary {{ $document->isSubmitted() ? 'd-none' : '' }}"
                                 id="submitBtn">
-                                <i class="ti ti-send me-1"></i> Submit
-                            </button>
+                                        <i class="ti ti-send me-1"></i> Submit
+                                    </button>
                         </div>
                     </div>
                 </div>
@@ -175,7 +175,7 @@
     @include('action-logs.partials.task-editor-styles')
 
     @push('scripts')
-        <script>
+    <script>
             document.addEventListener('DOMContentLoaded', function () {
                 if (typeof window.ActionLogTaskEditor === 'undefined') {
                     return;
@@ -188,8 +188,8 @@
                     csrfToken: @json(csrf_token()),
                     documentState: @json($document->state),
                     isCreateMode: false,
-                });
             });
-        </script>
+        });
+    </script>
     @endpush
 </x-app-layout>

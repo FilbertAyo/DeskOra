@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\ActionLogProgressService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -754,6 +755,76 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $document->refresh();
         $uids = collect($document->content['tasks'] ?? [])->pluck('task_uid')->all();
         $this->assertSame(['task_a'], $uids);
+    }
+
+    public function test_deleted_carried_task_is_not_restored_by_carry_sync_or_dashboard(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 15, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+            /** @var User $staff */
+            $staff = User::factory()->create();
+
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $week25 = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_carry', 'Carried incomplete task', [$staff->id], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            $week25Doc = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week25->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 25 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_carry', 'Carried incomplete task', [$staff->id], 'In Progress'),
+                        $this->taskRow('task_local', 'Week 25 only task', [$staff->id]),
+                    ],
+                ],
+            ]);
+
+            $this->actingAs($manager)->putJson(route('action-logs.update', $week25Doc), [
+                'period_id' => $week25->id,
+                'action' => 'draft',
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_local', 'Week 25 only task', [$staff->id]),
+                    ],
+                ],
+            ])->assertOk();
+
+            $week25Doc->refresh();
+            $uids = collect($week25Doc->content['tasks'] ?? [])->pluck('task_uid')->all();
+            $this->assertSame(['task_local'], $uids);
+            $this->assertContains('task_carry', $week25Doc->content['meta']['removed_task_uids'] ?? []);
+
+            $this->actingAs($manager)->get(route('action-logs.edit', $week25Doc))->assertOk();
+            $week25Doc->refresh();
+            $uidsAfterEdit = collect($week25Doc->content['tasks'] ?? [])->pluck('task_uid')->all();
+            $this->assertSame(['task_local'], $uidsAfterEdit);
+
+            app(ActionLogProgressService::class)->buildForUser($staff);
+            $week25Doc->refresh();
+            $uidsAfterDashboard = collect($week25Doc->content['tasks'] ?? [])->pluck('task_uid')->all();
+            $this->assertSame(['task_local'], $uidsAfterDashboard);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_show_page_displays_responsible_from_prior_week_when_current_row_empty(): void

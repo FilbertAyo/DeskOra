@@ -417,20 +417,19 @@ class ActionLogController extends Controller
             $this->authorize('submit', $document);
         }
 
-        $this->persistCarriedTaskSyncIfNeeded($document, $period);
-        $document->refresh();
+        $previousTasks = $this->extractTasks($document->content);
 
         $normalizedContent = $this->normalizeActionLogContent($request->input('content', []));
-        $existingTasks = $this->extractTasks($document->content);
         $incomingTasks = $normalizedContent['tasks'] ?? [];
 
-        $finalTasks = $this->mergeManagerTaskUpdates($existingTasks, $incomingTasks, $period, (string) Auth::id());
+        $finalTasks = $this->mergeManagerTaskUpdates($previousTasks, $incomingTasks, $period, (string) Auth::id());
 
         if (empty($finalTasks)) {
             return $this->actionLogErrorResponse($request, 'Action log must contain at least one task.');
         }
 
         $content = $this->mergeActionLogContentWithTasks($document->content, $finalTasks);
+        $content = $this->recordRemovedTaskUidsAfterManagerSave($content, $previousTasks, $finalTasks);
         $updateData = [
             'content' => $content,
             'title' => $this->buildActionLogTitle($period),
@@ -967,6 +966,48 @@ class ActionLogController extends Controller
     {
         $content = is_array($existingContent) ? $existingContent : [];
         $content['tasks'] = $this->renumberTasks($tasks);
+
+        return $content;
+    }
+
+    /**
+     * Remember task UIDs the manager removed so carry-forward sync does not restore them.
+     *
+     * @param  array<string, mixed>  $content
+     * @param  array<int, mixed>  $previousTasks
+     * @param  array<int, mixed>  $finalTasks
+     * @return array<string, mixed>
+     */
+    private function recordRemovedTaskUidsAfterManagerSave(array $content, array $previousTasks, array $finalTasks): array
+    {
+        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
+        $removed = is_array($meta['removed_task_uids'] ?? null)
+            ? array_values(array_map('strval', $meta['removed_task_uids']))
+            : [];
+
+        $finalUids = [];
+        foreach ($finalTasks as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+            $uid = trim((string) ($task['task_uid'] ?? ''));
+            if ($uid !== '') {
+                $finalUids[$uid] = true;
+            }
+        }
+
+        foreach ($previousTasks as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+            $uid = trim((string) ($task['task_uid'] ?? ''));
+            if ($uid !== '' && ! isset($finalUids[$uid])) {
+                $removed[] = $uid;
+            }
+        }
+
+        $meta['removed_task_uids'] = array_values(array_unique(array_filter($removed)));
+        $content['meta'] = $meta;
 
         return $content;
     }

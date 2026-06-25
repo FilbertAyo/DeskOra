@@ -241,8 +241,11 @@ class ActionLogProgressService
             return;
         }
 
+        $content = is_array($currentDoc->content) ? $currentDoc->content : [];
+        $content['tasks'] = $sync['tasks'];
+
         $currentDoc->update([
-            'content' => ['tasks' => $sync['tasks']],
+            'content' => $content,
         ]);
         $this->documentDomainSyncService->syncFromDocument($currentDoc->fresh());
     }

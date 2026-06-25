@@ -387,6 +387,9 @@ class DocumentContentAssembler
         if ($actionLog->submission_email_sent) {
             $meta['submission_email_sent'] = true;
         }
+        if (is_array($actionLog->removed_task_uids) && $actionLog->removed_task_uids !== []) {
+            $meta['removed_task_uids'] = $actionLog->removed_task_uids;
+        }
 
         return [
             'tasks' => $tasks,

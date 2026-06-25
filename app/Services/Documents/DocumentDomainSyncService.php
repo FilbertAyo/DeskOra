@@ -420,12 +420,23 @@ class DocumentDomainSyncService
         $submissionEmailSent = (bool) ($meta['submission_email_sent'] ?? false)
             || (bool) ($existingActionLog?->submission_email_sent ?? false);
 
+        $removedTaskUids = [];
+        if (array_key_exists('removed_task_uids', $meta) && is_array($meta['removed_task_uids'])) {
+            $removedTaskUids = array_values(array_filter(array_map(
+                static fn ($uid) => trim((string) $uid),
+                $meta['removed_task_uids']
+            )));
+        } elseif (is_array($existingActionLog?->removed_task_uids)) {
+            $removedTaskUids = $existingActionLog->removed_task_uids;
+        }
+
         $actionLog = $this->upsertWithId(ActionLog::class, (string) $document->id, [
             'user_id' => (string) $document->user_id,
             'period_id' => $document->period_id ? (string) $document->period_id : null,
             'title' => $document->title,
             'state' => $document->state ?? WeeklyPlan::STATE_DRAFT,
             'submission_email_sent' => $submissionEmailSent,
+            'removed_task_uids' => $removedTaskUids !== [] ? $removedTaskUids : null,
         ]);
 
         $actionLog->tasks()->delete();
