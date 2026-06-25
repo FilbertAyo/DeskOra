@@ -458,7 +458,7 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not started,In progress'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Done and carry,Not started,In progress'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 
@@ -1190,7 +1190,7 @@ class DocumentController extends Controller
             $validationRules['content.activity_progress'] = ['nullable', 'array'];
             $validationRules['content.activity_progress.*.activity_output'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.off_plan_activity'] = ['nullable', 'string', 'max:2000'];
-            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Not started,In progress'];
+            $validationRules['content.activity_progress.*.progress'] = ['nullable', 'string', 'in:Done,Partially done,Done and carry,Not started,In progress'];
             $validationRules['content.activity_progress.*.remarks_challenges'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.activity_progress.*.next_step'] = ['nullable', 'string', 'max:2000'];
 
@@ -3268,7 +3268,7 @@ class DocumentController extends Controller
                     $offPlanActivity = '';
                 }
                 $progress = trim((string) ($row['progress'] ?? ''));
-                $row['carry_to_next_plan'] = $progress === 'Partially done';
+                $row['carry_to_next_plan'] = in_array($progress, ['Partially done', 'Done and carry'], true);
 
                 $row['activity_output'] = $activityOutput;
                 $row['off_plan_activity'] = $offPlanActivity;
@@ -3575,7 +3575,7 @@ class DocumentController extends Controller
             }
 
             $progress = trim((string) ($row['progress'] ?? ''));
-            if ($progress !== 'Partially done') {
+            if (! in_array($progress, ['Partially done', 'Done and carry'], true)) {
                 continue;
             }
 

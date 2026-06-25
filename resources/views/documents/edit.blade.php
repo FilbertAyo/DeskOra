@@ -14,12 +14,12 @@
                             <div class="col-md-8 mb-2 mb-md-0">
                                 <h5 class="mb-0">
                                     <i class="ti ti-file-text me-2"></i>Edit Document
-                                    <span class="badge bg-light-info border border-info ml-2">{{ $document->type_name }}</span>
+                                   
                                 </h5>
                             </div>
                             <div class="col-md-4 text-md-end">
-                                <small class="text-muted">Update fields below, then save draft or submit.</small>
-                            </div>
+                            <span class="badge bg-light-info border border-info ml-2">{{ $document->type_name }}</span>
+                           </div>
                         </div>
                     </div>
                     <div class="card-body">

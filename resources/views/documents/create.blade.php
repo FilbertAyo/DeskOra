@@ -630,6 +630,7 @@
                             <select class="form-select" name="content[activity_progress][${reportActivityIndex}][progress]">
                                 <option value="">-- Select --</option>
                                 <option value="Done">Done</option>
+                                <option value="Done and carry">Done (recurring)</option>
                                 <option value="Partially done">Carry to next week</option>
                                 <option value="Not started">Not done</option>
                             </select>

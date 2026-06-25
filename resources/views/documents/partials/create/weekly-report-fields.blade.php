@@ -184,6 +184,7 @@
                                             $cur = old("content.activity_progress.$i.progress", $row['progress'] ?? '');
                                             $progressOptions = [
                                                 'Done' => 'Done',
+                                                'Done and carry' => 'Done (recurring)',
                                                 'Partially done' => 'Carry to next week',
                                                 'Not started' => 'Not done',
                                             ];

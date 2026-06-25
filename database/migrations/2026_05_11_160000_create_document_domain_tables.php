@@ -186,7 +186,7 @@ return new class extends Migration
             $table->string('activity_uid', 64)->nullable();
             $table->text('activity_output')->nullable();
             $table->text('off_plan_activity')->nullable();
-            $table->enum('progress', ['Not started', 'In progress', 'Done', 'Partially done'])->nullable();
+            $table->enum('progress', ['Not started', 'In progress', 'Done', 'Partially done', 'Done and carry'])->nullable();
             $table->text('remarks_challenges')->nullable();
             $table->text('next_step')->nullable();
             $table->boolean('carry_to_next_plan')->default(false);
