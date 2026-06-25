@@ -3,7 +3,6 @@
 use App\Http\Controllers\ActionLogController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\AiAssistController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DepositController;
@@ -51,10 +50,6 @@ Route::get('/documents/employee/dashboard', function () {
 })->middleware(['auth', 'verified']);
 
 Route::middleware('auth')->group(function () {
-    Route::post('/ai/assist', AiAssistController::class)
-        ->middleware('throttle:20,1')
-        ->name('ai.assist');
-
     Route::get('/profile/settings', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile/settings', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

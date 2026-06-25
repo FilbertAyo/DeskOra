@@ -13,20 +13,6 @@ class AiAssistService
         return filled(config('services.gemini.api_key'));
     }
 
-    /**
-     * @return array{action: string, text: string}
-     */
-    public function assist(string $text, string $action): array
-    {
-        $text = $this->requireText($text);
-        $action = $this->normalizeWritingAction($action);
-
-        return [
-            'action' => $action,
-            'text' => $this->generate($this->writingPromptFor($action), $text),
-        ];
-    }
-
     public function summarizeWeeklySubmission(string $text, bool $hasPlan, bool $hasReport): string
     {
         $text = $this->requireText($text);
@@ -204,33 +190,6 @@ class AiAssistService
             .'then finish with results and an overall conclusion. '
             .'Use 3 to 5 short paragraphs. Separate each paragraph with one blank line. '
             .'Do not use bullet points, numbered lists, or section labels. ';
-    }
-
-    private function normalizeWritingAction(string $action): string
-    {
-        $action = strtolower(trim($action));
-
-        if (! in_array($action, ['improve', 'expand'], true)) {
-            throw new RuntimeException('Unsupported AI action.');
-        }
-
-        return $action;
-    }
-
-    private function writingPromptFor(string $action): string
-    {
-        $plainText = $this->plainTextInstruction();
-
-        return match ($action) {
-            'improve' => $plainText
-                .'You help staff write clear, professional workplace reports and plans. '
-                .'Improve the user text for clarity and tone. Keep the same meaning and facts. '
-                .'Do not invent details. Return only the improved text.',
-            'expand' => $plainText
-                .'You help staff write clear workplace reports and plans. '
-                .'Expand the user notes into fuller, professional sentences. '
-                .'Do not invent facts that were not implied. Return only the expanded text.',
-        };
     }
 
     private function weeklySubmissionSummaryPrompt(bool $hasPlan, bool $hasReport): string

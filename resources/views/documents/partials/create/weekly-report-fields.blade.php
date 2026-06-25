@@ -96,9 +96,6 @@
             <h6 class="mb-0"><i class="ti ti-book-open me-2"></i>1. Summary of the Week</h6>
         </div>
         <div class="card-body">
-            <div class="d-flex justify-content-end mb-2">
-                @include('documents.partials.ai-assist-button', ['target' => '#weekly_report_summary', 'action' => 'improve'])
-            </div>
             <textarea class="form-control @error('content.summary') is-invalid @enderror"
                 id="weekly_report_summary"
                 name="content[summary]"

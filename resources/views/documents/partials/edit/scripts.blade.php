@@ -83,61 +83,6 @@
                 startSessionMonitoring();
             }
 
-            const aiAssistUrl = "{{ route('ai.assist') }}";
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-            document.querySelectorAll('.ai-assist-btn').forEach((button) => {
-                button.addEventListener('click', async function () {
-                    const targetSelector = this.dataset.target;
-                    const action = this.dataset.action || 'improve';
-                    const field = targetSelector ? document.querySelector(targetSelector) : null;
-
-                    if (!field) {
-                        showNotifier('AI Assist', 'Could not find the text field.', 'danger');
-                        return;
-                    }
-
-                    const text = field.value.trim();
-                    if (text === '') {
-                        showNotifier('AI Assist', 'Please type something first, then click AI Assist.', 'warning');
-                        field.focus();
-                        return;
-                    }
-
-                    const originalHtml = this.innerHTML;
-                    this.disabled = true;
-                    this.innerHTML = '<i class="ti ti-loader spinning me-1"></i> Working...';
-
-                    try {
-                        const response = await fetch(aiAssistUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                            credentials: 'same-origin',
-                            body: JSON.stringify({ text, action }),
-                        });
-
-                        const data = await response.json();
-
-                        if (!response.ok) {
-                            throw new Error(data.message || 'AI request failed.');
-                        }
-
-                        field.value = data.text || text;
-                        showNotifier('AI Assist', 'Text updated. Please review before saving.', 'success');
-                    } catch (error) {
-                        showNotifier('AI Assist', error.message || 'AI request failed.', 'danger');
-                    } finally {
-                        this.disabled = false;
-                        this.innerHTML = originalHtml;
-                    }
-                });
-            });
-
             // Update file label when file is selected
             if (fileInput && fileLabel) {
                 fileInput.addEventListener('change', function(e) {

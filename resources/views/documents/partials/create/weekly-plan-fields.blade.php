@@ -32,7 +32,6 @@
                     <label for="main_target" class="form-label mb-0">
                         Objective (s) / Main Target (s) <span class="text-danger">*</span>
                     </label>
-                    @include('documents.partials.ai-assist-button', ['target' => '#main_target', 'action' => 'improve'])
                 </div>
                 <textarea class="form-control @error('main_target') is-invalid @enderror"
                     name="main_target"
