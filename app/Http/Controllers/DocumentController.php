@@ -1038,6 +1038,50 @@ class DocumentController extends Controller
     }
 
     /**
+     * Download a weekly plan or weekly report as PDF.
+     */
+    public function downloadPdf(Document $document)
+    {
+        if (! in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)) {
+            abort(404, 'Document not found.');
+        }
+
+        $this->authorize('view', $document);
+
+        $document->load(['user', 'period', 'sharedUsers']);
+
+        $weekLabel = $document->period
+            ? 'week_'.$document->period->week_number.'_'.$document->period->year
+            : 'no_period';
+
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
+            $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
+            $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
+
+            $pdf = Pdf::loadView('documents.pdf.weekly-plan-pdf', compact(
+                'document',
+                'carriedActivities',
+                'incomingMeetings',
+                'assignedWeeklyActivities',
+            ));
+
+            $filename = 'weekly_plan_'.$weekLabel.'_'.$document->id.'.pdf';
+        } else {
+            $teamUsers = $this->teamUsersForSelection();
+
+            $pdf = Pdf::loadView('documents.pdf.weekly-report-pdf', compact(
+                'document',
+                'teamUsers',
+            ));
+
+            $filename = 'weekly_report_'.$weekLabel.'_'.$document->id.'.pdf';
+        }
+
+        return $pdf->download($filename);
+    }
+
+    /**
      * @return Collection<int, mixed>
      */
     private function assignedWeeklyActivitiesForWeeklyPlanDocument(Document $document): Collection

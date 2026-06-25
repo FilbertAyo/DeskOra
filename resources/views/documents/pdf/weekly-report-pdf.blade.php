@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 9pt;
+            color: #222;
+            margin: 0;
+        }
+        h2, h4 {
+            margin: 0 0 6px 0;
+            text-align: center;
+        }
+        .meta {
+            margin-top: 12px;
+            margin-bottom: 12px;
+            font-size: 9pt;
+        }
+        .meta-row {
+            margin-bottom: 4px;
+        }
+        .section-title {
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8.5pt;
+            table-layout: fixed;
+            margin-bottom: 10px;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 4px;
+            text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        th {
+            background: #f5f5f5;
+        }
+        .text-end { text-align: right; }
+        .fw-bold { font-weight: bold; }
+        .text-center { text-align: center; }
+    </style>
+</head>
+<body>
+    @php
+        $content = is_array($document->content) ? $document->content : [];
+        $summary = trim((string) ($content['summary'] ?? ''));
+        $activityProgress = $content['activity_progress'] ?? [];
+        $reportMeetings = is_array($content['key_meetings'] ?? null) ? $content['key_meetings'] : [];
+        $keyAchievements = is_array($content['key_achievements'] ?? null) ? $content['key_achievements'] : [];
+        $challengesMitigation = $content['challenges_mitigation'] ?? [];
+        $budgetStatuses = $content['budget_statuses'] ?? [];
+
+        $relatedPlan = \App\Models\Document::findWeeklyPlanForUserAndPeriod(
+            $document->period_id,
+            (string) $document->user_id
+        );
+        $planBudget = is_array($relatedPlan?->content ?? null) ? ($relatedPlan->content['budget'] ?? []) : [];
+
+        $targetStatus = trim((string) ($content['target_accomplished_status'] ?? ''));
+        if (! in_array($targetStatus, ['completed', 'partially_completed', 'not_completed'], true)) {
+            if ($document->target_accomplished === true || $document->target_accomplished === 1 || $document->target_accomplished === '1') {
+                $targetStatus = 'completed';
+            } elseif ($document->target_accomplished === false || $document->target_accomplished === 0 || $document->target_accomplished === '0') {
+                $targetStatus = 'not_completed';
+            } else {
+                $targetStatus = '';
+            }
+        }
+
+        $targetStatusLabel = match ($targetStatus) {
+            'completed' => 'Completed',
+            'partially_completed' => 'Partially completed',
+            'not_completed' => 'Not completed',
+            default => '',
+        };
+
+        $hasTargetAccomplishment = ($relatedPlan && trim((string) ($relatedPlan->main_target ?? '')) !== '')
+            || $targetStatus !== '';
+
+        $hasActivityProgress = collect($activityProgress ?: [])->contains(function ($row) {
+            if (! is_array($row)) {
+                return false;
+            }
+            foreach (['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'] as $k) {
+                if (trim((string) ($row[$k] ?? '')) !== '') {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        $achievementRows = array_values(array_filter(array_map(function ($item) {
+            if (is_string($item)) {
+                return trim($item);
+            }
+            if (is_array($item)) {
+                return trim((string) ($item['achievement'] ?? ''));
+            }
+
+            return '';
+        }, $keyAchievements)));
+        $hasAchievements = count($achievementRows) > 0;
+
+        $hasReportMeetings = collect($reportMeetings ?: [])->contains(function ($row) {
+            if (! is_array($row)) {
+                return false;
+            }
+            foreach (['date', 'meeting', 'participant_user_ids', 'participants', 'status', 'location', 'reactions_notes'] as $k) {
+                $value = $row[$k] ?? null;
+                if (is_array($value)) {
+                    if (count(array_filter(array_map(static fn ($item) => trim((string) $item), $value))) > 0) {
+                        return true;
+                    }
+                } elseif (trim((string) $value) !== '') {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        $hasChallengesMitigation = collect($challengesMitigation ?: [])->contains(function ($row) {
+            if (! is_array($row)) {
+                return false;
+            }
+            foreach (['challenge', 'action_taken_planned'] as $k) {
+                if (trim((string) ($row[$k] ?? '')) !== '') {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        $planBudgetFiltered = is_array($planBudget) ? array_values(array_filter($planBudget, function ($row) {
+            if (!is_array($row)) {
+                return false;
+            }
+
+            return trim((string) ($row['item'] ?? '')) !== ''
+                || trim((string) ($row['description_purpose'] ?? '')) !== ''
+                || trim((string) ($row['amount'] ?? '')) !== '';
+        })) : [];
+        $reviewsByUid = $relatedPlan ? $relatedPlan->budgetReviewItemsByUid() : [];
+        $statusByUid = [];
+        foreach ($budgetStatuses as $s) {
+            $sUid = is_array($s) ? trim((string) ($s['budget_uid'] ?? '')) : '';
+            if ($sUid !== '') {
+                $statusByUid[$sUid] = $s;
+            }
+        }
+        $planBudgetTotal = 0.0;
+        foreach ($planBudgetFiltered as $planBudgetRow) {
+            $planBudgetRow = is_array($planBudgetRow) ? $planBudgetRow : [];
+            $planBudgetTotal += \App\Models\Document::parseBudgetAmount((string) ($planBudgetRow['amount'] ?? ''));
+        }
+        $hasBudgetStatus = count($planBudgetFiltered) > 0;
+    @endphp
+
+    <h2>Weekly Report</h2>
+    <h4>{{ $document->display_title }}</h4>
+
+    <div class="meta">
+        <div class="meta-row"><strong>Created by:</strong> {{ $document->user?->name ?? '-' }}</div>
+        <div class="meta-row"><strong>State:</strong> {{ ucfirst((string) $document->state) }}</div>
+        <div class="meta-row"><strong>Work period:</strong>
+            @if($document->period)
+                Week {{ $document->period->week_number }} of {{ $document->period->year }}
+            @else
+                -
+            @endif
+        </div>
+        <div class="meta-row"><strong>Updated at:</strong> {{ $document->updated_at?->format('M d, Y h:i A') }}</div>
+    </div>
+
+    @if($hasTargetAccomplishment)
+        <div class="section-title">Main Target Accomplishment Status</div>
+        @if($relatedPlan && trim((string) ($relatedPlan->main_target ?? '')) !== '')
+            <p><strong>Main Target from Weekly Plan:</strong> {{ $relatedPlan->main_target }}</p>
+        @endif
+        @if($targetStatus !== '')
+            <p><strong>Accomplishment Status:</strong> {{ $targetStatusLabel }}</p>
+            @if(in_array($targetStatus, ['partially_completed', 'not_completed'], true) && trim((string) ($document->target_explanation ?? '')) !== '')
+                <p><strong>Explanation:</strong> {{ $document->target_explanation }}</p>
+            @endif
+        @endif
+    @endif
+
+    @if($summary !== '')
+        <div class="section-title">Summary of the Week</div>
+        <p>{{ $summary }}</p>
+    @endif
+
+    @if($hasActivityProgress)
+        <div class="section-title">Weekly Activity Progress</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 6%;">No.</th>
+                    <th>Activity/Output</th>
+                    <th style="width: 14%;">Progress</th>
+                    <th>Remarks/Challenges</th>
+                    <th style="width: 16%;">Next Step</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php $apNum = 0; @endphp
+                @foreach(($activityProgress ?: []) as $row)
+                    @php
+                        $row = is_array($row) ? $row : [];
+                        $apEmpty = true;
+                        foreach (['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'] as $apk) {
+                            if (trim((string) ($row[$apk] ?? '')) !== '') {
+                                $apEmpty = false;
+                                break;
+                            }
+                        }
+                        $activityOutputRaw = trim((string) ($row['activity_output'] ?? ''));
+                        $offPlanActivity = trim((string) ($row['off_plan_activity'] ?? ''));
+                        $activityOutputDisplay = $activityOutputRaw;
+                        $carryToNextPlan = in_array(trim((string) ($row['progress'] ?? '')), ['Partially done', 'Done and carry'], true)
+                            || (bool) ($row['carry_to_next_plan'] ?? false);
+                        if ($activityOutputRaw === '__off_plan__') {
+                            $activityOutputDisplay = $offPlanActivity !== '' ? ('Other (Not on Plan): '.$offPlanActivity) : 'Other (Not on Plan)';
+                        } elseif ($activityOutputRaw === '' && $offPlanActivity !== '') {
+                            $activityOutputDisplay = 'Other (Not on Plan): '.$offPlanActivity;
+                        }
+                    @endphp
+                    @if(!$apEmpty)
+                        @php
+                            $apNum++;
+                            $progressRaw = trim((string) ($row['progress'] ?? ''));
+                            $progressDisplay = match ($progressRaw) {
+                                'Partially done' => 'Carry to next week',
+                                'Done and carry' => 'Done (recurring)',
+                                'Not started' => 'Not done',
+                                default => $progressRaw,
+                            };
+                        @endphp
+                        <tr>
+                            <td class="text-center">{{ $apNum }}</td>
+                            <td>{{ $activityOutputDisplay }}</td>
+                            <td>{{ $progressDisplay }}</td>
+                            <td>{{ $row['remarks_challenges'] ?? '' }}</td>
+                            <td>
+                                {{ $row['next_step'] ?? '' }}
+                                @if($carryToNextPlan)
+                                    (Will be carried to next weekly plan)
+                                @endif
+                            </td>
+                        </tr>
+                    @endif
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if($hasAchievements)
+        <div class="section-title">Key Achievements</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 6%;">No.</th>
+                    <th>Achievement</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($achievementRows as $idx => $achievement)
+                    <tr>
+                        <td class="text-center">{{ $idx + 1 }}</td>
+                        <td>{{ $achievement }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if($hasReportMeetings)
+        <div class="section-title">Meetings Progress</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 12%;">Date</th>
+                    <th>Meeting / Engagement</th>
+                    <th style="width: 18%;">Participant(s)</th>
+                    <th style="width: 10%;">Status</th>
+                    <th style="width: 12%;">Location</th>
+                    <th>Reactions / Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(($reportMeetings ?: []) as $meetingRow)
+                    @php
+                        $meetingRow = is_array($meetingRow) ? $meetingRow : [];
+                        $participantIds = is_array($meetingRow['participant_user_ids'] ?? null) ? $meetingRow['participant_user_ids'] : [];
+                        $participantIds = array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $participantIds)));
+                        $participantIdSet = array_fill_keys($participantIds, true);
+                        $participantNames = collect(($teamUsers ?? collect()))
+                            ->filter(static fn ($u) => isset($participantIdSet[(string) $u->id]))
+                            ->pluck('name')
+                            ->values()
+                            ->all();
+                        $legacyParticipantsText = trim((string) ($meetingRow['participants'] ?? ''));
+                        $meetingEmpty = trim((string) ($meetingRow['date'] ?? '')) === ''
+                            && trim((string) ($meetingRow['meeting'] ?? '')) === ''
+                            && trim((string) ($meetingRow['status'] ?? '')) === ''
+                            && trim((string) ($meetingRow['location'] ?? '')) === ''
+                            && trim((string) ($meetingRow['reactions_notes'] ?? '')) === ''
+                            && count($participantIds) === 0
+                            && $legacyParticipantsText === '';
+                    @endphp
+                    @if(!$meetingEmpty)
+                        <tr>
+                            <td>{{ $meetingRow['date'] ?? '' }}</td>
+                            <td>{{ $meetingRow['meeting'] ?? '' }}</td>
+                            <td>{{ ! empty($participantNames) ? implode(', ', $participantNames) : $legacyParticipantsText }}</td>
+                            <td>{{ trim((string) ($meetingRow['status'] ?? '')) }}</td>
+                            <td>{{ $meetingRow['location'] ?? '' }}</td>
+                            <td>{{ $meetingRow['reactions_notes'] ?? '' }}</td>
+                        </tr>
+                    @endif
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if($hasChallengesMitigation)
+        <div class="section-title">Challenges &amp; Mitigation</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Challenge(s)</th>
+                    <th style="width: 35%;">Action Taken/Planned</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(($challengesMitigation ?: []) as $row)
+                    @php
+                        $row = is_array($row) ? $row : [];
+                        $cmEmpty = true;
+                        foreach (['challenge', 'action_taken_planned'] as $cmk) {
+                            if (trim((string) ($row[$cmk] ?? '')) !== '') {
+                                $cmEmpty = false;
+                                break;
+                            }
+                        }
+                    @endphp
+                    @if(!$cmEmpty)
+                        <tr>
+                            <td>{{ $row['challenge'] ?? '' }}</td>
+                            <td>{{ $row['action_taken_planned'] ?? '' }}</td>
+                        </tr>
+                    @endif
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if($hasBudgetStatus)
+        <div class="section-title">Budget Status (from weekly plan)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Budget Item</th>
+                    <th>Description / Purpose</th>
+                    <th style="width: 14%;">Amount</th>
+                    <th style="width: 12%;">Review</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($planBudgetFiltered as $i => $planRow)
+                    @php
+                        $planRow = is_array($planRow) ? $planRow : [];
+                        $uid = trim((string) ($planRow['budget_uid'] ?? ''));
+                        $review = ($uid !== '' && isset($reviewsByUid[$uid])) ? $reviewsByUid[$uid] : null;
+                        $reviewDecision = is_array($review) ? ($review['decision'] ?? null) : null;
+                        $statusRow = ($uid !== '' && isset($statusByUid[$uid])) ? $statusByUid[$uid] : ($budgetStatuses[$i] ?? []);
+                        $statusRow = is_array($statusRow) ? $statusRow : [];
+                        $reviewLabel = match ($reviewDecision) {
+                            'approved' => 'Approved',
+                            'rejected' => 'Rejected',
+                            'pending' => 'Pending',
+                            default => '-',
+                        };
+                    @endphp
+                    <tr>
+                        <td>{{ $planRow['item'] ?? '' }}</td>
+                        <td>{{ $planRow['description_purpose'] ?? '' }}</td>
+                        <td>{{ $planRow['amount'] ?? '' }}</td>
+                        <td>{{ $reviewLabel }}</td>
+                        <td>{{ $statusRow['notes'] ?? '' }}</td>
+                    </tr>
+                @endforeach
+                <tr class="fw-bold">
+                    <td colspan="2" class="text-end">Total</td>
+                    <td class="text-end">{{ number_format($planBudgetTotal, 2) }}</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
+</body>
+</html>

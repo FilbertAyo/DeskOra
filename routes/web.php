@@ -100,6 +100,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{document}/weekly-report/review', [DocumentWorkflowController::class, 'weeklyReportReview'])
             ->name('weekly-report.review');
 
+        Route::get('/{document}/download', [DocumentCrudController::class, 'downloadPdf'])->name('download');
         Route::get('/{document}', [DocumentCrudController::class, 'show'])->name('show');
         Route::get('/{document}/edit', [DocumentCrudController::class, 'edit'])->name('edit');
         Route::put('/{document}', [DocumentCrudController::class, 'update'])->name('update');
