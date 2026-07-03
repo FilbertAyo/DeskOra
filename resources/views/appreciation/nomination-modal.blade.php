@@ -8,7 +8,7 @@
                   
                     <div>
                         <h4 class="mb-0" id="staffNominationModalLabel">Monthly Staff Appreciation Nomination</h4>
-                        <small class="text-success">For {{ $staffNominationPeriod?->label() }}</small>
+                        <h5 class="text-success fw-semibold">For {{ $staffNominationPeriod?->label() }}</h5>
                     </div>
                 </div>
           </div>
