@@ -292,6 +292,56 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('reassign', $latest['source'] ?? null);
     }
 
+    public function test_manager_editor_reassign_with_explicit_reassign_flag(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $originalAssignee */
+        $originalAssignee = User::factory()->create();
+        /** @var User $newAssignee */
+        $newAssignee = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Flagged reassign task', [$originalAssignee->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    array_merge(
+                        $this->taskRow('task_a', 'Flagged reassign task', [$newAssignee->id], 'Reassign'),
+                        [
+                            'notes_progress' => 'Explicit reassign flag',
+                            'reassign' => true,
+                        ]
+                    ),
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('tasks.0.responsible_user_ids.0', (string) $newAssignee->id);
+
+        $reloaded = Document::fromDomainId((string) $document->id);
+        $history = $reloaded->content['tasks'][0]['history'] ?? [];
+        $latest = end($history);
+        $this->assertSame('reassign', $latest['source'] ?? null);
+    }
+
     public function test_reassign_history_persists_after_document_reload(): void
     {
         /** @var User $manager */

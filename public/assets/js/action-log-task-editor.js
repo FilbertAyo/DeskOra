@@ -139,6 +139,7 @@
             let editingIndex = null;
             let editingPreviousResponsibleIds = [];
             let autosaveInFlight = false;
+            let autosaveChain = Promise.resolve();
 
             function assigneeLabel(task) {
                 const ids = Array.isArray(task.responsible_user_ids) ? task.responsible_user_ids : [];
@@ -292,12 +293,16 @@
 
                 taskList.forEach(function (task, index) {
                     const uid = task.task_uid || genUid();
+                    const progress = task.progress || 'Not Started';
                     formData.append('content[tasks][' + index + '][task_uid]', uid);
                     formData.append('content[tasks][' + index + '][task]', task.task || '');
                     (task.responsible_user_ids || []).forEach(function (responsibleId) {
                         formData.append('content[tasks][' + index + '][responsible_user_ids][]', responsibleId);
                     });
-                    formData.append('content[tasks][' + index + '][progress]', task.progress || 'Not Started');
+                    formData.append('content[tasks][' + index + '][progress]', progress);
+                    if (progress === REASSIGN_OPTION) {
+                        formData.append('content[tasks][' + index + '][reassign]', '1');
+                    }
                     formData.append('content[tasks][' + index + '][due_date]', task.due_date || '');
                     formData.append('content[tasks][' + index + '][compilation_date]', task.compilation_date || '');
                     formData.append('content[tasks][' + index + '][notes_progress]', task.notes_progress || '');
@@ -396,43 +401,56 @@
             }
 
             async function autosaveTasks() {
-                if (autosaveInFlight) {
-                    return;
-                }
-                if (!tasks.length) {
-                    throw new Error('Please add at least one action log task.');
-                }
-
-                autosaveInFlight = true;
-                if (modalSaveBtn) {
-                    modalSaveBtn.disabled = true;
-                }
-
-                try {
-                    const response = await fetch(saveUrl, {
-                        method: 'POST',
-                        headers: {
-                            Accept: 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: buildFormData(tasks, 'draft'),
-                    });
-
-                    const data = await response.json();
-                    if (!response.ok || !data.success) {
-                        throw new Error(data.message || 'Failed to save task.');
+                const runSave = async function () {
+                    if (!tasks.length) {
+                        throw new Error('Please add at least one action log task.');
                     }
 
-                    applyServerResponse(data);
-                    showAutosaveAlert(autosaveAlert, '<i class="ti ti-check me-1"></i>' + (data.message || 'Task saved.'), 'success');
-                    return data;
-                } finally {
-                    autosaveInFlight = false;
+                    autosaveInFlight = true;
                     if (modalSaveBtn) {
-                        modalSaveBtn.disabled = false;
+                        modalSaveBtn.disabled = true;
                     }
-                }
+
+                    try {
+                        const response = await fetch(saveUrl, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: buildFormData(tasks, 'draft'),
+                        });
+
+                        const raw = await response.text();
+                        let data = null;
+                        try {
+                            data = raw ? JSON.parse(raw) : null;
+                        } catch (parseError) {
+                            throw new Error(
+                                response.ok
+                                    ? 'Could not read the server response. Please refresh and try again.'
+                                    : 'Save failed (HTTP ' + response.status + '). Please refresh and try again.'
+                            );
+                        }
+
+                        if (!response.ok || !data || !data.success) {
+                            throw new Error((data && data.message) || 'Failed to save task.');
+                        }
+
+                        applyServerResponse(data);
+                        showAutosaveAlert(autosaveAlert, '<i class="ti ti-check me-1"></i>' + (data.message || 'Task saved.'), 'success');
+                        return data;
+                    } finally {
+                        autosaveInFlight = false;
+                        if (modalSaveBtn) {
+                            modalSaveBtn.disabled = false;
+                        }
+                    }
+                };
+
+                autosaveChain = autosaveChain.then(runSave, runSave);
+                return autosaveChain;
             }
 
             function renderTaskTable() {
@@ -631,25 +649,35 @@
 
             if (modalSaveBtn) {
                 modalSaveBtn.addEventListener('click', function () {
-                    const modalTask = normalizeTask(readModal());
+                    let modalTask = normalizeTask(readModal());
                     if (!modalTask.task.trim()) {
                         window.alert('Please describe what needs to be done.');
                         return;
                     }
 
                     if (modalTask.progress === REASSIGN_OPTION) {
-                        if (!modalTask.responsible_user_ids.length) {
-                            window.alert('Please select who should receive this task.');
-                            return;
-                        }
                         if (!modalTask.notes_progress.trim()) {
                             window.alert('Please explain why you are reassigning this task.');
                             return;
                         }
-                        if (sameIdSets(modalTask.responsible_user_ids, editingPreviousResponsibleIds)) {
-                            window.alert('Please choose a different assignee when reassigning this task.');
+
+                        const previousSet = new Set(editingPreviousResponsibleIds.map(String));
+                        const newAssigneeIds = modalTask.responsible_user_ids
+                            .map(String)
+                            .filter(function (id) {
+                                return !previousSet.has(id);
+                            });
+
+                        if (newAssigneeIds.length === 0) {
+                            window.alert('Please select a new assignee for this task.');
                             return;
                         }
+                        if (newAssigneeIds.length > 1) {
+                            window.alert('Please select only one new assignee when reassigning.');
+                            return;
+                        }
+
+                        modalTask.responsible_user_ids = [newAssigneeIds[0]];
                     }
 
                     const previousTasks = tasks.slice();

@@ -151,6 +151,7 @@ class ActionLogController extends Controller
             'content.tasks.*.compilation_date' => ['nullable', 'date'],
             'content.tasks.*.notes_progress' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.status_reason' => ['nullable', 'string', 'max:2000'],
+            'content.tasks.*.reassign' => ['nullable', 'boolean'],
         ]);
 
         // Get period
@@ -381,6 +382,7 @@ class ActionLogController extends Controller
             'content.tasks.*.compilation_date' => ['nullable', 'date'],
             'content.tasks.*.notes_progress' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.status_reason' => ['nullable', 'string', 'max:2000'],
+            'content.tasks.*.reassign' => ['nullable', 'boolean'],
         ]);
 
         // Get period
@@ -631,7 +633,8 @@ class ActionLogController extends Controller
             $compilationDate = trim((string) ($task['compilation_date'] ?? ''));
             $notesProgress = trim((string) ($task['notes_progress'] ?? ''));
             $taskUid = trim((string) ($task['task_uid'] ?? ''));
-            $isReassign = $progress === self::QUICK_UPDATE_REASSIGN;
+            $isReassign = $progress === self::QUICK_UPDATE_REASSIGN
+                || filter_var($task['reassign'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
             $responsibleIds = $this->normalizeResponsibleIds($task['responsible_user_ids'] ?? []);
 
@@ -886,6 +889,16 @@ class ActionLogController extends Controller
 
     private function applyCancelledTaskRules(array $task, bool $isManager): array
     {
+        $isReassign = ! empty($task['reassign'])
+            || trim((string) ($task['progress'] ?? '')) === self::QUICK_UPDATE_REASSIGN;
+
+        if ($isReassign) {
+            $task['reassign'] = true;
+            $task['status_reason'] = null;
+
+            return $task;
+        }
+
         $progress = trim((string) ($task['progress'] ?? self::PROGRESS_NOT_STARTED));
         if (! in_array($progress, self::PROGRESS_OPTIONS, true)) {
             $progress = self::PROGRESS_NOT_STARTED;
