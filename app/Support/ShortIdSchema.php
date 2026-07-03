@@ -41,6 +41,9 @@ final class ShortIdSchema
             'action_log_tasks',
             'weekly_matrices',
             'weekly_matrix_entries',
+            'nomination_periods',
+            'nomination_participations',
+            'nominations',
         ];
     }
 
@@ -128,6 +131,10 @@ final class ShortIdSchema
             ['action_log_task_history', 'action_log_task_id'],
             ['action_log_task_history', 'period_id'],
             ['action_log_task_history', 'updated_by'],
+            ['nomination_participations', 'nomination_period_id'],
+            ['nomination_participations', 'user_id'],
+            ['nominations', 'nomination_period_id'],
+            ['nominations', 'nominee_id'],
         ];
     }
 

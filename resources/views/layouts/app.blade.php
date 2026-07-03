@@ -52,6 +52,10 @@
                         </div>
                     </div>
                 </div>
+
+                @if ($showStaffNominationModal ?? false)
+                    @include('appreciation.nomination-modal')
+                @endif
             @else
                 @include('errors.deactivated')
             @endif

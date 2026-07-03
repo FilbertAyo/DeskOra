@@ -91,6 +91,31 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        // Decide whether to surface the monthly staff appreciation nomination modal.
+        View::composer('layouts.app', function ($view) {
+            $showStaffNominationModal = false;
+            $staffNominationPeriod = null;
+
+            if (Auth::check() && Schema::hasTable('nomination_periods')) {
+                /** @var \App\Models\User $user */
+                $user = Auth::user();
+                $service = app(\App\Services\StaffAppreciationService::class);
+                $staffNominationPeriod = $service->currentOpenPeriod();
+
+                if ($staffNominationPeriod
+                    && ($user->status ?? '') === 'active'
+                    && ! $service->hasResponded($staffNominationPeriod, $user)) {
+                    $snoozed = session(\App\Http\Controllers\StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
+                    $showStaffNominationModal = $snoozed !== $staffNominationPeriod->id;
+                }
+            }
+
+            $view->with([
+                'showStaffNominationModal' => $showStaffNominationModal,
+                'staffNominationPeriod' => $staffNominationPeriod,
+            ]);
+        });
+
         // Slot views do not inherit layout composer data; omit layouts.app (reminder toast is dashboard-only).
         $weeklyReminderViews = [
             'dashboard',

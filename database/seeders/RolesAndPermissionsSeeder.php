@@ -37,6 +37,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage year plans',
             'manage work periods',
             'manage anonymous feedback',
+            'view appreciation nominations',
             'view activity log',
             'review staff requisition',
             'approve staff requisition',

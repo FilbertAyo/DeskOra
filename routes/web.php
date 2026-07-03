@@ -12,6 +12,7 @@ use App\Http\Controllers\DocumentCrudController;
 use App\Http\Controllers\DocumentDashboardController;
 use App\Http\Controllers\DocumentWorkflowController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
+use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PettyController;
 use App\Http\Controllers\ProfileController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\StaffAppreciationNominationController;
 use App\Http\Controllers\WeeklyMatrixController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
@@ -156,6 +158,18 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+
+    // Staff Appreciation Nomination (staff-facing, anonymous)
+    Route::prefix('staff-appreciation')->name('appreciation.')->group(function () {
+        Route::get('/staff-search', [StaffAppreciationNominationController::class, 'staffSearch'])
+            ->middleware('throttle:30,1')
+            ->name('staff-search');
+        Route::post('/nominate', [StaffAppreciationNominationController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('nominate');
+        Route::post('/skip', [StaffAppreciationNominationController::class, 'skip'])->name('skip');
+        Route::post('/remind-later', [StaffAppreciationNominationController::class, 'remindLater'])->name('remind-later');
+    });
 
 });
 
@@ -306,6 +320,14 @@ Route::middleware(['auth', 'permission:manage work periods'])->group(function ()
     Route::post('/work-periods/{work_period}/close', [WorkPeriodController::class, 'close'])->name('work-periods.close');
     Route::post('/work-periods/{work_period}/archive', [WorkPeriodController::class, 'archive'])->name('work-periods.archive');
     Route::post('/work-periods/reopen-and-reset', [WorkPeriodController::class, 'reopenAndReset'])->name('work-periods.reopen-and-reset');
+});
+
+// Staff Appreciation Nomination (management view)
+Route::middleware(['auth', 'permission:view appreciation nominations'])->group(function () {
+    Route::get('/management/staff-appreciation', [ManageStaffAppreciationController::class, 'index'])
+        ->name('management.appreciation.index');
+    Route::get('/management/staff-appreciation/{nomination_period}', [ManageStaffAppreciationController::class, 'show'])
+        ->name('management.appreciation.show');
 });
 
 // Bonus Petty Cash Routes - View Permission

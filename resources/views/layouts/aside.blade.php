@@ -319,14 +319,32 @@
                     <i class="ti ti-settings"></i>
                 </li>
 
-                @can('manage work periods')
-                    <li class="pc-item {{ Request::routeIs('work-periods.*') ? 'active' : '' }}">
-                        <a href="{{ route('work-periods.index') }}" class="pc-link">
-                            <span class="pc-micon"><i class="ti ti-calendar"></i></span>
-                            <span class="pc-mtext">Manage Work Periods</span>
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('management.*') ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-settings"></i></span>
+                            <span class="pc-mtext">Management</span>
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
+                        <ul class="pc-submenu">
+                            @can('view appreciation nominations')
+                                <li class="{{ Request::routeIs('management.appreciation.*') ? 'active' : '' }}">
+                                    <a href="{{ route('management.appreciation.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Staff Appreciation</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('manage work periods')
+                                <li class="{{ Request::routeIs('work-periods.*') ? 'active' : '' }}">
+                                    <a href="{{ route('work-periods.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Work Periods</span>
+                                    </a>
+                                </li>
+                            @endcan
+                        </ul>
                     </li>
-                @endcan
+
+              
                
                     <li class="pc-item {{ Request::routeIs('reports') ? 'active' : '' }}">
                         <a href="{{ route('reports') }}" class="pc-link">

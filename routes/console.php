@@ -25,3 +25,9 @@ Schedule::command('work-periods:send-reminders')
     ->everyMinute()
     ->timezone(config('app.timezone', 'UTC'))
     ->description('Dispatch configured weekly plan/report reminders');
+
+// Open the monthly staff appreciation nomination window (26th) and close ended windows.
+Schedule::command('nominations:manage')
+    ->dailyAt('00:05')
+    ->timezone(config('app.timezone', 'UTC'))
+    ->description('Manage monthly staff appreciation nomination periods');
