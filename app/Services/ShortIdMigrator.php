@@ -322,13 +322,21 @@ class ShortIdMigrator
 
     private function dropDocumentsView(): void
     {
-        if (DocumentsUnionView::exists()) {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (DocumentsUnionView::isView()) {
             DB::statement('DROP VIEW IF EXISTS documents');
         }
     }
 
     private function recreateDocumentsView(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
         if (! Schema::hasTable('weekly_plans')) {
             return;
         }

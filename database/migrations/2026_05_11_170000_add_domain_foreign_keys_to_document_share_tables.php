@@ -112,6 +112,16 @@ return new class extends Migration
 
     private function hasForeignKey(string $table, string $constraint): bool
     {
+        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            $rows = \Illuminate\Support\Facades\DB::select(
+                "SELECT COUNT(*) AS aggregate FROM sqlite_master WHERE type = 'table' AND sql LIKE ?",
+                ['%'.$constraint.'%']
+            );
+
+            return ((int) ($rows[0]->aggregate ?? 0)) > 0;
+        }
+
         $result = \Illuminate\Support\Facades\DB::select(
             'SELECT COUNT(*) AS aggregate FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND table_name = ? AND constraint_name = ?',
             [$table, $constraint]

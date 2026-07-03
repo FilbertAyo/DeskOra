@@ -19,6 +19,7 @@ class ActionLog extends Model
         'state',
         'submission_email_sent',
         'removed_task_uids',
+        'superseded_by_action_log_id',
     ];
 
     protected function casts(): array

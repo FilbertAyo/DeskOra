@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ActionLog;
 use App\Models\Document;
 use App\Models\WorkPeriod;
 use App\Support\ShortId;
@@ -183,15 +184,17 @@ class ActionLogCarryForwardService
      */
     private function getPriorActionLogDocuments(WorkPeriod $targetPeriod): \Illuminate\Support\Collection
     {
-        return Document::query()
+        return ActionLog::query()
             ->with('period')
-            ->ofType(Document::TYPE_ACTION_LOG)
+            ->whereNull('superseded_by_action_log_id')
             ->whereNotNull('period_id')
             ->where('period_id', '!=', $targetPeriod->id)
             ->whereHas('period', function ($query) use ($targetPeriod): void {
                 $query->whereDate('week_start_date', '<', $targetPeriod->week_start_date);
             })
             ->get()
+            ->map(fn (ActionLog $log) => Document::fromDomainId((string) $log->id))
+            ->filter()
             ->sortByDesc(function (Document $doc) {
                 $period = $doc->period;
                 $start = $period?->week_start_date?->timestamp ?? 0;

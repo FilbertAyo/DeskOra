@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
-use App\Models\ActionLogTask;
 use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Services\ActionLogCarryForwardService;
-use App\Services\Documents\DocumentDomainSyncService;
 use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -18,7 +16,6 @@ use Illuminate\Support\Facades\Auth;
 class ActionLogController extends Controller
 {
     public function __construct(
-        private readonly DocumentDomainSyncService $documentDomainSyncService,
         private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
     ) {}
 
@@ -108,10 +105,7 @@ class ActionLogController extends Controller
 
         // If shared action log already exists for current period, redirect to edit.
         if ($defaultPeriodId) {
-            $existingCurrent = Document::where('period_id', $defaultPeriodId)
-                ->where('type', Document::TYPE_ACTION_LOG)
-                ->latest('id')
-                ->first();
+            $existingCurrent = Document::findCanonicalActionLogForPeriod((string) $defaultPeriodId);
 
             if ($existingCurrent) {
                 return redirect()->route('action-logs.edit', $existingCurrent)
@@ -170,10 +164,7 @@ class ActionLogController extends Controller
         }
 
         // Shared action log per week period.
-        $existingDocument = Document::where('type', Document::TYPE_ACTION_LOG)
-            ->where('period_id', $period->id)
-            ->latest('id')
-            ->first();
+        $existingDocument = Document::findCanonicalActionLogForPeriod((string) $period->id);
         $wasSubmitted = $existingDocument?->isSubmitted() ?? false;
 
         $title = $this->buildActionLogTitle($period);
@@ -198,7 +189,7 @@ class ActionLogController extends Controller
             }
 
             $oldTasks = $this->extractTasks($existingDocument->content);
-            $finalTasks = $this->mergeManagerStoreTasks(
+            $finalTasks = $this->mergeManagerTaskUpdates(
                 $oldTasks,
                 $normalizedContent['tasks'] ?? [],
                 $period,
@@ -211,13 +202,13 @@ class ActionLogController extends Controller
             $nextState = $this->resolveActionLogStateAfterSave($action, $wasSubmitted);
 
             $content = $this->mergeActionLogContentWithTasks($existingDocument->content, $finalTasks);
+            $content = $this->recordRemovedTaskUidsAfterManagerSave($content, $oldTasks, $finalTasks);
 
             $existingDocument->update([
                 'title' => $title,
                 'content' => $content,
                 'state' => $nextState,
             ]);
-            $this->documentDomainSyncService->syncFromDocument($existingDocument);
 
             $document = $existingDocument;
         } else {
@@ -235,7 +226,6 @@ class ActionLogController extends Controller
                 'content' => $this->mergeActionLogContentWithTasks(null, $initialTasks),
                 'state' => $state,
             ]);
-            $this->documentDomainSyncService->syncFromDocument($document);
         }
 
         $message = ($action === 'submit')
@@ -341,11 +331,6 @@ class ActionLogController extends Controller
 
         $this->authorize('manageActionLogs', $document);
 
-        if ($document->period && $document->period->isOpen()) {
-            $this->persistCarriedTaskSyncIfNeeded($document, $document->period);
-            $document->refresh();
-        }
-
         // Get all work periods for dropdown
         $workPeriods = WorkPeriod::orderBy('year', 'desc')
             ->orderBy('week_number', 'desc')
@@ -415,6 +400,19 @@ class ActionLogController extends Controller
             $this->authorize('submit', $document);
         }
 
+        if ($request->wantsJson() && $request->filled('expected_updated_at')) {
+            $expected = strtotime((string) $request->input('expected_updated_at')) ?: 0;
+            $actual = optional($document->updated_at)->timestamp ?? 0;
+            if ($expected > 0 && $actual > $expected) {
+                return response()->json([
+                    'message' => 'This action log was updated elsewhere. Refresh the page and try again.',
+                    'conflict' => true,
+                    'document_id' => $document->id,
+                    'updated_at' => optional($document->updated_at)?->toIso8601String(),
+                ], 409);
+            }
+        }
+
         $previousTasks = $this->extractTasks($document->content);
 
         $normalizedContent = $this->normalizeActionLogContent($request->input('content', []));
@@ -441,7 +439,6 @@ class ActionLogController extends Controller
         }
 
         $document->update($updateData);
-        $this->documentDomainSyncService->syncFromDocument($document);
 
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
@@ -554,7 +551,6 @@ class ActionLogController extends Controller
         $document->update([
             'content' => $this->mergeActionLogContentWithTasks($document->content, $tasks),
         ]);
-        $this->documentDomainSyncService->syncFromDocument($document);
 
         $message = $isReassign
             ? 'Task reassigned successfully.'
@@ -610,7 +606,6 @@ class ActionLogController extends Controller
         $document->update([
             'content' => $this->mergeActionLogContentWithTasks($document->content, $sync['tasks']),
         ]);
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
     }
 
     private function orderActionLogsByWorkPeriodDesc($query)
@@ -682,37 +677,6 @@ class ActionLogController extends Controller
         $tasks = $content['tasks'] ?? [];
 
         return is_array($tasks) ? $tasks : [];
-    }
-
-    private function mergeManagerStoreTasks(array $existingTasks, array $incomingTasks, WorkPeriod $period, string $actorUserId): array
-    {
-        $merged = [];
-        foreach ($existingTasks as $existingTask) {
-            if (! is_array($existingTask)) {
-                continue;
-            }
-            $task = $this->normalizeActionLogContent(['tasks' => [$existingTask]])['tasks'][0] ?? null;
-            if (! is_array($task)) {
-                continue;
-            }
-            $merged[$task['task_uid']] = $task;
-        }
-
-        foreach ($incomingTasks as $incomingTask) {
-            if (! is_array($incomingTask)) {
-                continue;
-            }
-            $task = $this->normalizeActionLogContent(['tasks' => [$incomingTask]])['tasks'][0] ?? null;
-            if (! is_array($task)) {
-                continue;
-            }
-            $task = $this->applyCancelledTaskRules($task, true);
-            $existing = $merged[$task['task_uid']] ?? null;
-            $task = $this->applyManagerTaskChange($existing, $task, $period, $actorUserId);
-            $merged[$task['task_uid']] = $task;
-        }
-
-        return array_values($merged);
     }
 
     private function mergeManagerTaskUpdates(array $existingTasks, array $incomingTasks, WorkPeriod $period, string $actorUserId): array
@@ -950,37 +914,6 @@ class ActionLogController extends Controller
         unset($task);
 
         return array_values($tasks);
-    }
-
-    private function isUserAssignedToActionLog(User $user, Document $document): bool
-    {
-        $actionLog = $document->actionLogDomain()
-            ->with('tasks.assignees:id')
-            ->first();
-
-        if ($actionLog) {
-            return $actionLog->tasks->contains(function (ActionLogTask $task) use ($user) {
-                return $task->assignees->contains(fn ($assignee) => (string) $assignee->id === (string) $user->id);
-            });
-        }
-
-        $content = is_array($document->content) ? $document->content : [];
-        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-        foreach ($tasks as $task) {
-            if (! is_array($task)) {
-                continue;
-            }
-            $responsibleIds = $task['responsible_user_ids'] ?? [];
-            if (! is_array($responsibleIds)) {
-                continue;
-            }
-            $ids = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
-            if (in_array((string) $user->id, $ids, true)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function resolveActionLogStateAfterSave(string $action, bool $wasSubmitted): string

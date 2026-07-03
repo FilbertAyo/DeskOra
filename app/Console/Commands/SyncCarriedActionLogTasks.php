@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ActionLog;
 use App\Models\Document;
 use App\Models\WorkPeriod;
 use App\Services\ActionLogCarryForwardService;
-use App\Services\Documents\DocumentDomainSyncService;
 use Illuminate\Console\Command;
 
 class SyncCarriedActionLogTasks extends Command
@@ -18,7 +18,6 @@ class SyncCarriedActionLogTasks extends Command
 
     public function __construct(
         private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
-        private readonly DocumentDomainSyncService $documentDomainSyncService,
     ) {
         parent::__construct();
     }
@@ -34,11 +33,7 @@ class SyncCarriedActionLogTasks extends Command
             return Command::FAILURE;
         }
 
-        $document = Document::query()
-            ->actionLogs()
-            ->where('period_id', $period->id)
-            ->latest('id')
-            ->first();
+        $document = Document::findCanonicalActionLogForPeriod((string) $period->id);
 
         if (! $document) {
             $this->error('No action log document exists for '.$period->display_name.'.');
@@ -75,10 +70,22 @@ class SyncCarriedActionLogTasks extends Command
             return Command::SUCCESS;
         }
 
+        $existingContent = is_array($document->content) ? $document->content : [];
+        $actionLog = ActionLog::query()->find((string) $document->id);
+        $meta = is_array($existingContent['meta'] ?? null) ? $existingContent['meta'] : [];
+        if ($actionLog && is_array($actionLog->removed_task_uids) && $actionLog->removed_task_uids !== []) {
+            $meta['removed_task_uids'] = $actionLog->removed_task_uids;
+        }
+        if ($actionLog?->submission_email_sent) {
+            $meta['submission_email_sent'] = true;
+        }
+
         $document->update([
-            'content' => ['tasks' => $sync['tasks']],
+            'content' => [
+                'tasks' => $sync['tasks'],
+                'meta' => $meta,
+            ],
         ]);
-        $this->documentDomainSyncService->syncFromDocument($document->fresh());
 
         $this->info('Action log synced successfully.');
 

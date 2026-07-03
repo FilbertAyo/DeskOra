@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActionLog;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
@@ -48,6 +49,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
                 'action' => 'draft',
                 'content' => [
                     'tasks' => [
+                        $this->taskRow('task_a', 'Initial submitted task'),
                         $this->taskRow('task_b', 'Follow-up task on Friday'),
                     ],
                 ],
@@ -57,13 +59,13 @@ class ActionLogPanelCorrectionsTest extends TestCase
 
             $this->assertEquals(
                 1,
-                Document::query()
-                    ->where('type', Document::TYPE_ACTION_LOG)
+                ActionLog::query()
                     ->where('period_id', $period->id)
+                    ->whereNull('superseded_by_action_log_id')
                     ->count()
             );
 
-            $document->refresh();
+            $document = Document::fromDomainId((string) $document->id);
             $tasks = $document->content['tasks'] ?? [];
 
             $this->assertSame(Document::STATE_DRAFT, $document->state);
@@ -288,6 +290,96 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertNotEmpty($history);
         $latest = end($history);
         $this->assertSame('reassign', $latest['source'] ?? null);
+    }
+
+    public function test_reassign_history_persists_after_document_reload(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $staff */
+        $staff = User::factory()->create();
+        /** @var User $newAssignee */
+        $newAssignee = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'Reassign',
+            'reassign_user_id' => $newAssignee->id,
+            'notes_progress' => 'Persist reassign metadata',
+        ])->assertSessionHas('success');
+
+        $reloaded = Document::fromDomainId((string) $document->id);
+        $this->assertNotNull($reloaded);
+        $history = $reloaded->content['tasks'][0]['history'] ?? [];
+        $latest = end($history);
+        $this->assertSame('reassign', $latest['source'] ?? null);
+        $this->assertSame((string) $newAssignee->id, $latest['reassigned_to'] ?? null);
+        $this->assertContains((string) $staff->id, $latest['reassigned_from'] ?? []);
+    }
+
+    public function test_edit_get_does_not_mutate_action_log_tasks(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+            $manager->givePermissionTo('manage action logs');
+
+            $previous = $this->createOpenPeriod(2026, 13, '2026-03-23', '2026-03-29');
+            $current = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $previous->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 13 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_carry', 'Carried open task', [], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            $document = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $current->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 14 of 2026',
+                'state' => Document::STATE_DRAFT,
+                'content' => [
+                    'tasks' => [],
+                    'meta' => ['removed_task_uids' => ['task_carry']],
+                ],
+            ]);
+
+            $before = json_encode($document->content);
+
+            $this->actingAs($manager)->get(route('action-logs.edit', $document))->assertOk();
+
+            $document->refresh();
+            $this->assertSame($before, json_encode($document->content));
+            $this->assertCount(0, $document->content['tasks'] ?? []);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_quick_update_requires_progress_notes(): void
@@ -717,7 +809,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
         }
     }
 
-    public function test_edit_syncs_missing_carried_tasks_into_current_week_log(): void
+    public function test_manager_update_syncs_missing_carried_tasks_into_current_week_log(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 19, 10, 0, 0));
 
@@ -755,9 +847,8 @@ class ActionLogPanelCorrectionsTest extends TestCase
                 ],
             ]);
 
-            $response = $this->actingAs($manager)->get(route('action-logs.edit', $week25Doc));
-
-            $response->assertOk();
+            $this->artisan('action-logs:sync-carried-tasks', ['--period' => $week25->id])
+                ->assertSuccessful();
 
             $week25Doc->refresh();
             $taskTexts = collect($week25Doc->content['tasks'] ?? [])->pluck('task')->all();
@@ -966,7 +1057,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame([(string) $assignee->id], $row['responsible_user_ids'] ?? null);
     }
 
-    public function test_staff_can_quick_update_carried_task_after_edit_sync(): void
+    public function test_staff_can_quick_update_carried_task_after_explicit_carry_sync(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 19, 10, 0, 0));
 
@@ -1006,7 +1097,8 @@ class ActionLogPanelCorrectionsTest extends TestCase
                 ],
             ]);
 
-            $this->actingAs($manager)->get(route('action-logs.edit', $week25Doc))->assertOk();
+            $this->artisan('action-logs:sync-carried-tasks', ['--period' => $week25->id])
+                ->assertSuccessful();
 
             $week25Doc->refresh();
             $this->assertTrue(
@@ -1222,7 +1314,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $documentId = $response->json('document_id');
             $this->assertNotEmpty($documentId);
 
-            $document = Document::find($documentId);
+            $document = Document::fromDomainId((string) $documentId);
             $this->assertNotNull($document);
             $this->assertSame(Document::TYPE_ACTION_LOG, $document->type);
             $this->assertSame(Document::STATE_DRAFT, $document->state);

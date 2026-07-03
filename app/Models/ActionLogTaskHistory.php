@@ -20,12 +20,16 @@ class ActionLogTaskHistory extends Model
         'status_reason',
         'changed_at',
         'source',
+        'reassigned_from_user_ids',
+        'reassigned_to_user_ids',
     ];
 
     protected function casts(): array
     {
         return [
             'changed_at' => 'datetime',
+            'reassigned_from_user_ids' => 'array',
+            'reassigned_to_user_ids' => 'array',
         ];
     }
 

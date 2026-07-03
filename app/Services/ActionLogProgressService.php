@@ -2,16 +2,20 @@
 
 namespace App\Services;
 
+use App\Models\ActionLog;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
-use App\Services\Documents\DocumentDomainSyncService;
+use App\Support\ActionLogTaskSupport;
+use Illuminate\Database\Eloquent\Builder;
 
 class ActionLogProgressService
 {
+    /** @var array<string, array<string, mixed>> */
+    private array $buildForUserCache = [];
+
     public function __construct(
         private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
-        private readonly DocumentDomainSyncService $documentDomainSyncService,
     ) {}
 
     /**
@@ -19,28 +23,48 @@ class ActionLogProgressService
      */
     public function buildForUser(User $user): array
     {
-        $this->syncCurrentPeriodActionLogIfNeeded();
+        $cacheKey = (string) $user->id;
+        if (isset($this->buildForUserCache[$cacheKey])) {
+            return $this->buildForUserCache[$cacheKey];
+        }
 
         $canManageActionLogs = $user->hasPermissionTo('manage action logs');
-        $documentsQuery = Document::with('period')
-            ->actionLogs()
+        $currentPeriod = WorkPeriod::getCurrent();
+
+        $actionLogQuery = ActionLog::query()
+            ->with(['period', 'tasks.assignees'])
+            ->whereNull('superseded_by_action_log_id')
             ->whereNotNull('period_id');
 
-        $documents = $canManageActionLogs
-            ? $documentsQuery->get()
-            : $documentsQuery->where('state', Document::STATE_SUBMITTED)->get()
-                ->filter(fn (Document $document) => $this->isUserAssignedToActionLog($user, $document))->values();
+        if ($canManageActionLogs) {
+            $actionLogQuery->where(function (Builder $query) use ($currentPeriod): void {
+                if ($currentPeriod) {
+                    $query->where('period_id', $currentPeriod->id);
+                }
+                $query->orWhere(function (Builder $draftQuery): void {
+                    $draftQuery->where('state', Document::STATE_DRAFT)
+                        ->whereHas('period', fn (Builder $periodQuery) => $periodQuery->where('status', WorkPeriod::STATUS_OPEN));
+                });
+            });
+        } else {
+            $actionLogQuery
+                ->where('state', Document::STATE_SUBMITTED)
+                ->whereHas('tasks.assignees', fn (Builder $query) => $query->where('users.id', $user->id));
+        }
+
+        $documents = $actionLogQuery->get()
+            ->map(fn (ActionLog $log) => Document::fromDomainId((string) $log->id))
+            ->filter()
+            ->values();
 
         if ($documents->isEmpty()) {
-            return [
+            return $this->buildForUserCache[$cacheKey] = [
                 'activeTasks' => [],
                 'currentDraftId' => null,
                 'showNotifications' => false,
             ];
         }
 
-        // Keep one document per period: prefer the latest updated record,
-        // and break ties toward drafts so in-progress staff updates are reflected.
         $selectedByPeriod = $documents
             ->groupBy('period_id')
             ->map(function ($periodDocs) {
@@ -57,7 +81,6 @@ class ActionLogProgressService
             ->sortBy(fn ($doc) => optional($doc->period)->week_start_date?->timestamp ?? 0)
             ->values();
 
-        $currentPeriod = WorkPeriod::getCurrent();
         $priorResponsibleMap = $currentPeriod
             ? $this->actionLogCarryForwardService->buildPriorResponsibleMap($currentPeriod)
             : [];
@@ -65,8 +88,6 @@ class ActionLogProgressService
             ? $selectedByPeriod->first(fn ($doc) => $doc->period_id === $currentPeriod->id && $doc->isDraft())
             : null;
 
-        // Focus tasks should reflect what is still pending now.
-        // Prefer current-week action log rows; fall back to historical timeline only if current week has none.
         $focusPeriodDocuments = $selectedByPeriod;
         if ($currentPeriod) {
             $currentPeriodDocs = $selectedByPeriod
@@ -84,9 +105,8 @@ class ActionLogProgressService
                 continue;
             }
 
-            $content = is_array($document->content) ? $document->content : [];
-            $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-            if (empty($tasks)) {
+            $tasks = ActionLogTaskSupport::extractTasks($document->content);
+            if ($tasks === []) {
                 continue;
             }
 
@@ -95,11 +115,7 @@ class ActionLogProgressService
                     continue;
                 }
 
-                $responsibleIds = $task['responsible_user_ids'] ?? [];
-                if (! is_array($responsibleIds)) {
-                    $responsibleIds = [];
-                }
-                $responsibleIds = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
+                $responsibleIds = ActionLogTaskSupport::normalizeResponsibleIds($task['responsible_user_ids'] ?? []);
                 $taskUid = trim((string) ($task['task_uid'] ?? ''));
                 if ($responsibleIds === [] && $taskUid !== '' && isset($priorResponsibleMap[$taskUid])) {
                     $responsibleIds = $priorResponsibleMap[$taskUid];
@@ -194,7 +210,7 @@ class ActionLogProgressService
             ->values()
             ->all();
 
-        return [
+        return $this->buildForUserCache[$cacheKey] = [
             'activeTasks' => $activeTasks,
             'currentDraftId' => $canManageActionLogs ? $currentDraftDoc?->id : null,
             'showNotifications' => ! empty($activeTasks),
@@ -219,37 +235,6 @@ class ActionLogProgressService
         return $this->pendingUpdatesForUser($user) !== [];
     }
 
-    private function syncCurrentPeriodActionLogIfNeeded(): void
-    {
-        $currentPeriod = WorkPeriod::getCurrent();
-        if (! $currentPeriod || ! $currentPeriod->isOpen()) {
-            return;
-        }
-
-        $currentDoc = Document::query()
-            ->actionLogs()
-            ->where('period_id', $currentPeriod->id)
-            ->latest('id')
-            ->first();
-
-        if (! $currentDoc) {
-            return;
-        }
-
-        $sync = $this->actionLogCarryForwardService->syncMissingCarriedTasks($currentDoc, $currentPeriod);
-        if (! $sync['changed']) {
-            return;
-        }
-
-        $content = is_array($currentDoc->content) ? $currentDoc->content : [];
-        $content['tasks'] = $sync['tasks'];
-
-        $currentDoc->update([
-            'content' => $content,
-        ]);
-        $this->documentDomainSyncService->syncFromDocument($currentDoc->fresh());
-    }
-
     /**
      * @param  \Illuminate\Support\Collection<int, Document>  $documentsByPeriod
      */
@@ -267,8 +252,7 @@ class ActionLogProgressService
                 continue;
             }
 
-            $content = is_array($document->content) ? $document->content : [];
-            $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
+            $tasks = ActionLogTaskSupport::extractTasks($document->content);
             foreach ($tasks as $task) {
                 if (! is_array($task)) {
                     continue;
@@ -298,48 +282,7 @@ class ActionLogProgressService
                 continue;
             }
 
-            $source = trim((string) ($entry['source'] ?? ''));
-            if ($source === 'auto_init') {
-                continue;
-            }
-            if ($source === 'update') {
-                return true;
-            }
-
-            $notes = trim((string) ($entry['notes_progress'] ?? ''));
-            $reason = trim((string) ($entry['status_reason'] ?? ''));
-            if ($notes !== '' || $reason !== '') {
-                return true;
-            }
-
-            $fromProgress = trim((string) ($entry['from_progress'] ?? ''));
-            $toProgress = trim((string) ($entry['to_progress'] ?? ''));
-
-            if ($fromProgress !== '' && $toProgress !== '' && $fromProgress !== $toProgress) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function isUserAssignedToActionLog(User $user, Document $document): bool
-    {
-        $content = is_array($document->content) ? $document->content : [];
-        $tasks = is_array($content['tasks'] ?? null) ? $content['tasks'] : [];
-
-        foreach ($tasks as $task) {
-            if (! is_array($task)) {
-                continue;
-            }
-
-            $responsibleIds = $task['responsible_user_ids'] ?? [];
-            if (! is_array($responsibleIds)) {
-                continue;
-            }
-
-            $ids = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $responsibleIds)));
-            if (in_array((string) $user->id, $ids, true)) {
+            if (ActionLogTaskSupport::isRealHistoryEntry($entry)) {
                 return true;
             }
         }

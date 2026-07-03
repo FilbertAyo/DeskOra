@@ -366,6 +366,12 @@ class DocumentContentAssembler
                     'status_reason' => (string) ($historyRow->status_reason ?? ''),
                     'changed_at' => (string) ($historyRow->changed_at ?? ''),
                     'source' => (string) ($historyRow->source ?? ''),
+                    'reassigned_from' => is_array($historyRow->reassigned_from_user_ids)
+                        ? array_values($historyRow->reassigned_from_user_ids)
+                        : [],
+                    'reassigned_to' => is_array($historyRow->reassigned_to_user_ids)
+                        ? (string) ($historyRow->reassigned_to_user_ids[0] ?? '')
+                        : '',
                 ];
             }
 

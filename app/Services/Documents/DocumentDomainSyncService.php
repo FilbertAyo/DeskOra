@@ -439,16 +439,20 @@ class DocumentDomainSyncService
             'removed_task_uids' => $removedTaskUids !== [] ? $removedTaskUids : null,
         ]);
 
-        $actionLog->tasks()->delete();
+        $actionLog->load('tasks.history');
+
+        $existingByUid = $actionLog->tasks->keyBy(fn ($t) => (string) $t->task_uid);
+        $incomingUids = [];
 
         foreach (array_values($taskRows) as $index => $row) {
             if (! is_array($row)) {
                 continue;
             }
 
-            $task = ActionLogTask::query()->create([
-                'action_log_id' => (string) $actionLog->id,
-                'task_uid' => trim((string) ($row['task_uid'] ?? '')) ?: ('task_'.Str::lower((string) Str::ulid())),
+            $taskUid = trim((string) ($row['task_uid'] ?? '')) ?: ('task_'.Str::lower((string) Str::ulid()));
+            $incomingUids[] = $taskUid;
+
+            $attributes = [
                 'task_no' => (int) ($row['task_no'] ?? ($index + 1)),
                 'task' => trim((string) ($row['task'] ?? '')) ?: null,
                 'progress' => trim((string) ($row['progress'] ?? '')) ?: 'Not Started',
@@ -457,7 +461,17 @@ class DocumentDomainSyncService
                 'notes_progress' => trim((string) ($row['notes_progress'] ?? '')) ?: null,
                 'status_reason' => trim((string) ($row['status_reason'] ?? '')) ?: null,
                 'sort_order' => $index,
-            ]);
+            ];
+
+            $task = $existingByUid->get($taskUid);
+            if ($task) {
+                $task->update($attributes);
+            } else {
+                $task = ActionLogTask::query()->create(array_merge($attributes, [
+                    'action_log_id' => (string) $actionLog->id,
+                    'task_uid' => $taskUid,
+                ]));
+            }
 
             $assigneeIds = collect(is_array($row['responsible_user_ids'] ?? null) ? $row['responsible_user_ids'] : [])
                 ->map(fn ($id) => trim((string) $id))
@@ -467,11 +481,19 @@ class DocumentDomainSyncService
                 ->all();
             $task->assignees()->sync($assigneeIds);
 
+            $task->history()->delete();
             $historyRows = is_array($row['history'] ?? null) ? $row['history'] : [];
             foreach ($historyRows as $historyRow) {
                 if (! is_array($historyRow)) {
                     continue;
                 }
+
+                $reassignedFrom = is_array($historyRow['reassigned_from'] ?? null)
+                    ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $historyRow['reassigned_from'])))
+                    : null;
+                $reassignedTo = trim((string) ($historyRow['reassigned_to'] ?? ''));
+                $reassignedToIds = $reassignedTo !== '' ? [$reassignedTo] : null;
+
                 $task->history()->create([
                     'period_id' => trim((string) ($historyRow['period_id'] ?? '')) ?: null,
                     'period_label' => trim((string) ($historyRow['period_label'] ?? '')) ?: null,
@@ -482,8 +504,16 @@ class DocumentDomainSyncService
                     'status_reason' => trim((string) ($historyRow['status_reason'] ?? '')) ?: null,
                     'changed_at' => trim((string) ($historyRow['changed_at'] ?? '')) ?: null,
                     'source' => trim((string) ($historyRow['source'] ?? '')) ?: null,
+                    'reassigned_from_user_ids' => $reassignedFrom !== [] ? $reassignedFrom : null,
+                    'reassigned_to_user_ids' => $reassignedToIds,
                 ]);
             }
+        }
+
+        if ($incomingUids !== []) {
+            $actionLog->tasks()->whereNotIn('task_uid', $incomingUids)->delete();
+        } else {
+            $actionLog->tasks()->delete();
         }
     }
 }
