@@ -18,18 +18,7 @@
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="alert alert-light-primary border border-primary d-flex align-items-start gap-2" role="alert">
-                <i class="ti ti-shield-lock f-20 mt-1"></i>
-                <div class="small">
-                    Nominations are <strong>anonymous</strong>. You can see who was nominated and why, but never who
-                    submitted a nomination. These results are intended to surface staff who positively impact colleagues;
-                    the final Employee of the Month decision remains with management.
-                </div>
-            </div>
-        </div>
-    </div>
+  
 
     @if (! $currentPeriod)
         <div class="card shadow-none border">
@@ -53,9 +42,7 @@
                             <span class="badge bg-light-secondary border border-secondary ms-2">Closed</span>
                         @endif
                     </h5>
-                    <p class="text-muted small mb-0 mt-1">
-                        Window: {{ $currentPeriod->opens_at->format('M d, H:i') }} – {{ $currentPeriod->closes_at->format('M d, H:i') }}
-                    </p>
+                   
                 </div>
                 <a href="{{ route('management.appreciation.show', $currentPeriod) }}" class="btn btn-sm btn-light">
                     <i class="ti ti-external-link me-1"></i> Full results
@@ -106,7 +93,7 @@
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0"><i class="ti ti-calendar-stats me-2"></i>History</h5>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body p-3">
                 <div class="table-responsive">
                     <table class="table table-hover table-bordered mb-0 align-middle">
                         <thead class="thead-light">

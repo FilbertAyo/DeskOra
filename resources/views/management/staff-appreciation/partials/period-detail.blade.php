@@ -8,7 +8,7 @@
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-xl-3">
-        <div class="card shadow-none border h-100 mb-0">
+        <div class="card shadow-none border mb-0">
             <div class="card-body">
                 <p class="text-muted mb-1 small text-uppercase">Eligible staff</p>
                 <h3 class="mb-0">{{ $stats['eligible'] }}</h3>
@@ -16,16 +16,16 @@
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="card shadow-none border h-100 mb-0">
+        <div class="card shadow-none border mb-0">
             <div class="card-body">
                 <p class="text-muted mb-1 small text-uppercase">Responded</p>
-                <h3 class="mb-0">{{ $stats['responded'] }} <span class="text-muted f-14">/ {{ $stats['eligible'] }}</span></h3>
-                <span class="badge bg-light-primary border border-primary text-dark mt-1">{{ $stats['rate'] }}% participation</span>
-            </div>
+                <h3 class="mb-0">{{ $stats['responded'] }} <span class="text-muted f-14">/ {{ $stats['eligible'] }}</span>       <span class="badge bg-light-primary border border-primary text-dark mt-1">{{ $stats['rate'] }}% participation</span>
+                </h3>
+           </div>
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="card shadow-none border h-100 mb-0">
+        <div class="card shadow-none border mb-0">
             <div class="card-body">
                 <p class="text-muted mb-1 small text-uppercase">Nominations</p>
                 <h3 class="mb-0 text-success">{{ $stats['nominated'] }}</h3>
@@ -33,7 +33,7 @@
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="card shadow-none border h-100 mb-0">
+        <div class="card shadow-none border mb-0">
             <div class="card-body">
                 <p class="text-muted mb-1 small text-uppercase">Skipped</p>
                 <h3 class="mb-0 text-muted">{{ $stats['skipped'] }}</h3>
