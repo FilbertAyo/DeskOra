@@ -352,6 +352,14 @@ class DashboardController extends Controller
                 (string) $currentPeriod->id,
             )
             : collect();
+        $todaysDayName = now()->format('l');
+        $todaysWeeklyTasks = $currentPeriod
+            ? $this->weeklyActivityAssignmentService->todaysTasksForUser(
+                (string) $user->id,
+                (string) $currentPeriod->id,
+                $todaysDayName,
+            )
+            : collect();
 
         $currentPlanYear = (int) now()->year;
         $currentYearPlan = YearPlan::query()
@@ -435,6 +443,8 @@ class DashboardController extends Controller
             'actionLogProgress',
             'teamUsers',
             'assignedWeeklyActivities',
+            'todaysDayName',
+            'todaysWeeklyTasks',
             'yearPlanMonthCoverageAlert'
         ));
     }

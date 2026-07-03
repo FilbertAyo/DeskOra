@@ -70,6 +70,10 @@
         $planCoverageTotalCount = (int) ($planCoverageAlert['totalActivities'] ?? 0);
         $planCoverageYear = (int) ($planCoverageAlert['year'] ?? now()->year);
         $planCoverageActionUrl = $planCoverageAlert['actionUrl'] ?? null;
+        $todaysWeeklyTasks = collect($todaysWeeklyTasks ?? []);
+        $todaysDayName = $todaysDayName ?? now()->format('l');
+        $showTodaysWeeklyTasks = in_array($todaysDayName, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], true);
+        $todaysTasksClear = ! $showTodaysWeeklyTasks || $todaysWeeklyTasks->isEmpty();
     @endphp
 
 
@@ -116,175 +120,177 @@
         @endif
 
         <div class="col-12 col-lg-8 col-md-8 mb-3">
-            <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="ti ti-bell me-2"></i>Insights</h5>
-                    <span class="badge bg-light-primary border border-primary">
-                        {{ ($returnedDocs->count() ?? 0) + ($plainDraftDocs->count() ?? 0) + $activeActionTaskCount + $sharedWithMeCount + $assignedWeeklyActivityCount }}
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-6 col-xl-2">
-                            <div class="p-3 border rounded h-100">
-                                <p class="mb-1 text-muted small">
-                                    <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned
-                                </p>
-                                <h4 class="mb-1 text-dark">{{ $returnedDocs->count() }}</h4>
-                          </div>
-                        </div>
-                        <div class="col-6 col-xl-2">
-                            <div class="p-3 border rounded h-100">
-                                <p class="mb-1 text-muted small">
-                                    <i class="ti ti-file-edit text-warning me-1"></i>Drafts 
-                                </p>
-                                <h4 class="mb-1 text-dark">{{ $plainDraftDocs->count() }}</h4>
-                           </div>
-                        </div>
-                        <div class="col-6 col-xl-2">
-                            <div class="p-3 border rounded h-100">
-                                <p class="mb-1 text-muted small">
-                                    <i class="ti ti-clipboard-list text-primary me-1"></i>Open
-                                </p>
-                                <h4 class="mb-1 text-dark">{{ $activeActionTaskCount }}</h4>
-                           </div>
-                        </div>
-                        <div class="col-6 col-xl-4">
-                            <div class="p-3 border rounded h-100">
-                                <p class="mb-1 text-muted small">
-                                    <i class="ti ti-users-group text-info me-1"></i>Shared
-                                </p>
-                                <h4 class="mb-1 text-dark">{{ $sharedWithMeCount }}</h4>
-                              @if($sharedWithMeCount > 0)
-                                    <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top small">
-                                        @if(isset($dashboardAvailableTypes['weekly_plan']))
-                                            <a href="{{ route('documents.weekly-plans') }}" class="text-decoration-none">
-                                                <i class="ti ti-target me-1"></i>Weekly plans
-                                            </a>
-                                        @endif
-                                        @if(isset($dashboardAvailableTypes['weekly_report']))
-                                            <a href="{{ route('documents.weekly-reports') }}" class="text-decoration-none">
-                                                <i class="ti ti-activity me-1"></i>Weekly reports
-                                            </a>
-                                        @endif
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="col-6 col-xl-2">
-                            <div class="p-3 border rounded h-100">
-                                <p class="mb-1 text-muted small">
-                                    <i class="ti ti-clipboard-list text-secondary me-1"></i>Assigned
-                                </p>
-                                <h4 class="mb-1 text-dark">{{ $assignedWeeklyActivityCount }}</h4>
-                           </div>
+            <div class="row g-3">
+                <div class="col-6 col-xl-2">
+                    <div class="card shadow-none border">
+                        <div class="card-body">
+                            <p class="mb-1 text-muted small">
+                                <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned
+                            </p>
+                            <h4 class="mb-0 text-dark">{{ $returnedDocs->count() }}</h4>
                         </div>
                     </div>
-
-                    @if($weeklySubmissionReminder && count($weeklySubmissionReminder->missedMessages) > 0)
-                        <div class="alert alert-danger border mb-0 mt-3">
-                            <p class="mb-1 fw-semibold"><i class="ti ti-alert-circle me-1"></i>Missed submission window</p>
-                            <p class="mb-2 small text-muted">
-                                @if(isset($deadlineStatuses['plan_due']) || isset($deadlineStatuses['report_due']))
-                                    @if(isset($deadlineStatuses['plan_due']))
-                                        Plan cutoff: {{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y H:i') }}.
-                                    @endif
-                                    @if(isset($deadlineStatuses['report_due']))
-                                        Report cutoff: {{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}.
-                                    @endif
-                                @else
-                                    Weekly plan and report cut-off is managed by the active work period deadlines.
-                                @endif
+                </div>
+                <div class="col-6 col-xl-2">
+                    <div class="card shadow-none border">
+                        <div class="card-body">
+                            <p class="mb-1 text-muted small">
+                                <i class="ti ti-file-edit text-warning me-1"></i>Drafts
                             </p>
-                            <ul class="mb-0 ps-3 small">
-                                @foreach($weeklySubmissionReminder->missedMessages as $line)
-                                    <li>{{ $line }}</li>
-                                @endforeach
-                            </ul>
+                            <h4 class="mb-0 text-dark">{{ $plainDraftDocs->count() }}</h4>
                         </div>
-                    @endif
-
-                    @if($hasWeeklyGraceWindow)
-                        <div class="alert alert-warning border mb-0 mt-3">
-                            <p class="mb-2 fw-semibold"><i class="ti ti-clock-hour-4 me-1"></i>Grace period is active</p>
-                            <p class="mb-2 small text-muted">
-                                Your administrator extended the deadline. Use the buttons below to create or finish the document before the new cutoff.
+                    </div>
+                </div>
+                <div class="col-6 col-xl-2">
+                    <div class="card shadow-none border">
+                        <div class="card-body">
+                            <p class="mb-1 text-muted small">
+                                <i class="ti ti-clipboard-list text-primary me-1"></i>Open
                             </p>
-                            <ul class="mb-3 ps-3 small">
-                                @foreach($planGraceEntries as $planGraceEntry)
-                                    <li class="mb-2">
-                                        <span class="d-block">
-                                            Weekly plan deadline was extended
-                                            @if($planGraceEntry->period)
-                                                for Week {{ $planGraceEntry->period->week_number }} of {{ $planGraceEntry->period->year }}
-                                            @endif.
-                                            @if($planGraceEntry->graceEndsAt)
-                                                You can still submit until {{ $planGraceEntry->graceEndsAt->format('M d, Y H:i') }}.
-                                            @endif
-                                        </span>
-                                        @if(isset($availableTypes['weekly_plan']))
-                                            <span class="d-inline-block mt-1">
-                                                @include('documents.partials.weekly-submission-action-button', [
-                                                    'slot' => $planGraceEntry,
-                                                    'documentType' => 'weekly_plan',
-                                                    'btnClass' => 'btn-warning',
-                                                ])
-                                            </span>
-                                        @endif
-                                    </li>
-                                @endforeach
-                                @foreach($reportGraceEntries as $reportGraceEntry)
-                                    <li class="{{ $loop->last ? 'mb-0' : 'mb-2' }}">
-                                        <span class="d-block">
-                                            Weekly report deadline was extended
-                                            @if($reportGraceEntry->period)
-                                                for Week {{ $reportGraceEntry->period->week_number }} of {{ $reportGraceEntry->period->year }}
-                                            @endif.
-                                            @if($reportGraceEntry->graceEndsAt)
-                                                You can still submit until {{ $reportGraceEntry->graceEndsAt->format('M d, Y H:i') }}.
-                                            @endif
-                                        </span>
-                                        @if(isset($availableTypes['weekly_report']))
-                                            <span class="d-inline-block mt-1">
-                                                @include('documents.partials.weekly-submission-action-button', [
-                                                    'slot' => $reportGraceEntry,
-                                                    'documentType' => 'weekly_report',
-                                                    'btnClass' => 'btn-warning',
-                                                ])
-                                            </span>
-                                        @endif
-                                    </li>
-                                @endforeach
-                            </ul>
+                            <h4 class="mb-0 text-dark">{{ $activeActionTaskCount }}</h4>
                         </div>
-                    @endif
-
-                    @if($collaborationEvents->isNotEmpty())
-                        <div class="border rounded p-3 mt-3">
-                            <p class="fw-semibold mb-2"><i class="ti ti-users-group me-1"></i>Recent collaboration updates</p>
-                            @foreach($collaborationEvents as $event)
-                                <div class="d-flex align-items-start gap-2 mb-2">
-                                    <span class="badge {{ $event['badge_class'] ?? 'bg-light' }} align-self-center">{{ $event['badge_label'] ?? '' }}</span>
-                                    <div class="flex-grow-1 min-w-0">
-                                        @if(!empty($event['document_id']))
-                                            <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
-                                                {{ $event['message'] }}
-                                            </a>
-                                        @else
-                                            <span class="small d-block">{{ $event['message'] }}</span>
-                                        @endif
-                                    </div>
-                                    <small class="text-muted text-nowrap">{{ $event['created_at']->diffForHumans() }}</small>
+                    </div>
+                </div>
+                <div class="col-6 col-xl-4">
+                    <div class="card shadow-none border">
+                        <div class="card-body">
+                            <p class="mb-1 text-muted small">
+                                <i class="ti ti-users-group text-info me-1"></i>Shared
+                            </p>
+                            <h4 class="mb-0 text-dark">{{ $sharedWithMeCount }}</h4>
+                            @if($sharedWithMeCount > 0)
+                                <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top small">
+                                    @if(isset($dashboardAvailableTypes['weekly_plan']))
+                                        <a href="{{ route('documents.weekly-plans') }}" class="text-decoration-none">
+                                            <i class="ti ti-target me-1"></i>Weekly plans
+                                        </a>
+                                    @endif
+                                    @if(isset($dashboardAvailableTypes['weekly_report']))
+                                        <a href="{{ route('documents.weekly-reports') }}" class="text-decoration-none">
+                                            <i class="ti ti-activity me-1"></i>Weekly reports
+                                        </a>
+                                    @endif
                                 </div>
-                            @endforeach
+                            @endif
                         </div>
-                    @endif
+                    </div>
+                </div>
+                <div class="col-6 col-xl-2">
+                    <div class="card shadow-none border">
+                        <div class="card-body">
+                            <p class="mb-1 text-muted small">
+                                <i class="ti ti-clipboard-list text-secondary me-1"></i>Assigned
+                            </p>
+                            <h4 class="mb-0 text-dark">{{ $assignedWeeklyActivityCount }}</h4>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            @if($weeklySubmissionReminder && count($weeklySubmissionReminder->missedMessages) > 0)
+                <div class="alert alert-danger border mb-0 mt-3">
+                    <p class="mb-1 fw-semibold"><i class="ti ti-alert-circle me-1"></i>Missed submission window</p>
+                    <p class="mb-2 small text-muted">
+                        @if(isset($deadlineStatuses['plan_due']) || isset($deadlineStatuses['report_due']))
+                            @if(isset($deadlineStatuses['plan_due']))
+                                Plan cutoff: {{ \Carbon\Carbon::parse($deadlineStatuses['plan_due'])->format('M d, Y H:i') }}.
+                            @endif
+                            @if(isset($deadlineStatuses['report_due']))
+                                Report cutoff: {{ \Carbon\Carbon::parse($deadlineStatuses['report_due'])->format('M d, Y H:i') }}.
+                            @endif
+                        @else
+                            Weekly plan and report cut-off is managed by the active work period deadlines.
+                        @endif
+                    </p>
+                    <ul class="mb-0 ps-3 small">
+                        @foreach($weeklySubmissionReminder->missedMessages as $line)
+                            <li>{{ $line }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if($hasWeeklyGraceWindow)
+                <div class="alert alert-warning border mb-0 mt-3">
+                    <p class="mb-2 fw-semibold"><i class="ti ti-clock-hour-4 me-1"></i>Grace period is active</p>
+                    <p class="mb-2 small text-muted">
+                        Your administrator extended the deadline. Use the buttons below to create or finish the document before the new cutoff.
+                    </p>
+                    <ul class="mb-3 ps-3 small">
+                        @foreach($planGraceEntries as $planGraceEntry)
+                            <li class="mb-2">
+                                <span class="d-block">
+                                    Weekly plan deadline was extended
+                                    @if($planGraceEntry->period)
+                                        for Week {{ $planGraceEntry->period->week_number }} of {{ $planGraceEntry->period->year }}
+                                    @endif.
+                                    @if($planGraceEntry->graceEndsAt)
+                                        You can still submit until {{ $planGraceEntry->graceEndsAt->format('M d, Y H:i') }}.
+                                    @endif
+                                </span>
+                                @if(isset($availableTypes['weekly_plan']))
+                                    <span class="d-inline-block mt-1">
+                                        @include('documents.partials.weekly-submission-action-button', [
+                                            'slot' => $planGraceEntry,
+                                            'documentType' => 'weekly_plan',
+                                            'btnClass' => 'btn-warning',
+                                        ])
+                                    </span>
+                                @endif
+                            </li>
+                        @endforeach
+                        @foreach($reportGraceEntries as $reportGraceEntry)
+                            <li class="{{ $loop->last ? 'mb-0' : 'mb-2' }}">
+                                <span class="d-block">
+                                    Weekly report deadline was extended
+                                    @if($reportGraceEntry->period)
+                                        for Week {{ $reportGraceEntry->period->week_number }} of {{ $reportGraceEntry->period->year }}
+                                    @endif.
+                                    @if($reportGraceEntry->graceEndsAt)
+                                        You can still submit until {{ $reportGraceEntry->graceEndsAt->format('M d, Y H:i') }}.
+                                    @endif
+                                </span>
+                                @if(isset($availableTypes['weekly_report']))
+                                    <span class="d-inline-block mt-1">
+                                        @include('documents.partials.weekly-submission-action-button', [
+                                            'slot' => $reportGraceEntry,
+                                            'documentType' => 'weekly_report',
+                                            'btnClass' => 'btn-warning',
+                                        ])
+                                    </span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if($collaborationEvents->isNotEmpty())
+                <div class="card shadow-none border mt-3">
+                    <div class="card-body">
+                        <p class="fw-semibold mb-2"><i class="ti ti-users-group me-1"></i>Recent collaboration updates</p>
+                        @foreach($collaborationEvents as $event)
+                            <div class="d-flex align-items-start gap-2 mb-2">
+                                <span class="badge {{ $event['badge_class'] ?? 'bg-light' }} align-self-center">{{ $event['badge_label'] ?? '' }}</span>
+                                <div class="flex-grow-1 min-w-0">
+                                    @if(!empty($event['document_id']))
+                                        <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
+                                            {{ $event['message'] }}
+                                        </a>
+                                    @else
+                                        <span class="small d-block">{{ $event['message'] }}</span>
+                                    @endif
+                                </div>
+                                <small class="text-muted text-nowrap">{{ $event['created_at']->diffForHumans() }}</small>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="col-12 col-lg-4 col-md-4 mb-3">
-            <div class="card shadow-none border h-100">
+            <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom">
                     <h5 class="mb-0"><i class="ti ti-calendar-event me-2"></i>Weekly plan & report</h5>
                 </div>
@@ -371,17 +377,24 @@
         </div>
 
         <div class="col-xl-8 col-md-8 col-12">
-            <div class="card shadow-none border h-100">
+            <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Weekly Activities</h5>
-                    <small class="text-muted">Revisions and drafts</small>
+                    <small class="text-muted">Today's plan & revisions</small>
                 </div>
                 <div class="card-body">
-                    @if($assignedWeeklyActivityCount > 0 && $currentPeriod)
-                        @include('documents.partials.weekly-assigned-activities-card', [
-                            'assignmentPeriod' => $currentPeriod,
-                            'embedded' => true,
-                        ])
+                    @if($showTodaysWeeklyTasks && $todaysWeeklyTasks->isNotEmpty())
+                        <div class="mb-3">
+                            <h6 class="text-primary mb-2">
+                                <i class="ti ti-calendar-event me-1"></i>{{ $todaysDayName }}'s tasks
+                            </h6>
+                            @foreach($todaysWeeklyTasks as $task)
+                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
+                                    <span>{{ $task['activity'] }}</span>
+                                    <small class="text-muted">{{ $task['source_label'] }}</small>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
 
                     @if($returnedDocs->count() > 0)
@@ -453,10 +466,10 @@
                         </div>
                     @endif
 
-                    @if($activeActionTaskCount === 0 && $assignedWeeklyActivityCount === 0 && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
+                    @if($activeActionTaskCount === 0 && $todaysTasksClear && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
                         <div class="text-center py-4">
                             <i class="ti ti-mood-smile fs-1 text-success"></i>
-                            <p class="text-muted mt-2 mb-0">Great flow. No pending revisions or drafts right now.</p>
+                            <p class="text-muted mt-2 mb-0">Nothing pending right now.</p>
                         </div>
                     @endif
                 </div>
@@ -465,7 +478,7 @@
 
 
         <div class="col-xl-4 col-md-4 col-12">
-            <div class="card shadow-none border h-100">
+            <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="ti ti-bolt me-2"></i>My Action Tasks
@@ -534,11 +547,9 @@
                         </div>
                     @else
                         <div class="text-center py-4">
-                            <i class="ti ti-checkup-list fs-1 text-muted"></i>
+                            <i class="ti ti-check fs-1 text-success"></i>
                             <p class="text-muted mb-0 mt-2">No action tasks need your attention right now.</p>
-                            <a href="{{ route('action-logs.index') }}" class="btn btn-sm btn-outline-primary mt-2">
-                                <i class="ti ti-eye me-1"></i>View Action Logs
-                            </a>
+                           
                         </div>
                     @endif
                 </div>

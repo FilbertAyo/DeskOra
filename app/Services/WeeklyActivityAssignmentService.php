@@ -12,6 +12,9 @@ use Illuminate\Support\Str;
 
 class WeeklyActivityAssignmentService
 {
+    /** @var list<string> */
+    public const PLAN_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
     public function syncForWeeklyPlan(Document $weeklyPlan): void
     {
         if ($weeklyPlan->type !== Document::TYPE_WEEKLY_PLAN) {
@@ -193,6 +196,64 @@ class WeeklyActivityAssignmentService
         }
 
         return $query->get();
+    }
+
+    /**
+     * @return Collection<int, array{activity: string, source_label: string}>
+     */
+    public function todaysTasksForUser(string $userId, ?string $periodId, ?string $day = null): Collection
+    {
+        $day = trim((string) ($day ?? now()->format('l')));
+        if (! in_array($day, self::PLAN_DAYS, true)) {
+            return collect();
+        }
+
+        $tasks = collect();
+
+        if ($periodId) {
+            $plan = Document::findWeeklyPlanForUserAndPeriod($periodId, $userId);
+            if ($plan) {
+                $domainPlan = WeeklyPlan::query()
+                    ->with('activities')
+                    ->find($plan->id);
+
+                foreach ($domainPlan?->activities ?? [] as $activity) {
+                    if ((string) ($activity->day ?? '') !== $day) {
+                        continue;
+                    }
+
+                    $activityText = trim((string) ($activity->activity ?? ''));
+                    if ($activityText === '') {
+                        continue;
+                    }
+
+                    $tasks->push([
+                        'activity' => $activityText,
+                        'source_label' => 'Your plan',
+                    ]);
+                }
+            }
+        }
+
+        foreach ($this->assignmentsForUser($userId, $periodId) as $assignment) {
+            $payload = is_array($assignment->activity_payload ?? null) ? $assignment->activity_payload : [];
+            if (trim((string) ($payload['day'] ?? '')) !== $day) {
+                continue;
+            }
+
+            $activityText = trim((string) ($payload['activity'] ?? ''));
+            if ($activityText === '') {
+                continue;
+            }
+
+            $sourceName = trim((string) ($assignment->sourceUser->name ?? ''));
+            $tasks->push([
+                'activity' => $activityText,
+                'source_label' => $sourceName !== '' ? 'From '.$sourceName : 'Assigned',
+            ]);
+        }
+
+        return $tasks->values();
     }
 
     private function resolveSourceWeeklyPlan(Document $weeklyPlan, bool $withActivities = false): ?WeeklyPlan
