@@ -15,13 +15,16 @@ class EnsureDocumentsUnionView extends Command
 
     public function handle(): int
     {
-        $requiredTables = ['weekly_plans', 'weekly_reports', 'monthly_reports', 'action_logs'];
-        foreach ($requiredTables as $table) {
-            if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
-                $this->error("Missing required table: {$table}. Run domain migrations first.");
+        if (! DocumentsUnionView::canCreate()) {
+            foreach (DocumentsUnionView::REQUIRED_TABLES as $table) {
+                if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    $this->error("Missing required table: {$table}. Run domain migrations first.");
 
-                return self::FAILURE;
+                    return self::FAILURE;
+                }
             }
+
+            return self::FAILURE;
         }
 
         if (DocumentsUnionView::exists() && ! $this->option('force')) {

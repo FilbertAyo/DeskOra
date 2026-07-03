@@ -2,6 +2,7 @@
     'use strict';
 
     const PROGRESS_OPTIONS = ['Not Started', 'In Progress', 'Done', 'Cancelled'];
+    const REASSIGN_OPTION = 'Reassign';
 
     function progressBadgeClass(progress) {
         switch (progress) {
@@ -136,6 +137,7 @@
 
             let tasks = [];
             let editingIndex = null;
+            let editingPreviousResponsibleIds = [];
             let autosaveInFlight = false;
 
             function assigneeLabel(task) {
@@ -146,13 +148,16 @@
                 return names.length > 0 ? names.join(', ') : '';
             }
 
-            function fillProgressSelect(selected) {
+            function fillProgressSelect(selected, includeReassign) {
                 const sel = document.getElementById('actionLogModalProgress');
                 if (!sel) {
                     return;
                 }
+                const options = includeReassign
+                    ? PROGRESS_OPTIONS.concat([REASSIGN_OPTION])
+                    : PROGRESS_OPTIONS.slice();
                 sel.innerHTML = '';
-                PROGRESS_OPTIONS.forEach(function (label) {
+                options.forEach(function (label) {
                     const option = document.createElement('option');
                     option.value = label;
                     option.textContent = label;
@@ -161,6 +166,36 @@
                     }
                     sel.appendChild(option);
                 });
+                toggleReassignMode();
+            }
+
+            function sameIdSets(left, right) {
+                const a = (left || []).map(String).sort();
+                const b = (right || []).map(String).sort();
+                if (a.length !== b.length) {
+                    return false;
+                }
+                return a.every(function (value, index) {
+                    return value === b[index];
+                });
+            }
+
+            function toggleReassignMode() {
+                const progressEl = document.getElementById('actionLogModalProgress');
+                const notesLabel = document.querySelector('#actionLogTaskModal .action-log-modal-notes-label');
+                const isReassign = progressEl && progressEl.value === REASSIGN_OPTION;
+
+                if (modalResponsible) {
+                    modalResponsible.classList.toggle('border', isReassign);
+                    modalResponsible.classList.toggle('border-warning', isReassign);
+                    modalResponsible.classList.toggle('rounded', isReassign);
+                    modalResponsible.classList.toggle('p-2', isReassign);
+                }
+                if (notesLabel) {
+                    notesLabel.innerHTML = isReassign
+                        ? 'Reason for reassignment <span class="text-danger">*</span>'
+                        : 'Notes / progress update';
+                }
             }
 
             function cloneUserOptionsIntoModal(selectedIds) {
@@ -202,8 +237,9 @@
                 document.getElementById('actionLogModalDueDate').value = '';
                 document.getElementById('actionLogModalCompilationDate').value = '';
                 document.getElementById('actionLogModalNotes').value = '';
-                fillProgressSelect('Not Started');
+                fillProgressSelect('Not Started', false);
                 cloneUserOptionsIntoModal([]);
+                editingPreviousResponsibleIds = [];
             }
 
             function readModal() {
@@ -226,8 +262,11 @@
                 document.getElementById('actionLogModalDueDate').value = task.due_date || '';
                 document.getElementById('actionLogModalCompilationDate').value = task.compilation_date || '';
                 document.getElementById('actionLogModalNotes').value = task.notes_progress || '';
-                fillProgressSelect(task.progress || 'Not Started');
+                fillProgressSelect(task.progress || 'Not Started', true);
                 cloneUserOptionsIntoModal(task.responsible_user_ids || []);
+                editingPreviousResponsibleIds = Array.isArray(task.responsible_user_ids)
+                    ? task.responsible_user_ids.map(String)
+                    : [];
             }
 
             function showModal() {
@@ -523,11 +562,17 @@
                     const trigger = event.relatedTarget;
                     if (trigger && trigger.id === 'addTaskRowBtn') {
                         editingIndex = null;
+                        editingPreviousResponsibleIds = [];
                         modalTitle.textContent = 'Add task';
                         setManagerOnlyVisible();
                         clearModal();
                     }
                 });
+
+                const progressEl = document.getElementById('actionLogModalProgress');
+                if (progressEl) {
+                    progressEl.addEventListener('change', toggleReassignMode);
+                }
             }
 
             if (addTaskRowBtn) {
@@ -550,6 +595,9 @@
                             return;
                         }
                         editingIndex = index;
+                        editingPreviousResponsibleIds = Array.isArray(tasks[index].responsible_user_ids)
+                            ? tasks[index].responsible_user_ids.map(String)
+                            : [];
                         modalTitle.textContent = 'Edit task ' + (index + 1);
                         setManagerOnlyVisible();
                         fillModal(tasks[index]);
@@ -587,6 +635,21 @@
                     if (!modalTask.task.trim()) {
                         window.alert('Please describe what needs to be done.');
                         return;
+                    }
+
+                    if (modalTask.progress === REASSIGN_OPTION) {
+                        if (!modalTask.responsible_user_ids.length) {
+                            window.alert('Please select who should receive this task.');
+                            return;
+                        }
+                        if (!modalTask.notes_progress.trim()) {
+                            window.alert('Please explain why you are reassigning this task.');
+                            return;
+                        }
+                        if (sameIdSets(modalTask.responsible_user_ids, editingPreviousResponsibleIds)) {
+                            window.alert('Please choose a different assignee when reassigning this task.');
+                            return;
+                        }
                     }
 
                     const previousTasks = tasks.slice();

@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 <div class="mb-0">
-                    <label for="actionLogModalNotes" class="form-label">Notes / progress update</label>
+                    <label for="actionLogModalNotes" class="form-label action-log-modal-notes-label">Notes / progress update</label>
                     <textarea class="form-control action-log-textarea-md" id="actionLogModalNotes" rows="4" placeholder="Weekly updates, blockers, or context"></textarea>
                 </div>
             </div>

@@ -25,7 +25,7 @@ return new class extends Migration
                 $table->ulid('period_id')->nullable();
             } else {
                 $table->foreignUlid('source_document_id')->constrained('documents')->cascadeOnDelete();
-                $table->foreignUlid('source_weekly_plan_id')->nullable()->constrained('weekly_plans')->nullOnDelete();
+                $table->ulid('source_weekly_plan_id')->nullable();
                 $table->foreignUlid('source_user_id')->constrained('users')->cascadeOnDelete();
                 $table->foreignUlid('assignee_user_id')->constrained('users')->cascadeOnDelete();
                 $table->foreignUlid('period_id')->nullable()->constrained('work_periods')->nullOnDelete();

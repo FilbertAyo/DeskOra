@@ -6,7 +6,6 @@ use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Notifications\WorkPeriodOpenedNotification;
-use App\Notifications\WeeklyActionLogSubmittedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
 use App\Notifications\WeeklyDocumentDepartmentHeadNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
@@ -139,24 +138,6 @@ class WorkflowEmailNotificationService
         }
 
         Notification::send($recipients, new WeeklyBudgetSubmissionNotification($document, $submittedBy));
-    }
-
-    /**
-     * Notify all active users with email/both channel when weekly action log is submitted.
-     */
-    public function notifyWeeklyActionLogSubmitted(Document $actionLog, User $submittedBy): void
-    {
-        if ($actionLog->type !== Document::TYPE_ACTION_LOG || ! $actionLog->isSubmitted()) {
-            return;
-        }
-
-        $actionLog->loadMissing('period');
-        $recipients = $this->eligibleEmailRecipients()->get();
-        if ($recipients->isEmpty()) {
-            return;
-        }
-
-        Notification::send($recipients, new WeeklyActionLogSubmittedNotification($actionLog, $submittedBy));
     }
 
     /**

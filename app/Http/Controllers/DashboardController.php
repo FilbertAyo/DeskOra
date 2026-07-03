@@ -341,6 +341,11 @@ class DashboardController extends Controller
             ->values();
 
         $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
+        $teamUsers = User::query()
+            ->active()
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
         $assignedWeeklyActivities = $currentPeriod
             ? $this->weeklyActivityAssignmentService->assignmentsForUser(
                 (string) $user->id,
@@ -428,6 +433,7 @@ class DashboardController extends Controller
             'canSeeWeeklyDashboard',
             'weeklyDashboardData',
             'actionLogProgress',
+            'teamUsers',
             'assignedWeeklyActivities',
             'yearPlanMonthCoverageAlert'
         ));

@@ -193,6 +193,103 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('No longer needed', $task['notes_progress'] ?? null);
     }
 
+    public function test_assigned_staff_can_reassign_task_to_another_user(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $staff */
+        $staff = User::factory()->create();
+        /** @var User $newAssignee */
+        $newAssignee = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'Reassign',
+            'reassign_user_id' => $newAssignee->id,
+            'notes_progress' => 'Handing this over to a teammate',
+        ]);
+
+        $response->assertSessionHas('success');
+        $document->refresh();
+        $task = $document->content['tasks'][0] ?? [];
+
+        $this->assertSame([(string) $newAssignee->id], $task['responsible_user_ids'] ?? null);
+        $this->assertSame('In Progress', $task['progress'] ?? null);
+        $this->assertSame('Handing this over to a teammate', $task['notes_progress'] ?? null);
+
+        $history = $task['history'] ?? [];
+        $this->assertNotEmpty($history);
+        $latest = end($history);
+        $this->assertSame('reassign', $latest['source'] ?? null);
+        $this->assertSame((string) $newAssignee->id, $latest['reassigned_to'] ?? null);
+    }
+
+    public function test_manager_can_reassign_task_from_editor_update(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        /** @var User $originalAssignee */
+        $originalAssignee = User::factory()->create();
+        /** @var User $newAssignee */
+        $newAssignee = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Manager reassigned task', [$originalAssignee->id], 'In Progress'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('action-logs.update', $document), [
+            'period_id' => $period->id,
+            'action' => 'draft',
+            'content' => [
+                'tasks' => [
+                    array_merge(
+                        $this->taskRow('task_a', 'Manager reassigned task', [$newAssignee->id], 'Reassign'),
+                        ['notes_progress' => 'Reassigned from manager editor']
+                    ),
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHas('success');
+        $document->refresh();
+        $task = $document->content['tasks'][0] ?? [];
+
+        $this->assertSame([(string) $newAssignee->id], $task['responsible_user_ids'] ?? null);
+        $this->assertSame('In Progress', $task['progress'] ?? null);
+        $this->assertSame('Reassigned from manager editor', $task['notes_progress'] ?? null);
+
+        $history = $task['history'] ?? [];
+        $this->assertNotEmpty($history);
+        $latest = end($history);
+        $this->assertSame('reassign', $latest['source'] ?? null);
+    }
+
     public function test_quick_update_requires_progress_notes(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));

@@ -2,13 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\ActionLog;
 use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Notifications\WorkPeriodOpenedNotification;
-use App\Notifications\WeeklyActionLogSubmittedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
 use App\Notifications\WeeklyDocumentDepartmentHeadNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
@@ -142,7 +140,7 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertSentTo($owner, WeeklyDocumentReturnedToDraftNotification::class);
     }
 
-    public function test_action_log_submission_notifies_all_active_users_with_email_or_both_channels(): void
+    public function test_action_log_submission_does_not_email_staff(): void
     {
         Notification::fake();
 
@@ -153,12 +151,6 @@ class WorkflowEmailNotificationTest extends TestCase
 
         $activeEmail = $this->createActiveUserWithChannel('email');
         $activeBoth = $this->createActiveUserWithChannel('both');
-        $activeSms = $this->createActiveUserWithChannel('sms');
-        $inactiveEmail = User::factory()->create([
-            'status' => 'inactive',
-            'notification_channel' => 'email',
-            'email' => 'inactive@example.com',
-        ]);
 
         $this->actingAs($manager)->post(route('action-logs.store'), [
             'period_id' => $period->id,
@@ -174,14 +166,10 @@ class WorkflowEmailNotificationTest extends TestCase
             ],
         ])->assertRedirect();
 
-        Notification::assertSentTo($manager, WeeklyActionLogSubmittedNotification::class);
-        Notification::assertSentTo($activeEmail, WeeklyActionLogSubmittedNotification::class);
-        Notification::assertSentTo($activeBoth, WeeklyActionLogSubmittedNotification::class);
-        Notification::assertNotSentTo($activeSms, WeeklyActionLogSubmittedNotification::class);
-        Notification::assertNotSentTo($inactiveEmail, WeeklyActionLogSubmittedNotification::class);
+        Notification::assertNothingSent();
     }
 
-    public function test_action_log_resubmit_after_edit_does_not_send_email(): void
+    public function test_action_log_resubmit_after_edit_still_does_not_email_staff(): void
     {
         Notification::fake();
 
@@ -190,8 +178,6 @@ class WorkflowEmailNotificationTest extends TestCase
         $manager = $this->createActiveUserWithChannel('email');
         $manager->givePermissionTo('create action logs');
 
-        $recipient = $this->createActiveUserWithChannel('email');
-
         $this->actingAs($manager)->post(route('action-logs.store'), [
             'period_id' => $period->id,
             'action' => 'submit',
@@ -206,8 +192,7 @@ class WorkflowEmailNotificationTest extends TestCase
             ],
         ])->assertRedirect();
 
-        Notification::assertSentTo($manager, WeeklyActionLogSubmittedNotification::class);
-        Notification::assertSentTo($recipient, WeeklyActionLogSubmittedNotification::class);
+        Notification::assertNothingSent();
 
         $document = Document::query()
             ->where('type', Document::TYPE_ACTION_LOG)
@@ -215,7 +200,6 @@ class WorkflowEmailNotificationTest extends TestCase
             ->first();
 
         $this->assertNotNull($document);
-        $this->assertTrue((bool) ActionLog::query()->find($document->id)?->submission_email_sent);
 
         $this->actingAs($manager)->putJson(route('action-logs.update', $document), [
             'period_id' => $period->id,
@@ -233,7 +217,6 @@ class WorkflowEmailNotificationTest extends TestCase
 
         $document->refresh();
         $this->assertSame(Document::STATE_DRAFT, $document->state);
-        $this->assertTrue((bool) ActionLog::query()->find($document->id)?->submission_email_sent);
 
         $this->actingAs($manager)->put(route('action-logs.update', $document), [
             'period_id' => $period->id,
@@ -249,8 +232,7 @@ class WorkflowEmailNotificationTest extends TestCase
             ],
         ])->assertRedirect();
 
-        Notification::assertSentToTimes($manager, WeeklyActionLogSubmittedNotification::class, 1);
-        Notification::assertSentToTimes($recipient, WeeklyActionLogSubmittedNotification::class, 1);
+        Notification::assertNothingSent();
     }
 
     public function test_document_approver_role_receives_submission_email_without_direct_permission_grant(): void
@@ -328,7 +310,6 @@ class WorkflowEmailNotificationTest extends TestCase
 
         Notification::assertNotSentTo($owner, WeeklyDocumentSubmittedNotification::class);
         Notification::assertNotSentTo($owner, WeeklyBudgetSubmissionNotification::class);
-        Notification::assertNotSentTo($owner, WeeklyActionLogSubmittedNotification::class);
         Notification::assertNotSentTo($owner, WeeklyDocumentReturnedToDraftNotification::class);
     }
 

@@ -163,7 +163,7 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function ensureDocumentsUnionView(): void
     {
-        if (! Schema::hasTable('weekly_plans')) {
+        if (DocumentsUnionView::shouldDeferAutoEnsure() || ! DocumentsUnionView::canCreate()) {
             return;
         }
 

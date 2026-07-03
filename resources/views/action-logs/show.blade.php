@@ -269,13 +269,20 @@
                                                                         @if($isEmpty)
                                                                             <div class="small text-muted fst-italic">Not updated</div>
                                                                         @else
-                                                                            <div class="mb-1">
-                                                                                @if($fromProgress)
-                                                                                    <span class="badge bg-light-light border border-light text-dark">{{ $fromProgress }}</span>
-                                                                                    <i class="ti ti-arrow-right text-muted mx-1"></i>
-                                                                                @endif
-                                                                                <span class="badge {{ $dotClass === 'al-dot-success' ? 'bg-light-success border border-success' : ($dotClass === 'al-dot-danger' ? 'bg-light-danger border border-danger' : ($dotClass === 'al-dot-info' ? 'bg-light-info border border-info' : 'bg-light-secondary border border-secondary')) }}">{{ $toProgress }}</span>
-                                                                            </div>
+                                                                            @if(($entry['source'] ?? '') === 'reassign' && !empty($entry['reassigned_to']))
+                                                                                <div class="mb-1">
+                                                                                    <span class="badge bg-light-warning border border-warning text-dark">Reassigned</span>
+                                                                                    <span class="small text-muted ms-1">to {{ $responsibleNameMap[(string) $entry['reassigned_to']] ?? 'Unknown user' }}</span>
+                                                                                </div>
+                                                                            @else
+                                                                                <div class="mb-1">
+                                                                                    @if($fromProgress)
+                                                                                        <span class="badge bg-light-light border border-light text-dark">{{ $fromProgress }}</span>
+                                                                                        <i class="ti ti-arrow-right text-muted mx-1"></i>
+                                                                                    @endif
+                                                                                    <span class="badge {{ $dotClass === 'al-dot-success' ? 'bg-light-success border border-success' : ($dotClass === 'al-dot-danger' ? 'bg-light-danger border border-danger' : ($dotClass === 'al-dot-info' ? 'bg-light-info border border-info' : 'bg-light-secondary border border-secondary')) }}">{{ $toProgress }}</span>
+                                                                                </div>
+                                                                            @endif
                                                                             @if(!empty($entry['notes_progress']))
                                                                                 <div class="small text-dark"><i class="ti ti-note me-1 text-muted"></i>{{ $entry['notes_progress'] }}</div>
                                                                             @endif

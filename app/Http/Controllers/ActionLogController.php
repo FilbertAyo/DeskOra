@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
-use App\Models\ActionLog;
 use App\Models\ActionLogTask;
 use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Services\ActionLogCarryForwardService;
 use App\Services\Documents\DocumentDomainSyncService;
-use App\Services\WorkflowEmailNotificationService;
 use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -20,7 +18,6 @@ use Illuminate\Support\Facades\Auth;
 class ActionLogController extends Controller
 {
     public function __construct(
-        private readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
         private readonly DocumentDomainSyncService $documentDomainSyncService,
         private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
     ) {}
@@ -32,6 +29,8 @@ class ActionLogController extends Controller
     private const PROGRESS_DONE = 'Done';
 
     private const PROGRESS_CANCELLED = 'Cancelled';
+
+    private const QUICK_UPDATE_REASSIGN = 'Reassign';
 
     private const PROGRESS_OPTIONS = [
         self::PROGRESS_NOT_STARTED,
@@ -153,7 +152,7 @@ class ActionLogController extends Controller
             'content.tasks.*.task' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.responsible_user_ids' => ['nullable', 'array'],
             'content.tasks.*.responsible_user_ids.*' => ['nullable', 'string', 'short_id', 'exists:users,id'],
-            'content.tasks.*.progress' => ['nullable', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
+            'content.tasks.*.progress' => ['nullable', 'string', 'in:'.implode(',', array_merge(self::PROGRESS_OPTIONS, [self::QUICK_UPDATE_REASSIGN]))],
             'content.tasks.*.due_date' => ['nullable', 'date'],
             'content.tasks.*.compilation_date' => ['nullable', 'date'],
             'content.tasks.*.notes_progress' => ['nullable', 'string', 'max:4000'],
@@ -242,7 +241,6 @@ class ActionLogController extends Controller
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
             : 'Action Log saved as draft.';
-        $this->finalizeActionLogSubmitNotification($document->refresh(), $user, $action);
 
         if ($request->wantsJson()) {
             return $this->actionLogAutosaveJsonResponse($document, $message);
@@ -393,7 +391,7 @@ class ActionLogController extends Controller
             'content.tasks.*.task' => ['nullable', 'string', 'max:4000'],
             'content.tasks.*.responsible_user_ids' => ['nullable', 'array'],
             'content.tasks.*.responsible_user_ids.*' => ['nullable', 'string', 'short_id', 'exists:users,id'],
-            'content.tasks.*.progress' => ['nullable', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
+            'content.tasks.*.progress' => ['nullable', 'string', 'in:'.implode(',', array_merge(self::PROGRESS_OPTIONS, [self::QUICK_UPDATE_REASSIGN]))],
             'content.tasks.*.due_date' => ['nullable', 'date'],
             'content.tasks.*.compilation_date' => ['nullable', 'date'],
             'content.tasks.*.notes_progress' => ['nullable', 'string', 'max:4000'],
@@ -448,7 +446,6 @@ class ActionLogController extends Controller
         $message = ($action === 'submit')
             ? 'Action Log submitted successfully.'
             : 'Action Log updated successfully.';
-        $this->finalizeActionLogSubmitNotification($document->refresh(), $actingUser, $action);
 
         if ($request->wantsJson()) {
             return $this->actionLogAutosaveJsonResponse($document, $message);
@@ -480,9 +477,18 @@ class ActionLogController extends Controller
 
         $validated = $request->validate([
             'task_uid' => ['required', 'string', 'max:80'],
-            'progress' => ['required', 'string', 'in:Not Started,In Progress,Done,Cancelled'],
+            'progress' => ['required', 'string', 'in:'.implode(',', array_merge(self::STAFF_PROGRESS_OPTIONS, [self::QUICK_UPDATE_REASSIGN]))],
             'notes_progress' => ['required', 'string', 'max:4000'],
+            'reassign_user_id' => ['nullable', 'string', 'short_id', 'exists:users,id'],
         ]);
+
+        $isReassign = $validated['progress'] === self::QUICK_UPDATE_REASSIGN;
+        if ($isReassign) {
+            $request->validate([
+                'reassign_user_id' => ['required', 'string', 'short_id', 'exists:users,id'],
+            ]);
+            $validated['reassign_user_id'] = trim((string) $request->input('reassign_user_id'));
+        }
 
         $document->loadMissing('period');
         $period = $document->period;
@@ -512,10 +518,29 @@ class ActionLogController extends Controller
                     ->with('error', 'You can only update tasks where you are assigned as the responsible person.');
             }
 
-            $before = $task;
-            $task['progress'] = $validated['progress'];
-            $task['notes_progress'] = $validated['notes_progress'];
-            $task = $this->appendTaskHistoryIfChanged($before, $task, $period, (string) $user->id);
+            if ($isReassign) {
+                $newAssigneeId = (string) $validated['reassign_user_id'];
+                if (in_array($newAssigneeId, $responsibleIds, true)) {
+                    return redirect()->back()
+                        ->with('error', 'This task is already assigned to the selected person.');
+                }
+
+                $task = $this->appendTaskReassignHistory(
+                    $task,
+                    $period,
+                    (string) $user->id,
+                    $responsibleIds,
+                    $newAssigneeId,
+                    $validated['notes_progress']
+                );
+                $task['responsible_user_ids'] = [$newAssigneeId];
+            } else {
+                $before = $task;
+                $task['progress'] = $validated['progress'];
+                $task['notes_progress'] = $validated['notes_progress'];
+                $task = $this->appendTaskHistoryIfChanged($before, $task, $period, (string) $user->id);
+            }
+
             $found = true;
             break;
         }
@@ -531,8 +556,12 @@ class ActionLogController extends Controller
         ]);
         $this->documentDomainSyncService->syncFromDocument($document);
 
+        $message = $isReassign
+            ? 'Task reassigned successfully.'
+            : 'Task progress updated successfully.';
+
         return redirect()->back()
-            ->with('success', 'Task progress updated successfully.');
+            ->with('success', $message);
     }
 
     /**
@@ -607,6 +636,7 @@ class ActionLogController extends Controller
             $compilationDate = trim((string) ($task['compilation_date'] ?? ''));
             $notesProgress = trim((string) ($task['notes_progress'] ?? ''));
             $taskUid = trim((string) ($task['task_uid'] ?? ''));
+            $isReassign = $progress === self::QUICK_UPDATE_REASSIGN;
 
             $responsibleIds = $this->normalizeResponsibleIds($task['responsible_user_ids'] ?? []);
 
@@ -614,7 +644,9 @@ class ActionLogController extends Controller
                 continue;
             }
 
-            if (! in_array($progress, self::PROGRESS_OPTIONS, true)) {
+            if ($isReassign) {
+                $progress = '';
+            } elseif (! in_array($progress, self::PROGRESS_OPTIONS, true)) {
                 $progress = self::PROGRESS_NOT_STARTED;
             }
 
@@ -634,6 +666,7 @@ class ActionLogController extends Controller
                 'compilation_date' => $compilationDate !== '' ? $this->formatActionLogDateForStorage($compilationDate) : null,
                 'notes_progress' => $notesProgress,
                 'status_reason' => null,
+                'reassign' => $isReassign,
                 'history' => $history,
             ];
         }
@@ -675,7 +708,7 @@ class ActionLogController extends Controller
             }
             $task = $this->applyCancelledTaskRules($task, true);
             $existing = $merged[$task['task_uid']] ?? null;
-            $task = $this->appendTaskHistoryIfChanged($existing, $task, $period, $actorUserId);
+            $task = $this->applyManagerTaskChange($existing, $task, $period, $actorUserId);
             $merged[$task['task_uid']] = $task;
         }
 
@@ -716,7 +749,7 @@ class ActionLogController extends Controller
                 }
             }
 
-            $task = $this->appendTaskHistoryIfChanged($existing, $task, $period, $actorUserId);
+            $task = $this->applyManagerTaskChange($existing, $task, $period, $actorUserId);
             $merged[] = $task;
         }
 
@@ -797,6 +830,94 @@ class ActionLogController extends Controller
         $newTask['history'] = $history;
 
         return $newTask;
+    }
+
+    private function applyManagerTaskChange(?array $existingTask, array $task, WorkPeriod $period, string $actorUserId): array
+    {
+        $isReassign = (bool) ($task['reassign'] ?? false);
+        unset($task['reassign']);
+
+        if (! $isReassign || ! $existingTask) {
+            return $this->appendTaskHistoryIfChanged($existingTask, $task, $period, $actorUserId);
+        }
+
+        $existingResponsible = is_array($existingTask['responsible_user_ids'] ?? null)
+            ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $existingTask['responsible_user_ids'])))
+            : [];
+        $newResponsible = is_array($task['responsible_user_ids'] ?? null)
+            ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $task['responsible_user_ids'])))
+            : [];
+
+        if ($newResponsible === []) {
+            $task['responsible_user_ids'] = $existingResponsible;
+
+            return $this->appendTaskHistoryIfChanged($existingTask, $task, $period, $actorUserId);
+        }
+
+        $newAssigneeId = $newResponsible[0];
+        if (count($newResponsible) === 1 && in_array($newAssigneeId, $existingResponsible, true)) {
+            $task['progress'] = trim((string) ($existingTask['progress'] ?? self::PROGRESS_NOT_STARTED));
+
+            return $this->appendTaskHistoryIfChanged($existingTask, $task, $period, $actorUserId);
+        }
+
+        $task['progress'] = trim((string) ($existingTask['progress'] ?? self::PROGRESS_NOT_STARTED));
+        $task['responsible_user_ids'] = count($newResponsible) === 1
+            ? [$newAssigneeId]
+            : $newResponsible;
+        $notes = trim((string) ($task['notes_progress'] ?? ''));
+
+        $reassigned = $this->appendTaskReassignHistory(
+            array_merge($existingTask, ['progress' => $task['progress']]),
+            $period,
+            $actorUserId,
+            $existingResponsible,
+            $newAssigneeId,
+            $notes
+        );
+
+        return array_merge($task, [
+            'history' => $reassigned['history'],
+            'notes_progress' => $reassigned['notes_progress'],
+            'progress' => $reassigned['progress'],
+        ]);
+    }
+
+    /**
+     * @param  array<int, string>  $previousResponsibleIds
+     */
+    private function appendTaskReassignHistory(
+        array $task,
+        WorkPeriod $period,
+        string $actorUserId,
+        array $previousResponsibleIds,
+        string $newAssigneeId,
+        string $notes
+    ): array {
+        $history = is_array($task['history'] ?? null)
+            ? array_values(array_filter($task['history'], static fn ($entry) => is_array($entry)))
+            : [];
+
+        $currentProgress = trim((string) ($task['progress'] ?? self::PROGRESS_NOT_STARTED));
+
+        $history[] = [
+            'period_id' => (string) $period->id,
+            'period_label' => 'Week '.$period->week_number.' of '.$period->year,
+            'updated_by' => $actorUserId,
+            'from_progress' => $currentProgress !== '' ? $currentProgress : null,
+            'to_progress' => $currentProgress !== '' ? $currentProgress : self::PROGRESS_NOT_STARTED,
+            'notes_progress' => $notes !== '' ? $notes : null,
+            'status_reason' => null,
+            'reassigned_from' => array_values($previousResponsibleIds),
+            'reassigned_to' => $newAssigneeId,
+            'changed_at' => now()->toDateTimeString(),
+            'source' => 'reassign',
+        ];
+
+        $task['history'] = $history;
+        $task['notes_progress'] = $notes;
+
+        return $task;
     }
 
     private function applyCancelledTaskRules(array $task, bool $isManager): array
@@ -1010,46 +1131,5 @@ class ActionLogController extends Controller
         $content['meta'] = $meta;
 
         return $content;
-    }
-
-    private function shouldNotifyActionLogFirstSubmission(Document $document): bool
-    {
-        $actionLog = ActionLog::query()->find((string) $document->id);
-        if ($actionLog?->submission_email_sent) {
-            return false;
-        }
-
-        $content = is_array($document->content) ? $document->content : [];
-        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
-
-        return ! (bool) ($meta['submission_email_sent'] ?? false);
-    }
-
-    /**
-     * @param  array<string, mixed>  $content
-     * @return array<string, mixed>
-     */
-    private function markActionLogSubmissionEmailSent(array $content): array
-    {
-        $meta = is_array($content['meta'] ?? null) ? $content['meta'] : [];
-        $meta['submission_email_sent'] = true;
-        $content['meta'] = $meta;
-
-        return $content;
-    }
-
-    private function finalizeActionLogSubmitNotification(Document $document, User $submittedBy, string $action): void
-    {
-        if ($action !== 'submit' || ! $this->shouldNotifyActionLogFirstSubmission($document)) {
-            return;
-        }
-
-        $document->loadMissing('period');
-        $this->workflowEmailNotificationService->notifyWeeklyActionLogSubmitted($document, $submittedBy);
-
-        ActionLog::query()->whereKey($document->id)->update(['submission_email_sent' => true]);
-
-        $content = is_array($document->content) ? $document->content : [];
-        $document->setAttribute('content', $this->markActionLogSubmissionEmailSent($content));
     }
 }

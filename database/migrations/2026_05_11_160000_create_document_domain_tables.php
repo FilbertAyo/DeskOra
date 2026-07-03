@@ -53,7 +53,7 @@ return new class extends Migration
             } else {
                 $table->foreignUlid('carry_over_source_report_id')->nullable()->constrained('documents')->nullOnDelete();
             }
-            $table->foreignUlid('carry_over_source_weekly_report_id')->nullable()->constrained('weekly_reports')->nullOnDelete();
+            $table->ulid('carry_over_source_weekly_report_id')->nullable();
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 

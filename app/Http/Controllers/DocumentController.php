@@ -1515,8 +1515,9 @@ class DocumentController extends Controller
         }
 
         $document->loadMissing(['user', 'period']);
+        $teamUsers = $this->teamUsersForSelection();
 
-        return view('documents.weekly-report.action-tasks', compact('document', 'actionLogProgress'));
+        return view('documents.weekly-report.action-tasks', compact('document', 'actionLogProgress', 'teamUsers'));
     }
 
     /**

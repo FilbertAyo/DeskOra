@@ -9,9 +9,78 @@ class DocumentsUnionView
 {
     public const COLLATION = 'utf8mb4_unicode_ci';
 
+    /** @var list<string> */
+    public const REQUIRED_TABLES = [
+        'weekly_plans',
+        'weekly_reports',
+        'monthly_reports',
+        'action_logs',
+    ];
+
     public static function exists(): bool
     {
-        return Schema::hasTable('documents');
+        if (Schema::hasTable('documents')) {
+            return true;
+        }
+
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return false;
+        }
+
+        $result = DB::select(
+            'SELECT COUNT(*) AS aggregate FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = ?',
+            ['documents']
+        );
+
+        return ((int) ($result[0]->aggregate ?? 0)) > 0;
+    }
+
+    public static function isView(): bool
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return false;
+        }
+
+        $result = DB::select(
+            'SELECT COUNT(*) AS aggregate FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = ?',
+            ['documents']
+        );
+
+        return ((int) ($result[0]->aggregate ?? 0)) > 0;
+    }
+
+    public static function dropIfExists(): void
+    {
+        DB::statement('DROP VIEW IF EXISTS documents');
+        Schema::dropIfExists('documents');
+    }
+
+    public static function canCreate(): bool
+    {
+        foreach (self::REQUIRED_TABLES as $table) {
+            if (! Schema::hasTable($table)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function shouldDeferAutoEnsure(): bool
+    {
+        if (! app()->runningInConsole()) {
+            return false;
+        }
+
+        $argv = $_SERVER['argv'] ?? [];
+
+        foreach (['migrate:fresh', 'migrate:refresh', 'migrate:reset', 'db:wipe', 'migrate'] as $command) {
+            if (in_array($command, $argv, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function recreate(bool $withUnicodeCollation = true): void

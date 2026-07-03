@@ -45,7 +45,13 @@ git pull --ff-only
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
 
-echo "==> Running database migrations..."
+if grep -qE '^APP_ENV=production' .env 2>/dev/null; then
+  echo "==> Production environment detected."
+  echo "    Deploy uses forward-only migrations (migrate --force)."
+  echo "    Destructive commands such as migrate:fresh and db:wipe are never run here."
+fi
+
+echo "==> Running database migrations (forward-only)..."
 "$PHP_BIN" artisan migrate --force
 
 echo "==> Ensuring documents union view exists..."
