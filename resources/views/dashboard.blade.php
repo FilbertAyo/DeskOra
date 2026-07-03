@@ -291,9 +291,6 @@
 
         <div class="col-12 col-lg-4 col-md-4 mb-3">
             <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0"><i class="ti ti-calendar-event me-2"></i>Weekly plan & report</h5>
-                </div>
                 <div class="card-body">
                     @if($showWeeklyToast && $wr)
                         <ul class="mb-3 ps-3 small text-muted">
@@ -358,25 +355,14 @@
                         <div class="text-center">
                             <i class="ti ti-mood-smile fs-1 text-success"></i>
                             <p class="text-muted mb-0 mt-2">No action needed. Your weekly plan and report are up to date.</p>
-                            <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
-                                @if(isset($availableTypes['weekly_plan']))
-                                    <a href="{{ route('documents.weekly-plans') }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="ti ti-target me-1"></i>Weekly plans
-                                    </a>
-                                @endif
-                                @if(isset($availableTypes['weekly_report']))
-                                    <a href="{{ route('documents.weekly-reports') }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="ti ti-activity me-1"></i>Weekly reports
-                                    </a>
-                                @endif
-                            </div>
+                        
                         </div>
                     @endif
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-8 col-md-8 col-12">
+        <div class="col-xl-6 col-md-6 col-12">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Weekly Activities</h5>
@@ -477,7 +463,7 @@
         </div>
 
 
-        <div class="col-xl-4 col-md-4 col-12">
+        <div class="col-xl-6 col-md-6 col-12">
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">

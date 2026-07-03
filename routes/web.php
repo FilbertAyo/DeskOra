@@ -19,6 +19,7 @@ use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\WeeklyMatrixController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
 use Illuminate\Support\Facades\Route;
@@ -124,6 +125,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/{year}/activities', [YearPlanController::class, 'storeActivity'])->name('activities.store');
         Route::put('/{year}/activities/{activity}', [YearPlanController::class, 'updateActivity'])->name('activities.update');
         Route::delete('/{year}/activities/{activity}', [YearPlanController::class, 'destroyActivity'])->name('activities.destroy');
+    });
+
+    Route::prefix('weekly-matrix')->name('weekly-matrix.')->group(function () {
+        Route::get('/', [WeeklyMatrixController::class, 'index'])->name('index');
+        Route::get('/periods/{period}', [WeeklyMatrixController::class, 'period'])->name('period');
+        Route::get('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'edit'])->name('edit');
+        Route::post('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'store'])->name('store');
+        Route::put('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'update'])->name('update');
+        Route::delete('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'destroy'])->name('destroy');
+        Route::get('/periods/{period}/departments/{department}/suggestions', [WeeklyMatrixController::class, 'suggestions'])->name('suggestions');
     });
 
     // departments

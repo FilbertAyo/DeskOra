@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -142,6 +142,8 @@ return new class extends Migration
             $table->enum('decision', ['pending', 'approved', 'rejected'])->default('pending');
             $table->enum('approval_stage', ['pending', 'reviewed', 'approved', 'authorized', 'rejected'])->default('pending');
             $table->decimal('provided_amount', 14, 2)->default(0);
+            $table->decimal('review_provided_amount', 14, 2)->nullable();
+            $table->decimal('approve_provided_amount', 14, 2)->nullable();
             $table->text('note')->nullable();
             $table->foreignUlid('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
@@ -366,6 +368,8 @@ return new class extends Migration
             $table->text('status_reason')->nullable();
             $table->timestamp('changed_at')->nullable();
             $table->string('source')->nullable();
+            $table->json('reassigned_from_user_ids')->nullable();
+            $table->json('reassigned_to_user_ids')->nullable();
             $table->timestamps();
 
             $table->index(['action_log_task_id', 'changed_at']);

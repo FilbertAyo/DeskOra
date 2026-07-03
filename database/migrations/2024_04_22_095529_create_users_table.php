@@ -16,7 +16,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->foreignUlid('department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->foreignUlid('branch_id')->nullable()->constrained('branches')->nullOnDelete();
-       
+
             $table->string('file')->nullable();
             $table->string('signature')->nullable();
             $table->string('phone');
@@ -26,9 +26,9 @@ return new class extends Migration
             $table->string('avatar')->default('image/prof.jpeg');
             $table->boolean('dark_mode')->default(false);
             $table->string('messenger_color')->nullable();
-           
-        
+
             $table->rememberToken();
+            $table->timestamp('last_login_at')->nullable();
             $table->timestamps();
         });
 

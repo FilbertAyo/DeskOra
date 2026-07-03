@@ -23,6 +23,13 @@
                         </a>
                     </li>
 
+                    <li class="pc-item {{ Request::routeIs('weekly-matrix.*') ? 'active' : '' }}">
+                        <a href="{{ route('weekly-matrix.index') }}" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-layout-grid"></i></span>
+                            <span class="pc-mtext">Weekly Matrix</span>
+                        </a>
+                    </li>
+
                 <!-- Weekly Plans & Reports -->
                 <li class="pc-item pc-caption">
                     <label>Activities</label>

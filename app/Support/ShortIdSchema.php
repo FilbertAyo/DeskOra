@@ -39,6 +39,8 @@ final class ShortIdSchema
             'monthly_report_off_plan_items',
             'action_logs',
             'action_log_tasks',
+            'weekly_matrices',
+            'weekly_matrix_entries',
         ];
     }
 
@@ -114,6 +116,13 @@ final class ShortIdSchema
             ['action_logs', 'user_id'],
             ['action_logs', 'period_id'],
             ['action_log_tasks', 'action_log_id'],
+            ['weekly_matrices', 'period_id'],
+            ['weekly_matrices', 'department_id'],
+            ['weekly_matrices', 'created_by'],
+            ['weekly_matrices', 'updated_by'],
+            ['weekly_matrix_entries', 'weekly_matrix_id'],
+            ['weekly_matrix_entry_year_plan_activity', 'weekly_matrix_entry_id'],
+            ['weekly_matrix_entry_year_plan_activity', 'year_plan_activity_id'],
             ['action_log_task_assignees', 'action_log_task_id'],
             ['action_log_task_assignees', 'user_id'],
             ['action_log_task_history', 'action_log_task_id'],
