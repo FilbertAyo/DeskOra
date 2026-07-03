@@ -145,7 +145,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                    <a href="{{ route('weekly-matrix.download', $period) }}" class="btn btn-outline-danger">
+                    <a href="{{ route('weekly-matrix.download', $period) }}" class="btn btn-sm btn-outline-danger">
                         <i class="ti ti-download me-1"></i> Download PDF
                     </a>
                 </div>

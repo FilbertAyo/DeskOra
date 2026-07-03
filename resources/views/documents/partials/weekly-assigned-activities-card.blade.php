@@ -41,8 +41,8 @@
                 <div class="card-body">
         @endif
                 <div class="table-responsive">
-                    <table class="table table-bordered table-striped align-middle mb-0">
-                        <thead class="wh-thead-weekly-plan">
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead class="table-light">
                             <tr>
                                 <th style="width: 110px;">Status</th>
                                 <th style="width: 100px;">Day</th>

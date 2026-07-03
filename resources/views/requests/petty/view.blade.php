@@ -30,9 +30,9 @@
                         </div>
                         <div class="d-flex gap-2">
                             @if ($request->request_type !== 'Staff Requisition' && ($request->status == 'approved' || $request->status == 'paid'))
-                                <button type="button" class="btn btn-outline-success d-flex align-items-center" data-toggle="modal" data-target="#pettyCashModal">
+                                <button type="button" class="btn btn-sm btn-outline-danger d-flex align-items-center" data-toggle="modal" data-target="#pettyCashModal">
                                     <i class="ti ti-download me-2"></i>Download PDF
-                                </button>
+                                </button>   
                             @endif
                             @if ($request->status == 'pending' || $request->status == 'resubmission')
                                 @if ($request->request_type === 'Staff Requisition')

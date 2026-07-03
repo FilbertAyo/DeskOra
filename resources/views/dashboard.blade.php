@@ -686,10 +686,10 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="{{ route('weekly-matrix.period', $currentPeriod) }}" class="btn btn-outline-secondary">
+                        <a href="{{ route('weekly-matrix.period', $currentPeriod) }}" class="btn btn-sm btn-outline-secondary">
                             <i class="ti ti-external-link me-1"></i> Open period
                         </a>
-                        <a href="{{ route('weekly-matrix.download', $currentPeriod) }}" class="btn btn-outline-danger">
+                        <a href="{{ route('weekly-matrix.download', $currentPeriod) }}" class="btn btn-sm btn-outline-danger">
                             <i class="ti ti-download me-1"></i> Download PDF
                         </a>
                     </div>

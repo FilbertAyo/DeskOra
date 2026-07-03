@@ -95,6 +95,18 @@ class DocumentDomainSyncService
             'budget_review_note' => $document->budget_review_note,
         ]);
 
+        // Snapshot existing budget approval progress before the domain rows are
+        // rebuilt. The review table is the source of truth for the weekly budget
+        // review panel; without this, every Document save (which re-syncs) would
+        // cascade-delete the reviews and reset each item back to "pending".
+        $preservedReviewsByUid = WeeklyPlanBudgetItem::query()
+            ->where('weekly_plan_id', $weeklyPlan->id)
+            ->with('review')
+            ->get()
+            ->filter(fn (WeeklyPlanBudgetItem $budgetItem) => $budgetItem->review !== null)
+            ->keyBy(fn (WeeklyPlanBudgetItem $budgetItem) => trim((string) $budgetItem->budget_uid))
+            ->map(fn (WeeklyPlanBudgetItem $budgetItem) => $budgetItem->review);
+
         $weeklyPlan->activities()->delete();
         $weeklyPlan->meetings()->delete();
         $weeklyPlan->budgetItems()->delete();
@@ -181,6 +193,30 @@ class DocumentDomainSyncService
                 'amount_numeric' => Document::parseBudgetAmount($amountRaw),
                 'sort_order' => $index,
             ]);
+
+            // Preserve approval progress recorded directly on the domain review
+            // table (the review panel's write path). This keeps a reviewed /
+            // approved / authorized item from being reset when the plan re-syncs.
+            $preservedReview = $preservedReviewsByUid->get($budgetUid);
+            if ($preservedReview) {
+                WeeklyPlanBudgetReview::query()->create([
+                    'weekly_plan_budget_item_id' => (string) $budgetItem->id,
+                    'decision' => $preservedReview->decision,
+                    'approval_stage' => $preservedReview->approval_stage,
+                    'provided_amount' => $preservedReview->provided_amount,
+                    'review_provided_amount' => $preservedReview->review_provided_amount,
+                    'approve_provided_amount' => $preservedReview->approve_provided_amount,
+                    'note' => $preservedReview->note,
+                    'reviewed_by' => $preservedReview->reviewed_by,
+                    'reviewed_at' => $preservedReview->reviewed_at,
+                    'approved_by' => $preservedReview->approved_by,
+                    'approved_at' => $preservedReview->approved_at,
+                    'authorized_by' => $preservedReview->authorized_by,
+                    'authorized_at' => $preservedReview->authorized_at,
+                ]);
+
+                continue;
+            }
 
             $review = $reviewRows->get($budgetUid);
             $decision = in_array(($review['decision'] ?? null), [

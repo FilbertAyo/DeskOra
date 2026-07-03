@@ -90,8 +90,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped align-middle mb-0">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered align-middle mb-0">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th style="width: 60px;">No.</th>
                                                             <th style="width: 320px;">Activity (from Weekly Plan)</th>
@@ -200,8 +200,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped align-middle mb-0">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered align-middle mb-0">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th style="width: 160px;">Date</th>
                                                             <th>Meeting / Engagement</th>
@@ -304,8 +304,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped align-middle mb-0">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered align-middle mb-0">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th style="width: 70px;">No.</th>
                                                             <th>Achievement</th>
@@ -358,8 +358,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped align-middle mb-0">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered align-middle mb-0">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th>Challenge(s)</th>
                                                             <th style="width: 320px;">Action Taken/Planned</th>
@@ -429,8 +429,8 @@
 
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
-                                                    <table class="table table-bordered table-striped align-middle mb-0">
-                                                        <thead class="wh-thead-weekly-report">
+                                                    <table class="table table-bordered align-middle mb-0">
+                                                        <thead class="table-light">
                                                             <tr>
                                                                 <th>Budget Item / Activity</th>
                                                                 <th>Description / Purpose</th>

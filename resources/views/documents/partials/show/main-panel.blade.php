@@ -8,12 +8,12 @@
                     </h5>
                     <div class="d-flex gap-2">
                         @if(in_array($document->type, [\App\Models\Document::TYPE_WEEKLY_PLAN, \App\Models\Document::TYPE_WEEKLY_REPORT], true))
-                            <a href="{{ route('documents.download', $document) }}" class="btn btn-sm btn-info">
+                            <a href="{{ route('documents.download', $document) }}" class="btn btn-sm btn-outline-danger">
                                 <i class="ti ti-download me-1"></i> Download PDF
                             </a>
                         @endif
                         @if($document->file_path && $document->hasFile())
-                            <a href="{{ $document->file_url }}" target="_blank" class="btn btn-sm btn-info">
+                            <a href="{{ $document->file_url }}" target="_blank" class="btn btn-sm btn-outline-danger">
                                 <i class="ti ti-download me-1"></i> Download PDF
                             </a>
                         @endif

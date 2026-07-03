@@ -104,7 +104,7 @@
                                     </a>
                                     @endif
                                 @endcan
-                                <a href="{{ route('action-logs.download', $document->id) }}" class="btn btn-outline-danger btn-sm">
+                                <a href="{{ route('action-logs.download', $document->id) }}" class="btn btn-sm btn-outline-danger">
                                     <i class="ti ti-download me-1"></i> Download PDF
                                 </a>
                                 @can('manageActionLogs', $document)

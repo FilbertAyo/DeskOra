@@ -22,7 +22,7 @@
             @endphp
             
             <div class="card shadow-none border border-info">
-                <div class="card-header bg-light-info">
+                <div class="card-header bg-light">
                     <h6 class="mb-0">
                         <i class="ti ti-target me-2"></i>Main Target Accomplishment Status
                     </h6>

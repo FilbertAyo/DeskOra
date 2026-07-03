@@ -102,7 +102,7 @@
                                                 <i class="ti ti-eye me-2"></i> View
                                             </a>
                                             @canany(['download staff requisition', 'authorize staff requisition', 'approve pettycash payments'])
-                                                <a class="dropdown-item" href="{{ route('petty.requisition.download', $tx['request_id']) }}">
+                                                <a class="dropdown-item btn btn-sm btn-outline-danger" href="{{ route('petty.requisition.download', $tx['request_id']) }}">
                                                     <i class="ti ti-download me-2"></i> Download PDF
                                                 </a>
                                             @endcanany

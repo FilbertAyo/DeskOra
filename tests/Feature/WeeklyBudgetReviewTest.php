@@ -709,11 +709,6 @@ class WeeklyBudgetReviewTest extends TestCase
             ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
         )->assertRedirect()->assertSessionHas('success');
 
-        $this->actingAs($authorizer)->post(
-            route('documents.process-weekly-budget-review', $plan->id),
-            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
-        )->assertRedirect()->assertSessionHas('error');
-
         $this->actingAs($approver)->post(
             route('documents.process-weekly-budget-review', $plan->id),
             ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
@@ -726,6 +721,34 @@ class WeeklyBudgetReviewTest extends TestCase
 
         $plan->refresh();
         $this->assertSame(Document::BUDGET_REVIEW_APPROVED, $plan->budget_review_status);
+    }
+
+    public function test_authorizer_can_authorize_directly_from_pending(): void
+    {
+        [, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $authorizer = $this->createStageReviewer('authorize weekly budgets');
+
+        $plan = $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'ItemA', 'description_purpose' => 'A', 'amount' => '100'],
+        ]);
+        $uid = $plan->budgetItems()[0]['budget_uid'];
+
+        $this->actingAs($authorizer)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 80]
+        )->assertRedirect()->assertSessionHas('success');
+
+        $review = WeeklyPlanBudgetReview::query()
+            ->whereHas('budgetItem', fn ($query) => $query->where('budget_uid', $uid))
+            ->first();
+
+        $this->assertNotNull($review);
+        $this->assertSame(Document::BUDGET_REVIEW_STAGE_AUTHORIZED, $review->approval_stage);
+        $this->assertSame(80.0, (float) $review->provided_amount);
+        $this->assertSame(80.0, (float) $review->review_provided_amount);
+        $this->assertSame(80.0, (float) $review->approve_provided_amount);
     }
 
     // ------------------------------------------------------------------

@@ -1,5 +1,5 @@
 <div class="col-12 mb-3">
-    <div class="card border-primary-subtle">
+    <div class="card border">
         <div class="card-header bg-white border-bottom">
             <h6 class="mb-0"><i class="ti ti-users-group me-2"></i>Collaboration (Optional)</h6>
         </div>
@@ -22,7 +22,7 @@
 </div>
 
 <div class="col-12 mb-3">
-    <div class="card border-primary">
+    <div class="card border">
         <div class="card-header bg-white border-bottom">
             <h6 class="mb-0"><i class="ti ti-target me-2"></i>1. Key Objective for the Week</h6>
         </div>
@@ -41,9 +41,7 @@
                 @error('main_target')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
-                <small class="form-text text-muted">
-                    This becomes the "Main Target(s)" used by weekly reports.
-                </small>
+              
             </div>
 
             <div class="mb-3">
@@ -56,7 +54,7 @@
 </div>
 
 <div class="col-12 mb-3">
-    <div class="card border-secondary">
+    <div class="card border">
         <div class="card-header bg-white border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="ti ti-calendar me-2"></i>2. Planned Activities</h6>
@@ -66,12 +64,10 @@
             </div>
         </div>
         <div class="card-body">
-            <small class="form-text text-muted mb-2">
-                Drafts can be saved without activities. For any activity row you fill in, please provide both a Day and Activity text.
-            </small>
+           
             <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle mb-0">
-                    <thead class="wh-thead-weekly-plan">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
                             <th style="width: 100px;">Day</th>
                             <th>Activity</th>
@@ -157,7 +153,7 @@
 @include('documents.partials.weekly-assigned-activities-card')
 
 <div class="col-12 mb-3">
-    <div class="card border-info">
+    <div class="card border">
         <div class="card-header bg-white border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="ti ti-users me-2"></i>3. Key Meetings / Engagements</h6>
@@ -168,8 +164,8 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle mb-0">
-                    <thead class="wh-thead-weekly-plan">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
                             <th style="width: 150px;">Date</th>
                             <th>Meeting / Engagement</th>
@@ -246,7 +242,7 @@
 </div>
 
 <div class="col-12 mb-3">
-    <div class="card border-success">
+    <div class="card border">
         <div class="card-header bg-white border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="ti ti-dollar-sign me-2"></i>4. Budget</h6>
@@ -257,8 +253,8 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle mb-0">
-                    <thead class="wh-thead-weekly-plan">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
                             <th style="width: 500px;">Budget Item / Activity</th>
                             <th style="width: 500px;">Description / Purpose</th>
@@ -293,7 +289,7 @@
                                     <input class="form-control"
                                         name="content[budget][{{ $i }}][amount]"
                                         value="{{ old("content.budget.$i.amount", $budgetRow['amount'] ?? '') }}"
-                                        placeholder="e.g., 25">
+                                        placeholder="e.g., 25000">
                                 </td>
                                 <td class="text-center align-middle">
                                     <button type="button" class="btn btn-sm btn-outline-danger remove-budget-row">&times;</button>
@@ -302,9 +298,7 @@
                         @endforeach
                     </tbody>
                 </table>
-                <small class="form-text text-muted mt-2">
-                    Amount is optional. If provided, it will be shown on the weekly report budget section.
-                </small>
+              
             </div>
         </div>
     </div>

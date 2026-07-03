@@ -63,19 +63,36 @@
     <div class="card tbl-card">
         <div class="card-header bg-white border-bottom">
             <div class="row align-items-center">
-                <div class="col-md-4">
+                <!-- <div class="col-md-4">
                     <h5 class="mb-0"><i class="ti ti-wallet me-2 text-muted"></i>Weekly Budget Submissions</h5>
                     @if(isset($defaultPeriod) && $defaultPeriod && !request()->filled('period_id'))
                         <small class="text-muted">Showing latest week: Week {{ $defaultPeriod->week_number }} &bull; {{ $defaultPeriod->year }}</small>
                     @endif
-                </div>
-                <div class="col-md-8">
+                </div> -->
+                <div class="col-md-12">
                     <div class="alert alert-light border mb-2 py-2">
-                        <small class="mb-0 d-block">
-                            <strong>How approval works:</strong>
-                            Reviewer checks first, approver confirms, then final approver authorizes.
-                            <strong>Final approver can authorize directly</strong> and the system auto-completes earlier approvals.
-                        </small>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div>
+                                <small class="text-muted d-block mb-1">Approval flow</small>
+                                <div class="d-flex flex-wrap align-items-center gap-1">
+                                    @foreach($approvalFlowSteps as $index => $step)
+                                        @if($index > 0)
+                                            <span class="text-muted mx-1">→</span>
+                                        @endif
+                                        <span class="badge bg-light-light border border text-dark">{{ $step['label'] }}</span>
+                                    @endforeach
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    Each item moves Review → Approve → Authorize.
+                                    Final authorizers may authorize directly; earlier steps are auto-completed.
+                                </small>
+                            </div>
+                            @if(! empty($userApprovalActions))
+                                <span class="badge bg-light-primary border border-primary">
+                                    Your actions: {{ $userApprovalActions }}
+                                </span>
+                            @endif
+                        </div>
                     </div>
                     <form method="GET" action="{{ route('documents.weekly-budget-review') }}" id="budgetFilterForm" class="row g-2">
                         <div class="col-md-3">
@@ -123,10 +140,10 @@
                                 <i class="ti ti-plus me-1"></i>Add Mid-Week Budget
                             </button>
                         @endcan
-                        <a href="{{ route('documents.weekly-budget-review.export.pdf', request()->query()) }}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{{ route('documents.weekly-budget-review.export.pdf', request()->query()) }}" class="btn btn-sm btn-outline-danger">
                             <i class="ti ti-file-type-pdf me-1"></i>Download PDF
                         </a>
-                        <a href="{{ route('documents.weekly-budget-review.export.excel', request()->query()) }}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{{ route('documents.weekly-budget-review.export.excel', request()->query()) }}" class="btn btn-sm btn-outline-danger">
                             <i class="ti ti-file-spreadsheet me-1"></i>Download Excel
                         </a>
                     </div>
@@ -143,8 +160,8 @@
                                 <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
                             </h6>
                             <div class="text-end">
-                                <span class="badge bg-light-light border border-light text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
-                                <span class="badge bg-light-light border border-light text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
+                                <span class="badge bg-light-light border border text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
+                                <span class="badge bg-light-light border border text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -184,8 +201,8 @@
 
                                 {{-- Item rows --}}
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-bordered table-striped mb-0">
-                                        <thead class="thead-light">
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <thead class="thead-secondary">
                                             <tr>
                                                 <th style="width: 50px;" class="text-center">#</th>
                                                 <th>Item</th>
@@ -193,111 +210,15 @@
                                                 <th class="text-end" style="width: 140px;">Requested</th>
                                                 <th class="text-end" style="width: 140px;">Provided</th>
                                                 <th style="width: 120px;">Status</th>
-                                                <!-- <th>Note</th> -->
                                                 <th class="text-center" style="width: 120px;">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @foreach($staffItems as $idx => $item)
-                                                @php
-                                                    $isRejected = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_REJECTED
-                                                        || ($item['approval_stage'] ?? '') === \App\Models\Document::BUDGET_REVIEW_STAGE_REJECTED;
-                                                    $approvalStage = $item['approval_stage'] ?? \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING;
-                                                    $isFinalApproved = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_APPROVED
-                                                        && $approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
-                                                    $canReview = auth()->user()?->can('review weekly budgets');
-                                                    $canApprove = auth()->user()?->can('approve weekly budgets');
-                                                    $canAuthorize = auth()->user()?->can('authorize weekly budgets');
-
-                                                    $nextStage = null;
-                                                    if (! $isRejected && ! $isFinalApproved) {
-                                                        if ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
-                                                            $nextStage = 'review';
-                                                        } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED && $canApprove) {
-                                                            $nextStage = 'approve';
-                                                        } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED && $canAuthorize) {
-                                                            $nextStage = 'authorize';
-                                                        }
-                                                    }
-
-                                                    $actionLabel = match ($nextStage) {
-                                                        'review' => 'Review',
-                                                        'approve' => 'Approve',
-                                                        'authorize' => 'Authorize',
-                                                        default => null,
-                                                    };
-
-                                                    $awaitingLabel = match ($approvalStage) {
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING => 'Awaiting Review',
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED => 'Awaiting Approval',
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED => 'Awaiting Authorization',
-                                                        default => null,
-                                                    };
-
-                                                    $reviewAmount = $item['review_provided_amount'] ?? null;
-                                                    if ($reviewAmount === null && in_array($approvalStage, [
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED,
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED,
-                                                        \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
-                                                    ], true) && ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_APPROVED) {
-                                                        $reviewAmount = (float) ($item['provided_amount'] ?? 0);
-                                                    }
-
-                                                    $approveAmount = $item['approve_provided_amount'] ?? null;
-                                                    $displayProvided = $isFinalApproved
-                                                        ? (float) ($item['provided_amount'] ?? 0)
-                                                        : ($approveAmount ?? $reviewAmount);
-                                                    $showProvided = ! $isRejected && $displayProvided !== null && $displayProvided > 0;
-                                                @endphp
-                                                <tr>
-                                                    <td class="text-center">{{ $idx + 1 }}</td>
-                                                    <td>{{ $item['item'] }}</td>
-                                                    <td>{{ $item['description_purpose'] }}</td>
-                                                    <td class="text-end">{{ $item['amount'] }}</td>
-                                                    <td class="text-end">
-                                                        @if($showProvided)
-                                                            {{ number_format($displayProvided, 2) }}
-                                                        @else
-                                                            <span class="text-muted">—</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        @if($isFinalApproved)
-                                                            <span class="badge bg-light-success border border-success">Approved</span>
-                                                        @elseif($isRejected)
-                                                            <span class="badge bg-light-danger border border-danger">Rejected</span>
-                                                        @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
-                                                            <span class="badge bg-light-primary border border-primary">Pending Authorization</span>
-                                                        @elseif($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED)
-                                                            <span class="badge bg-light-success border border-success">Reviewed</span>
-                                                        @else
-                                                            <span class="badge bg-light-warning border border-warning text-dark">Pending Review</span>
-                                                        @endif
-                                                    </td>
-                                                    <!-- <td>
-                                                        <small>{{ $item['note'] ?? '' }}</small>
-                                                    </td> -->
-                                                    <td class="text-center">
-                                                        @if($actionLabel)
-                                                            <x-table-action-dropdown :label="$actionLabel">
-                                                                <button type="button" class="dropdown-item"
-                                                                    data-bs-toggle="modal"
-                                                                    data-bs-target="#itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}">
-                                                                    <i class="ti ti-check me-2"></i>
-                                                                    {{ $actionLabel }}
-                                                                </button>
-                                                            </x-table-action-dropdown>
-                                                        @elseif($awaitingLabel)
-                                                            <span class="badge bg-light-info border border-info text-dark">{{ $awaitingLabel }}</span>
-                                                        @elseif($isFinalApproved)
-                                                            <span class="badge bg-light-success border border-success">Complete</span>
-                                                        @elseif($isRejected)
-                                                            <span class="badge bg-light-danger border border-danger">Closed</span>
-                                                        @else
-                                                            <span class="text-muted">—</span>
-                                                        @endif
-                                                    </td>
-                                                </tr>
+                                                @include('documents.partials.reviewer.budget-item-row', [
+                                                    'item' => $item,
+                                                    'rowNumber' => $idx + 1,
+                                                ])
                                             @endforeach
                                         </tbody>
                                         <tfoot>
@@ -311,185 +232,13 @@
                                     </table>
                                 </div>
 
-                                {{-- Per-item review modals --}}
                                 @foreach($staffItems as $item)
-                                    @php
-                                        $isRejected = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_REJECTED
-                                            || ($item['approval_stage'] ?? '') === \App\Models\Document::BUDGET_REVIEW_STAGE_REJECTED;
-                                        $approvalStage = $item['approval_stage'] ?? \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING;
-                                        $isFinalApproved = ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_APPROVED
-                                            && $approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
-                                        $canReview = auth()->user()?->can('review weekly budgets');
-                                        $canApprove = auth()->user()?->can('approve weekly budgets');
-                                        $canAuthorize = auth()->user()?->can('authorize weekly budgets');
-
-                                        $nextStage = null;
-                                        if (! $isRejected && ! $isFinalApproved) {
-                                            if ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_PENDING && $canReview) {
-                                                $nextStage = 'review';
-                                            } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED && $canApprove) {
-                                                $nextStage = 'approve';
-                                            } elseif ($approvalStage === \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED && $canAuthorize) {
-                                                $nextStage = 'authorize';
-                                            }
-                                        }
-
-                                        $actionLabel = match ($nextStage) {
-                                            'review' => 'Review',
-                                            'approve' => 'Approve',
-                                            'authorize' => 'Authorize',
-                                            default => null,
-                                        };
-
-                                        $reviewAmount = $item['review_provided_amount'] ?? null;
-                                        if ($reviewAmount === null && in_array($approvalStage, [
-                                            \App\Models\Document::BUDGET_REVIEW_STAGE_REVIEWED,
-                                            \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED,
-                                            \App\Models\Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
-                                        ], true) && ($item['decision'] ?? '') === \App\Models\Document::BUDGET_REVIEW_APPROVED) {
-                                            $reviewAmount = (float) ($item['provided_amount'] ?? 0);
-                                        }
-
-                                        $approveAmount = $item['approve_provided_amount'] ?? null;
-                                        $defaultProvidedInput = $nextStage === 'approve'
-                                            ? ($reviewAmount ?? (float) ($item['amount_numeric'] ?? 0))
-                                            : ($approveAmount ?? $reviewAmount ?? (float) ($item['amount_numeric'] ?? 0));
-
-                                        $modalTitle = match ($nextStage) {
-                                            'review' => 'Review Budget Item',
-                                            'approve' => 'Approve Budget Item',
-                                            'authorize' => 'Authorize Budget Item',
-                                            default => 'Budget Item',
-                                        };
-
-                                        $submitLabel = match ($nextStage) {
-                                            'review' => 'Save Review',
-                                            'approve' => 'Save Approval',
-                                            'authorize' => 'Save Authorization',
-                                            default => 'Save',
-                                        };
-                                    @endphp
-                                    @if($actionLabel)
-                                        <div class="modal fade" id="itemReviewModal_{{ $item['document_id'] }}_{{ $item['budget_uid'] }}" tabindex="-1" aria-hidden="true">
-                                            <div class="modal-dialog">
-                                                <form method="POST" action="{{ route('documents.process-weekly-budget-review', $item['document_id']) }}" class="modal-content">
-                                                    @csrf
-                                                    <input type="hidden" name="budget_uid" value="{{ $item['budget_uid'] }}">
-                                                    <div class="modal-header">
-                                                        <h5 class="modal-title">{{ $modalTitle }}</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        @if($nextStage === 'authorize' && $approvalStage !== \App\Models\Document::BUDGET_REVIEW_STAGE_APPROVED)
-                                                            <div class="alert alert-light border py-2">
-                                                                <small>
-                                                                    Final authorization will automatically mark review and approval stages as completed.
-                                                                </small>
-                                                            </div>
-                                                        @endif
-                                                        <div class="mb-3">
-                                                            <label class="form-label text-muted">Item</label>
-                                                            <div class="fw-semibold">{{ $item['item'] }}</div>
-                                                            @if($item['description_purpose'])
-                                                                <small class="text-muted d-block">{{ $item['description_purpose'] }}</small>
-                                                            @endif
-                                                            <div class="mt-2">
-                                                                <span class="badge bg-light-warning border border-warning text-dark">Requested: {{ $item['amount'] }}</span>
-                                                            </div>
-                                                        </div>
-
-                                                        @if($nextStage === 'approve' && $reviewAmount !== null)
-                                                            <div class="alert alert-light border mb-3 py-2">
-                                                                <small class="text-muted d-block mb-1">Previous review</small>
-                                                                <div class="fw-semibold">
-                                                                    Provided amount:
-                                                                    <span class="badge bg-light-success border border-success">{{ number_format($reviewAmount, 2) }}</span>
-                                                                </div>
-                                                                @if(! empty($item['review_stage_by_name']))
-                                                                    <small class="text-muted d-block mt-1">
-                                                                        Reviewed by {{ $item['review_stage_by_name'] }}
-                                                                        @if(! empty($item['review_stage_at']))
-                                                                            on {{ \Carbon\Carbon::parse($item['review_stage_at'])->format('M d, Y H:i') }}
-                                                                        @endif
-                                                                    </small>
-                                                                @endif
-                                                            </div>
-                                                        @endif
-
-                                                        @if($nextStage === 'authorize')
-                                                            <div class="alert alert-light border mb-3 py-2">
-                                                                <small class="text-muted d-block mb-1">Approval history</small>
-                                                                @if($reviewAmount !== null)
-                                                                    <div class="mb-1">
-                                                                        Review amount:
-                                                                        <span class="badge bg-light-success border border-success">{{ number_format($reviewAmount, 2) }}</span>
-                                                                        @if(! empty($item['review_stage_by_name']))
-                                                                            <small class="text-muted">by {{ $item['review_stage_by_name'] }}</small>
-                                                                        @endif
-                                                                    </div>
-                                                                @endif
-                                                                @if($approveAmount !== null)
-                                                                    <div>
-                                                                        Approval amount:
-                                                                        <span class="badge bg-light-success border border-success">{{ number_format($approveAmount, 2) }}</span>
-                                                                        @if(! empty($item['approve_stage_by_name']))
-                                                                            <small class="text-muted">by {{ $item['approve_stage_by_name'] }}</small>
-                                                                        @endif
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        @endif
-
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Decision</label>
-                                                            <select name="decision" class="form-control js-budget-decision" required>
-                                                                <option value="approved" selected>Approve</option>
-                                                                <option value="rejected">Reject</option>
-                                                            </select>
-                                                        </div>
-                                                        <div class="mb-3 js-provided-amount-group">
-                                                            <label class="form-label">
-                                                                @if($nextStage === 'review')
-                                                                    Provided Amount
-                                                                @elseif($nextStage === 'approve')
-                                                                    Approved Amount
-                                                                @else
-                                                                    Authorized Amount
-                                                                @endif
-                                                            </label>
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                name="provided_amount"
-                                                                value="{{ number_format($defaultProvidedInput, 2, '.', '') }}"
-                                                                class="form-control js-provided-amount-input">
-                                                            <small class="text-muted">Required when decision is approve.</small>
-                                                        </div>
-                                                        <div class="mb-0 js-note-group">
-                                                            <label class="form-label">Note</label>
-                                                            <textarea name="note" rows="3" class="form-control js-note-input" placeholder="Optional reason for rejection">{{ $item['note'] ?? '' }}</textarea>
-                                                            <small class="text-muted">Visible only when decision is reject.</small>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                                        <button type="submit" class="btn {{ $nextStage === 'authorize' ? 'btn-success' : 'btn-primary' }}">
-                                                            {{ $submitLabel }}
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    @endif
+                                    @include('documents.partials.reviewer.budget-item-modal', ['item' => $item])
                                 @endforeach
+
                             @endforeach
                         </div>
-                        {{-- Department total footer --}}
-                        <div class="card-footer bg-light d-flex justify-content-end">
-                            <strong class="me-3">Department Total Requested: {{ number_format($dept['requested_total'], 2) }}</strong>
-                            <strong>Department Total Provided: {{ number_format($dept['provided_total'], 2) }}</strong>
-                        </div>
+                     
                     </div>
                 @endforeach
 
@@ -580,6 +329,7 @@
                     if (noteGroup && noteInput) {
                         noteGroup.style.display = isApproved ? 'none' : '';
                         noteInput.disabled = isApproved;
+                        noteInput.required = !isApproved;
                     }
                 }
 

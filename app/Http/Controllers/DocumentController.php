@@ -2244,6 +2244,8 @@ class DocumentController extends Controller
             'statusFilter' => $statusFilter,
             'defaultPeriod' => $defaultPeriod,
             'activePeriodId' => $activePeriodId,
+            'approvalFlowSteps' => \App\Support\WeeklyBudgetApprovalFlow::steps(),
+            'userApprovalActions' => \App\Support\WeeklyBudgetApprovalFlow::userActionSummary($user),
         ]);
     }
 
@@ -2352,32 +2354,7 @@ class DocumentController extends Controller
 
     private function resolveBudgetApprovalActionStage(string $currentStage, User $user): ?string
     {
-        if (! in_array($currentStage, Document::budgetReviewStages(), true)) {
-            $currentStage = Document::BUDGET_REVIEW_STAGE_PENDING;
-        }
-
-        return match ($currentStage) {
-            Document::BUDGET_REVIEW_STAGE_PENDING => $this->canProcessBudgetStage($user, 'review')
-                ? 'review'
-                : null,
-            Document::BUDGET_REVIEW_STAGE_REVIEWED => $this->canProcessBudgetStage($user, 'approve')
-                ? 'approve'
-                : null,
-            Document::BUDGET_REVIEW_STAGE_APPROVED => $this->canProcessBudgetStage($user, 'authorize')
-                ? 'authorize'
-                : null,
-            default => null,
-        };
-    }
-
-    private function canProcessBudgetStage(User $user, string $stage): bool
-    {
-        return match ($stage) {
-            'review' => $user->hasPermissionTo('review weekly budgets'),
-            'approve' => $user->hasPermissionTo('approve weekly budgets'),
-            'authorize' => $user->hasPermissionTo('authorize weekly budgets'),
-            default => false,
-        };
+        return \App\Support\WeeklyBudgetApprovalFlow::resolveNextActionStage($currentStage, $user);
     }
 
     private function stageAfterAction(string $actionStage, string $decision): string

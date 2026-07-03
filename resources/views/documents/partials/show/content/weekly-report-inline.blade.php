@@ -77,8 +77,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th style="width: 70px;">No.</th>
                                                             <th>Activity/Output</th>
@@ -166,8 +166,8 @@
                                             @endphp
                                             @if(count($achievementRows) > 0)
                                                 <div class="table-responsive">
-                                                    <table class="table table-bordered table-striped mb-0">
-                                                        <thead class="wh-thead-weekly-report">
+                                                    <table class="table table-bordered mb-0">
+                                                        <thead class="table-light">
                                                             <tr>
                                                                 <th style="width: 70px;">No.</th>
                                                                 <th>Achievement</th>
@@ -195,8 +195,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th style="width: 140px;">Date</th>
                                                             <th>Meeting / Engagement</th>
@@ -256,8 +256,8 @@
                                         </div>
                                         <div class="card-body">
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-striped">
-                                                    <thead class="wh-thead-weekly-report">
+                                                <table class="table table-bordered">
+                                                    <thead class="table-light">
                                                         <tr>
                                                             <th>Challenge(s)</th>
                                                             <th style="width: 360px;">Action Taken/Planned</th>
@@ -321,8 +321,8 @@
                                             @endphp
                                             @if(count($planBudgetFiltered) > 0)
                                                 <div class="table-responsive">
-                                                    <table class="table table-bordered table-striped">
-                                                        <thead class="wh-thead-weekly-report">
+                                                    <table class="table table-bordered">
+                                                        <thead class="table-light">
                                                             <tr>
                                                                 <th>Budget Item</th>
                                                                 <th>Description / Purpose</th>

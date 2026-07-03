@@ -38,7 +38,7 @@
     @if ($suggestions->isNotEmpty())
         <div class="card shadow-none border mb-3">
             <div class="card-header bg-white border-bottom py-2">
-                <button class="btn btn-link text-decoration-none p-0 fw-semibold text-dark"
+                <button class="btn btn-link text-decoration-none p-0 fw-semibold text-warning"
                         type="button"
                         data-bs-toggle="collapse"
                         data-bs-target="#weeklyMatrixSuggestions"
