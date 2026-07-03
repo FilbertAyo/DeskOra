@@ -7,7 +7,9 @@ use App\Models\User;
 use App\Models\WeeklyMatrix;
 use App\Models\WorkPeriod;
 use App\Services\WeeklyMatrixService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class WeeklyMatrixController extends Controller
@@ -46,12 +48,122 @@ class WeeklyMatrixController extends Controller
 
     public function period(WorkPeriod $period)
     {
-        $subDepartments = $this->weeklyMatrixService->subDepartmentsWithMatrixStatus($period);
+        $matrices = $this->weeklyMatrixService->matricesForPeriodTable($period);
+        $canCreate = $this->weeklyMatrixService->subDepartmentsWithoutMatrix($period)->isNotEmpty();
 
         return view('weekly-matrix.period', [
             'period' => $period,
-            'subDepartments' => $subDepartments,
+            'matrices' => $matrices,
+            'canCreate' => $canCreate,
         ]);
+    }
+
+    public function periodTable(WorkPeriod $period)
+    {
+        $matrices = $this->weeklyMatrixService->matricesForPeriodTable($period);
+
+        $html = view('weekly-matrix.partials.matrix-table', [
+            'period' => $period,
+            'matrices' => $matrices,
+        ])->render();
+
+        return response()->json([
+            'html' => $html,
+            'week_number' => $period->week_number,
+            'year' => $period->year,
+            'date_range' => $period->date_range,
+        ]);
+    }
+
+    public function download(WorkPeriod $period)
+    {
+        $matrices = $this->weeklyMatrixService->matricesForPeriodTable($period);
+
+        $pdf = Pdf::loadView('weekly-matrix.pdf', [
+            'period' => $period,
+            'matrices' => $matrices,
+        ])->setPaper('a4', 'landscape');
+
+        $filename = 'weekly_matrix_week_'.$period->week_number.'_'.$period->year.'.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    public function create(Request $request, WorkPeriod $period)
+    {
+        $availableSubDepartments = $this->weeklyMatrixService->subDepartmentsWithoutMatrix($period);
+
+        if ($availableSubDepartments->isEmpty()) {
+            return redirect()
+                ->route('weekly-matrix.period', $period)
+                ->with('error', 'All sub-departments already have a matrix for this work period.');
+        }
+
+        $selectedDepartmentId = old('department_id', $request->query('department_id', $availableSubDepartments->first()?->id));
+        $selectedDepartment = $availableSubDepartments->firstWhere('id', $selectedDepartmentId)
+            ?? $availableSubDepartments->first();
+
+        $yearPlanOptions = $selectedDepartment
+            ? $this->weeklyMatrixService->yearPlanOptionsForSubDepartment($period, $selectedDepartment)
+            : collect();
+
+        $suggestions = $selectedDepartment
+            ? $this->weeklyMatrixService->suggestionsFromWeeklyPlans($period, $selectedDepartment)
+            : collect();
+
+        $entry = $this->singleEntryDefaults(old('entry'));
+
+        return view('weekly-matrix.create', [
+            'period' => $period,
+            'availableSubDepartments' => $availableSubDepartments,
+            'selectedDepartment' => $selectedDepartment,
+            'entry' => $entry,
+            'yearPlanOptions' => $yearPlanOptions,
+            'suggestions' => $suggestions,
+        ]);
+    }
+
+    public function storeFromCreate(Request $request, WorkPeriod $period)
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $availableIds = $this->weeklyMatrixService
+            ->subDepartmentsWithoutMatrix($period)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        $validated = $request->validate([
+            'department_id' => ['required', 'string', 'short_id', Rule::in($availableIds)],
+            'entry' => ['required', 'array'],
+            'entry.key_activity' => ['required', 'string', 'max:20000'],
+            'entry.output' => ['nullable', 'string', 'max:20000'],
+            'entry.outcome' => ['nullable', 'string', 'max:20000'],
+            'entry.impact' => ['nullable', 'string', 'max:20000'],
+            'entry.indicators' => ['nullable', 'string', 'max:20000'],
+            'entry.baseline' => ['nullable', 'string', 'max:20000'],
+            'entry.target' => ['nullable', 'string', 'max:20000'],
+            'entry.means_of_verification' => ['nullable', 'string', 'max:20000'],
+            'entry.year_plan_activity_ids' => ['nullable', 'array'],
+            'entry.year_plan_activity_ids.*' => ['string', 'short_id', 'exists:year_plan_activities,id'],
+        ]);
+
+        $department = Department::query()->findOrFail($validated['department_id']);
+        $this->weeklyMatrixService->ensureSubDepartment($department);
+
+        $matrix = WeeklyMatrix::create([
+            'period_id' => $period->id,
+            'department_id' => $department->id,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        $this->weeklyMatrixService->syncEntries($matrix, [$validated['entry']], $user);
+
+        return redirect()
+            ->route('weekly-matrix.period', $period)
+            ->with('success', 'Weekly matrix created for '.$department->name.'.');
     }
 
     public function edit(WorkPeriod $period, Department $department)
@@ -66,13 +178,19 @@ class WeeklyMatrixController extends Controller
             ->with(['entries.yearPlanActivities.department'])
             ->first();
 
+        if (! $matrix) {
+            return redirect()
+                ->route('weekly-matrix.create', $period)
+                ->with('error', 'Create a matrix for this sub-department first.');
+        }
+
         $yearPlanOptions = $this->weeklyMatrixService->yearPlanOptionsForSubDepartment($period, $department);
         $suggestions = $this->weeklyMatrixService->suggestionsFromWeeklyPlans($period, $department);
 
         $entryDefaults = old('entries');
         if (! is_array($entryDefaults)) {
             $entryDefaults = $matrix
-                ? $matrix->entries->map(fn ($entry) => [
+                ? $matrix->entries->take(1)->map(fn ($entry) => [
                     'key_activity' => $entry->key_activity,
                     'output' => $entry->output ?? '',
                     'outcome' => $entry->outcome ?? '',
@@ -87,18 +205,10 @@ class WeeklyMatrixController extends Controller
         }
 
         if ($entryDefaults === []) {
-            $entryDefaults = [[
-                'key_activity' => '',
-                'output' => '',
-                'outcome' => '',
-                'impact' => '',
-                'indicators' => '',
-                'baseline' => '',
-                'target' => '',
-                'means_of_verification' => '',
-                'year_plan_activity_ids' => [],
-            ]];
+            $entryDefaults = [$this->emptyEntry()];
         }
+
+        $entryDefaults = [array_merge($this->emptyEntry(), $entryDefaults[0] ?? [])];
 
         $viewMode = request()->boolean('view');
 
@@ -159,7 +269,7 @@ class WeeklyMatrixController extends Controller
         $this->weeklyMatrixService->ensureSubDepartment($department);
 
         $validated = $request->validate([
-            'entries' => ['required', 'array', 'min:1'],
+            'entries' => ['required', 'array', 'size:1'],
             'entries.*.key_activity' => ['required', 'string', 'max:20000'],
             'entries.*.output' => ['nullable', 'string', 'max:20000'],
             'entries.*.outcome' => ['nullable', 'string', 'max:20000'],
@@ -199,7 +309,37 @@ class WeeklyMatrixController extends Controller
         $this->weeklyMatrixService->syncEntries($matrix, $validated['entries'], $user);
 
         return redirect()
-            ->route('weekly-matrix.edit', [$period, $department])
+            ->route('weekly-matrix.period', $period)
             ->with('success', $existing ? 'Weekly matrix updated.' : 'Weekly matrix created.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyEntry(): array
+    {
+        return [
+            'key_activity' => '',
+            'output' => '',
+            'outcome' => '',
+            'impact' => '',
+            'indicators' => '',
+            'baseline' => '',
+            'target' => '',
+            'means_of_verification' => '',
+            'year_plan_activity_ids' => [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function singleEntryDefaults(mixed $input): array
+    {
+        if (! is_array($input)) {
+            return $this->emptyEntry();
+        }
+
+        return array_merge($this->emptyEntry(), $input);
     }
 }

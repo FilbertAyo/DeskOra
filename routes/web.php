@@ -130,6 +130,10 @@ Route::middleware('auth')->group(function () {
     Route::prefix('weekly-matrix')->name('weekly-matrix.')->group(function () {
         Route::get('/', [WeeklyMatrixController::class, 'index'])->name('index');
         Route::get('/periods/{period}', [WeeklyMatrixController::class, 'period'])->name('period');
+        Route::get('/periods/{period}/table', [WeeklyMatrixController::class, 'periodTable'])->name('period.table');
+        Route::get('/periods/{period}/download', [WeeklyMatrixController::class, 'download'])->name('download');
+        Route::get('/periods/{period}/create', [WeeklyMatrixController::class, 'create'])->name('create');
+        Route::post('/periods/{period}/create', [WeeklyMatrixController::class, 'storeFromCreate'])->name('create.store');
         Route::get('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'edit'])->name('edit');
         Route::post('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'store'])->name('store');
         Route::put('/periods/{period}/departments/{department}', [WeeklyMatrixController::class, 'update'])->name('update');

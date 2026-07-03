@@ -86,7 +86,14 @@
                             <h5 class="m-b-10">Dashboard</h5>
                             <x-dashboard-greeting />
                         </div>
-                     
+                        @if (($currentPeriod ?? null))
+                            <span class="wm-matrix-cta-wrap">
+                                <button type="button" class="wm-matrix-cta-btn" data-bs-toggle="modal" data-bs-target="#dashboardMatrixModal">
+                                    <i class="ti ti-layout-grid me-1"></i>
+                                    View weekly matrix
+                                </button>
+                            </span>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -550,5 +557,176 @@
         'triggerClass' => 'js-quick-update-task',
         'teamUsers' => $teamUsers ?? collect(),
     ])
+
+    @if (($currentPeriod ?? null))
+        @once
+            <style>
+                .weekly-matrix-modal-dialog {
+                    max-width: 96vw;
+                    width: 96vw;
+                }
+
+                .wm-matrix-cta-wrap {
+                    position: relative;
+                    display: inline-flex;
+                    padding: 2px;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    isolation: isolate;
+                }
+
+                .wm-matrix-cta-wrap::before {
+                    content: '';
+                    position: absolute;
+                    inset: -120%;
+                    background: conic-gradient(
+                        from 0deg,
+                        transparent 0deg,
+                        rgba(var(--bs-primary-rgb), 0.15) 40deg,
+                        rgba(var(--bs-primary-rgb), 0.85) 120deg,
+                        #7dd3fc 180deg,
+                        rgba(var(--bs-primary-rgb), 0.85) 240deg,
+                        rgba(var(--bs-primary-rgb), 0.15) 300deg,
+                        transparent 360deg
+                    );
+                    animation: wmMatrixBorderSpin 2.8s linear infinite;
+                    z-index: 0;
+                }
+
+                .wm-matrix-cta-wrap::after {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    border-radius: 10px;
+                    box-shadow: 0 0 14px rgba(var(--bs-primary-rgb), 0.35);
+                    animation: wmMatrixGlowPulse 2.8s ease-in-out infinite;
+                    pointer-events: none;
+                    z-index: 0;
+                }
+
+                .wm-matrix-cta-btn {
+                    position: relative;
+                    z-index: 1;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.15rem;
+                    padding: 0.5rem 1.05rem;
+                    border: none;
+                    border-radius: 8px;
+                    background: #fff;
+                    color: var(--bs-primary);
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                    line-height: 1.25;
+                    white-space: nowrap;
+                    cursor: pointer;
+                    transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+                }
+
+                .wm-matrix-cta-btn:hover {
+                    background: rgba(var(--bs-primary-rgb), 0.06);
+                    color: var(--bs-primary);
+                    transform: translateY(-1px);
+                }
+
+                .wm-matrix-cta-btn:focus-visible {
+                    outline: 2px solid rgba(var(--bs-primary-rgb), 0.45);
+                    outline-offset: 2px;
+                }
+
+                .wm-matrix-cta-btn .ti {
+                    font-size: 1rem;
+                }
+
+                @keyframes wmMatrixBorderSpin {
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+
+                @keyframes wmMatrixGlowPulse {
+                    0%, 100% {
+                        box-shadow: 0 0 10px rgba(var(--bs-primary-rgb), 0.25);
+                    }
+                    50% {
+                        box-shadow: 0 0 22px rgba(var(--bs-primary-rgb), 0.5);
+                    }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .wm-matrix-cta-wrap::before,
+                    .wm-matrix-cta-wrap::after {
+                        animation: none;
+                    }
+
+                    .wm-matrix-cta-wrap::before {
+                        background: linear-gradient(
+                            135deg,
+                            rgba(var(--bs-primary-rgb), 0.5),
+                            rgba(var(--bs-primary-rgb), 0.85),
+                            #7dd3fc
+                        );
+                    }
+                }
+            </style>
+        @endonce
+        <div class="modal fade" id="dashboardMatrixModal" tabindex="-1" aria-labelledby="dashboardMatrixModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable weekly-matrix-modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="dashboardMatrixModalLabel">
+                            Weekly Matrix — Week {{ $currentPeriod->week_number }} · {{ $currentPeriod->year }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="dashboardMatrixBody">
+                        <div class="text-center text-muted py-5">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Loading matrix…
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="{{ route('weekly-matrix.period', $currentPeriod) }}" class="btn btn-outline-secondary">
+                            <i class="ti ti-external-link me-1"></i> Open period
+                        </a>
+                        <a href="{{ route('weekly-matrix.download', $currentPeriod) }}" class="btn btn-outline-danger">
+                            <i class="ti ti-download me-1"></i> Download PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const modalEl = document.getElementById('dashboardMatrixModal');
+                    const bodyEl = document.getElementById('dashboardMatrixBody');
+                    if (!modalEl || !bodyEl) {
+                        return;
+                    }
+
+                    let loaded = false;
+                    modalEl.addEventListener('show.bs.modal', function () {
+                        if (loaded) {
+                            return;
+                        }
+
+                        fetch('{{ route('weekly-matrix.period.table', $currentPeriod) }}', {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        })
+                            .then((response) => response.ok ? response.json() : Promise.reject(response))
+                            .then((data) => {
+                                bodyEl.innerHTML = data.html || '<p class="text-muted mb-0">No matrix present.</p>';
+                                loaded = true;
+                            })
+                            .catch(() => {
+                                bodyEl.innerHTML = '<div class="alert alert-warning mb-0">Could not load the weekly matrix. Please try again.</div>';
+                            });
+                    });
+                });
+            </script>
+        @endpush
+    @endif
 
 </x-app-layout>

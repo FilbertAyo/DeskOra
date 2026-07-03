@@ -1,5 +1,5 @@
 @php
-    $columnLabels = [
+    $fieldLabels = [
         'key_activity' => 'Key Activities',
         'output' => 'Output',
         'outcome' => 'Outcome',
@@ -10,10 +10,8 @@
         'means_of_verification' => 'Means of Verification',
     ];
     $isEditing = ! $viewMode;
-    $formAction = $matrix
-        ? route('weekly-matrix.update', [$period, $department])
-        : route('weekly-matrix.store', [$period, $department]);
-    $formMethod = $matrix ? 'PUT' : 'POST';
+    $entry = $entryDefaults[0] ?? [];
+    $singleEntry = $matrix?->entries->first();
 @endphp
 
 <x-app-layout>
@@ -76,7 +74,7 @@
             </div>
             <div class="collapse" id="weeklyMatrixSuggestions">
                 <div class="card-body pt-2">
-                    <p class="text-muted small">These come from submitted weekly plans for this sub-department. Click to add a row with the key activity pre-filled.</p>
+                    <p class="text-muted small">Click a suggestion to pre-fill the key activity field.</p>
                     <div class="list-group list-group-flush">
                         @foreach ($suggestions as $suggestion)
                             <button type="button"
@@ -98,208 +96,148 @@
     @endif
 
     @if ($isEditing)
-        <form method="POST" action="{{ $formAction }}" id="weeklyMatrixForm">
+        <form method="POST" action="{{ route('weekly-matrix.update', [$period, $department]) }}" id="weeklyMatrixForm">
             @csrf
-            @if ($formMethod === 'PUT')
-                @method('PUT')
-            @endif
+            @method('PUT')
 
             <div class="card shadow-none border mb-3">
-                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 class="mb-0">Key activities matrix</h6>
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="addMatrixRowBtn">
-                        <i class="ti ti-plus me-1"></i> Add row
-                    </button>
+                <div class="card-header bg-white border-bottom">
+                    <h6 class="mb-0">Sub-department & year plan</h6>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-bordered mb-0 align-middle weekly-matrix-entry-table" id="weeklyMatrixEntryTable">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="min-width: 180px;">{{ $columnLabels['key_activity'] }}</th>
-                                    <th style="min-width: 140px;">{{ $columnLabels['output'] }}</th>
-                                    <th style="min-width: 140px;">{{ $columnLabels['outcome'] }}</th>
-                                    <th style="min-width: 140px;">{{ $columnLabels['impact'] }}</th>
-                                    <th style="min-width: 140px;">{{ $columnLabels['indicators'] }}</th>
-                                    <th style="min-width: 120px;">{{ $columnLabels['baseline'] }}</th>
-                                    <th style="min-width: 120px;">{{ $columnLabels['target'] }}</th>
-                                    <th style="min-width: 160px;">{{ $columnLabels['means_of_verification'] }}</th>
-                                    <th style="min-width: 180px;">Year plan links</th>
-                                    <th style="width: 60px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="weeklyMatrixEntryBody">
-                                @foreach ($entryDefaults as $index => $entry)
-                                    @include('weekly-matrix.partials.entry-row', [
-                                        'index' => $index,
-                                        'entry' => $entry,
-                                        'yearPlanOptions' => $yearPlanOptions,
-                                        'viewMode' => false,
-                                    ])
-                                @endforeach
-                            </tbody>
-                        </table>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Sub-department</label>
+                            <div class="form-control-plaintext fw-semibold">
+                                @if ($department->parent?->name)
+                                    <span class="text-muted">{{ $department->parent->name }} —</span>
+                                @endif
+                                {{ $department->name }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            @include('weekly-matrix.partials.year-plan-picker', [
+                                'period' => $period,
+                                'entry' => $entry,
+                                'yearPlanOptions' => $yearPlanOptions,
+                                'namePrefix' => 'entries[0]',
+                            ])
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card shadow-none border mb-3">
+                <div class="card-header bg-white border-bottom">
+                    <h6 class="mb-0">Key activity details</h6>
+                </div>
+                <div class="card-body">
+                    @include('weekly-matrix.partials.entry-fields-vertical', [
+                        'entry' => $entry,
+                        'namePrefix' => 'entries[0]',
+                    ])
                 </div>
                 <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
-                        @if ($matrix)
-                            <button type="button"
-                                    class="btn btn-outline-danger btn-sm"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#deleteMatrixModal">
-                                <i class="ti ti-trash me-1"></i> Delete matrix
-                            </button>
-                        @endif
-                    </div>
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteMatrixModal">
+                        <i class="ti ti-trash me-1"></i> Delete matrix
+                    </button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-device-floppy me-1"></i> Save matrix
+                        <i class="ti ti-device-floppy me-1"></i> Save changes
                     </button>
                 </div>
             </div>
         </form>
 
-        @if ($matrix)
-            <div class="modal fade" id="deleteMatrixModal" tabindex="-1" aria-labelledby="deleteMatrixModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="deleteMatrixModalLabel">Delete matrix</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            Delete the weekly matrix for <strong>{{ $department->name }}</strong> in week {{ $period->week_number }}?
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <form method="POST" action="{{ route('weekly-matrix.destroy', [$period, $department]) }}">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger">Delete</button>
-                            </form>
-                        </div>
+        <div class="modal fade" id="deleteMatrixModal" tabindex="-1" aria-labelledby="deleteMatrixModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteMatrixModalLabel">Delete matrix</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Delete the weekly matrix for <strong>{{ $department->name }}</strong> in week {{ $period->week_number }}?
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <form method="POST" action="{{ route('weekly-matrix.destroy', [$period, $department]) }}">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
                     </div>
                 </div>
             </div>
-        @endif
-
-        <template id="weeklyMatrixRowTemplate">
-            @include('weekly-matrix.partials.entry-row', [
-                'index' => '__INDEX__',
-                'entry' => [
-                    'key_activity' => '',
-                    'output' => '',
-                    'outcome' => '',
-                    'impact' => '',
-                    'indicators' => '',
-                    'baseline' => '',
-                    'target' => '',
-                    'means_of_verification' => '',
-                    'year_plan_activity_ids' => [],
-                ],
-                'yearPlanOptions' => $yearPlanOptions,
-                'viewMode' => false,
-            ])
-        </template>
+        </div>
 
         @push('scripts')
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
-                    const body = document.getElementById('weeklyMatrixEntryBody');
-                    const template = document.getElementById('weeklyMatrixRowTemplate');
-                    const addBtn = document.getElementById('addMatrixRowBtn');
-
-                    function reindexRows() {
-                        body.querySelectorAll('tr[data-matrix-row]').forEach((row, index) => {
-                            row.querySelectorAll('[name]').forEach((input) => {
-                                input.name = input.name.replace(/entries\[\d+]/, 'entries[' + index + ']');
-                            });
-                        });
-                    }
-
-                    function addRow(keyActivity) {
-                        const index = body.querySelectorAll('tr[data-matrix-row]').length;
-                        let html = template.innerHTML.replaceAll('__INDEX__', String(index));
-                        body.insertAdjacentHTML('beforeend', html);
-                        if (keyActivity) {
-                            const lastRow = body.lastElementChild;
-                            const textarea = lastRow.querySelector('textarea[name$="[key_activity]"]');
-                            if (textarea) {
-                                textarea.value = keyActivity;
-                            }
-                        }
-                    }
-
-                    addBtn?.addEventListener('click', function () {
-                        addRow('');
-                    });
-
-                    body.addEventListener('click', function (event) {
-                        const removeBtn = event.target.closest('.weekly-matrix-remove-row');
-                        if (!removeBtn) {
-                            return;
-                        }
-                        const rows = body.querySelectorAll('tr[data-matrix-row]');
-                        if (rows.length <= 1) {
-                            window.alert('At least one row is required.');
-                            return;
-                        }
-                        removeBtn.closest('tr')?.remove();
-                        reindexRows();
-                    });
-
                     document.querySelectorAll('.weekly-matrix-suggestion-btn').forEach((button) => {
                         button.addEventListener('click', function () {
-                            addRow(button.getAttribute('data-activity') || '');
+                            const textarea = document.querySelector('textarea[name="entries[0][key_activity]"]');
+                            if (textarea) {
+                                textarea.value = button.getAttribute('data-activity') || '';
+                                textarea.focus();
+                            }
                         });
                     });
                 });
             </script>
         @endpush
     @else
+        <div class="card shadow-none border mb-3">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0">Sub-department & year plan</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Sub-department</label>
+                        <div class="fw-semibold">
+                            @if ($department->parent?->name)
+                                <span class="text-muted">{{ $department->parent->name }} —</span>
+                            @endif
+                            {{ $department->name }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Year plan links</label>
+                        @if ($singleEntry && $singleEntry->yearPlanActivities->isNotEmpty())
+                            <div class="d-flex flex-column gap-1">
+                                @foreach ($singleEntry->yearPlanActivities as $activity)
+                                    <div class="small">
+                                        <span class="badge bg-light text-dark border">{{ $activity->displayCode() }}</span>
+                                        {{ $activity->description }}
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="text-muted">—</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card shadow-none border">
             <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0">Key activities matrix</h6>
+                <h6 class="mb-0">Key activity details</h6>
             </div>
-            <div class="card-body p-0">
-                @if (! $matrix || $matrix->entries->isEmpty())
-                    <div class="p-4 text-muted">No matrix entries yet.</div>
+            <div class="card-body">
+                @if (! $singleEntry)
+                    <div class="text-muted">No matrix entries yet.</div>
                 @else
-                    <div class="table-responsive">
-                        <table class="table table-bordered mb-0 weekly-matrix-entry-table">
-                            <thead class="table-light">
-                                <tr>
-                                    @foreach ($columnLabels as $label)
-                                        <th style="min-width: 140px;">{{ $label }}</th>
-                                    @endforeach
-                                    <th style="min-width: 180px;">Year plan links</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($matrix->entries as $entry)
-                                    <tr>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->key_activity }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->output }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->outcome }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->impact }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->indicators }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->baseline }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->target }}</div></td>
-                                        <td><div class="mb-0" style="white-space: pre-wrap;">{{ $entry->means_of_verification }}</div></td>
-                                        <td>
-                                            @forelse ($entry->yearPlanActivities as $activity)
-                                                <div class="small mb-1">
-                                                    <span class="badge bg-light text-dark border">{{ $activity->displayCode() }}</span>
-                                                    {{ Str::limit($activity->description, 80) }}
-                                                </div>
-                                            @empty
-                                                <span class="text-muted">—</span>
-                                            @endforelse
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                    <div class="row g-4">
+                        @foreach ($fieldLabels as $field => $label)
+                            <div class="col-xl-6 col-md-6 col-12">
+                                <label class="form-label text-muted small mb-1">{{ $label }}</label>
+                                <div class="border rounded p-3 bg-light h-100" style="white-space: pre-wrap;">{{ $singleEntry->{$field} ?: '—' }}</div>
+                            </div>
+                        @endforeach
                     </div>
                 @endif
             </div>
@@ -308,13 +246,10 @@
 
     @push('styles')
         <style>
-            .weekly-matrix-entry-table textarea {
-                min-height: 96px;
-                font-size: 0.875rem;
+            .weekly-matrix-field-input {
+                font-size: 0.9375rem;
+                line-height: 1.5;
                 resize: vertical;
-            }
-            .weekly-matrix-entry-table td {
-                vertical-align: top;
             }
         </style>
     @endpush

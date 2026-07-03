@@ -91,6 +91,64 @@ class WeeklyMatrixService
     }
 
     /**
+     * Existing matrices for a work period (table listing).
+     *
+     * @return Collection<int, array{
+     *     department: Department,
+     *     matrix: WeeklyMatrix,
+     *     entry: \App\Models\WeeklyMatrixEntry|null,
+     *     year_plan_link_count: int
+     * }>
+     */
+    public function matricesForPeriodTable(WorkPeriod $period): Collection
+    {
+        return WeeklyMatrix::query()
+            ->where('period_id', $period->id)
+            ->with(['department.parent', 'entries.yearPlanActivities'])
+            ->get()
+            ->sortBy(function (WeeklyMatrix $matrix) {
+                $department = $matrix->department;
+
+                return [
+                    sprintf('%05d', $department?->plan_section_number ?? 99999),
+                    $department?->name ?? '',
+                ];
+            })
+            ->values()
+            ->map(function (WeeklyMatrix $matrix): array {
+                $entry = $matrix->entries->first();
+                $yearPlanLinkCount = $entry
+                    ? $entry->yearPlanActivities->count()
+                    : 0;
+
+                return [
+                    'department' => $matrix->department,
+                    'matrix' => $matrix,
+                    'entry' => $entry,
+                    'year_plan_link_count' => $yearPlanLinkCount,
+                ];
+            });
+    }
+
+    /**
+     * Sub-departments that do not yet have a matrix for this period.
+     *
+     * @return Collection<int, Department>
+     */
+    public function subDepartmentsWithoutMatrix(WorkPeriod $period): Collection
+    {
+        $existingDepartmentIds = WeeklyMatrix::query()
+            ->where('period_id', $period->id)
+            ->pluck('department_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        return $this->subDepartments()
+            ->reject(fn (Department $department) => in_array((string) $department->id, $existingDepartmentIds, true))
+            ->values();
+    }
+
+    /**
      * @return Collection<int, YearPlanActivity>
      */
     public function yearPlanOptionsForSubDepartment(WorkPeriod $period, Department $subDepartment): Collection
@@ -210,6 +268,12 @@ class WeeklyMatrixService
         if ($normalized->isEmpty()) {
             throw ValidationException::withMessages([
                 'entries' => 'Add at least one key activity row.',
+            ]);
+        }
+
+        if ($normalized->count() > 1) {
+            throw ValidationException::withMessages([
+                'entries' => 'Each sub-department can have only one key activity.',
             ]);
         }
 

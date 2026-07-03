@@ -58,11 +58,14 @@ class WeeklyMatrixTest extends TestCase
         ];
 
         $create = $this->actingAs($user)->post(
-            route('weekly-matrix.store', [$period, $subDepartment]),
-            $payload
+            route('weekly-matrix.create.store', $period),
+            [
+                'department_id' => $subDepartment->id,
+                'entry' => $payload['entries'][0],
+            ]
         );
 
-        $create->assertRedirect(route('weekly-matrix.edit', [$period, $subDepartment]));
+        $create->assertRedirect(route('weekly-matrix.period', $period));
         $create->assertSessionHas('success');
 
         $this->assertDatabaseHas('weekly_matrices', [
@@ -106,7 +109,7 @@ class WeeklyMatrixTest extends TestCase
             $updatePayload
         );
 
-        $update->assertRedirect(route('weekly-matrix.edit', [$period, $subDepartment]));
+        $update->assertRedirect(route('weekly-matrix.period', $period));
         $this->assertDatabaseHas('weekly_matrix_entries', [
             'weekly_matrix_id' => $matrix->id,
             'key_activity' => 'Updated activity',
@@ -128,19 +131,18 @@ class WeeklyMatrixTest extends TestCase
 
         $formattedText = "- Item one\n- Item two\n• Bullet three";
 
-        $this->actingAs($user)->post(route('weekly-matrix.store', [$period, $subDepartment]), [
-            'entries' => [
-                [
-                    'key_activity' => $formattedText,
-                    'output' => '',
-                    'outcome' => '',
-                    'impact' => '',
-                    'indicators' => '',
-                    'baseline' => '',
-                    'target' => '',
-                    'means_of_verification' => '',
-                    'year_plan_activity_ids' => [],
-                ],
+        $this->actingAs($user)->post(route('weekly-matrix.create.store', $period), [
+            'department_id' => $subDepartment->id,
+            'entry' => [
+                'key_activity' => $formattedText,
+                'output' => '',
+                'outcome' => '',
+                'impact' => '',
+                'indicators' => '',
+                'baseline' => '',
+                'target' => '',
+                'means_of_verification' => '',
+                'year_plan_activity_ids' => [],
             ],
         ])->assertRedirect();
 
@@ -211,14 +213,86 @@ class WeeklyMatrixTest extends TestCase
             ],
         ];
 
-        $this->actingAs($user)->post(route('weekly-matrix.store', [$period, $subDepartment]), $payload);
+        $this->actingAs($user)->post(route('weekly-matrix.create.store', $period), [
+            'department_id' => $subDepartment->id,
+            'entry' => $payload['entries'][0],
+        ]);
 
         $duplicate = $this->actingAs($user)->post(
-            route('weekly-matrix.store', [$period, $subDepartment]),
-            $payload
+            route('weekly-matrix.create.store', $period),
+            [
+                'department_id' => $subDepartment->id,
+                'entry' => $payload['entries'][0],
+            ]
         );
 
-        $duplicate->assertSessionHasErrors('entries');
+        $duplicate->assertSessionHasErrors('department_id');
+    }
+
+    public function test_period_page_shows_empty_table_before_any_matrix(): void
+    {
+        [$period] = $this->createPeriodAndSubDepartment();
+        $user = $this->createActiveUser();
+
+        $response = $this->actingAs($user)->get(route('weekly-matrix.period', $period));
+
+        $response->assertOk();
+        $response->assertSee('No matrix present');
+        $response->assertSee('Create');
+    }
+
+    public function test_period_table_endpoint_returns_matrix_html(): void
+    {
+        [$period, $subDepartment, $yearPlanActivity] = $this->createPeriodAndSubDepartment(withYearPlan: true);
+        $user = $this->createActiveUser();
+
+        $this->actingAs($user)->post(route('weekly-matrix.create.store', $period), [
+            'department_id' => $subDepartment->id,
+            'entry' => [
+                'key_activity' => 'Consolidated key activity',
+                'output' => '',
+                'outcome' => '',
+                'impact' => '',
+                'indicators' => '',
+                'baseline' => '',
+                'target' => '',
+                'means_of_verification' => '',
+                'year_plan_activity_ids' => [(string) $yearPlanActivity->id],
+            ],
+        ])->assertRedirect();
+
+        $response = $this->actingAs($user)->getJson(route('weekly-matrix.period.table', $period));
+
+        $response->assertOk();
+        $response->assertJsonStructure(['html', 'week_number', 'year', 'date_range']);
+        $this->assertStringContainsString('Consolidated key activity', $response->json('html'));
+        $this->assertStringContainsString($yearPlanActivity->displayCode(), $response->json('html'));
+    }
+
+    public function test_matrix_pdf_download_returns_pdf(): void
+    {
+        [$period, $subDepartment] = $this->createPeriodAndSubDepartment();
+        $user = $this->createActiveUser();
+
+        $this->actingAs($user)->post(route('weekly-matrix.create.store', $period), [
+            'department_id' => $subDepartment->id,
+            'entry' => [
+                'key_activity' => 'PDF key activity',
+                'output' => '',
+                'outcome' => '',
+                'impact' => '',
+                'indicators' => '',
+                'baseline' => '',
+                'target' => '',
+                'means_of_verification' => '',
+                'year_plan_activity_ids' => [],
+            ],
+        ])->assertRedirect();
+
+        $response = $this->actingAs($user)->get(route('weekly-matrix.download', $period));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
     }
 
     public function test_parent_department_is_rejected_for_matrix_edit(): void
