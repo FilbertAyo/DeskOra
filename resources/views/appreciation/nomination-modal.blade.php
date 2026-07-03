@@ -8,7 +8,7 @@
                   
                     <div>
                         <h4 class="mb-0" id="staffNominationModalLabel">Monthly Staff Appreciation Nomination</h4>
-                        <small class="text-muted">{{ $staffNominationPeriod?->label() }}</small>
+                        <small class="text-success">For {{ $staffNominationPeriod?->label() }}</small>
                     </div>
                 </div>
           </div>
@@ -17,7 +17,7 @@
                 <p class="text-muted mb-3">
                     Who made a positive impact on your work this month? Nominate one colleague who demonstrated
                     teamwork, leadership, helpfulness, or exceptional performance. Your nomination is
-                    <strong>anonymous</strong> and helps management recognize staff contributions.
+                    <strong>anonymous</strong> and can help management on staff recognition.
                 </p>
 
                 <div id="sanmAlert" class="alert d-none" role="alert"></div>
@@ -62,7 +62,7 @@
             </div>
 
             <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
-                <button type="button" class="btn btn-link text-muted p-0" data-sanm-action="skip">
+                <button type="button" class="btn btn-link text-danger p-0" data-sanm-action="skip">
                     Skip This Month
                 </button>
                 <div class="d-flex gap-2">
