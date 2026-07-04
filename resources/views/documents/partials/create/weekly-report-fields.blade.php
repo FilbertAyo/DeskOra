@@ -5,8 +5,8 @@
 ])
 
 <div class="col-12 mb-3">
-    <div class="card border-info">
-        <div class="card-header bg-light-info">
+    <div class="card border">
+        <div class="card-header bg-light">
             <h6 class="mb-0"><i class="ti ti-target me-2"></i>Main Target (from weekly plan)</h6>
         </div>
         <div class="card-body">
@@ -85,8 +85,7 @@
                 @endif
             </div>
 
-            <p class="text-muted small mb-0">You will confirm target accomplishment when you review and submit your report.</p>
-        </div>
+       </div>
     </div>
 </div>
 
