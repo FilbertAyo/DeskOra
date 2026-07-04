@@ -5,5 +5,4 @@
     @include('documents.partials.show.weekly-report-target-accomplishment')
     @include('documents.partials.show.main-panel')
     @include('documents.partials.show.reject-modal')
-    @include('documents.partials.ai-summary-offcanvas')
 </x-app-layout>

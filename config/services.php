@@ -31,16 +31,19 @@ return [
         ],
     ],
 
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
-        'max_tokens' => env('GEMINI_MAX_TOKENS', 500),
-        'summary_max_tokens' => env('GEMINI_SUMMARY_MAX_TOKENS', 800),
-        'question_max_tokens' => env('GEMINI_QUESTION_MAX_TOKENS', 400),
-        'timeout' => env('GEMINI_TIMEOUT', 30),
-        'summary_cache_enabled' => filter_var(env('GEMINI_SUMMARY_CACHE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
-        'summary_cache_seconds' => env('GEMINI_SUMMARY_CACHE_SECONDS', 604800),
-        'max_requests_per_minute' => env('GEMINI_MAX_REQUESTS_PER_MINUTE', 5),
+    'groq' => [
+        'api_key' => trim(trim((string) env('GROQ_API_KEY', '')), '"\''),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'max_tokens' => env('GROQ_MAX_TOKENS', 500),
+        'summary_max_tokens' => env('GROQ_SUMMARY_MAX_TOKENS', 800),
+        'question_max_tokens' => env('GROQ_QUESTION_MAX_TOKENS', 400),
+        'timeout' => env('GROQ_TIMEOUT', 30),
+        'summary_cache_enabled' => filter_var(env('GROQ_SUMMARY_CACHE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'summary_cache_seconds' => env('GROQ_SUMMARY_CACHE_SECONDS', 604800),
+        'max_requests_per_minute' => env('GROQ_MAX_REQUESTS_PER_MINUTE', 30),
+        'assistant_max_tokens' => env('GROQ_ASSISTANT_MAX_TOKENS', 600),
+        'assistant_max_requests_per_minute' => env('GROQ_ASSISTANT_MAX_REQUESTS_PER_MINUTE', 10),
     ],
 
 ];

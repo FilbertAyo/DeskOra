@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use RuntimeException;
@@ -10,7 +11,7 @@ class AiAssistService
 {
     public function isConfigured(): bool
     {
-        return filled(config('services.gemini.api_key'));
+        return filled(config('services.groq.api_key'));
     }
 
     public function summarizeWeeklySubmission(string $text, bool $hasPlan, bool $hasReport): string
@@ -20,7 +21,27 @@ class AiAssistService
         return $this->generate(
             $this->weeklySubmissionSummaryPrompt($hasPlan, $hasReport),
             $text,
-            (int) config('services.gemini.summary_max_tokens', 800),
+            (int) config('services.groq.summary_max_tokens', 800),
+            formatAsSummary: true
+        );
+    }
+
+    public function answerPortalQuestion(string $question, ?User $user = null): string
+    {
+        $question = trim($question);
+
+        if ($question === '') {
+            throw new RuntimeException('Please enter a question.');
+        }
+
+        if ($user !== null) {
+            $this->acquireAssistantUserSlot($user);
+        }
+
+        return $this->generate(
+            $this->portalAssistantSystemPrompt($user),
+            $this->portalAssistantUserMessage($question, $user),
+            (int) config('services.groq.assistant_max_tokens', 600),
             formatAsSummary: true
         );
     }
@@ -51,7 +72,7 @@ class AiAssistService
         return $this->generate(
             $prompt,
             $userMessage,
-            (int) config('services.gemini.question_max_tokens', 400),
+            (int) config('services.groq.question_max_tokens', 400),
             formatAsSummary: true
         );
     }
@@ -75,7 +96,7 @@ class AiAssistService
     private function requireText(string $text): string
     {
         if (! $this->isConfigured()) {
-            throw new RuntimeException('AI is not configured. Add GEMINI_API_KEY to your .env file.');
+            throw new RuntimeException('AI is not configured. Add GROQ_API_KEY to your .env file.');
         }
 
         $text = trim($text);
@@ -89,49 +110,37 @@ class AiAssistService
 
     private function generate(string $systemPrompt, string $userText, ?int $maxTokens = null, bool $formatAsSummary = false): string
     {
-        $model = config('services.gemini.model', 'gemini-2.5-flash-lite');
-        $url = sprintf(
-            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
-            $model
-        );
+        if (! $this->isConfigured()) {
+            throw new RuntimeException('AI is not configured. Add GROQ_API_KEY to your .env file.');
+        }
+
+        $model = config('services.groq.model', 'llama-3.3-70b-versatile');
+        $baseUrl = rtrim((string) config('services.groq.base_url', 'https://api.groq.com/openai/v1'), '/');
+        $url = $baseUrl.'/chat/completions';
+
         $payload = [
-            'system_instruction' => [
-                'parts' => [
-                    ['text' => $systemPrompt],
-                ],
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userText],
             ],
-            'contents' => [
-                [
-                    'role' => 'user',
-                    'parts' => [
-                        ['text' => $userText],
-                    ],
-                ],
-            ],
-            'generationConfig' => [
-                'temperature' => 0.4,
-                'maxOutputTokens' => $maxTokens ?? (int) config('services.gemini.max_tokens', 500),
-            ],
+            'temperature' => 0.4,
+            'max_tokens' => $maxTokens ?? (int) config('services.groq.max_tokens', 500),
         ];
 
-        $this->acquireGeminiSlot();
+        $this->acquireAiSlot();
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
-            'x-goog-api-key' => config('services.gemini.api_key'),
+            'Authorization' => 'Bearer '.config('services.groq.api_key'),
         ])
-            ->timeout((int) config('services.gemini.timeout', 30))
+            ->timeout((int) config('services.groq.timeout', 30))
             ->post($url, $payload);
 
         if ($response->successful()) {
-            $result = trim((string) $response->json('candidates.0.content.parts.0.text', ''));
+            $result = trim((string) $response->json('choices.0.message.content', ''));
 
             if ($result === '') {
-                $blockReason = $response->json('promptFeedback.blockReason');
-                if ($blockReason) {
-                    throw new RuntimeException('AI could not process this document. Please try again later.');
-                }
-
                 throw new RuntimeException('AI returned an empty response. Please try again.');
             }
 
@@ -145,10 +154,10 @@ class AiAssistService
         throw new RuntimeException($this->friendlyApiError($response->status(), $message));
     }
 
-    private function acquireGeminiSlot(): void
+    private function acquireAiSlot(): void
     {
-        $key = 'gemini-api-global';
-        $maxAttempts = max(1, (int) config('services.gemini.max_requests_per_minute', 5));
+        $key = 'groq-api-global';
+        $maxAttempts = max(1, (int) config('services.groq.max_requests_per_minute', 30));
 
         if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
             $seconds = RateLimiter::availableIn($key);
@@ -159,16 +168,72 @@ class AiAssistService
         RateLimiter::hit($key, 60);
     }
 
-    private function friendlyApiError(int $status, string $message): string
+    private function acquireAssistantUserSlot(User $user): void
     {
-        if ($status === 429 || str_contains(strtolower($message), 'quota exceeded')) {
-            if (preg_match('/retry in ([0-9.]+)s/i', $message, $matches)) {
-                $seconds = (int) ceil((float) $matches[1]);
+        $key = 'groq-assistant-user:'.$user->id;
+        $maxAttempts = max(1, (int) config('services.groq.assistant_max_requests_per_minute', 10));
 
-                return "Gemini free tier limit reached. Please wait about {$seconds} seconds and try again.";
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            throw new RuntimeException("You've reached the AI assistant limit. Please wait about {$seconds} seconds and try again.");
+        }
+
+        RateLimiter::hit($key, 60);
+    }
+
+    private function portalAssistantSystemPrompt(?User $user): string
+    {
+        $plainText = $this->plainTextInstruction();
+
+        return $plainText
+            .'You are Deskora AI, a helpful assistant for the Adilisha Portal (also called WorkHub). '
+            .'Staff use this portal for weekly work plans, weekly reports, monthly reports, action logs, document management, petty cash requisitions and approvals, staff appreciation, year planning, work periods, payments, and organization reports. '
+            .'Answer questions about how the portal works, what features exist, and general workflows. '
+            .'Reply in 1 to 3 short, clear paragraphs. Be practical and friendly. '
+            .'If you do not know a specific policy, deadline, or data value, say so honestly and suggest where in the portal the user might look (for example Dashboard, Documents, Petty Cash, or Action Log). '
+            .'Do not invent specific numbers, names, or approval statuses. '
+            .'Do not claim you can see the user\'s actual documents or records unless that feature is explicitly provided.';
+    }
+
+    private function portalAssistantUserMessage(string $question, ?User $user): string
+    {
+        $message = 'Question from staff member: '.$question;
+
+        if ($user !== null) {
+            $context = ['Name: '.$user->name];
+
+            if (filled($user->title)) {
+                $context[] = 'Title: '.$user->title;
             }
 
-            return 'Gemini free tier limit reached. Please wait about a minute and try again.';
+            if ($user->department) {
+                $context[] = 'Department: '.$user->department->name;
+            }
+
+            $message = "Staff context:\n".implode("\n", $context)."\n\n".$message;
+        }
+
+        return $message;
+    }
+
+    private function friendlyApiError(int $status, string $message): string
+    {
+        $normalized = strtolower($message);
+
+        if (str_contains($normalized, 'invalid api key') || str_contains($normalized, 'invalid authentication')) {
+            return 'AI is not configured correctly. Set a valid GROQ_API_KEY (starts with gsk_) in .env, then run php artisan config:clear.';
+        }
+
+        if ($status === 429 || str_contains($normalized, 'rate limit') || str_contains($normalized, 'quota')) {
+            if (preg_match('/try again in ([0-9.]+)\s*s/i', $message, $matches)
+                || preg_match('/retry in ([0-9.]+)s/i', $message, $matches)) {
+                $seconds = (int) ceil((float) $matches[1]);
+
+                return "AI free tier limit reached. Please wait about {$seconds} seconds and try again.";
+            }
+
+            return 'AI free tier limit reached. Please wait about a minute and try again.';
         }
 
         return $message;

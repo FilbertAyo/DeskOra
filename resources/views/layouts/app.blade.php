@@ -64,6 +64,10 @@
 
     @include('layouts.footer')
 
+    @if(config('services.groq.api_key') && Auth::check() && Auth::user()->status === 'active')
+        @include('partials.deskora-ai-assistant')
+    @endif
+
 
   <!-- [Page Specific JS] start -->
   <script src="{{ asset('assets/js/plugins/apexcharts.min.js') }}"></script>

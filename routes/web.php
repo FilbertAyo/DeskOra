@@ -15,6 +15,7 @@ use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PettyController;
+use App\Http\Controllers\PortalAiAssistantController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicAnonymousFeedbackController;
 use App\Http\Controllers\ReplenishmentController;
@@ -57,6 +58,10 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile/settings', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/picture/update', [ProfileController::class, 'updateProfile'])->name('profile.image');
+
+    Route::post('/ai-assistant/ask', [PortalAiAssistantController::class, 'ask'])
+        ->middleware('throttle:20,1')
+        ->name('ai-assistant.ask');
 
     // Documents routes
     Route::prefix('documents')->name('documents.')->group(function () {

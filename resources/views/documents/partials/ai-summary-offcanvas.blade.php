@@ -1,4 +1,4 @@
-@if(config('services.gemini.api_key'))
+@if(config('services.groq.api_key'))
     @php
         $offcanvasId = 'documentAiSummaryOffcanvas';
         $offcanvasLabelId = $offcanvasId.'Label';
@@ -6,9 +6,12 @@
 
     <div class="offcanvas offcanvas-end" tabindex="-1" id="{{ $offcanvasId }}" aria-labelledby="{{ $offcanvasLabelId }}" style="width: min(480px, 100vw);">
         <div class="offcanvas-header border-bottom">
-            <div>
-                <h5 class="offcanvas-title mb-1" id="{{ $offcanvasLabelId }}">AI Summary</h5>
-                <div class="small text-muted" id="documentAiSummaryMeta"></div>
+            <div class="d-flex align-items-center gap-2">
+                <img src="{{ asset('assets/images/deskora-ai-icon.svg') }}" alt="" width="24" height="24" class="deskora-ai-icon">
+                <div>
+                    <h5 class="offcanvas-title mb-1" id="{{ $offcanvasLabelId }}">AI Summary</h5>
+                    <div class="small text-muted" id="documentAiSummaryMeta"></div>
+                </div>
             </div>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
@@ -32,7 +35,7 @@
                     placeholder="Example: Was the main target accomplished?"></textarea>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <small class="text-muted">Answers use only this week's plan and report.</small>
-                    <button type="button" class="btn btn-primary btn-sm" id="documentAiAskBtn">
+                    <button type="button" class="btn btn-outline-primary btn-sm deskora-ai-ask-btn" id="documentAiAskBtn">
                         <i class="ti ti-send me-1"></i> Ask
                     </button>
                 </div>
@@ -79,6 +82,16 @@
 
         .document-ai-qa-thread .qa-answer p:last-child {
             margin-bottom: 0;
+        }
+
+        .deskora-ai-icon {
+            object-fit: contain;
+            flex-shrink: 0;
+            background: transparent;
+        }
+
+        .deskora-ai-ask-btn {
+            background: transparent;
         }
     </style>
 

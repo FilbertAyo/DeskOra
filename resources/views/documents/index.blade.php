@@ -180,15 +180,6 @@
                                                 <td class="text-center">
                                                     @if($planDoc || $reportDoc)
                                                         <x-table-action-dropdown>
-                                                        @if(config('services.gemini.api_key'))
-    <button type="button" class="dropdown-item ai-document-summary-btn text-success"
-        data-plan-id="{{ $planDoc?->id }}"
-        data-report-id="{{ $reportDoc?->id }}"
-        data-summary-title="{{ $period ? 'Week '.$period->week_number.' of '.$period->year : 'Weekly submission' }}"
-        data-summary-staff="{{ ($row['participants'] ?? collect())->pluck('name')->filter()->unique()->implode(', ') }}">
-        <i class="ti ti-search me-2"></i> AI Summary
-    </button>
-    @endif
     @if($planDoc)
     <a class="dropdown-item" href="{{ route('documents.show', $planDoc->id) }}">
     <i class="ti ti-target me-2"></i> View Plan
@@ -225,6 +216,5 @@
         </div>
     </div>
 
-    @include('documents.partials.ai-summary-offcanvas')
 </x-app-layout>
 

@@ -94,12 +94,12 @@ class DocumentAiSummaryCache
 
     private function isEnabled(): bool
     {
-        return (bool) config('services.gemini.summary_cache_enabled', true);
+        return (bool) config('services.groq.summary_cache_enabled', true);
     }
 
     private function ttlSeconds(): int
     {
-        return max(60, (int) config('services.gemini.summary_cache_seconds', 604800));
+        return max(60, (int) config('services.groq.summary_cache_seconds', 604800));
     }
 
     private function summaryCacheKey(?Document $plan, ?Document $report): string
