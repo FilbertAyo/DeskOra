@@ -64,7 +64,7 @@
                     maxlength="1000"
                     placeholder="Example: How do I submit a weekly plan?"></textarea>
                 <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small class="text-muted" id="deskoraAiInputHint">Navigation guidance; live data included when your question needs it.</small>
+                    <small class="text-muted" id="deskoraAiInputHint">AI-generated responses may be incorrect. Verify before taking action.</small>
                     <button type="button" class="btn btn-warning btn-sm deskora-ai-ask-btn" id="deskoraAiAskBtn">
                         <x-deskora-ai-icon class="me-1 deskora-ai-btn-logo" :size="16" />
                         Ask
