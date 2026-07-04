@@ -1,22 +1,40 @@
 <div class="col-12 mb-3">
-    <div class="card border">
-        <div class="card-header bg-white border-bottom">
-            <h6 class="mb-0"><i class="ti ti-users-group me-2"></i>Collaboration (Optional)</h6>
-        </div>
-        <div class="card-body">
-            @php
-                $selectedSharedUsers = old('shared_user_ids', []);
-                if (!is_array($selectedSharedUsers)) $selectedSharedUsers = [];
-            @endphp
-            <x-staff-checkbox-select
-                id="shared_user_ids"
-                name="shared_user_ids[]"
-                :users="$shareableUsers ?? collect()"
-                :selected="$selectedSharedUsers"
-                title="Assigned Staff"
-                hint="Selected staff can view, edit, and submit this weekly plan while it remains draft."
-                error-key="shared_user_ids"
-            />
+    @php
+        $selectedSharedUsers = old('shared_user_ids', []);
+        if (!is_array($selectedSharedUsers)) $selectedSharedUsers = [];
+        $collabCount = count($selectedSharedUsers);
+        $collabExpanded = $errors->has('shared_user_ids');
+    @endphp
+    <div class="accordion" id="collaborationAccordion">
+        <div class="accordion-item border">
+            <h2 class="accordion-header" id="collaborationHeading">
+                <button class="accordion-button py-2 {{ $collabExpanded ? '' : 'collapsed' }}"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collaborationCollapse"
+                        aria-expanded="{{ $collabExpanded ? 'true' : 'false' }}"
+                        aria-controls="collaborationCollapse">
+                    <i class="ti ti-users-group me-2"></i>
+                    <span class="fw-semibold">Collaboration (Optional)</span>
+                    <span class="badge bg-primary rounded-pill ms-2 {{ $collabCount > 0 ? '' : 'd-none' }}">{{ $collabCount }}</span>
+                </button>
+            </h2>
+            <div id="collaborationCollapse"
+                 class="accordion-collapse collapse {{ $collabExpanded ? 'show' : '' }}"
+                 aria-labelledby="collaborationHeading"
+                 data-bs-parent="#collaborationAccordion">
+                <div class="accordion-body">
+                    <x-staff-checkbox-select
+                        id="shared_user_ids"
+                        name="shared_user_ids[]"
+                        :users="$shareableUsers ?? collect()"
+                        :selected="$selectedSharedUsers"
+                        title="Assigned Staff"
+                        hint="Selected staff can view, edit, and submit this weekly plan while it remains draft."
+                        error-key="shared_user_ids"
+                    />
+                </div>
+            </div>
         </div>
     </div>
 </div>
