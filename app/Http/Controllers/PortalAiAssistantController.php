@@ -20,7 +20,7 @@ class PortalAiAssistantController extends Controller
         ]);
 
         try {
-            $answer = $this->aiAssistService->answerPortalQuestion(
+            $result = $this->aiAssistService->answerPortalQuestion(
                 $validated['question'],
                 $request->user()
             );
@@ -32,7 +32,8 @@ class PortalAiAssistantController extends Controller
 
         return response()->json([
             'question' => trim($validated['question']),
-            'answer' => $answer,
+            'answer' => $result['answer'],
+            'has_live_data' => $result['has_live_data'],
         ]);
     }
 }

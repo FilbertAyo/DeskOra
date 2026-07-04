@@ -64,8 +64,8 @@
                     maxlength="1000"
                     placeholder="Example: How do I submit a weekly plan?"></textarea>
                 <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small class="text-muted" id="deskoraAiInputHint">General guidance only — not your live data.</small>
-                    <button type="button" class="btn btn-outline-primary btn-sm deskora-ai-ask-btn" id="deskoraAiAskBtn">
+                    <small class="text-muted" id="deskoraAiInputHint">Navigation guidance; live data included when your question needs it.</small>
+                    <button type="button" class="btn btn-warning btn-sm deskora-ai-ask-btn" id="deskoraAiAskBtn">
                         <x-deskora-ai-icon class="me-1 deskora-ai-btn-logo" :size="16" />
                         Ask
                     </button>
@@ -157,8 +157,11 @@
             color: #fff;
         }
 
-        .deskora-ai-offcanvas__logo,
         .deskora-ai-btn-logo {
+            color: #fff;
+        }
+
+        .deskora-ai-offcanvas__logo {
             color: #fad02c;
         }
 
@@ -167,10 +170,6 @@
                 max-width: 1.75rem;
                 max-height: 1.75rem;
             }
-        }
-
-        .deskora-ai-ask-btn {
-            background: transparent;
         }
 
         .deskora-ai-suggestion-btn {

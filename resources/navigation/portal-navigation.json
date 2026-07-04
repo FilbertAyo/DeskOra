@@ -1,0 +1,559 @@
+{
+    "version": "1.0.0",
+    "updated": "2026-07-04",
+    "portal_name": "Adilisha Portal (WorkHub)",
+    "entries": [
+        {
+            "id": "dashboard",
+            "label": "Dashboard",
+            "menu_path": "Sidebar > Dashboard",
+            "route": "dashboard",
+            "description": "Home overview with pending weekly submissions, tasks, and quick links.",
+            "intents": [
+                "dashboard",
+                "home",
+                "main page",
+                "overview",
+                "landing page"
+            ]
+        },
+        {
+            "id": "profile_settings",
+            "label": "Profile settings",
+            "menu_path": "Top bar > Profile > Settings",
+            "route": "profile.edit",
+            "description": "Update your name, password, and profile picture.",
+            "intents": [
+                "profile",
+                "profile settings",
+                "change password",
+                "update profile",
+                "my account"
+            ]
+        },
+        {
+            "id": "year_plan",
+            "label": "Year Plan",
+            "menu_path": "Sidebar > Year Plan",
+            "route": "year-plan.index",
+            "permission": "manage year plans",
+            "description": "View and manage the organization's annual plan and activities.",
+            "intents": [
+                "year plan",
+                "annual plan",
+                "yearly plan",
+                "manage year plan"
+            ]
+        },
+        {
+            "id": "weekly_matrix",
+            "label": "Weekly Matrix",
+            "menu_path": "Sidebar > Weekly Matrix",
+            "route": "weekly-matrix.index",
+            "description": "View weekly matrix periods and department activity grids.",
+            "intents": [
+                "weekly matrix",
+                "matrix",
+                "department matrix",
+                "weekly grid"
+            ]
+        },
+        {
+            "id": "weekly_plans_list",
+            "label": "Weekly Plans list",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Weekly Plans",
+            "route": "documents.weekly-plans",
+            "description": "List your weekly work plans and open existing ones.",
+            "intents": [
+                "weekly plans",
+                "my weekly plans",
+                "view weekly plans",
+                "list weekly plans"
+            ]
+        },
+        {
+            "id": "create_weekly_plan",
+            "label": "Create weekly plan",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Weekly Plans > Create",
+            "route": "documents.create",
+            "query": {
+                "type": "weekly_plan"
+            },
+            "description": "Create and submit a new weekly work plan for the current or upcoming work period.",
+            "intents": [
+                "create weekly plan",
+                "submit weekly plan",
+                "new weekly plan",
+                "write weekly plan",
+                "how do i submit a weekly plan"
+            ]
+        },
+        {
+            "id": "weekly_reports_list",
+            "label": "Weekly Reports list",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Weekly Reports",
+            "route": "documents.weekly-reports",
+            "description": "List your weekly work reports and open existing ones.",
+            "intents": [
+                "weekly reports",
+                "my weekly reports",
+                "view weekly reports",
+                "list weekly reports"
+            ]
+        },
+        {
+            "id": "create_weekly_report",
+            "label": "Create weekly report",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Weekly Reports > Create",
+            "route": "documents.create",
+            "query": {
+                "type": "weekly_report"
+            },
+            "description": "Create and submit a new weekly work report for a work period.",
+            "intents": [
+                "create weekly report",
+                "submit weekly report",
+                "new weekly report",
+                "write weekly report",
+                "how do i submit a weekly report"
+            ]
+        },
+        {
+            "id": "action_log_list",
+            "label": "Action Log",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Action Log",
+            "route": "action-logs.index",
+            "description": "View action log minutes and follow-up tasks from meetings.",
+            "intents": [
+                "action log",
+                "action logs",
+                "meeting minutes",
+                "track action log",
+                "action log tasks"
+            ]
+        },
+        {
+            "id": "create_action_log",
+            "label": "Create action log",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Action Log > Create",
+            "route": "action-logs.create",
+            "description": "Create a new action log entry (restricted to authorized preparers).",
+            "intents": [
+                "create action log",
+                "new action log",
+                "add action log",
+                "write meeting minutes"
+            ]
+        },
+        {
+            "id": "monthly_reports",
+            "label": "Monthly Reports",
+            "menu_path": "Sidebar > Monthly Reports",
+            "route": "documents.monthly-report",
+            "description": "View and manage monthly report submissions.",
+            "intents": [
+                "monthly reports",
+                "monthly report",
+                "view monthly reports"
+            ]
+        },
+        {
+            "id": "create_monthly_report",
+            "label": "Create monthly report",
+            "menu_path": "Sidebar > Monthly Reports > Create",
+            "route": "documents.create",
+            "query": {
+                "type": "monthly_report"
+            },
+            "description": "Create and submit a new monthly report.",
+            "intents": [
+                "create monthly report",
+                "submit monthly report",
+                "new monthly report"
+            ]
+        },
+        {
+            "id": "all_documents",
+            "label": "All Documents",
+            "menu_path": "Sidebar > All Documents",
+            "route": "documents.index",
+            "description": "Browse all documents you can access, including shared submissions.",
+            "intents": [
+                "all documents",
+                "documents",
+                "browse documents",
+                "shared documents",
+                "documents shared with me",
+                "view documents"
+            ]
+        },
+        {
+            "id": "view_document",
+            "label": "View a specific document",
+            "menu_path": "All Documents or Weekly Plans/Reports > open a document",
+            "dynamic": true,
+            "description": "Open a document from a list page. There is no single fixed URL without a document ID.",
+            "intents": [
+                "open document",
+                "view document",
+                "document details"
+            ]
+        },
+        {
+            "id": "review_submissions",
+            "label": "Review submissions",
+            "menu_path": "Sidebar > Review Activities > Submissions",
+            "route": "documents.reviewer-dashboard",
+            "permission": "approve documents",
+            "description": "Review submitted weekly plans and weekly reports as an approver.",
+            "intents": [
+                "review submissions",
+                "review weekly plans",
+                "review weekly reports",
+                "approver dashboard",
+                "review activities"
+            ]
+        },
+        {
+            "id": "weekly_budget_review",
+            "label": "Weekly Budget review",
+            "menu_path": "Sidebar > Review Activities > Weekly Budget",
+            "route": "documents.weekly-budget-review",
+            "permission": "view weekly budgets",
+            "description": "Review and process weekly budget entries for submitted plans.",
+            "intents": [
+                "weekly budget",
+                "budget review",
+                "review weekly budget",
+                "weekly budget review"
+            ]
+        },
+        {
+            "id": "staff_requisitions_list",
+            "label": "Staff Requisitions",
+            "menu_path": "Sidebar > Petty Cash > Requests > Staff Requisitions",
+            "route": "requisition.index",
+            "permission": "request pettycash",
+            "description": "View and manage your staff requisition requests.",
+            "intents": [
+                "staff requisitions",
+                "my requisitions",
+                "requisition list",
+                "view requisitions"
+            ]
+        },
+        {
+            "id": "create_staff_requisition",
+            "label": "Create staff requisition",
+            "menu_path": "Sidebar > Petty Cash > Requests > Staff Requisitions > Create",
+            "route": "requisition.create",
+            "permission": "request pettycash",
+            "description": "Submit a new staff requisition request.",
+            "intents": [
+                "create requisition",
+                "new requisition",
+                "submit requisition",
+                "request requisition",
+                "staff requisition"
+            ]
+        },
+        {
+            "id": "petty_cash_requests",
+            "label": "Petty Cash requests",
+            "menu_path": "Sidebar > Petty Cash > Requests > Petty Cash",
+            "route": "petty.index",
+            "permission": "request pettycash",
+            "description": "View and manage your petty cash reimbursement requests.",
+            "intents": [
+                "petty cash",
+                "my petty cash",
+                "petty cash requests",
+                "reimbursement requests"
+            ]
+        },
+        {
+            "id": "create_petty_cash",
+            "label": "Create petty cash request",
+            "menu_path": "Sidebar > Petty Cash > Requests > Petty Cash > Create",
+            "route": "petty.create",
+            "permission": "request pettycash",
+            "description": "Submit a new petty cash or reimbursement request.",
+            "intents": [
+                "create petty cash",
+                "new petty cash",
+                "submit petty cash",
+                "request petty cash",
+                "reimbursement"
+            ]
+        },
+        {
+            "id": "review_petty_cash",
+            "label": "Review petty cash",
+            "menu_path": "Sidebar > Petty Cash > Approvals > Review Petty Cash",
+            "route": "petty.list",
+            "route_params": {
+                "stage": "review",
+                "type": "petty"
+            },
+            "permissions_any": [
+                "first pettycash approval",
+                "review requests"
+            ],
+            "description": "First-stage review queue for petty cash and reimbursement requests.",
+            "intents": [
+                "review petty cash",
+                "petty cash review",
+                "first approval petty cash"
+            ]
+        },
+        {
+            "id": "review_requisitions",
+            "label": "Review requisitions",
+            "menu_path": "Sidebar > Petty Cash > Approvals > Review Requisitions",
+            "route": "petty.list",
+            "route_params": {
+                "stage": "review",
+                "type": "requisition"
+            },
+            "permission": "review staff requisition",
+            "description": "First-stage review queue for staff requisitions.",
+            "intents": [
+                "review requisitions",
+                "requisition review"
+            ]
+        },
+        {
+            "id": "approve_petty_cash",
+            "label": "Approve petty cash",
+            "menu_path": "Sidebar > Petty Cash > Approvals > Approve Petty Cash",
+            "route": "petty.list",
+            "route_params": {
+                "stage": "approve",
+                "type": "petty"
+            },
+            "permissions_any": [
+                "last pettycash approval",
+                "approve requests"
+            ],
+            "description": "Final approval queue for petty cash and reimbursement requests.",
+            "intents": [
+                "approve petty cash",
+                "petty cash approval",
+                "final approve petty cash"
+            ]
+        },
+        {
+            "id": "approve_requisitions",
+            "label": "Approve requisitions",
+            "menu_path": "Sidebar > Petty Cash > Approvals > Approve Requisitions",
+            "route": "petty.list",
+            "route_params": {
+                "stage": "approve",
+                "type": "requisition"
+            },
+            "permission": "approve staff requisition",
+            "description": "Final approval queue for staff requisitions.",
+            "intents": [
+                "approve requisitions",
+                "requisition approval",
+                "how does petty cash approval work"
+            ]
+        },
+        {
+            "id": "authorize_petty_cash",
+            "label": "Authorize petty cash",
+            "menu_path": "Sidebar > Petty Cash > Approvals > Authorize Petty Cash",
+            "route": "petty.list",
+            "route_params": {
+                "stage": "authorize",
+                "type": "petty"
+            },
+            "permission": "authorize requests",
+            "description": "Authorization queue for petty cash after approval.",
+            "intents": [
+                "authorize petty cash",
+                "petty cash authorization"
+            ]
+        },
+        {
+            "id": "authorize_requisitions",
+            "label": "Authorize requisitions",
+            "menu_path": "Sidebar > Petty Cash > Approvals > Authorize Requisitions",
+            "route": "petty.list",
+            "route_params": {
+                "stage": "authorize",
+                "type": "requisition"
+            },
+            "permission": "authorize staff requisition",
+            "description": "Authorization queue for staff requisitions after approval.",
+            "intents": [
+                "authorize requisitions",
+                "requisition authorization"
+            ]
+        },
+        {
+            "id": "petty_cash_payments",
+            "label": "Petty Cash Payments",
+            "menu_path": "Sidebar > Finance & Transactions > Petty Cash Payments",
+            "route": "petty.cashier",
+            "permission": "view cashflow movements",
+            "description": "Process approved petty cash payments as cashier.",
+            "intents": [
+                "petty cash payments",
+                "cashier",
+                "process payments",
+                "pay petty cash"
+            ]
+        },
+        {
+            "id": "cash_management",
+            "label": "Cash Management",
+            "menu_path": "Sidebar > Finance & Transactions > Cash Management",
+            "route": "deposit.index",
+            "permission": "view cashflow movements",
+            "description": "Manage cash deposits and replenishment.",
+            "intents": [
+                "cash management",
+                "deposits",
+                "replenishment",
+                "cash deposits"
+            ]
+        },
+        {
+            "id": "petty_cash_flow",
+            "label": "Petty Cash Flow",
+            "menu_path": "Sidebar > Finance & Transactions > Petty Cash Flow",
+            "route": "cashflow.index",
+            "permission": "view cashflow movements",
+            "description": "View petty cash flow movements and balances.",
+            "intents": [
+                "petty cash flow",
+                "cashflow",
+                "cash flow report"
+            ]
+        },
+        {
+            "id": "requisition_records",
+            "label": "Requisition Records",
+            "menu_path": "Sidebar > Finance & Transactions > Requisition Records",
+            "route": "requisition.records",
+            "permissions_any": [
+                "view cashflow movements",
+                "review staff requisition",
+                "approve staff requisition",
+                "authorize staff requisition",
+                "download staff requisition"
+            ],
+            "description": "View historical requisition records and downloads.",
+            "intents": [
+                "requisition records",
+                "requisition history",
+                "past requisitions"
+            ]
+        },
+        {
+            "id": "staff_appreciation",
+            "label": "Staff Appreciation",
+            "menu_path": "Sidebar > Reports and Settings > Management > Staff Appreciation",
+            "route": "management.appreciation.index",
+            "permission": "view appreciation nominations",
+            "description": "View staff appreciation nomination periods and results (management).",
+            "intents": [
+                "staff appreciation",
+                "appreciation nominations",
+                "manage appreciation"
+            ]
+        },
+        {
+            "id": "work_periods",
+            "label": "Work Periods",
+            "menu_path": "Sidebar > Reports and Settings > Management > Work Periods",
+            "route": "work-periods.index",
+            "permission": "manage work periods",
+            "description": "Create, close, and manage weekly work periods.",
+            "intents": [
+                "work periods",
+                "manage periods",
+                "open period",
+                "close period"
+            ]
+        },
+        {
+            "id": "org_reports",
+            "label": "Org Reports & Documents",
+            "menu_path": "Sidebar > Reports and Settings > Org Reports & Documents",
+            "route": "reports",
+            "permission": "view reports",
+            "description": "Organization-wide reports and shared documents library.",
+            "intents": [
+                "org reports",
+                "organization reports",
+                "reports list",
+                "view reports"
+            ]
+        },
+        {
+            "id": "users_settings",
+            "label": "Users",
+            "menu_path": "Sidebar > Reports and Settings > Settings > Users",
+            "route": "admin.index",
+            "description": "Manage portal user accounts.",
+            "intents": [
+                "users",
+                "user management",
+                "manage users",
+                "admin users"
+            ]
+        },
+        {
+            "id": "roles_settings",
+            "label": "Roles",
+            "menu_path": "Sidebar > Reports and Settings > Settings > Roles",
+            "route": "roles.index",
+            "permission": "manage roles and permissions",
+            "description": "Manage roles and permissions.",
+            "intents": [
+                "roles",
+                "permissions",
+                "manage roles"
+            ]
+        },
+        {
+            "id": "departments_settings",
+            "label": "Departments",
+            "menu_path": "Sidebar > Reports and Settings > Settings > Departments",
+            "route": "departments",
+            "permission": "manage departments",
+            "description": "Manage organization departments.",
+            "intents": [
+                "departments",
+                "manage departments"
+            ]
+        },
+        {
+            "id": "activity_log",
+            "label": "Activity log",
+            "menu_path": "Sidebar > Reports and Settings > Settings > Activity log",
+            "route": "activity-log.index",
+            "permission": "view activity log",
+            "description": "Audit trail of portal activity (admin).",
+            "intents": [
+                "activity log",
+                "audit log",
+                "system activity"
+            ]
+        },
+        {
+            "id": "weekly_plan_vs_report",
+            "label": "Weekly plan vs weekly report (informational)",
+            "menu_path": "N/A — conceptual",
+            "description": "A weekly plan sets intentions for the upcoming week; a weekly report records what was done during a completed week. Plans are submitted before the week; reports after.",
+            "intents": [
+                "difference between weekly plan and weekly report",
+                "weekly plan vs weekly report",
+                "what is a weekly plan",
+                "what is a weekly report"
+            ]
+        }
+    ]
+}

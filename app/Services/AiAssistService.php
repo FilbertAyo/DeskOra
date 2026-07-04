@@ -9,6 +9,11 @@ use RuntimeException;
 
 class AiAssistService
 {
+    public function __construct(
+        private ?PortalNavigationIntelligenceService $navigationIntelligence = null,
+        private ?PortalAiContextResolver $contextResolver = null,
+    ) {}
+
     public function isConfigured(): bool
     {
         return filled(config('services.groq.api_key'));
@@ -26,7 +31,7 @@ class AiAssistService
         );
     }
 
-    public function answerPortalQuestion(string $question, ?User $user = null): string
+    public function answerPortalQuestion(string $question, ?User $user = null): array
     {
         $question = trim($question);
 
@@ -38,12 +43,21 @@ class AiAssistService
             $this->acquireAssistantUserSlot($user);
         }
 
-        return $this->generate(
-            $this->portalAssistantSystemPrompt($user),
-            $this->portalAssistantUserMessage($question, $user),
-            (int) config('services.groq.assistant_max_tokens', 600),
+        $context = $user !== null
+            ? $this->getContextResolver()->resolve($user, $question)
+            : ['domains' => [], 'snapshot' => '', 'has_live_data' => false];
+
+        $answer = $this->generate(
+            $this->portalAssistantSystemPrompt($user, $context['has_live_data']),
+            $this->portalAssistantUserMessage($question, $context),
+            (int) config('services.groq.assistant_max_tokens', $context['has_live_data'] ? 700 : 600),
             formatAsSummary: true
         );
+
+        return [
+            'answer' => $answer,
+            'has_live_data' => $context['has_live_data'],
+        ];
     }
 
     public function answerWeeklySubmissionQuestion(string $sourceText, string $question, ?string $summary = null): string
@@ -182,36 +196,49 @@ class AiAssistService
         RateLimiter::hit($key, 60);
     }
 
-    private function portalAssistantSystemPrompt(?User $user): string
+    private function portalAssistantSystemPrompt(?User $user, bool $hasLiveData = false): string
     {
         $plainText = $this->plainTextInstruction();
 
+        $liveDataRules = $hasLiveData
+            ? 'When a LIVE DATA SNAPSHOT is included with the question, use ONLY that snapshot for factual answers about the user\'s records, counts, statuses, or deadlines. '
+            : 'If no LIVE DATA SNAPSHOT is included, you do not have the user\'s live records — guide them using navigation only and do not invent statuses or counts. ';
+
         return $plainText
             .'You are Deskora AI, a helpful assistant for the Adilisha Portal (also called WorkHub). '
-            .'Staff use this portal for weekly work plans, weekly reports, monthly reports, action logs, document management, petty cash requisitions and approvals, staff appreciation, year planning, work periods, payments, and organization reports. '
-            .'Answer questions about how the portal works, what features exist, and general workflows. '
-            .'Reply in 1 to 3 short, clear paragraphs. Be practical and friendly. '
-            .'If you do not know a specific policy, deadline, or data value, say so honestly and suggest where in the portal the user might look (for example Dashboard, Documents, Petty Cash, or Action Log). '
-            .'Do not invent specific numbers, names, or approval statuses. '
-            .'Do not claim you can see the user\'s actual documents or records unless that feature is explicitly provided.';
+            .'Interpret staff questions, match them to entries in the navigation catalog below, and guide users using ONLY that catalog for routes and menu paths. '
+            .$liveDataRules
+            .'Answer directly in 1 to 3 short, clear paragraphs. Be practical and friendly. '
+            .'Do not greet the user or open with their name, job title, or department. Do not say hello unless they greeted you first. '
+            .'If you do not know a specific policy or data value, say so honestly. '
+            .'Do not invent specific numbers, names, approval statuses, menu paths, or URLs. '
+            .'Do not claim you can see records that were not provided in a LIVE DATA SNAPSHOT. '
+            ."\n\n"
+            .$this->getNavigationIntelligence()->formatPromptContext($user);
     }
 
-    private function portalAssistantUserMessage(string $question, ?User $user): string
+    private function getNavigationIntelligence(): PortalNavigationIntelligenceService
+    {
+        return $this->navigationIntelligence ??= app(PortalNavigationIntelligenceService::class);
+    }
+
+    private function getContextResolver(): PortalAiContextResolver
+    {
+        return $this->contextResolver ??= app(PortalAiContextResolver::class);
+    }
+
+    /**
+     * @param  array{domains: array<int, string>, snapshot: string, has_live_data: bool}  $context
+     */
+    private function portalAssistantUserMessage(string $question, array $context): string
     {
         $message = 'Question from staff member: '.$question;
 
-        if ($user !== null) {
-            $context = ['Name: '.$user->name];
-
-            if (filled($user->title)) {
-                $context[] = 'Title: '.$user->title;
-            }
-
-            if ($user->department) {
-                $context[] = 'Department: '.$user->department->name;
-            }
-
-            $message = "Staff context:\n".implode("\n", $context)."\n\n".$message;
+        if (! empty($context['has_live_data']) && filled($context['snapshot'])) {
+            $message = "LIVE DATA SNAPSHOT (pre-processed by the portal backend — use only this for factual answers about the user's records):\n"
+                .$context['snapshot']
+                ."\n\n"
+                .$message;
         }
 
         return $message;
