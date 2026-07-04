@@ -89,7 +89,7 @@
 
                     @if($weeklyRows->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-hover table-bordered table-striped">
+                                <table class="table table-hover table-bordered">
                                     <thead class="thead-light">
                                         <tr>
                                             <th class="text-center" style="width: 50px;">No.</th>
