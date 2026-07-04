@@ -1931,6 +1931,14 @@ class DocumentController extends Controller
             ];
         }
 
+        // Once the user has already submitted their plan for the deadline period,
+        // the deadline reminder is no longer relevant and should be hidden.
+        $weeklyPlanAlreadySubmitted = false;
+        if ($planDeadlinePeriod) {
+            $existingPlan = Document::findWeeklyPlanForPeriodOwner((string) $planDeadlinePeriod->id, (string) $user->id);
+            $weeklyPlanAlreadySubmitted = $existingPlan?->isSubmitted() ?? false;
+        }
+
         return view('documents.weekly.plans', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
@@ -1941,6 +1949,7 @@ class DocumentController extends Controller
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
             'weeklyPlanSlot' => $weeklyPlanSlot,
+            'weeklyPlanAlreadySubmitted' => $weeklyPlanAlreadySubmitted,
         ]);
     }
 
@@ -2083,6 +2092,15 @@ class DocumentController extends Controller
         $weeklyReportSlot = app(\App\Services\WeeklySubmissionWindowService::class)
             ->resolveReportSlot($user, $selectedCreatePeriod instanceof WorkPeriod ? $selectedCreatePeriod : null);
 
+        // Once the user has already submitted their report for the deadline period,
+        // the deadline reminder is no longer relevant and should be hidden.
+        $reportDeadlinePeriod = $weeklyReportSlot->period ?? $currentPeriod;
+        $weeklyReportAlreadySubmitted = false;
+        if ($reportDeadlinePeriod) {
+            $existingReport = Document::findWeeklyReportForPeriodOwner((string) $reportDeadlinePeriod->id, (string) $user->id);
+            $weeklyReportAlreadySubmitted = $existingReport?->isSubmitted() ?? false;
+        }
+
         return view('documents.weekly.reports', [
             'documents' => $documents,
             'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
@@ -2093,6 +2111,7 @@ class DocumentController extends Controller
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
             'weeklyReportSlot' => $weeklyReportSlot,
+            'weeklyReportAlreadySubmitted' => $weeklyReportAlreadySubmitted,
         ]);
     }
 

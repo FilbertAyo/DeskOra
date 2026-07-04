@@ -71,7 +71,7 @@
                 </div>
                 <div class="card-body">
                     <!-- Deadline Status -->
-                    @if($deadlineStatuses)
+                    @if($deadlineStatuses && !($weeklyReportAlreadySubmitted ?? false))
                         <div class="alert {{ ($weeklyReportSlot ?? null)?->graceActive ? 'alert-warning' : 'alert-info' }} mb-4">
                             <div class="row align-items-center">
                                 <div class="col-md-8">
@@ -111,7 +111,7 @@
                     <!-- Reports List -->
                     @if($documents->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover table-bordered table-striped">
+                            <table class="table table-hover table-bordered">
                                 <thead class="thead-light">
                                     <tr>
                                         <th class="text-center" style="width: 50px;">No.</th>
