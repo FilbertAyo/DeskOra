@@ -17,7 +17,7 @@ return [
     'suggested_questions' => [
         'How do I submit a weekly plan?',
         'What is the difference between a weekly plan and a weekly report?',
-        'How does petty cash approval work?',
+        'How does staff requisition approval work?',
         'Where can I track my action log tasks?',
         'How do I view documents shared with me?',
     ],
