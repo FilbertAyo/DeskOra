@@ -102,13 +102,11 @@ class PortalNavigationIntelligenceService
     {
         return implode(' ', [
             'NAVIGATION RULES (mandatory):',
-            'You must use ONLY the PORTAL NAVIGATION CATALOG below as the single source of truth for routes, menu paths, and available actions.',
-            'Never invent, guess, or assume URLs, menu items, or features that are not listed in the catalog.',
-            'When guiding the user, cite the menu path from the catalog and include the exact URL when one is provided.',
+            'You must use ONLY the PORTAL NAVIGATION CATALOG below as the single source of truth for menu paths and available actions.',
+            'Never invent, guess, or assume menu items, pages, or features that are not listed in the catalog.',
+            'When you point the user to a page, cite its menu path from the catalog. Guide by menu path only and never include a URL or web link.',
             'If the user asks for something that does not match any catalog entry or intent, clearly say that action or page is not available in the portal.',
-            'If an entry is informational only (no URL), explain using the description without making up a link.',
-            'If the user lacks permission for an entry, explain that they may not have access and suggest asking an administrator.',
-            'Do not claim you can open pages for the user; give them the menu path and URL to navigate themselves.',
+            'Do not claim you can open pages for the user; give them the menu path to navigate themselves.',
         ]);
     }
 
@@ -125,10 +123,6 @@ class PortalNavigationIntelligenceService
                 $entry['label'],
                 'Menu: '.($entry['menu_path'] ?? 'N/A'),
             ];
-
-            if ($url = $this->resolveUrl($entry)) {
-                $parts[] = 'URL: '.$url;
-            }
 
             if (! empty($entry['description'])) {
                 $parts[] = 'About: '.$entry['description'];

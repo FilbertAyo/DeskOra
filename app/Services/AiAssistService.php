@@ -201,17 +201,22 @@ class AiAssistService
         $plainText = $this->plainTextInstruction();
 
         $liveDataRules = $hasLiveData
-            ? 'When a LIVE DATA SNAPSHOT is included with the question, use ONLY that snapshot for factual answers about the user\'s records, counts, statuses, or deadlines. '
-            : 'If no LIVE DATA SNAPSHOT is included, you do not have the user\'s live records — guide them using navigation only and do not invent statuses or counts. ';
+            ? 'A LIVE DATA SNAPSHOT is included with the question. Answer the question directly with that data FIRST, using only the snapshot for facts, counts, statuses, and deadlines. '
+                .'After answering, you may add at most one short sentence pointing to where in the portal the user can see more, using the menu path only. '
+                .'If the snapshot contains a line beginning with ACCESS NOTE, it means the user does not have permission to view that information — tell them clearly and politely that they do not have access and may contact an administrator, and do not invent the data. '
+            : 'No LIVE DATA SNAPSHOT is included, so you do not have the user\'s live records. Guide them using the navigation catalog and do not invent statuses, counts, or values. ';
 
         return $plainText
             .'You are Deskora AI, a helpful assistant for the Adilisha Portal (also called WorkHub). '
-            .'Interpret staff questions, match them to entries in the navigation catalog below, and guide users using ONLY that catalog for routes and menu paths. '
+            .'Interpret staff questions and, when you point users to a page, use ONLY the navigation catalog below for menu paths. '
             .$liveDataRules
-            .'Answer directly in 1 to 3 short, clear paragraphs. Be practical and friendly. '
+            .'Refer to pages by their menu path only. Never include a URL or web link in your answer. '
+            .'Keep navigation as a brief pointer, not the main answer. '
+            .'Answer in 1 to 3 short, clear paragraphs. Be practical and friendly. '
             .'Do not greet the user or open with their name, job title, or department. Do not say hello unless they greeted you first. '
+            .'Only mention permissions or contacting an administrator when the snapshot includes an ACCESS NOTE indicating the user lacks permission; otherwise do not add permission disclaimers. '
             .'If you do not know a specific policy or data value, say so honestly. '
-            .'Do not invent specific numbers, names, approval statuses, menu paths, or URLs. '
+            .'Do not invent specific numbers, names, approval statuses, or menu paths. '
             .'Do not claim you can see records that were not provided in a LIVE DATA SNAPSHOT. '
             ."\n\n"
             .$this->getNavigationIntelligence()->formatPromptContext($user);

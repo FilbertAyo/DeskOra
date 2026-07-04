@@ -86,6 +86,35 @@ class PortalAiContextResolverTest extends TestCase
         $this->assertStringContainsString('Documents for this user', $context['snapshot']);
     }
 
+    public function test_permitted_user_gets_system_stats_snapshot(): void
+    {
+        $user = $this->makeUser(['users management settings']);
+
+        $context = app(PortalAiContextResolver::class)->resolve(
+            $user,
+            'How many active users are in the system?'
+        );
+
+        $this->assertTrue($context['has_live_data']);
+        $this->assertStringContainsString('System statistics', $context['snapshot']);
+        $this->assertStringContainsString('Active users:', $context['snapshot']);
+        $this->assertStringNotContainsString('ACCESS NOTE', $context['snapshot']);
+    }
+
+    public function test_unpermitted_user_gets_access_note_for_system_stats(): void
+    {
+        $user = $this->makeUser();
+
+        $context = app(PortalAiContextResolver::class)->resolve(
+            $user,
+            'How many active users are in the system?'
+        );
+
+        $this->assertTrue($context['has_live_data']);
+        $this->assertStringContainsString('ACCESS NOTE', $context['snapshot']);
+        $this->assertStringNotContainsString('System statistics', $context['snapshot']);
+    }
+
     private function makeUser(array $permissions = []): User
     {
         $department = Department::create(['name' => 'Programs']);

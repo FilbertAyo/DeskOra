@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Department;
 use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
@@ -39,6 +40,7 @@ class PortalAiContextResolver
                 'approvals' => $this->approvalsSection($user),
                 'action_logs' => $this->actionLogsSection($user),
                 'documents' => $this->documentsSection($user),
+                'system_stats' => $this->systemStatsSection($user),
                 default => null,
             };
 
@@ -98,13 +100,31 @@ class PortalAiContextResolver
             }
         }
 
+        $domainMap = config('ai-assistant.navigation_entry_domains', []);
+
         if ($domains === []) {
             $matches = $this->navigationIntelligence->findByIntent($question, $user);
             if ($matches !== []) {
                 $topId = (string) ($matches[0]['id'] ?? '');
-                $domainMap = config('ai-assistant.navigation_entry_domains', []);
                 if (isset($domainMap[$topId])) {
                     $domains[] = $domainMap[$topId];
+                }
+            }
+        }
+
+        // Broaden: an explicit data-style question ("how many", "count", "list of", "status")
+        // that still has no domain is mapped to the best-matching navigation entry's domain.
+        $isDataStyle = (bool) preg_match(
+            '/\b(how many|number of|count|total|list of|status|pending|overdue|due|my|mine|have i|did i)\b/',
+            $normalized
+        );
+
+        if ($domains === [] && $isDataStyle) {
+            foreach ($this->navigationIntelligence->findByIntent($question, $user) as $match) {
+                $entryId = (string) ($match['id'] ?? '');
+                if (isset($domainMap[$entryId])) {
+                    $domains[] = $domainMap[$entryId];
+                    break;
                 }
             }
         }
@@ -174,7 +194,7 @@ class PortalAiContextResolver
     private function financeRequestsSection(User $user): string
     {
         if (! $user->can('request pettycash')) {
-            return '';
+            return 'ACCESS NOTE: This user does not have permission to raise or view petty cash and requisition requests.';
         }
 
         $statusCounts = FinanceRequest::query()
@@ -218,21 +238,20 @@ class PortalAiContextResolver
 
     private function approvalsSection(User $user): string
     {
-        $counts = $this->approvalNavService->countsFor($user);
-
-        if (($counts['total'] ?? 0) === 0
-            && ! $user->canAny([
-                'first pettycash approval',
-                'last pettycash approval',
-                'review staff requisition',
-                'approve staff requisition',
-                'authorize staff requisition',
-                'review requests',
-                'approve requests',
-                'authorize requests',
-            ])) {
-            return '';
+        if (! $user->canAny([
+            'first pettycash approval',
+            'last pettycash approval',
+            'review staff requisition',
+            'approve staff requisition',
+            'authorize staff requisition',
+            'review requests',
+            'approve requests',
+            'authorize requests',
+        ])) {
+            return 'ACCESS NOTE: This user is not an approver, so they have no approval queue.';
         }
+
+        $counts = $this->approvalNavService->countsFor($user);
 
         return implode("\n", [
             'Approval queue counts for this user:',
@@ -287,6 +306,31 @@ class PortalAiContextResolver
             'Documents for this user:',
             'Submitted documents owned by user: '.$ownedSubmittedCount,
             'Weekly plans/reports shared with user (not owned): '.$sharedWithMeCount,
+        ]);
+    }
+
+    private function systemStatsSection(User $user): string
+    {
+        $permission = (string) (config('ai-assistant.context_domain_permissions.system_stats') ?? 'users management settings');
+
+        if (! $user->can($permission)) {
+            return 'ACCESS NOTE: This user does not have permission to view system-wide user or department statistics.';
+        }
+
+        $totalUsers = User::count();
+        $activeUsers = User::active()->count();
+        $inactiveUsers = max(0, $totalUsers - $activeUsers);
+        $activeTopDepartments = Department::query()
+            ->where('status', 'active')
+            ->whereNull('parent_id')
+            ->count();
+
+        return implode("\n", [
+            'System statistics:',
+            'Total users: '.$totalUsers,
+            'Active users: '.$activeUsers,
+            'Inactive users: '.$inactiveUsers,
+            'Active top-level departments: '.$activeTopDepartments,
         ]);
     }
 }

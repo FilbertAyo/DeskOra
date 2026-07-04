@@ -46,14 +46,21 @@ class PortalNavigationIntelligenceTest extends TestCase
         $this->assertSame('create_weekly_plan', $matches[0]['id']);
     }
 
-    public function test_format_prompt_includes_navigation_rules_and_urls(): void
+    public function test_format_prompt_includes_navigation_rules_without_urls(): void
     {
         $service = app(PortalNavigationIntelligenceService::class);
         $prompt = $service->formatPromptContext();
 
         $this->assertStringContainsString('NAVIGATION RULES', $prompt);
         $this->assertStringContainsString('create_weekly_plan', $prompt);
-        $this->assertStringContainsString(route('dashboard'), $prompt);
-        $this->assertStringContainsString('Never invent, guess, or assume URLs', $prompt);
+        $this->assertStringContainsString('Menu:', $prompt);
+
+        // No URLs should ever be injected into the prompt.
+        $this->assertStringNotContainsString('URL:', $prompt);
+        $this->assertStringNotContainsString('http://', $prompt);
+        $this->assertStringNotContainsString('https://', $prompt);
+
+        // The forced permission caveat has been removed.
+        $this->assertStringNotContainsString('suggest asking an administrator', $prompt);
     }
 }

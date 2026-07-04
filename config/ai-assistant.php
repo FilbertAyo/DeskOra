@@ -75,6 +75,21 @@ return [
             'all documents',
             'my documents',
         ],
+        'system_stats' => [
+            'active user',
+            'active users',
+            'total users',
+            'how many users',
+            'number of users',
+            'user count',
+            'staff count',
+            'how many staff',
+            'department count',
+            'how many departments',
+            'number of departments',
+            'system stats',
+            'system statistics',
+        ],
     ],
 
     'navigation_entry_domains' => [
@@ -91,6 +106,23 @@ return [
         'approve_requisitions' => 'approvals',
         'action_log_list' => 'action_logs',
         'all_documents' => 'documents',
+        'users_settings' => 'system_stats',
+        'departments_settings' => 'system_stats',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Context domain permissions
+    |--------------------------------------------------------------------------
+    |
+    | Domains listed here require the given permission before the backend will
+    | resolve their data. When the user lacks it, the resolver returns an
+    | ACCESS NOTE so the AI can tell them they do not have access.
+    |
+    */
+
+    'context_domain_permissions' => [
+        'system_stats' => 'users management settings',
     ],
 
     'context_snapshot_max_tasks' => 5,
