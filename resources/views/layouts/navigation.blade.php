@@ -30,7 +30,7 @@
 
         @php
             $currentPeriod = $currentPeriod ?? null;
-            $recentNotifications = Auth::user()->notifications()->latest()->limit(6)->get();
+            $recentNotifications = Auth::user()->unreadNotifications()->latest()->limit(5)->get();
             $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
         @endphp
 
@@ -74,7 +74,7 @@
                                     Anonymous feedback inbox
                                 </a>
                             @endcan
-                            <a href="{{ route('notification.index') }}" class="dropdown-item">
+                            <a href="{{ route('notifications.inbox') }}" class="dropdown-item">
                                 <i class="ti ti-bell me-2"></i>
                                 Notifications
                             </a>
@@ -90,7 +90,7 @@
                        role="button"
                        aria-haspopup="true"
                        aria-expanded="false"
-                       title="Alerts">
+                       title="Notifications">
                         <i class="ti ti-bell"></i>
                         @if($unreadNotificationCount > 0)
                             <span class="badge bg-light-danger border border-danger rounded-pill position-absolute" style="margin-left:-8px; margin-top:-8px;">
@@ -114,33 +114,26 @@
                                 $data = is_array($notification->data ?? null) ? $notification->data : [];
                                 $title = $data['title'] ?? 'Notification';
                                 $message = $data['message'] ?? 'You have a new update.';
-                                $actionUrl = $data['action_url'] ?? route('notification.index');
                             @endphp
-                            <div class="dropdown-item {{ $notification->read_at ? '' : 'bg-light' }}">
-                                <div class="d-flex justify-content-between align-items-start gap-2">
-                                    <div class="flex-grow-1">
-                                        <a href="{{ $actionUrl }}" class="text-decoration-none">
-                                            <div class="fw-semibold text-dark">{{ $title }}</div>
-                                        </a>
-                                        <small class="text-muted d-block">{{ $message }}</small>
-                                        <small class="text-muted">{{ $notification->created_at?->diffForHumans() }}</small>
-                                    </div>
-                                    @if(!$notification->read_at)
-                                        <form action="{{ route('notifications.read', $notification->id) }}" method="POST">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Read</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </div>
+                            <a href="{{ route('notifications.open', $notification->id) }}"
+                               class="dropdown-item bg-light">
+                                <div class="fw-semibold text-dark">{{ $title }}</div>
+                                <small class="text-muted d-block">{{ $message }}</small>
+                                <small class="text-muted">{{ $notification->created_at?->diffForHumans() }}</small>
+                            </a>
                         @empty
-                            <div class="dropdown-item text-muted">No notifications yet.</div>
+                            <div class="dropdown-item text-muted">No new notifications.</div>
                         @endforelse
 
                         <div class="border-top">
-                            <a href="{{ route('notification.index') }}" class="dropdown-item text-primary">
-                                <i class="ti ti-settings me-1"></i>Manage notification settings
+                            <a href="{{ route('notifications.inbox') }}" class="dropdown-item text-primary">
+                                <i class="ti ti-list me-1"></i>View all notifications
                             </a>
+                            @can('view notification settings')
+                                <a href="{{ route('notification.index') }}" class="dropdown-item text-muted">
+                                    <i class="ti ti-settings me-1"></i>Notification settings
+                                </a>
+                            @endcan
                         </div>
                     </div>
                 </li>

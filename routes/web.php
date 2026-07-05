@@ -183,6 +183,8 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::get('/notifications', [NotificationController::class, 'inbox'])->name('notifications.inbox');
+    Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 
     // Staff Appreciation Nomination (staff-facing, anonymous)
     Route::prefix('staff-appreciation')->name('appreciation.')->group(function () {

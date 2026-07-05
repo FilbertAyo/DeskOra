@@ -168,6 +168,7 @@ class MeetingMinuteTest extends TestCase
         $minute->refresh();
         $this->assertSame('updated-minutes.pdf', $minute->stored_name);
         $this->assertNotSame($oldPath, $minute->path);
+        $this->assertSame((string) $manager->id, (string) $minute->uploaded_by);
         Storage::disk('public')->assertMissing($oldPath);
         Storage::disk('public')->assertExists($minute->path);
     }

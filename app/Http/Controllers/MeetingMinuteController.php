@@ -135,7 +135,6 @@ class MeetingMinuteController extends Controller
             'path' => $path,
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize(),
-            'uploaded_by' => $request->user()->id,
         ]);
 
         return redirect()

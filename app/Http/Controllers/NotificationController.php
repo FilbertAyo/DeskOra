@@ -24,7 +24,7 @@ class NotificationController extends Controller
             ->latest()
             ->limit(25)
             ->get()
-            ->map(function (ReminderDispatchLog $log) use ($reminderConfig, $graceConfig) {
+            ->map(function (ReminderDispatchLog $log) use ($graceConfig) {
                 $log->setAttribute(
                     'dispatch_type_label',
                     $log->reminder_config_id === $graceConfig->id
@@ -106,6 +106,36 @@ class NotificationController extends Controller
         }
 
         return back();
+    }
+
+    public function inbox(Request $request)
+    {
+        $notifications = $request->user()
+            ->notifications()
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        $unreadCount = $request->user()->unreadNotifications()->count();
+
+        return view('notifications.inbox', compact('notifications', 'unreadCount'));
+    }
+
+    public function open(Request $request, string $notificationId): RedirectResponse
+    {
+        $notification = $request->user()
+            ->notifications()
+            ->where('id', $notificationId)
+            ->firstOrFail();
+
+        if ($notification->read_at === null) {
+            $notification->markAsRead();
+        }
+
+        $data = is_array($notification->data) ? $notification->data : [];
+        $actionUrl = $data['action_url'] ?? route('notifications.inbox');
+
+        return redirect()->to($actionUrl);
     }
 
     public function markAllRead(Request $request): RedirectResponse

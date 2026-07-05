@@ -79,7 +79,7 @@
                                         <th>Work Period</th>
                                         <th style="width: 90px;">Year</th>
                                         <th style="width: 140px;">Status</th>
-                                        <th style="width: 180px;">Uploaded By</th>
+                                        <th style="width: 180px;">Created By</th>
                                         <th class="text-center" style="width: 120px;">Actions</th>
                                     </tr>
                                 </thead>
@@ -109,7 +109,7 @@
                                                 @if($minute)
                                                     <small class="text-muted">
                                                         {{ $minute->uploader->name ?? 'N/A' }}<br>
-                                                        <span>{{ $minute->updated_at->format('M d, Y') }}</span>
+                                                        <span>{{ $minute->created_at->format('M d, Y') }}</span>
                                                     </small>
                                                 @else
                                                     <span class="text-muted">—</span>
