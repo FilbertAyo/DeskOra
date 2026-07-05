@@ -324,13 +324,21 @@
                     <i class="ti ti-settings"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('management.*') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('management.*', 'anonymous-feedback.*', 'work-periods.*') ? 'active pc-trigger' : '' }}">
                         <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-settings"></i></span>
                             <span class="pc-mtext">Management</span>
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
+                            @can('manage anonymous feedback')
+                                <li class="{{ Request::routeIs('anonymous-feedback.*') ? 'active' : '' }}">
+                                    <a href="{{ route('anonymous-feedback.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Anonymous Feedback</span>
+                                    </a>
+                                </li>
+                            @endcan
+
                             @can('view appreciation nominations')
                                 <li class="{{ Request::routeIs('management.appreciation.*') ? 'active' : '' }}">
                                     <a href="{{ route('management.appreciation.index') }}" class="pc-link">

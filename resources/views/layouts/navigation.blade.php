@@ -56,33 +56,6 @@
 
         <div class="ms-auto">
             <ul class="list-unstyled">
-               
-                    <li class="dropdown pc-h-item">
-                        <a class="pc-head-link dropdown-toggle arrow-none me-0"
-                           data-bs-toggle="dropdown"
-                           href="#"
-                           role="button"
-                           aria-haspopup="true"
-                           aria-expanded="false"
-                           title="Resources">
-                             <i class="ti ti-message-circle"></i>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-end pc-h-dropdown">
-                            @can('manage anonymous feedback')
-                                <a href="{{ route('anonymous-feedback.index') }}" class="dropdown-item">
-                                    <i class="ti ti-message-circle me-2"></i>
-                                    Anonymous feedback inbox
-                                </a>
-                            @endcan
-                            <a href="{{ route('notifications.inbox') }}" class="dropdown-item">
-                                <i class="ti ti-bell me-2"></i>
-                                Notifications
-                            </a>
-                        </div>
-                    </li>
-               
-               
-
                 <li class="dropdown pc-h-item">
                     <a class="pc-head-link dropdown-toggle arrow-none me-0"
                        data-bs-toggle="dropdown"
