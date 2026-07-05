@@ -55,20 +55,22 @@
                 </div>
             </div>
 
-            <div class="deskora-ai-input border-top pt-3 mt-auto">
-                <label for="deskoraAiQuestionInput" class="form-label small fw-semibold mb-2">Your question</label>
-                <textarea
-                    id="deskoraAiQuestionInput"
-                    class="form-control form-control-sm"
-                    rows="3"
-                    maxlength="1000"
-                    placeholder="Example: How do I submit a weekly plan?"></textarea>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small class="text-muted" id="deskoraAiInputHint">AI-generated responses may be incorrect. Verify before taking action.</small>
-                    <button type="button" class="btn btn-warning btn-sm deskora-ai-ask-btn" id="deskoraAiAskBtn">
-                        <x-deskora-ai-icon class="me-1 deskora-ai-btn-logo" :size="16" />
-                        Ask
-                    </button>
+            <div class="deskora-ai-input deskora-ai-input--prompt border-top pt-3 mt-auto">
+                <div class="deskora-ai-prompt-shell">
+                    <label for="deskoraAiQuestionInput" class="deskora-ai-prompt-label">Ask Deskora anything</label>
+                    <textarea
+                        id="deskoraAiQuestionInput"
+                        class="form-control deskora-ai-prompt-field"
+                        rows="3"
+                        maxlength="1000"
+                        placeholder="What tasks are assigned to me this week?"></textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-2 gap-2 flex-wrap">
+                        <small class="text-muted deskora-ai-input-hint" id="deskoraAiInputHint">AI-generated responses may be incorrect. Verify before taking action.</small>
+                        <button type="button" class="btn btn-warning btn-sm deskora-ai-ask-btn" id="deskoraAiAskBtn">
+                            <x-deskora-ai-icon class="me-1 deskora-ai-btn-logo" :size="16" />
+                            Ask
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -213,6 +215,55 @@
 
         .deskora-ai-thread .qa-loading {
             color: var(--bs-secondary-color);
+        }
+
+        .deskora-ai-prompt-shell {
+            border: 2px solid #fad02c;
+            border-radius: 0.85rem;
+            padding: 0.85rem 0.95rem;
+            background: linear-gradient(180deg, rgba(250, 208, 44, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
+            box-shadow: 0 0 0 1px rgba(250, 208, 44, 0.15), 0 8px 24px rgba(245, 184, 0, 0.12);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .deskora-ai-prompt-shell:focus-within {
+            border-color: #f5b800;
+            box-shadow: 0 0 0 3px rgba(250, 208, 44, 0.22), 0 10px 28px rgba(245, 184, 0, 0.16);
+        }
+
+        .deskora-ai-prompt-label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #9a7200;
+            margin-bottom: 0.45rem;
+            letter-spacing: 0.01em;
+        }
+
+        .deskora-ai-prompt-field {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+            resize: none;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            min-height: 4.5rem;
+        }
+
+        .deskora-ai-prompt-field:focus {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .deskora-ai-prompt-field::placeholder {
+            color: rgba(108, 117, 125, 0.85);
+        }
+
+        .deskora-ai-input-hint {
+            max-width: 16rem;
+            line-height: 1.35;
         }
     </style>
 

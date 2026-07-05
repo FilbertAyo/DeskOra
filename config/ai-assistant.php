@@ -15,12 +15,12 @@ return [
     'document_summary_label' => 'Summarize this weekly submission',
 
     'suggested_questions' => [
+        'What tasks are assigned to me this week?',
         'How do I submit a weekly plan?',
-        'How does staff requisition approval work?',
-        'Where can I view the weekly matrix for this week?',
+    'How does staff requisition approval work?',
         'What year plan activities apply to my sub-department?',
         'How do I record impact in the weekly matrix?',
-        'Have I submitted my weekly report?',
+       
     ],
 
     /*
@@ -34,6 +34,18 @@ return [
     */
 
     'context_domains' => [
+        'assigned_tasks' => [
+            'assigned task',
+            'assigned tasks',
+            'assigned to me',
+            'my assigned',
+            'tasks assigned',
+            'assigned by',
+            'from other staff',
+            'team member',
+            'this week tasks',
+            'my tasks this week',
+        ],
         'weekly_submissions' => [
             'weekly plan',
             'weekly report',
@@ -137,6 +149,7 @@ return [
         'approve_petty_cash' => 'approvals',
         'approve_requisitions' => 'approvals',
         'action_log_list' => 'action_logs',
+        'assigned_tasks_overview' => 'assigned_tasks',
         'all_documents' => 'documents',
         'users_settings' => 'system_stats',
         'departments_settings' => 'system_stats',

@@ -16,6 +16,7 @@ class PortalAiContextResolver
         private readonly WorkPeriodService $workPeriodService,
         private readonly RequestApprovalNavService $approvalNavService,
         private readonly ActionLogProgressService $actionLogProgressService,
+        private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
         private readonly PortalNavigationIntelligenceService $navigationIntelligence,
     ) {}
 
@@ -43,6 +44,7 @@ class PortalAiContextResolver
                 'finance_requests' => $this->financeRequestsSection($user),
                 'approvals' => $this->approvalsSection($user),
                 'action_logs' => $this->actionLogsSection($user),
+                'assigned_tasks' => $this->assignedTasksSection($user),
                 'documents' => $this->documentsSection($user),
                 'system_stats' => $this->systemStatsSection($user),
                 default => null,
@@ -76,7 +78,7 @@ class PortalAiContextResolver
         );
 
         $isDataQuestion = (bool) preg_match(
-            '/\b(my|mine|status|pending|submitted|have i|did i|how many|count|waiting|draft|not submitted|already submitted|due|deadline|overdue|track my|shared with me|shared documents)\b/',
+            '/\b(my|mine|status|pending|submitted|have i|did i|how many|count|waiting|draft|not submitted|already submitted|due|deadline|overdue|track my|shared with me|shared documents|assigned|give me all|list my|show my)\b/',
             $normalized
         );
 
@@ -134,7 +136,7 @@ class PortalAiContextResolver
         }
 
         if ($domains === [] && preg_match('/\b(my|mine|status|have i|did i)\b/', $normalized)) {
-            $domains[] = 'weekly_submissions';
+            $domains[] = preg_match('/\btasks?\b/', $normalized) ? 'assigned_tasks' : 'weekly_submissions';
         }
 
         return array_values(array_unique($domains));
@@ -317,6 +319,73 @@ class PortalAiContextResolver
 
             if ($entryCount > 3) {
                 $lines[] = sprintf('  · ... and %d more entries', $entryCount - 3);
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function assignedTasksSection(User $user): string
+    {
+        $period = $this->workPeriodService->periodForWeeklyPlanSubmission()
+            ?? $this->workPeriodService->periodForWeeklyReportSubmission();
+        $lines = ['Tasks assigned to this user:'];
+
+        if ($period !== null) {
+            $lines[] = sprintf('Work period: Week %s of %s', $period->week_number, $period->year);
+        }
+
+        $assignments = $this->weeklyActivityAssignmentService->assignmentsForUser(
+            (string) $user->id,
+            $period !== null ? (string) $period->id : null
+        );
+
+        if ($assignments->isEmpty()) {
+            $lines[] = 'No weekly plan activities assigned by other staff for this period.';
+        } else {
+            $lines[] = 'Weekly plan activities assigned by other staff:';
+            $limit = max(1, (int) config('ai-assistant.context_snapshot_max_tasks', 5));
+
+            foreach ($assignments->take($limit) as $assignment) {
+                $payload = is_array($assignment->activity_payload) ? $assignment->activity_payload : [];
+                $activity = Str::limit(trim((string) ($payload['activity'] ?? '')), 80);
+                $day = trim((string) ($payload['day'] ?? ''));
+                $sourceName = trim((string) ($assignment->sourceUser->name ?? 'Unknown staff'));
+                $prefix = $day !== '' ? $day.': ' : '';
+
+                $lines[] = sprintf(
+                    '- %s%s (assigned by %s)',
+                    $prefix,
+                    $activity !== '' ? $activity : 'Untitled activity',
+                    $sourceName
+                );
+            }
+
+            if ($assignments->count() > $limit) {
+                $lines[] = sprintf('... and %d more assigned activities.', $assignments->count() - $limit);
+            }
+        }
+
+        $progress = $this->actionLogProgressService->buildForUser($user);
+        $activeTasks = collect($progress['activeTasks'] ?? []);
+        $taskLimit = max(1, (int) config('ai-assistant.context_snapshot_max_tasks', 5));
+
+        $lines[] = 'Action log tasks assigned to this user: '.$activeTasks->count();
+
+        if ($activeTasks->isEmpty()) {
+            $lines[] = 'No active action log tasks.';
+        } else {
+            foreach ($activeTasks->take($taskLimit) as $task) {
+                $lines[] = sprintf(
+                    '- %s (%s)%s',
+                    $task['task'] ?? 'Untitled task',
+                    $task['latest_progress'] ?? 'Unknown',
+                    ! empty($task['needs_update']) ? ', needs update' : ''
+                );
+            }
+
+            if ($activeTasks->count() > $taskLimit) {
+                $lines[] = sprintf('... and %d more action log tasks.', $activeTasks->count() - $taskLimit);
             }
         }
 

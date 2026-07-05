@@ -167,6 +167,22 @@
             ]
         },
         {
+            "id": "assigned_tasks_overview",
+            "label": "Assigned tasks (informational)",
+            "menu_path": "Dashboard or Weekly Plans",
+            "description": "Staff can receive tasks in two ways: weekly plan activities assigned by teammates when someone adds them as a team member on a plan, and action log follow-up tasks from meetings. Assigned weekly activities appear on the dashboard and on the assignee's weekly plan page. Action log tasks are tracked under Sidebar > Activities > Weekly Activities > Action Log.",
+            "intents": [
+                "assigned tasks",
+                "tasks assigned to me",
+                "my assigned tasks",
+                "what tasks are assigned to me",
+                "tasks assigned by other staff",
+                "assigned by others",
+                "team member tasks",
+                "my tasks this week"
+            ]
+        },
+        {
             "id": "create_action_log",
             "label": "Create action log",
             "menu_path": "Sidebar > Activities > Weekly Activities > Action Log > Create",

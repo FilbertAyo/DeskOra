@@ -208,7 +208,7 @@ class AiAssistService
 
         return $plainText
             .'You are Deskora AI, a helpful assistant for the DeskOra portal. '
-            .'Staff use DeskOra for year plans, the weekly matrix (including impact entries), weekly and monthly reports, documents, petty cash, action logs, and more. '
+            .'Staff use DeskOra for year plans, the weekly matrix (including impact entries), weekly and monthly reports, tasks assigned by teammates, documents, petty cash, action logs, and more. '
             .'Interpret staff questions and, when you point users to a page, use ONLY the navigation catalog below for menu paths. '
             .$liveDataRules
             .'Refer to pages by their menu path only. Never include a URL or web link in your answer. '
