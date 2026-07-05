@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Concerns\HasShortId;
-
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -141,6 +141,11 @@ class WorkPeriod extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, 'period_id');
+    }
+
+    public function meetingMinute(): HasOne
+    {
+        return $this->hasOne(MeetingMinute::class, 'period_id');
     }
 
     /**

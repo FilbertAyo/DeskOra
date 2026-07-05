@@ -36,7 +36,7 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'action-logs.*') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'action-logs.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Weekly Activities</span>
@@ -56,6 +56,11 @@
                         <li class="{{ Request::routeIs('action-logs.*') ? 'active' : '' }}">
                             <a href="{{ route('action-logs.index') }}" class="pc-link">
                                 <span class="pc-mtext">Action Log</span>
+                            </a>
+                        </li>
+                        <li class="{{ Request::routeIs('meeting-minutes.*') ? 'active' : '' }}">
+                            <a href="{{ route('meeting-minutes.index') }}" class="pc-link">
+                                <span class="pc-mtext">Minutes</span>
                             </a>
                         </li>
                     </ul>
@@ -140,9 +145,9 @@
                     </li>
                 @endif
 
-                <!-- Petty Cash -->
+                <!-- Finance & Accounting -->
                 <li class="pc-item pc-caption">
-                    <label>Petty Cash</label>
+                    <label>Finance & Accounting</label>
                     <i class="ti ti-file-text"></i>
                 </li>
 

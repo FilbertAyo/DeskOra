@@ -13,6 +13,7 @@ use App\Http\Controllers\DocumentDashboardController;
 use App\Http\Controllers\DocumentWorkflowController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
+use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PettyController;
 use App\Http\Controllers\PortalAiAssistantController;
@@ -123,6 +124,25 @@ Route::middleware('auth')->group(function () {
         Route::get('/{document}/edit', [ActionLogController::class, 'edit'])->name('edit');
         Route::put('/{document}', [ActionLogController::class, 'update'])->name('update');
         Route::delete('/{document}', [ActionLogController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('meeting-minutes')->name('meeting-minutes.')->group(function () {
+        Route::get('/', [MeetingMinuteController::class, 'index'])->name('index');
+        Route::get('/create', [MeetingMinuteController::class, 'create'])
+            ->middleware('permission:manage minutes')
+            ->name('create');
+        Route::post('/', [MeetingMinuteController::class, 'store'])
+            ->middleware('permission:manage minutes')
+            ->name('store');
+        Route::get('/{meetingMinute}/view', [MeetingMinuteController::class, 'view'])->name('view');
+        Route::get('/{meetingMinute}/download', [MeetingMinuteController::class, 'download'])->name('download');
+        Route::get('/{meetingMinute}/edit', [MeetingMinuteController::class, 'edit'])
+            ->middleware('permission:manage minutes')
+            ->name('edit');
+        Route::put('/{meetingMinute}', [MeetingMinuteController::class, 'update'])
+            ->middleware('permission:manage minutes')
+            ->name('update');
+        Route::get('/{meetingMinute}', [MeetingMinuteController::class, 'show'])->name('show');
     });
 
     Route::middleware('permission:manage year plans')->prefix('year-plans')->name('year-plan.')->group(function () {

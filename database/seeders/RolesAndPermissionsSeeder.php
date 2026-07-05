@@ -73,6 +73,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'create action logs',
             'manage action logs',
 
+            // Meeting minutes permissions
+            'manage minutes',
+
         ];
 
         // Combine all permissions
