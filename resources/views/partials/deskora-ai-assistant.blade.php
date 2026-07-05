@@ -32,7 +32,7 @@
         <div class="offcanvas-body d-flex flex-column">
             <div id="deskoraAiWelcome" class="deskora-ai-welcome mb-3">
                 <p class="small text-muted mb-0">
-                    Ask anything about how the portal works — weekly plans, reports, documents, petty cash, action logs, and more.
+                    Ask anything about how the DeskOra portal works — year plans, weekly matrix, impacts, weekly and monthly reports, documents, petty cash, action logs, and more.
                 </p>
             </div>
 

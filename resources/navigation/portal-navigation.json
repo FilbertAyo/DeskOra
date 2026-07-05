@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "updated": "2026-07-04",
-    "portal_name": "Adilisha Portal (WorkHub)",
+    "portal_name": "DeskOra portal",
     "entries": [
         {
             "id": "dashboard",
@@ -37,12 +37,28 @@
             "menu_path": "Sidebar > Year Plan",
             "route": "year-plan.index",
             "permission": "manage year plans",
-            "description": "View and manage the organization's annual plan and activities.",
+            "description": "View and manage the organization's annual plan, activities by sub-department, and planned months.",
             "intents": [
                 "year plan",
                 "annual plan",
                 "yearly plan",
-                "manage year plan"
+                "manage year plan",
+                "edit year plan",
+                "year plan activities"
+            ]
+        },
+        {
+            "id": "year_plan_overview",
+            "label": "Year Plan (informational)",
+            "menu_path": "N/A — conceptual",
+            "description": "The year plan lists annual activities by sub-department and month. Staff see planned activities linked to their sub-department in monthly reports and the weekly matrix. Only users with manage year plans permission can edit it under Sidebar > Year Plan.",
+            "intents": [
+                "what is a year plan",
+                "what is the year plan",
+                "year plan overview",
+                "year plan for my department",
+                "year plan for my sub-department",
+                "planned activities this month"
             ]
         },
         {
@@ -50,12 +66,30 @@
             "label": "Weekly Matrix",
             "menu_path": "Sidebar > Weekly Matrix",
             "route": "weekly-matrix.index",
-            "description": "View weekly matrix periods and department activity grids.",
+            "description": "View and edit weekly matrix grids by work period. Each sub-department records key activities, outputs, outcomes, impact, and links to year plan activities.",
             "intents": [
                 "weekly matrix",
                 "matrix",
                 "department matrix",
-                "weekly grid"
+                "weekly grid",
+                "view weekly matrix",
+                "edit weekly matrix",
+                "create weekly matrix"
+            ]
+        },
+        {
+            "id": "weekly_matrix_overview",
+            "label": "Weekly Matrix impact (informational)",
+            "menu_path": "Sidebar > Weekly Matrix",
+            "description": "The Impact column in the weekly matrix captures the effect or change resulting from the week's work. Outcomes describe results; impact explains why they matter. Link entries to year plan activities to show alignment with the annual plan.",
+            "intents": [
+                "matrix impact",
+                "impact column",
+                "what is impact in weekly matrix",
+                "record impact",
+                "impacts of the plan",
+                "impacts of plans",
+                "year plan links in matrix"
             ]
         },
         {
@@ -547,12 +581,15 @@
             "id": "weekly_plan_vs_report",
             "label": "Weekly plan vs weekly report (informational)",
             "menu_path": "N/A — conceptual",
-            "description": "A weekly plan sets intentions for the upcoming week; a weekly report records what was done during a completed week. Plans are submitted before the week; reports after.",
+            "description": "A weekly plan sets intentions for the upcoming week; a weekly report records what was done during a completed week. Plans are submitted before the week; reports after. Monthly reports summarize progress against year plan activities for the month.",
             "intents": [
                 "difference between weekly plan and weekly report",
                 "weekly plan vs weekly report",
                 "what is a weekly plan",
-                "what is a weekly report"
+                "what is a weekly report",
+                "staff reports",
+                "reports staff make",
+                "what reports do staff submit"
             ]
         }
     ]

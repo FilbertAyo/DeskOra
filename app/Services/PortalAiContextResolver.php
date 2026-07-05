@@ -6,6 +6,8 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
+use App\Models\WeeklyMatrix;
+use App\Models\YearPlan;
 use Illuminate\Support\Str;
 
 class PortalAiContextResolver
@@ -36,6 +38,8 @@ class PortalAiContextResolver
         foreach ($domains as $domain) {
             $section = match ($domain) {
                 'weekly_submissions' => $this->weeklySubmissionsSection($user),
+                'year_plans' => $this->yearPlansSection($user),
+                'weekly_matrix' => $this->weeklyMatrixSection($user),
                 'finance_requests' => $this->financeRequestsSection($user),
                 'approvals' => $this->approvalsSection($user),
                 'action_logs' => $this->actionLogsSection($user),
@@ -187,6 +191,134 @@ class PortalAiContextResolver
             (int) ($pendingDraftCounts[Document::TYPE_WEEKLY_REPORT] ?? 0),
             (int) ($pendingDraftCounts[Document::TYPE_MONTHLY_REPORT] ?? 0)
         );
+
+        return implode("\n", $lines);
+    }
+
+    private function yearPlansSection(User $user): string
+    {
+        $currentYear = (int) date('Y');
+        $currentMonth = (int) date('n');
+        $monthLabels = [
+            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
+            7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
+        ];
+        $lines = ['Year plan information for this user:'];
+
+        if ($user->can('manage year plans')) {
+            $plans = YearPlan::query()
+                ->orderByDesc('year')
+                ->limit(3)
+                ->withCount('activities')
+                ->get();
+
+            if ($plans->isEmpty()) {
+                $lines[] = 'No year plans exist yet.';
+            } else {
+                $lines[] = 'Year plans on file:';
+                foreach ($plans as $plan) {
+                    $lines[] = sprintf('- %d: %d activities', $plan->year, $plan->activities_count);
+                }
+            }
+        }
+
+        $plannedActivities = MonthlyReportYearPlanActivities::plannedForUserMonth($user, $currentYear, $currentMonth);
+
+        if ($plannedActivities->isEmpty()) {
+            $lines[] = sprintf(
+                'No year plan activities scheduled for user sub-departments in %s %d.',
+                $monthLabels[$currentMonth] ?? 'this month',
+                $currentYear
+            );
+        } else {
+            $lines[] = sprintf(
+                'Planned activities for user sub-departments in %s %d:',
+                $monthLabels[$currentMonth] ?? 'this month',
+                $currentYear
+            );
+
+            foreach ($plannedActivities->take(5) as $activity) {
+                $lines[] = sprintf(
+                    '- %s (%s): %s',
+                    $activity->displayCode(),
+                    $activity->department?->name ?? 'Unknown sub-department',
+                    Str::limit((string) $activity->description, 80)
+                );
+            }
+
+            if ($plannedActivities->count() > 5) {
+                $lines[] = sprintf('... and %d more planned activities.', $plannedActivities->count() - 5);
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function weeklyMatrixSection(User $user): string
+    {
+        $period = $this->workPeriodService->periodForWeeklyReportSubmission();
+
+        if ($period === null) {
+            return 'Weekly matrix: no open work period is available right now.';
+        }
+
+        $subDeptIds = MonthlyReportYearPlanActivities::subDepartmentIdsForUser($user);
+        $lines = [
+            sprintf('Weekly matrix for Week %s of %s:', $period->week_number, $period->year),
+        ];
+
+        if ($subDeptIds === []) {
+            $lines[] = 'User has no linked sub-departments, so no weekly matrix applies to them directly.';
+
+            return implode("\n", $lines);
+        }
+
+        $matrices = WeeklyMatrix::query()
+            ->where('period_id', $period->id)
+            ->whereIn('department_id', $subDeptIds)
+            ->with(['department', 'entries.yearPlanActivities'])
+            ->get()
+            ->keyBy(fn (WeeklyMatrix $matrix) => (string) $matrix->department_id);
+
+        foreach ($subDeptIds as $subDeptId) {
+            $department = Department::query()->find($subDeptId);
+            $departmentName = $department?->name ?? 'Unknown sub-department';
+            $matrix = $matrices->get($subDeptId);
+
+            if ($matrix === null) {
+                $lines[] = sprintf('- %s: no matrix submitted for this week yet', $departmentName);
+
+                continue;
+            }
+
+            $entryCount = $matrix->entries->count();
+            $lines[] = sprintf('- %s: %d %s', $departmentName, $entryCount, Str::plural('entry', $entryCount));
+
+            foreach ($matrix->entries->take(3) as $entry) {
+                $parts = [];
+
+                if (filled($entry->key_activity)) {
+                    $parts[] = 'Activity: '.Str::limit((string) $entry->key_activity, 60);
+                }
+
+                if (filled($entry->impact)) {
+                    $parts[] = 'Impact: '.Str::limit((string) $entry->impact, 80);
+                }
+
+                $yearPlanLinkCount = $entry->yearPlanActivities->count();
+                if ($yearPlanLinkCount > 0) {
+                    $parts[] = sprintf('%d year plan link(s)', $yearPlanLinkCount);
+                }
+
+                if ($parts !== []) {
+                    $lines[] = '  · '.implode('; ', $parts);
+                }
+            }
+
+            if ($entryCount > 3) {
+                $lines[] = sprintf('  · ... and %d more entries', $entryCount - 3);
+            }
+        }
 
         return implode("\n", $lines);
     }
