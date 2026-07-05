@@ -38,7 +38,7 @@
     @endif
 
     <div class="row">
-        <div class="col-md-8">
+        <div class="col-md-12">
             <form method="POST" action="{{ route('meeting-minutes.store') }}" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="period_id" value="{{ $period->id }}">

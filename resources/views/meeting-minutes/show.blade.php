@@ -23,7 +23,7 @@
                             <a href="{{ route('meeting-minutes.index') }}" class="btn btn-sm btn-light">
                                 <i class="ti ti-arrow-left me-1"></i> Back to Minutes
                             </a>
-                            <a href="{{ route('meeting-minutes.download', $meetingMinute) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ route('meeting-minutes.download', $meetingMinute) }}" class="btn btn-sm btn-outline-danger">
                                 <i class="ti ti-download me-1"></i> Download
                             </a>
                             @can('manage minutes')
