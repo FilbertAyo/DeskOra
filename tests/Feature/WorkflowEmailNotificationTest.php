@@ -6,7 +6,6 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
-use App\Notifications\WorkPeriodOpenedNotification;
 use App\Notifications\WeeklyBudgetSubmissionNotification;
 use App\Notifications\WeeklyDocumentDepartmentHeadNotification;
 use App\Notifications\WeeklyDocumentReturnedToDraftNotification;
@@ -313,47 +312,35 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertNotSentTo($owner, WeeklyDocumentReturnedToDraftNotification::class);
     }
 
-    public function test_creating_work_period_notifies_all_eligible_staff_by_email_channel(): void
+    public function test_creating_work_period_does_not_send_any_notification(): void
     {
         Notification::fake();
 
         $admin = $this->createActiveUserWithChannel('email');
         $admin->givePermissionTo('manage work periods');
 
-        $eligibleEmail = $this->createActiveUserWithChannel('email');
-        $eligibleBoth = $this->createActiveUserWithChannel('both');
-        $smsOnly = $this->createActiveUserWithChannel('sms');
+        // Eligible recipients that previously would have received an opened email.
+        $this->createActiveUserWithChannel('email');
+        $this->createActiveUserWithChannel('both');
 
-        $inactiveEmail = User::factory()->create([
-            'status' => 'inactive',
-            'notification_channel' => 'email',
-            'email' => 'inactive-work-period@example.com',
-        ]);
-
-        $missingEmail = $this->createActiveUserWithChannel('email');
-        $missingEmail->update(['email' => null]);
+        // Create the immediate next ISO week, which is the only week allowed by store().
+        $nextWeekStart = Carbon::now()->startOfWeek(Carbon::MONDAY)->addWeek();
 
         $response = $this->actingAs($admin)->post(route('work-periods.store'), [
-            'year' => 2026,
-            'week_number' => 17,
-            'week_start_date' => '2026-04-20',
+            'year' => $nextWeekStart->isoWeekYear(),
+            'week_number' => $nextWeekStart->isoWeek(),
+            'week_start_date' => $nextWeekStart->format('Y-m-d'),
         ]);
 
         $response->assertRedirect(route('work-periods.index'));
         $this->assertDatabaseHas('work_periods', [
-            'year' => 2026,
-            'week_number' => 17,
-            'week_start_date' => '2026-04-20',
+            'year' => $nextWeekStart->isoWeekYear(),
+            'week_number' => $nextWeekStart->isoWeek(),
+            'week_start_date' => $nextWeekStart->format('Y-m-d'),
             'status' => WorkPeriod::STATUS_OPEN,
         ]);
 
-        Notification::assertSentTo($admin, WorkPeriodOpenedNotification::class);
-        Notification::assertSentTo($eligibleEmail, WorkPeriodOpenedNotification::class);
-        Notification::assertSentTo($eligibleBoth, WorkPeriodOpenedNotification::class);
-
-        Notification::assertNotSentTo($smsOnly, WorkPeriodOpenedNotification::class);
-        Notification::assertNotSentTo($inactiveEmail, WorkPeriodOpenedNotification::class);
-        Notification::assertNotSentTo($missingEmail, WorkPeriodOpenedNotification::class);
+        Notification::assertNothingSent();
     }
 
     public function test_weekly_report_submission_notifies_department_head_with_email_channel(): void

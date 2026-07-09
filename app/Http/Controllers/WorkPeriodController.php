@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Models\WeeklyPlan;
 use App\Models\WorkPeriod;
 use App\Services\WeeklyGracePeriodNotificationDispatcher;
-use App\Services\WorkflowEmailNotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +15,6 @@ use Illuminate\Support\Facades\DB;
 class WorkPeriodController extends Controller
 {
     public function __construct(
-        private readonly WorkflowEmailNotificationService $workflowEmailNotifications,
         private readonly WeeklyGracePeriodNotificationDispatcher $gracePeriodNotifications,
     ) {}
 
@@ -195,8 +193,6 @@ class WorkPeriodController extends Controller
             'report_deadline' => $reportDeadline->format('Y-m-d'),
             'status' => WorkPeriod::STATUS_OPEN,
         ]);
-
-        $this->workflowEmailNotifications->notifyWorkPeriodOpened($period);
 
         return redirect()->route('work-periods.index')
             ->with('success', "Work period created successfully: Week {$period->week_number} of {$period->year}");

@@ -114,6 +114,28 @@ else
   fi
 fi
 
+echo "==> Ensuring Laravel scheduler cron is installed..."
+# The scheduler drives automatic work period creation (Thursday 15:30), deadline
+# reminders, and other recurring tasks. It only runs if `schedule:run` fires every
+# minute. Install the cron entry idempotently for the current user.
+#
+# If `crontab` is unavailable/restricted on this host (some cPanel setups), add the
+# following line manually via cPanel > Cron Jobs instead:
+#   * * * * * /opt/cpanel/ea-php82/root/usr/bin/php <repo-path>/artisan schedule:run >> /dev/null 2>&1
+SCHEDULE_CMD="$SCRIPT_DIR/artisan schedule:run"
+CRON_LINE="* * * * * $PHP_BIN $SCHEDULE_CMD >> /dev/null 2>&1"
+if command -v crontab >/dev/null 2>&1; then
+  if crontab -l 2>/dev/null | grep -Fq "$SCHEDULE_CMD"; then
+    echo "    Laravel scheduler cron already present."
+  else
+    ( crontab -l 2>/dev/null; echo "$CRON_LINE" ) | crontab -
+    echo "    Installed Laravel scheduler cron: $CRON_LINE"
+  fi
+else
+  echo "WARNING: 'crontab' not found. Add this cron manually via cPanel > Cron Jobs:"
+  echo "         $CRON_LINE"
+fi
+
 if [ "$CUTOVER_MODE" = "1" ]; then
   echo "==> Leaving maintenance mode..."
   "$PHP_BIN" artisan up
