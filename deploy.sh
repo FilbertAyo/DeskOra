@@ -115,7 +115,7 @@ else
 fi
 
 echo "==> Ensuring Laravel scheduler cron is installed..."
-# The scheduler drives automatic work period creation (Thursday 15:30), deadline
+# The scheduler drives automatic work period creation (Thursday 00:01), deadline
 # reminders, and other recurring tasks. It only runs if `schedule:run` fires every
 # minute. Install the cron entry idempotently for the current user.
 #
