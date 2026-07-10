@@ -38,11 +38,15 @@ php artisan action-logs:audit-duplicates
 # Merge duplicates into canonical log (requires --apply)
 php artisan action-logs:audit-duplicates --apply
 
-# Sync carried tasks from prior weeks (explicit)
+# Sync missing carried tasks from the previous week only (additive)
 php artisan action-logs:sync-carried-tasks
 
 # Dry-run carry sync
 php artisan action-logs:sync-carried-tasks --dry-run
+
+# Rebuild current week from previous week only (drops wrongly carried older tasks / duplicates)
+php artisan action-logs:sync-carried-tasks --rebuild --dry-run
+php artisan action-logs:sync-carried-tasks --rebuild
 ```
 
 ## Baseline queries (production copy)

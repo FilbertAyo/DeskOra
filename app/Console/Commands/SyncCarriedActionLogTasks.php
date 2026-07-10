@@ -12,9 +12,10 @@ class SyncCarriedActionLogTasks extends Command
 {
     protected $signature = 'action-logs:sync-carried-tasks
                             {--period= : Target work period ID (defaults to current open period)}
+                            {--rebuild : Drop wrongly carried older-week tasks and rebuild from previous week only}
                             {--dry-run : Preview changes without saving}';
 
-    protected $description = 'Sync incomplete action log tasks from prior weeks into the target period and restore responsible people';
+    protected $description = 'Sync incomplete action log tasks from the previous week into the target period and restore responsible people';
 
     public function __construct(
         private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
@@ -25,6 +26,7 @@ class SyncCarriedActionLogTasks extends Command
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
+        $rebuild = (bool) $this->option('rebuild');
         $period = $this->resolveTargetPeriod();
 
         if (! $period) {
@@ -43,11 +45,14 @@ class SyncCarriedActionLogTasks extends Command
 
         $this->info('Target period: '.$period->display_name.' ('.$period->id.')');
         $this->info('Action log document: '.$document->id);
+        $this->info('Mode: '.($rebuild ? 'rebuild' : 'additive sync'));
         if ($dryRun) {
             $this->warn('Dry run — no changes will be saved.');
         }
 
-        $sync = $this->actionLogCarryForwardService->syncMissingCarriedTasks($document, $period);
+        $sync = $rebuild
+            ? $this->actionLogCarryForwardService->rebuildCarriedTasks($document, $period)
+            : $this->actionLogCarryForwardService->syncMissingCarriedTasks($document, $period);
 
         if (! $sync['changed']) {
             $this->info('No carried tasks or responsible people needed syncing.');
@@ -58,10 +63,19 @@ class SyncCarriedActionLogTasks extends Command
         if (! empty($sync['added'])) {
             $this->info('Tasks to add ('.count($sync['added']).'):');
             foreach ($sync['added'] as $label) {
+                $this->line('  + '.$label);
+            }
+        }
+
+        if (! empty($sync['removed'])) {
+            $this->info('Tasks to remove ('.count($sync['removed']).'):');
+            foreach ($sync['removed'] as $label) {
                 $this->line('  - '.$label);
             }
-        } else {
-            $this->info('Responsible people will be restored on existing tasks.');
+        }
+
+        if (empty($sync['added']) && empty($sync['removed'])) {
+            $this->info('Responsible people will be restored / duplicates merged on existing tasks.');
         }
 
         if ($dryRun) {

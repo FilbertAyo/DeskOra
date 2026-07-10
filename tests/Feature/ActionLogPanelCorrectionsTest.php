@@ -804,7 +804,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('Updated task text', $document->content['tasks'][0]['task'] ?? null);
     }
 
-    public function test_carry_forward_collects_incomplete_tasks_across_multi_week_gap(): void
+    public function test_carry_forward_only_uses_immediate_previous_week(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 15, 10, 0, 0));
 
@@ -816,7 +816,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $week21 = $this->createOpenPeriod(2026, 21, '2026-05-18', '2026-05-24');
             $this->createOpenPeriod(2026, 22, '2026-05-25', '2026-05-31');
             $week23 = $this->createOpenPeriod(2026, 23, '2026-06-01', '2026-06-07');
-            $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
             $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
 
             Document::create([
@@ -845,15 +845,159 @@ class ActionLogPanelCorrectionsTest extends TestCase
                 ],
             ]);
 
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_prev', 'Week 24 previous task', [], 'In Progress'),
+                        $this->taskRow('task_done', 'Week 24 done task', [], 'Done'),
+                    ],
+                ],
+            ]);
+
             $response = $this->actingAs($manager)->get(route('action-logs.create'));
 
             $response->assertOk();
             $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
                 $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
 
-                return in_array('Stale week 21 task', $texts, true)
-                    && in_array('Week 23 only task', $texts, true);
+                return in_array('Week 24 previous task', $texts, true)
+                    && ! in_array('Stale week 21 task', $texts, true)
+                    && ! in_array('Week 23 only task', $texts, true)
+                    && ! in_array('Week 24 done task', $texts, true)
+                    && count($texts) === 1;
             });
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_carry_forward_dedupes_same_task_text_and_merges_assignees(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 15, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+            /** @var User $staffA */
+            $staffA = User::factory()->create();
+            /** @var User $staffB */
+            $staffB = User::factory()->create();
+
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_dup_a', 'Shared follow-up task', [$staffA->id], 'In Progress'),
+                        $this->taskRow('task_dup_b', 'Shared follow-up task', [$staffB->id], 'Not Started'),
+                    ],
+                ],
+            ]);
+
+            $response = $this->actingAs($manager)->get(route('action-logs.create'));
+
+            $response->assertOk();
+            $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks) use ($staffA, $staffB): bool {
+                if (count($carryForwardTasks) !== 1) {
+                    return false;
+                }
+
+                $task = $carryForwardTasks[0];
+                $assignees = collect($task['responsible_user_ids'] ?? [])->map(fn ($id) => (string) $id)->sort()->values()->all();
+                $expected = collect([(string) $staffA->id, (string) $staffB->id])->sort()->values()->all();
+
+                return ($task['task'] ?? null) === 'Shared follow-up task'
+                    && $assignees === $expected;
+            });
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_rebuild_drops_older_week_tasks_and_keeps_local_additions(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 6, 19, 10, 0, 0));
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+
+            $week23 = $this->createOpenPeriod(2026, 23, '2026-06-01', '2026-06-07');
+            $week24 = $this->createOpenPeriod(2026, 24, '2026-06-08', '2026-06-14');
+            $week25 = $this->createOpenPeriod(2026, 25, '2026-06-15', '2026-06-21');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week23->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 23 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_old', 'Stale week 23 task', [], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week24->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 24 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_prev', 'Week 24 carry task', [], 'In Progress'),
+                        $this->taskRow('task_done', 'Week 24 done task', [], 'Done'),
+                        $this->taskRow('task_dup_a', 'Duplicate text task', [], 'Not Started'),
+                        $this->taskRow('task_dup_b', 'Duplicate text task', [], 'In Progress'),
+                    ],
+                ],
+            ]);
+
+            $week25Doc = Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week25->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 25 of 2026',
+                'state' => Document::STATE_DRAFT,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_old', 'Stale week 23 task', [], 'In Progress'),
+                        $this->taskRow('task_prev', 'Week 24 carry task', [], 'In Progress'),
+                        $this->taskRow('task_dup_a', 'Duplicate text task', [], 'Not Started'),
+                        $this->taskRow('task_dup_b', 'Duplicate text task', [], 'In Progress'),
+                        $this->taskRow('task_local', 'Brand new week 25 task', [], 'Not Started'),
+                    ],
+                ],
+            ]);
+
+            $this->artisan('action-logs:sync-carried-tasks', [
+                '--period' => $week25->id,
+                '--rebuild' => true,
+            ])->assertSuccessful();
+
+            $week25Doc->refresh();
+            $texts = collect($week25Doc->content['tasks'] ?? [])->pluck('task')->values()->all();
+
+            $this->assertContains('Week 24 carry task', $texts);
+            $this->assertContains('Duplicate text task', $texts);
+            $this->assertContains('Brand new week 25 task', $texts);
+            $this->assertNotContains('Stale week 23 task', $texts);
+            $this->assertSame(1, collect($texts)->filter(fn ($t) => $t === 'Duplicate text task')->count());
+            $this->assertCount(3, $texts);
         } finally {
             Carbon::setTestNow();
         }
