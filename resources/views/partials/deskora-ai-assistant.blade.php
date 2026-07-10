@@ -269,20 +269,32 @@
             line-height: 1.35;
         }
 
-        /* Mandatory Deskora AI tour — hide Skip; stack above FAB/offcanvas */
+        /* Mandatory Deskora AI tour — hide Skip; wide responsive cards; stack above FAB/offcanvas */
         .introjs-skipbutton {
             display: none !important;
         }
 
-        .introjs-tooltip {
-            min-width: min(28rem, calc(100vw - 2rem));
-            max-width: min(36rem, calc(100vw - 2rem));
-            width: min(36rem, calc(100vw - 2rem));
+        body.deskora-ai-tour-active .introjs-tooltip,
+        .introjs-tooltip.deskora-ai-tour-tooltip {
+            box-sizing: border-box !important;
+            width: min(40rem, calc(100vw - 2.5rem)) !important;
+            min-width: min(40rem, calc(100vw - 2.5rem)) !important;
+            max-width: min(40rem, calc(100vw - 2.5rem)) !important;
         }
 
-        .introjs-tooltiptext {
+        body.deskora-ai-tour-active .introjs-tooltiptext,
+        .introjs-tooltip.deskora-ai-tour-tooltip .introjs-tooltiptext {
             font-size: 0.95rem;
             line-height: 1.55;
+        }
+
+        @media (max-width: 576px) {
+            body.deskora-ai-tour-active .introjs-tooltip,
+            .introjs-tooltip.deskora-ai-tour-tooltip {
+                width: calc(100vw - 1.5rem) !important;
+                min-width: calc(100vw - 1.5rem) !important;
+                max-width: calc(100vw - 1.5rem) !important;
+            }
         }
 
         body.deskora-ai-tour-active .deskora-ai-fab {
@@ -716,6 +728,7 @@
                     prevLabel: 'Back',
                     doneLabel: 'Done',
                     skipLabel: '',
+                    tooltipClass: 'deskora-ai-tour-tooltip',
                     showBullets: true,
                     showButtons: true,
                     exitOnOverlayClick: false,
