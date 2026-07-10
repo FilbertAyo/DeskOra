@@ -12,6 +12,7 @@ class AiAssistService
     public function __construct(
         private ?PortalNavigationIntelligenceService $navigationIntelligence = null,
         private ?PortalAiContextResolver $contextResolver = null,
+        private ?WeeklyDocumentFormKnowledgeService $formKnowledge = null,
     ) {}
 
     public function isConfigured(): bool
@@ -72,6 +73,8 @@ class AiAssistService
         $prompt = $this->plainTextInstruction()
             .'You answer staff questions about a weekly plan and weekly report. '
             .'Reply in 1 to 3 short, clear paragraphs. Use only facts from the documents provided. '
+            .'You may explain what each section or field means based on the data shown. '
+            .'If asked what is missing or empty, list sections that have no content in the provided data. '
             .'If the answer is not in the plan or report, say clearly that the information is not available there. '
             .'Do not invent facts.';
 
@@ -211,6 +214,7 @@ class AiAssistService
             .'Staff use DeskOra for year plans, the weekly matrix (including impact entries), weekly and monthly reports, tasks assigned by teammates, documents, petty cash, action logs, and more. '
             .'Interpret staff questions and, when you point users to a page, use ONLY the navigation catalog below for menu paths. '
             .$liveDataRules
+            .'When staff ask what to fill in on a weekly plan or weekly report, which sections exist, what a field means, or what is required, use the WEEKLY DOCUMENT FORM REFERENCE below. Do not invent fields. '
             .'Refer to pages by their menu path only. Never include a URL or web link in your answer. '
             .'Keep navigation as a brief pointer, not the main answer. '
             .'Answer in 1 to 3 short, clear paragraphs. Be practical and friendly. '
@@ -220,7 +224,9 @@ class AiAssistService
             .'Do not invent specific numbers, names, approval statuses, or menu paths. '
             .'Do not claim you can see records that were not provided in a LIVE DATA SNAPSHOT. '
             ."\n\n"
-            .$this->getNavigationIntelligence()->formatPromptContext($user);
+            .$this->getNavigationIntelligence()->formatPromptContext($user)
+            ."\n\n"
+            .$this->getFormKnowledge()->formatPromptContext();
     }
 
     private function getNavigationIntelligence(): PortalNavigationIntelligenceService
@@ -231,6 +237,11 @@ class AiAssistService
     private function getContextResolver(): PortalAiContextResolver
     {
         return $this->contextResolver ??= app(PortalAiContextResolver::class);
+    }
+
+    private function getFormKnowledge(): WeeklyDocumentFormKnowledgeService
+    {
+        return $this->formKnowledge ??= app(WeeklyDocumentFormKnowledgeService::class);
     }
 
     /**

@@ -57,4 +57,5 @@
     </div>
 
     @include('documents.partials.weekly-report-action-tasks-modal')
+    @include('documents.partials.deskora-ai-document-context')
 </x-app-layout>

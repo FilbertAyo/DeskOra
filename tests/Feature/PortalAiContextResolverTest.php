@@ -59,6 +59,55 @@ class PortalAiContextResolverTest extends TestCase
         $this->assertTrue($context['has_live_data']);
         $this->assertStringContainsString('Weekly submissions for this user', $context['snapshot']);
         $this->assertStringContainsString('submitted', strtolower($context['snapshot']));
+        $this->assertStringNotContainsString('--- Saved content ---', $context['snapshot']);
+    }
+
+    public function test_content_questions_include_saved_weekly_plan_body(): void
+    {
+        Carbon::setTestNow(Carbon::create(2025, 4, 7, 10, 0, 0));
+        [$nextPeriod] = $this->createCurrentAndNextPeriods();
+        $user = $this->makeUser(['create weekly plan', 'create weekly report']);
+
+        Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $user->id,
+            'title' => 'My plan',
+            'main_target' => 'Finish onboarding docs',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'budget' => [
+                    [
+                        'item' => 'Printing',
+                        'description_purpose' => 'Handouts',
+                        'amount' => '15000',
+                    ],
+                ],
+            ],
+        ]);
+
+        $context = app(PortalAiContextResolver::class)->resolve(
+            $user,
+            'What did I put in my weekly plan budget?'
+        );
+
+        $this->assertTrue($context['has_live_data']);
+        $this->assertStringContainsString('--- Saved content ---', $context['snapshot']);
+        $this->assertStringContainsString('Finish onboarding docs', $context['snapshot']);
+        $this->assertStringContainsString('Printing', $context['snapshot']);
+    }
+
+    public function test_form_structure_question_still_skips_live_data_when_navigation_only(): void
+    {
+        $user = $this->makeUser();
+
+        $context = app(PortalAiContextResolver::class)->resolve(
+            $user,
+            'How do I submit a weekly plan?'
+        );
+
+        $this->assertFalse($context['has_live_data']);
+        $this->assertSame('', $context['snapshot']);
     }
 
     public function test_navigation_documents_question_does_not_load_live_data(): void

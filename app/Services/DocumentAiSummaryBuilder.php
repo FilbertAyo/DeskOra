@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Models\Document;
+use App\Models\User;
 use RuntimeException;
 
 class DocumentAiSummaryBuilder
 {
+    /** @var array<string, string> */
+    private array $userNameCache = [];
+
     public function buildCombined(?Document $plan, ?Document $report): string
     {
         if (! $plan && ! $report) {
@@ -16,7 +20,7 @@ class DocumentAiSummaryBuilder
         $sections = [];
 
         if ($plan) {
-            $plan->loadMissing(['user', 'period']);
+            $plan->loadMissing(['user', 'period', 'sharedUsers:id,name']);
             $sections[] = $this->buildWeeklyPlan($plan);
         } else {
             $sections[] = "=== WEEKLY PLAN ===\nWeekly plan: not submitted or not available.";
@@ -24,7 +28,7 @@ class DocumentAiSummaryBuilder
 
         if ($report) {
             $report->loadMissing(['user', 'period']);
-            $sections[] = $this->buildWeeklyReport($report);
+            $sections[] = $this->buildWeeklyReport($report, $plan);
         } else {
             $sections[] = "=== WEEKLY REPORT ===\nWeekly report: not submitted or not available.";
         }
@@ -37,6 +41,16 @@ class DocumentAiSummaryBuilder
         $content = is_array($document->content) ? $document->content : [];
         $lines = ['=== WEEKLY PLAN ==='];
         $lines = array_merge($lines, $this->headerLines($document, 'Weekly Plan'));
+
+        $collaborators = $document->sharedUsers
+            ?->pluck('name')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->values()
+            ->all() ?? [];
+        if ($collaborators !== []) {
+            $lines[] = 'Collaboration staff: '.implode(', ', $collaborators);
+        }
 
         $mainTarget = trim((string) $document->main_target);
         if ($mainTarget !== '') {
@@ -62,9 +76,17 @@ class DocumentAiSummaryBuilder
                 $day = trim((string) ($row['day'] ?? ''));
                 $location = trim((string) ($row['location'] ?? ''));
                 $notes = trim((string) ($row['notes_inclusion'] ?? ''));
+                $team = $this->resolveUserNames($row['team_member_ids'] ?? []);
+                $carried = filled($row['carry_over_source_weekly_report_id'] ?? null);
                 $label = ($index + 1).'. '.($day !== '' ? $day.' - ' : '').$activity;
+                if ($carried) {
+                    $label .= ' [Carried from previous report]';
+                }
                 if ($location !== '') {
                     $label .= ' (Location: '.$location.')';
+                }
+                if ($team !== []) {
+                    $label .= ' (Team: '.implode(', ', $team).')';
                 }
                 if ($notes !== '') {
                     $label .= ' [Notes: '.$notes.']';
@@ -73,21 +95,26 @@ class DocumentAiSummaryBuilder
             }
         }
 
-        $this->appendMeetings($lines, $content['key_meetings'] ?? []);
-        $this->appendBudget($lines, $content['budget'] ?? []);
+        $this->appendMeetings($lines, $content['key_meetings'] ?? [], includeStatus: false);
+        $this->appendBudget($lines, $content['budget'] ?? [], $document->budget_review_status_label ?? null);
 
         return implode("\n", $lines);
     }
 
-    private function buildWeeklyReport(Document $document): string
+    private function buildWeeklyReport(Document $document, ?Document $relatedPlan = null): string
     {
         $content = is_array($document->content) ? $document->content : [];
         $lines = ['=== WEEKLY REPORT ==='];
         $lines = array_merge($lines, $this->headerLines($document, 'Weekly Report'));
 
-        $status = trim((string) ($content['target_accomplished_status'] ?? ''));
+        $status = trim((string) ($content['target_accomplished_status'] ?? $document->target_accomplished_status ?? ''));
         if ($status !== '') {
             $lines[] = 'Main target status: '.str_replace('_', ' ', $status);
+        }
+
+        $explanation = trim((string) ($content['target_explanation'] ?? $document->target_explanation ?? ''));
+        if ($explanation !== '') {
+            $lines[] = 'Target explanation: '.$explanation;
         }
 
         $summary = trim((string) ($content['summary'] ?? ''));
@@ -102,10 +129,22 @@ class DocumentAiSummaryBuilder
                 if (! is_array($row)) {
                     continue;
                 }
-                $activity = trim((string) ($row['activity_output'] ?? $row['off_plan_activity'] ?? ''));
+
+                $offPlan = trim((string) ($row['off_plan_activity'] ?? ''));
+                $activityOutput = trim((string) ($row['activity_output'] ?? ''));
+                $isOffPlan = $offPlan !== '' || $activityOutput === '__off_plan__';
+
+                if ($isOffPlan) {
+                    $activity = $offPlan !== '' ? $offPlan : 'Off-plan activity (not described)';
+                    $activity = 'Off-plan: '.$activity;
+                } else {
+                    $activity = $activityOutput;
+                }
+
                 if ($activity === '') {
                     continue;
                 }
+
                 $progress = trim((string) ($row['progress'] ?? ''));
                 $remarks = trim((string) ($row['remarks_challenges'] ?? ''));
                 $nextStep = trim((string) ($row['next_step'] ?? ''));
@@ -150,7 +189,24 @@ class DocumentAiSummaryBuilder
             }
         }
 
-        $this->appendMeetings($lines, $content['key_meetings'] ?? []);
+        $this->appendMeetings($lines, $content['key_meetings'] ?? [], includeStatus: true);
+
+        $planForBudget = $relatedPlan;
+        if (! $planForBudget && $document->period_id) {
+            $planForBudget = Document::findWeeklyPlanForPeriodOwner(
+                (string) $document->period_id,
+                (string) $document->user_id
+            );
+        }
+
+        if ($planForBudget) {
+            $planContent = is_array($planForBudget->content) ? $planForBudget->content : [];
+            $this->appendBudget(
+                $lines,
+                $planContent['budget'] ?? [],
+                $planForBudget->budget_review_status_label ?? null
+            );
+        }
 
         return implode("\n", $lines);
     }
@@ -177,7 +233,7 @@ class DocumentAiSummaryBuilder
      * @param  list<string>  $lines
      * @param  mixed  $meetings
      */
-    private function appendMeetings(array &$lines, mixed $meetings): void
+    private function appendMeetings(array &$lines, mixed $meetings, bool $includeStatus = false): void
     {
         if (! is_array($meetings) || $meetings === []) {
             return;
@@ -195,12 +251,20 @@ class DocumentAiSummaryBuilder
             $date = trim((string) ($row['date'] ?? ''));
             $location = trim((string) ($row['location'] ?? ''));
             $notes = trim((string) ($row['reactions_notes'] ?? ''));
+            $status = trim((string) ($row['status'] ?? ''));
+            $participants = $this->resolveUserNames($row['participant_user_ids'] ?? []);
             $label = '- '.$meeting;
             if ($date !== '') {
                 $label .= ' ('.$date.')';
             }
             if ($location !== '') {
                 $label .= ' at '.$location;
+            }
+            if ($participants !== []) {
+                $label .= ' | Participants: '.implode(', ', $participants);
+            }
+            if ($includeStatus && $status !== '') {
+                $label .= ' | Status: '.$status;
             }
             if ($notes !== '') {
                 $label .= ' — '.$notes;
@@ -213,13 +277,18 @@ class DocumentAiSummaryBuilder
      * @param  list<string>  $lines
      * @param  mixed  $budget
      */
-    private function appendBudget(array &$lines, mixed $budget): void
+    private function appendBudget(array &$lines, mixed $budget, ?string $reviewStatus = null): void
     {
         if (! is_array($budget) || $budget === []) {
             return;
         }
 
-        $lines[] = 'Budget items:';
+        $header = 'Budget items:';
+        if (filled($reviewStatus)) {
+            $header .= ' (Review: '.$reviewStatus.')';
+        }
+        $lines[] = $header;
+
         foreach ($budget as $row) {
             if (! is_array($row)) {
                 continue;
@@ -229,7 +298,7 @@ class DocumentAiSummaryBuilder
                 continue;
             }
             $description = trim((string) ($row['description_purpose'] ?? ''));
-            $amount = trim((string) ($row['amount'] ?? ''));
+            $amount = trim((string) ($row['amount'] ?? $row['amount_raw'] ?? ''));
             $label = '- '.$item;
             if ($description !== '') {
                 $label .= ': '.$description;
@@ -239,6 +308,49 @@ class DocumentAiSummaryBuilder
             }
             $lines[] = $label;
         }
+    }
+
+    /**
+     * @param  mixed  $ids
+     * @return list<string>
+     */
+    private function resolveUserNames(mixed $ids): array
+    {
+        if (! is_array($ids) || $ids === []) {
+            return [];
+        }
+
+        $names = [];
+        $missing = [];
+
+        foreach ($ids as $id) {
+            $id = trim((string) $id);
+            if ($id === '') {
+                continue;
+            }
+            if (isset($this->userNameCache[$id])) {
+                $names[] = $this->userNameCache[$id];
+            } else {
+                $missing[] = $id;
+            }
+        }
+
+        if ($missing !== []) {
+            $found = User::query()
+                ->whereIn('id', $missing)
+                ->pluck('name', 'id');
+
+            foreach ($missing as $id) {
+                $name = trim((string) ($found[$id] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $this->userNameCache[$id] = $name;
+                $names[] = $name;
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     private function finalize(array|string $lines): string

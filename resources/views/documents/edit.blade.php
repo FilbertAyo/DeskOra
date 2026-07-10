@@ -48,4 +48,5 @@
 
     @include('documents.partials.edit.scripts')
     @include('documents.partials.edit.styles')
+    @include('documents.partials.deskora-ai-document-context')
 </x-app-layout>

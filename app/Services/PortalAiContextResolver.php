@@ -18,6 +18,7 @@ class PortalAiContextResolver
         private readonly ActionLogProgressService $actionLogProgressService,
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
         private readonly PortalNavigationIntelligenceService $navigationIntelligence,
+        private readonly DocumentAiSummaryBuilder $documentAiSummaryBuilder,
     ) {}
 
     /**
@@ -34,11 +35,12 @@ class PortalAiContextResolver
         }
 
         $domains = $this->detectDomains($user, $question);
+        $includeWeeklyContent = $this->questionNeedsWeeklyDocumentContent($question);
         $sections = [];
 
         foreach ($domains as $domain) {
             $section = match ($domain) {
-                'weekly_submissions' => $this->weeklySubmissionsSection($user),
+                'weekly_submissions' => $this->weeklySubmissionsSection($user, $includeWeeklyContent),
                 'year_plans' => $this->yearPlansSection($user),
                 'weekly_matrix' => $this->weeklyMatrixSection($user),
                 'finance_requests' => $this->financeRequestsSection($user),
@@ -142,13 +144,15 @@ class PortalAiContextResolver
         return array_values(array_unique($domains));
     }
 
-    private function weeklySubmissionsSection(User $user): string
+    private function weeklySubmissionsSection(User $user, bool $includeContent = false): string
     {
         $currentPeriod = $this->workPeriodService->periodForWeeklyReportSubmission();
         $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $deadlines = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
         $lines = ['Weekly submissions for this user:'];
+        $plan = null;
+        $report = null;
 
         if ($nextPeriod) {
             $plan = Document::findWeeklyPlanForPeriodOwner((string) $nextPeriod->id, (string) $user->id);
@@ -194,7 +198,61 @@ class PortalAiContextResolver
             (int) ($pendingDraftCounts[Document::TYPE_MONTHLY_REPORT] ?? 0)
         );
 
+        if ($includeContent && ($plan || $report)) {
+            try {
+                $contentText = $this->documentAiSummaryBuilder->buildCombined($plan, $report);
+                $lines[] = '--- Saved content ---';
+                $lines[] = $contentText;
+            } catch (\RuntimeException) {
+                // No usable content yet — status lines above are enough.
+            }
+        }
+
         return implode("\n", $lines);
+    }
+
+    private function questionNeedsWeeklyDocumentContent(string $question): bool
+    {
+        $normalized = Str::lower(trim($question));
+
+        if ($normalized === '') {
+            return false;
+        }
+
+        $keywords = [
+            'what did i put',
+            'what have i filled',
+            'what did i write',
+            'what\'s in my',
+            'whats in my',
+            'what is in my',
+            'my budget',
+            'my activities',
+            'my main target',
+            'my objective',
+            'my summary',
+            'my achievements',
+            'my challenges',
+            'my meetings',
+            'show my plan',
+            'show my report',
+            'contents of my',
+            'content of my',
+            'filled in',
+            'i wrote',
+            'i put',
+        ];
+
+        foreach ($keywords as $keyword) {
+            if (str_contains($normalized, $keyword)) {
+                return true;
+            }
+        }
+
+        return (bool) preg_match(
+            '/\b(what|which|list|show|tell me)\b.*\b(my|mine)\b.*\b(plan|report|budget|activit|target|objective|meeting|achievement|challenge|summary)\b/',
+            $normalized
+        );
     }
 
     private function yearPlansSection(User $user): string

@@ -176,4 +176,5 @@
         });
     </script>
     @endpush
+    @include('documents.partials.deskora-ai-document-context')
 </x-app-layout>

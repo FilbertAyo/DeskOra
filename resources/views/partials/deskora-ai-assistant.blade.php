@@ -6,6 +6,9 @@
         $documentSummaryLabel = config('ai-assistant.document_summary_label', 'Summarize this weekly submission');
     @endphp
 
+    {{-- Deskora AI first-visit tour (Intro.js) — remove later with the tour script/CSS below --}}
+    <link rel="stylesheet" href="{{ asset('assets/css/plugins/introjs.min.css') }}">
+
     @stack('deskora-ai-context')
 
     <button
@@ -27,7 +30,7 @@
                     <div class="small text-muted" id="deskoraAiMeta"></div>
                 </div>
             </div>
-            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="btn-close text-reset deskora-ai-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column">
             <div id="deskoraAiWelcome" class="deskora-ai-welcome mb-3">
@@ -264,6 +267,41 @@
         .deskora-ai-input-hint {
             max-width: 16rem;
             line-height: 1.35;
+        }
+
+        /* Mandatory Deskora AI tour — hide Skip; stack above FAB/offcanvas */
+        .introjs-skipbutton {
+            display: none !important;
+        }
+
+        body.deskora-ai-tour-active .deskora-ai-fab {
+            z-index: 10000015;
+        }
+
+        body.deskora-ai-tour-panel .deskora-ai-offcanvas.show {
+            z-index: 10000010 !important;
+        }
+
+        body.deskora-ai-tour-panel .offcanvas-backdrop {
+            z-index: 10000005 !important;
+        }
+
+        body.deskora-ai-tour-panel .introjs-overlay {
+            z-index: 10000000 !important;
+        }
+
+        body.deskora-ai-tour-panel .introjs-helperLayer,
+        body.deskora-ai-tour-panel .introjs-disableInteraction {
+            z-index: 10000020 !important;
+        }
+
+        body.deskora-ai-tour-panel .introjs-tooltipReferenceLayer {
+            z-index: 10000030 !important;
+        }
+
+        body.deskora-ai-tour-active .deskora-ai-offcanvas-close {
+            pointer-events: none;
+            opacity: 0.35;
         }
     </style>
 
@@ -548,6 +586,162 @@
                     askQuestion(question);
                 });
             });
+        });
+    </script>
+
+    <script src="{{ asset('assets/js/plugins/intro.min.js') }}"></script>
+    <script>
+        // Temporary mandatory first-visit tour — remove with Intro.js assets/CSS above when retiring
+        document.addEventListener('DOMContentLoaded', function () {
+            const TOUR_STORAGE_KEY = 'deskora_ai_tour_v1';
+            const fabEl = document.querySelector('.deskora-ai-fab');
+            const offcanvasEl = document.getElementById('{{ $offcanvasId }}');
+
+            if (!fabEl || !offcanvasEl || typeof introJs !== 'function') {
+                return;
+            }
+
+            try {
+                if (window.localStorage.getItem(TOUR_STORAGE_KEY) === '1') {
+                    return;
+                }
+            } catch (error) {
+                // If storage is unavailable, still show the tour once this session.
+            }
+
+            if (typeof bootstrap === 'undefined' || !bootstrap.Offcanvas) {
+                return;
+            }
+
+            const suggestionsEl = document.getElementById('deskoraAiSuggestions');
+            const inputEl = document.querySelector('.deskora-ai-input');
+            const closeBtn = offcanvasEl.querySelector('.deskora-ai-offcanvas-close');
+            const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+            const previousBackdrop = offcanvasEl.getAttribute('data-bs-backdrop');
+            const previousKeyboard = offcanvasEl.getAttribute('data-bs-keyboard');
+
+            function setTourPanelMode(active) {
+                document.body.classList.toggle('deskora-ai-tour-panel', active);
+                if (active) {
+                    offcanvasEl.setAttribute('data-bs-backdrop', 'static');
+                    offcanvasEl.setAttribute('data-bs-keyboard', 'false');
+                    if (closeBtn) {
+                        closeBtn.setAttribute('disabled', 'disabled');
+                    }
+                    return;
+                }
+
+                if (previousBackdrop === null) {
+                    offcanvasEl.removeAttribute('data-bs-backdrop');
+                } else {
+                    offcanvasEl.setAttribute('data-bs-backdrop', previousBackdrop);
+                }
+
+                if (previousKeyboard === null) {
+                    offcanvasEl.removeAttribute('data-bs-keyboard');
+                } else {
+                    offcanvasEl.setAttribute('data-bs-keyboard', previousKeyboard);
+                }
+
+                if (closeBtn) {
+                    closeBtn.removeAttribute('disabled');
+                }
+            }
+
+            function stepNeedsPanel(targetElement) {
+                return targetElement === offcanvasEl
+                    || targetElement === suggestionsEl
+                    || targetElement === inputEl;
+            }
+
+            function openTourPanel() {
+                setTourPanelMode(true);
+                if (!offcanvasEl.classList.contains('show')) {
+                    offcanvas.show();
+                }
+            }
+
+            function cleanupTourUi() {
+                document.body.classList.remove('deskora-ai-tour-active');
+                setTourPanelMode(false);
+            }
+
+            const steps = [
+                {
+                    intro: '<strong>Meet Ask Deskora AI</strong><br>This assistant helps you learn how DeskOra works and can answer questions about weekly plans and reports. Please follow each step — you cannot skip this tour.'
+                },
+                {
+                    element: fabEl,
+                    intro: 'Tap this yellow <strong>Ask Deskora AI</strong> button anytime to open the assistant from any page.',
+                    position: 'left'
+                },
+                {
+                    element: offcanvasEl,
+                    intro: 'This is the Deskora AI chat panel. Ask about year plans, the weekly matrix, impacts, weekly and monthly reports, documents, petty cash, action logs, and more.',
+                    position: 'left'
+                },
+                {
+                    element: suggestionsEl,
+                    intro: 'Use these <strong>suggested questions</strong> for a quick start. On weekly plan or report pages, you may also see a summarize option.',
+                    position: 'left'
+                },
+                {
+                    element: inputEl,
+                    intro: 'Type your own question here and press <strong>Ask</strong>. AI answers can be wrong — always verify before taking action.',
+                    position: 'top'
+                }
+            ].filter((step) => !step.element || document.body.contains(step.element));
+
+            document.body.classList.add('deskora-ai-tour-active');
+
+            const tour = introJs()
+                .setOptions({
+                    steps: steps,
+                    nextLabel: 'Next',
+                    prevLabel: 'Back',
+                    doneLabel: 'Done',
+                    skipLabel: '',
+                    showBullets: true,
+                    showButtons: true,
+                    exitOnOverlayClick: false,
+                    exitOnEsc: false,
+                    disableInteraction: true,
+                    scrollToElement: true,
+                    overlayOpacity: 0.55
+                })
+                .onbeforechange(function (targetElement) {
+                    if (stepNeedsPanel(targetElement)) {
+                        openTourPanel();
+                        return;
+                    }
+
+                    setTourPanelMode(false);
+                    if (offcanvasEl.classList.contains('show')) {
+                        offcanvas.hide();
+                    }
+                })
+                .onafterchange(function () {
+                    const introInstance = this;
+                    window.setTimeout(function () {
+                        if (typeof introInstance.refresh === 'function') {
+                            introInstance.refresh();
+                        }
+                    }, 350);
+                })
+                .oncomplete(function () {
+                    try {
+                        window.localStorage.setItem(TOUR_STORAGE_KEY, '1');
+                    } catch (error) {
+                        // Ignore storage failures; tour already finished this visit.
+                    }
+                    cleanupTourUi();
+                })
+                .onexit(function () {
+                    // Do not mark complete on exit — refresh will restart until Done.
+                    cleanupTourUi();
+                });
+
+            tour.start();
         });
     </script>
 @endif
