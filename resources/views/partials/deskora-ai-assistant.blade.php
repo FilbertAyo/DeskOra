@@ -274,6 +274,17 @@
             display: none !important;
         }
 
+        .introjs-tooltip {
+            min-width: min(28rem, calc(100vw - 2rem));
+            max-width: min(36rem, calc(100vw - 2rem));
+            width: min(36rem, calc(100vw - 2rem));
+        }
+
+        .introjs-tooltiptext {
+            font-size: 0.95rem;
+            line-height: 1.55;
+        }
+
         body.deskora-ai-tour-active .deskora-ai-fab {
             z-index: 10000015;
         }
