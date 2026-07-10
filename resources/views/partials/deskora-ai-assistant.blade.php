@@ -691,11 +691,11 @@
 
             const steps = [
                 {
-                    intro: '<strong>Meet Ask Deskora AI</strong><br><br>'
+                    intro: '<strong>Meet Deskora AI</strong><br><br>'
                         + 'Ask Deskora AI is your in-portal assistant. Use it to learn how DeskOra works — including year plans, the weekly matrix, impacts, weekly and monthly reports, documents, petty cash, and action logs.<br><br>'
                         + 'On weekly plan or report pages, it can also <strong>summarize that submission</strong> and answer questions about the plan or report you are viewing.<br><br>'
                         + 'Responses are AI-generated and may be incorrect, so always verify before taking action.<br><br>'
-                        + 'Please follow each step to learn how to use it — you cannot skip this tour.'
+                        + 'Please follow each step to learn how to use it'
                 },
                 {
                     element: fabEl,
