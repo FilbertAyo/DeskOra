@@ -14,14 +14,15 @@ class ActionLogCarryForwardService
     private const PROGRESS_CANCELLED = 'Cancelled';
 
     /**
-     * Collect incomplete tasks from the immediate previous work period only.
+     * Collect incomplete tasks from the latest prior action log (immediate previous week when present,
+     * otherwise the most recent earlier week that has an action log).
      * Deduplicates by normalized task text and merges responsible_user_ids.
      *
      * @return list<array<string, mixed>>
      */
     public function getIncompleteTasksFromPriorPeriods(WorkPeriod $targetPeriod): array
     {
-        $previousLog = $this->getPreviousPeriodActionLogDocument($targetPeriod);
+        $previousLog = $this->getLatestPriorActionLogDocument($targetPeriod);
         if (! $previousLog) {
             return [];
         }
@@ -250,7 +251,7 @@ class ActionLogCarryForwardService
     }
 
     /**
-     * Restore responsible_user_ids from the previous week when empty on current rows.
+     * Restore responsible_user_ids from the latest prior action log when empty on current rows.
      *
      * @param  list<array<string, mixed>>  $tasks
      * @return list<array<string, mixed>>
@@ -287,7 +288,7 @@ class ActionLogCarryForwardService
     public function buildPriorResponsibleMap(WorkPeriod $targetPeriod): array
     {
         $map = [];
-        $previousLog = $this->getPreviousPeriodActionLogDocument($targetPeriod);
+        $previousLog = $this->getLatestPriorActionLogDocument($targetPeriod);
         if (! $previousLog) {
             return $map;
         }
@@ -331,14 +332,32 @@ class ActionLogCarryForwardService
         ))));
     }
 
-    private function getPreviousPeriodActionLogDocument(WorkPeriod $targetPeriod): ?Document
+    /**
+     * Prefer the immediate previous week's action log; if that week was skipped,
+     * fall back to the most recent earlier week that has one.
+     */
+    private function getLatestPriorActionLogDocument(WorkPeriod $targetPeriod): ?Document
     {
         $previousPeriod = $targetPeriod->getPreviousPeriod();
-        if (! $previousPeriod) {
-            return null;
+        if ($previousPeriod) {
+            $immediate = Document::findCanonicalActionLogForPeriod((string) $previousPeriod->id);
+            if ($immediate) {
+                return $immediate;
+            }
         }
 
-        return Document::findCanonicalActionLogForPeriod((string) $previousPeriod->id);
+        $priorLog = ActionLog::query()
+            ->whereNull('action_logs.superseded_by_action_log_id')
+            ->whereNotNull('action_logs.period_id')
+            ->where('action_logs.period_id', '!=', $targetPeriod->id)
+            ->join('work_periods', 'work_periods.id', '=', 'action_logs.period_id')
+            ->whereDate('work_periods.week_start_date', '<', $targetPeriod->week_start_date)
+            ->orderByDesc('work_periods.week_start_date')
+            ->orderByDesc('action_logs.id')
+            ->select('action_logs.*')
+            ->first();
+
+        return $priorLog ? Document::fromDomainId((string) $priorLog->id) : null;
     }
 
     /**

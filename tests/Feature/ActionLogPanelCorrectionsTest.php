@@ -804,7 +804,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->assertSame('Updated task text', $document->content['tasks'][0]['task'] ?? null);
     }
 
-    public function test_carry_forward_only_uses_immediate_previous_week(): void
+    public function test_carry_forward_uses_immediate_previous_week_when_present(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 6, 15, 10, 0, 0));
 
@@ -869,6 +869,48 @@ class ActionLogPanelCorrectionsTest extends TestCase
                     && ! in_array('Stale week 21 task', $texts, true)
                     && ! in_array('Week 23 only task', $texts, true)
                     && ! in_array('Week 24 done task', $texts, true)
+                    && count($texts) === 1;
+            });
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_carry_forward_falls_back_to_latest_prior_week_when_previous_week_missing(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 7, 20, 10, 0, 0)); // Week 30
+
+        try {
+            /** @var User $manager */
+            $manager = User::factory()->create();
+            $manager->givePermissionTo('create action logs');
+
+            $week28 = $this->createOpenPeriod(2026, 28, '2026-07-06', '2026-07-12');
+            $this->createOpenPeriod(2026, 29, '2026-07-13', '2026-07-19'); // no action log
+            $this->createOpenPeriod(2026, 30, '2026-07-20', '2026-07-26');
+
+            Document::create([
+                'user_id' => $manager->id,
+                'period_id' => $week28->id,
+                'type' => Document::TYPE_ACTION_LOG,
+                'title' => 'Action Log - Week 28 of 2026',
+                'state' => Document::STATE_SUBMITTED,
+                'content' => [
+                    'tasks' => [
+                        $this->taskRow('task_w28', 'Week 28 open task', [], 'In Progress'),
+                        $this->taskRow('task_w28_done', 'Week 28 done task', [], 'Done'),
+                    ],
+                ],
+            ]);
+
+            $response = $this->actingAs($manager)->get(route('action-logs.create'));
+
+            $response->assertOk();
+            $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
+                $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
+
+                return in_array('Week 28 open task', $texts, true)
+                    && ! in_array('Week 28 done task', $texts, true)
                     && count($texts) === 1;
             });
         } finally {
