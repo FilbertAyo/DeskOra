@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MeetingMinute;
 use App\Models\WorkPeriod;
+use App\Services\MeetingMinuteNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,10 @@ use Illuminate\Validation\Rule;
 
 class MeetingMinuteController extends Controller
 {
+    public function __construct(
+        private readonly MeetingMinuteNotificationService $meetingMinuteNotificationService,
+    ) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', MeetingMinute::class);
@@ -86,6 +91,11 @@ class MeetingMinuteController extends Controller
             'size' => $file->getSize(),
             'uploaded_by' => $request->user()->id,
         ]);
+
+        $this->meetingMinuteNotificationService->notifyMinutesUploaded(
+            $meetingMinute,
+            $request->user(),
+        );
 
         return redirect()
             ->route('meeting-minutes.show', $meetingMinute)

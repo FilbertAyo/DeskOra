@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\MeetingMinute;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Notifications\MeetingMinutesUploadedNotification;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -119,6 +121,69 @@ class MeetingMinuteTest extends TestCase
             ->assertSessionHasErrors('period_id');
 
         $this->assertSame(1, MeetingMinute::query()->where('period_id', $period->id)->count());
+    }
+
+    public function test_uploading_minutes_notifies_all_active_users_with_open_action(): void
+    {
+        Notification::fake();
+        Storage::fake('public');
+
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active', 'email' => 'manager@test.com']);
+        $manager->givePermissionTo('manage minutes');
+
+        /** @var User $staff */
+        $staff = User::factory()->create(['status' => 'active', 'email' => 'staff@test.com']);
+        $staff->assignRole('staff');
+
+        /** @var User $inactive */
+        $inactive = User::factory()->create(['status' => 'inactive', 'email' => 'inactive@test.com']);
+
+        $period = $this->createPeriod(2026, 10, '2026-03-02', '2026-03-08');
+        $file = UploadedFile::fake()->create('minutes.pdf', 100, 'application/pdf');
+
+        $this->actingAs($manager)->post(route('meeting-minutes.store'), [
+            'period_id' => $period->id,
+            'file' => $file,
+        ])->assertRedirect();
+
+        $minute = MeetingMinute::query()->where('period_id', $period->id)->firstOrFail();
+
+        Notification::assertSentTo($manager, MeetingMinutesUploadedNotification::class);
+        Notification::assertSentTo($staff, MeetingMinutesUploadedNotification::class);
+        Notification::assertNotSentTo($inactive, MeetingMinutesUploadedNotification::class);
+
+        Notification::assertSentTo($staff, MeetingMinutesUploadedNotification::class, function (MeetingMinutesUploadedNotification $notification) use ($staff, $minute): bool {
+            $data = $notification->toArray($staff);
+
+            return ($data['action_url'] ?? null) === route('meeting-minutes.show', $minute)
+                && str_contains((string) ($data['message'] ?? ''), 'Week 10 of 2026');
+        });
+    }
+
+    public function test_updating_minutes_does_not_resend_upload_notifications(): void
+    {
+        Notification::fake();
+        Storage::fake('public');
+
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active', 'email' => 'manager@test.com']);
+        $manager->givePermissionTo('manage minutes');
+
+        User::factory()->create(['status' => 'active', 'email' => 'staff@test.com']);
+
+        $period = $this->createPeriod(2026, 10, '2026-03-02', '2026-03-08');
+        $minute = $this->createMinuteForPeriod($period, $manager);
+
+        Notification::fake();
+
+        $newFile = UploadedFile::fake()->create('updated-minutes.pdf', 120, 'application/pdf');
+
+        $this->actingAs($manager)->put(route('meeting-minutes.update', $minute), [
+            'file' => $newFile,
+        ])->assertRedirect();
+
+        Notification::assertNothingSent();
     }
 
     public function test_view_route_returns_inline_pdf_and_download_returns_attachment(): void
