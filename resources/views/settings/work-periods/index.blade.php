@@ -69,45 +69,7 @@
     </div>
     @endif
 
-    <!-- Filters -->
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card shadow-none border">
-                <div class="card-body">
-                    <form method="GET" action="{{ route('work-periods.index') }}" class="row g-3">
-                        <div class="col-md-4">
-                            <label for="year" class="form-label">Filter by Year</label>
-                            <select name="year" id="year" class="form-control">
-                                <option value="">All Years</option>
-                                @foreach($years as $year)
-                                    <option value="{{ $year }}" {{ request('year') == $year ? 'selected' : '' }}>
-                                        {{ $year }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="status" class="form-label">Filter by Status</label>
-                            <select name="status" id="status" class="form-control">
-                                <option value="">All Statuses</option>
-                                <option value="open" {{ request('status') == 'open' ? 'selected' : '' }}>Open</option>
-                                <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>Closed</option>
-                                <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>Archived</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary me-2">
-                                <i class="ti ti-filter me-1"></i> Filter
-                            </button>
-                            <a href="{{ route('work-periods.index') }}" class="btn btn-light">
-                                <i class="ti ti-x me-1"></i> Clear
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+  
 
     <!-- Work Periods Table -->
     <div class="row">
@@ -119,7 +81,7 @@
                 <div class="card-body">
                     @if($periods->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover table-bordered table-striped">
+                            <table class="table table-hover table-bordered">
                                 <thead class="thead-light">
                                     <tr>
                                         <th class="text-center" style="width: 45px;">
