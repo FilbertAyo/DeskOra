@@ -28,7 +28,7 @@ class WeeklySubmissionWindowService
         $next = $this->workPeriods->periodForWeeklyPlanSubmission();
 
         $candidates = $this->planCandidatePeriods($current, $next);
-        if ($preferredPeriod && $preferredPeriod->isOpen()) {
+        if ($preferredPeriod && ($preferredPeriod->isOpen() || $preferredPeriod->isPlanGracePeriodActive())) {
             $candidates = $this->mergeUniquePeriods(
                 collect([$preferredPeriod]),
                 $candidates->all(),
@@ -46,7 +46,7 @@ class WeeklySubmissionWindowService
 
         $current = $this->workPeriods->periodForWeeklyReportSubmission();
 
-        $candidates = $preferredPeriod && $preferredPeriod->isOpen()
+        $candidates = $preferredPeriod && ($preferredPeriod->isOpen() || $preferredPeriod->isReportGracePeriodActive())
             ? collect([$preferredPeriod])
             : $this->reportCandidatePeriods($current);
 

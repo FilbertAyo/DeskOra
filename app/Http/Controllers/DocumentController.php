@@ -248,9 +248,9 @@ class DocumentController extends Controller
 
         if ($selectedType) {
             if ($selectedType === Document::TYPE_WEEKLY_PLAN) {
-                // For weekly plan, default to explicit period when its submission window is open; otherwise next week.
+                // Honor explicit period when open or in plan grace; otherwise next week.
                 $targetPlanPeriod = $nextPeriod;
-                if ($requestedPeriod && $requestedPeriod->isOpen()) {
+                if ($requestedPeriod && ($requestedPeriod->isOpen() || $requestedPeriod->isPlanGracePeriodActive())) {
                     $targetPlanPeriod = $requestedPeriod;
                 }
                 $defaultPeriodId = $targetPlanPeriod?->id;
@@ -261,9 +261,11 @@ class DocumentController extends Controller
                     }
                 }
             } elseif ($selectedType === Document::TYPE_WEEKLY_REPORT) {
-                // For weekly report, default to explicit period when its submission window is open; otherwise current week.
+                // Honor explicit period when open or in report grace; otherwise current week.
+                // Without grace, a closed prior week (e.g. 29) falls through to the current week
+                // and incorrectly loads that week's plan for main goal/activities.
                 $targetReportPeriod = $currentPeriod;
-                if ($requestedPeriod && $requestedPeriod->isOpen()) {
+                if ($requestedPeriod && ($requestedPeriod->isOpen() || $requestedPeriod->isReportGracePeriodActive())) {
                     $targetReportPeriod = $requestedPeriod;
                 }
                 $defaultPeriodId = $targetReportPeriod?->id;
