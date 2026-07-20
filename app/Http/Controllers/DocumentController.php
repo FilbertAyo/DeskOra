@@ -1937,7 +1937,7 @@ class DocumentController extends Controller
         // the deadline reminder is no longer relevant and should be hidden.
         $weeklyPlanAlreadySubmitted = false;
         if ($planDeadlinePeriod) {
-            $existingPlan = Document::findWeeklyPlanForPeriodOwner((string) $planDeadlinePeriod->id, (string) $user->id);
+            $existingPlan = Document::findWeeklyPlanForUserAndPeriod((string) $planDeadlinePeriod->id, (string) $user->id);
             $weeklyPlanAlreadySubmitted = $existingPlan?->isSubmitted() ?? false;
         }
 
@@ -2099,7 +2099,7 @@ class DocumentController extends Controller
         $reportDeadlinePeriod = $weeklyReportSlot->period ?? $currentPeriod;
         $weeklyReportAlreadySubmitted = false;
         if ($reportDeadlinePeriod) {
-            $existingReport = Document::findWeeklyReportForPeriodOwner((string) $reportDeadlinePeriod->id, (string) $user->id);
+            $existingReport = Document::findWeeklyReportForUserAndPeriod((string) $reportDeadlinePeriod->id, (string) $user->id);
             $weeklyReportAlreadySubmitted = $existingReport?->isSubmitted() ?? false;
         }
 

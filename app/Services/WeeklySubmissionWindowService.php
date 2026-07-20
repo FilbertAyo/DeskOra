@@ -204,7 +204,7 @@ class WeeklySubmissionWindowService
             return $this->emptySlot();
         }
 
-        $document = Document::findWeeklyPlanForPeriodOwner((string) $period->id, (string) $user->id);
+        $document = Document::findWeeklyPlanForUserAndPeriod((string) $period->id, (string) $user->id);
         if ($document?->isSubmitted()) {
             return $this->emptySlot();
         }
@@ -223,7 +223,7 @@ class WeeklySubmissionWindowService
             return $this->emptySlot();
         }
 
-        $document = Document::findWeeklyReportForPeriodOwner((string) $period->id, (string) $user->id);
+        $document = Document::findWeeklyReportForUserAndPeriod((string) $period->id, (string) $user->id);
         if ($document?->isSubmitted()) {
             return $this->emptySlot();
         }

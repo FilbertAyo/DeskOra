@@ -132,4 +132,101 @@ class WeeklyReportGracePeriodCreateTest extends TestCase
         $response->assertDontSee('Week 30 activity only', false);
         $response->assertSee('value="'.$week29->id.'"', false);
     }
+
+    public function test_shared_plan_collaborator_does_not_see_report_grace_when_group_report_submitted(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 7, 20, 10, 0, 0)); // Week 30
+
+        $week29 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 29,
+            'week_start_date' => '2026-07-13',
+            'week_end_date' => '2026-07-19',
+            'plan_deadline' => '2026-07-11',
+            'report_deadline' => '2026-07-22',
+            'status' => WorkPeriod::STATUS_CLOSED,
+        ]);
+
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 30,
+            'week_start_date' => '2026-07-20',
+            'week_end_date' => '2026-07-26',
+            'plan_deadline' => '2026-07-22',
+            'report_deadline' => '2026-07-25',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $owner = User::factory()->create(['status' => 'active']);
+        $owner->givePermissionTo(['create weekly plan', 'create weekly report']);
+
+        $collaborator = User::factory()->create(['status' => 'active']);
+        $collaborator->givePermissionTo(['create weekly plan', 'create weekly report']);
+
+        $plan = Document::create([
+            'user_id' => $owner->id,
+            'period_id' => $week29->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Shared week 29 plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Shared target',
+            'content' => ['planned_activities' => []],
+        ]);
+        $plan->sharedUsers()->sync([$collaborator->id]);
+
+        $report = Document::create([
+            'user_id' => $owner->id,
+            'period_id' => $week29->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Shared week 29 report',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [],
+        ]);
+        $report->sharedUsers()->sync([$collaborator->id]);
+
+        $windows = app(WeeklySubmissionWindowService::class);
+
+        $this->assertFalse($windows->graceReportEntries($collaborator)->isNotEmpty());
+        $this->assertFalse($windows->reportSlotForPeriod($collaborator, $week29->fresh())->showAction());
+        $this->assertFalse($windows->resolveReportSlot($collaborator, $week29->fresh())->showAction());
+    }
+
+    public function test_shared_plan_collaborator_does_not_see_plan_grace_when_group_plan_submitted(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 7, 20, 10, 0, 0)); // Week 30
+
+        $week30 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 30,
+            'week_start_date' => '2026-07-20',
+            'week_end_date' => '2026-07-26',
+            'plan_deadline' => '2026-07-22',
+            'report_deadline' => '2026-07-25',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $this->assertTrue($week30->fresh()->isPlanGracePeriodActive());
+
+        $owner = User::factory()->create(['status' => 'active']);
+        $owner->givePermissionTo('create weekly plan');
+
+        $collaborator = User::factory()->create(['status' => 'active']);
+        $collaborator->givePermissionTo('create weekly plan');
+
+        $plan = Document::create([
+            'user_id' => $owner->id,
+            'period_id' => $week30->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Shared week 30 plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Shared target',
+            'content' => ['planned_activities' => []],
+        ]);
+        $plan->sharedUsers()->sync([$collaborator->id]);
+
+        $windows = app(WeeklySubmissionWindowService::class);
+
+        $this->assertFalse($windows->gracePlanEntries($collaborator)->isNotEmpty());
+        $this->assertFalse($windows->planSlotForPeriod($collaborator, $week30->fresh())->showAction());
+    }
 }

@@ -490,6 +490,66 @@ class Document extends Model
             ->first();
     }
 
+    /**
+     * Weekly report for the same period that the user owns, is shared on, or is covered by a shared plan group.
+     */
+    public static function findWeeklyReportForUserAndPeriod(string $periodId, string $userId): ?Document
+    {
+        $ownedReport = WeeklyReport::query()
+            ->where('period_id', $periodId)
+            ->where('user_id', $userId)
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+
+        if ($ownedReport) {
+            return self::fromWeeklyReportModel($ownedReport);
+        }
+
+        $sharedReportId = DB::table('document_user_shares')
+            ->join('weekly_reports', 'weekly_reports.id', '=', 'document_user_shares.weekly_report_id')
+            ->where('document_user_shares.user_id', $userId)
+            ->where('weekly_reports.period_id', $periodId)
+            ->orderByDesc('weekly_reports.id')
+            ->value('weekly_reports.id');
+
+        if ($sharedReportId) {
+            $sharedReport = WeeklyReport::query()->find($sharedReportId);
+            if ($sharedReport) {
+                return self::fromWeeklyReportModel($sharedReport);
+            }
+        }
+
+        $plan = self::findWeeklyPlanForUserAndPeriod($periodId, $userId);
+        if ($plan) {
+            $plan->loadMissing('sharedUsers:id');
+            foreach ($plan->allEditableUserIds() as $participantId) {
+                if ((string) $participantId === (string) $userId) {
+                    continue;
+                }
+
+                $groupReport = WeeklyReport::query()
+                    ->where('period_id', $periodId)
+                    ->where('user_id', $participantId)
+                    ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
+                    ->latest('id')
+                    ->first();
+
+                if ($groupReport) {
+                    return self::fromWeeklyReportModel($groupReport);
+                }
+            }
+        }
+
+        return static::query()
+            ->forOwnerOrSharedUser($userId)
+            ->where('period_id', $periodId)
+            ->ofType(self::TYPE_WEEKLY_REPORT)
+            ->orderByRaw(self::submittedOrderByExpression(), [self::STATE_SUBMITTED])
+            ->latest('id')
+            ->first();
+    }
+
     public function resolveRouteBinding($value, $field = null)
     {
         $field = $field ?? $this->getRouteKeyName();
