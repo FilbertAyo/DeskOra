@@ -64,6 +64,10 @@
 
     @include('layouts.footer')
 
+    @if(Auth::check() && Auth::user()->status === 'active')
+        @include('partials.anonymous-feedback-fab')
+    @endif
+
     @if(config('services.groq.api_key') && Auth::check() && Auth::user()->status === 'active')
         @include('partials.deskora-ai-assistant')
     @endif

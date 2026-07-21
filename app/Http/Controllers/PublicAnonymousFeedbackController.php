@@ -6,6 +6,7 @@ use App\Http\Requests\StorePublicAnonymousFeedbackRequest;
 use App\Models\AnonymousFeedback;
 use App\Services\AnonymousFeedbackNotificationService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
@@ -34,6 +35,8 @@ class PublicAnonymousFeedbackController extends Controller
             'body' => $request->validated('body'),
             'status' => AnonymousFeedback::STATUS_NEW,
         ]);
+
+        Cache::forget('anonymous-feedback-new-count');
 
         try {
             $this->notificationService->notifySubmitted($feedback);

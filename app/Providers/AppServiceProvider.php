@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Data\WeeklySubmissionReminder;
 use App\Database\DocumentsUnionView;
+use App\Models\AnonymousFeedback;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
 use App\Services\RequestApprovalNavService;
@@ -71,6 +72,19 @@ class AppServiceProvider extends ServiceProvider
                 });
             }
 
+            $newAnonymousFeedbackCount = 0;
+            if (
+                Auth::check()
+                && Auth::user()->can('manage anonymous feedback')
+                && Schema::hasTable('anonymous_feedback')
+            ) {
+                $newAnonymousFeedbackCount = (int) Cache::remember(
+                    'anonymous-feedback-new-count',
+                    now()->addSeconds(45),
+                    fn () => AnonymousFeedback::query()->new()->count()
+                );
+            }
+
             $view->with([
                 'approvalsReviewCount' => $approvalsReviewCount,
                 'approvalsApproveCount' => $approvalsApproveCount,
@@ -78,6 +92,7 @@ class AppServiceProvider extends ServiceProvider
                 'approvalsTotalCount' => $approvalsTotalCount,
                 'processingPettiesCount' => $processingCount,
                 'approvedPettiesCount' => $approvedCount,
+                'newAnonymousFeedbackCount' => $newAnonymousFeedbackCount,
             ]);
         });
 

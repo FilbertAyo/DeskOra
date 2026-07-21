@@ -8,6 +8,7 @@ use Endroid\QrCode\Writer\PngWriter;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
@@ -72,6 +73,8 @@ class ManageAnonymousFeedbackController extends Controller
         ]);
 
         $anonymous_feedback->update(['status' => $validated['status']]);
+
+        Cache::forget('anonymous-feedback-new-count');
 
         return redirect()
             ->back()
