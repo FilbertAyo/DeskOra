@@ -126,14 +126,6 @@
     data-bs-target="#anonymousFeedbackModal{{ $row->id }}">
     <i class="ti ti-eye me-2"></i> View
     </button>
-    <form action="{{ route('anonymous-feedback.destroy', $row) }}" method="POST"
-    onsubmit="return confirm('Delete this feedback entry? This cannot be undone.');">
-    @csrf
-    @method('DELETE')
-    <button type="submit" class="dropdown-item text-danger">
-    <i class="ti ti-trash me-2"></i> Delete
-    </button>
-    </form>
 </x-table-action-dropdown>
                                         </td>
                                     </tr>

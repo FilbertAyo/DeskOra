@@ -313,7 +313,6 @@ Route::middleware(['auth', 'permission:manage anonymous feedback'])->group(funct
     Route::get('/settings/anonymous-feedback', [ManageAnonymousFeedbackController::class, 'index'])->name('anonymous-feedback.index');
     Route::get('/settings/anonymous-feedback/qr.png', [ManageAnonymousFeedbackController::class, 'downloadQr'])->name('anonymous-feedback.qr-download');
     Route::patch('/settings/anonymous-feedback/{anonymous_feedback}', [ManageAnonymousFeedbackController::class, 'update'])->name('anonymous-feedback.update');
-    Route::delete('/settings/anonymous-feedback/{anonymous_feedback}', [ManageAnonymousFeedbackController::class, 'destroy'])->name('anonymous-feedback.destroy');
 });
 
 Route::middleware(['auth', 'permission:view activity log'])->group(function () {
