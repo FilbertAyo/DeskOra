@@ -64,7 +64,7 @@ class AnonymousFeedbackTest extends TestCase
         ]);
     }
 
-    public function test_submission_notifies_managers_with_email_preference(): void
+    public function test_submission_notifies_managers_regardless_of_channel_preference(): void
     {
         Notification::fake();
 
@@ -97,7 +97,29 @@ class AnonymousFeedbackTest extends TestCase
 
         Notification::assertSentTo($managerEmail, AnonymousFeedbackSubmittedNotification::class);
         Notification::assertSentTo($managerBoth, AnonymousFeedbackSubmittedNotification::class);
-        Notification::assertNotSentTo($managerSmsOnly, AnonymousFeedbackSubmittedNotification::class);
+        Notification::assertSentTo($managerSmsOnly, AnonymousFeedbackSubmittedNotification::class);
+    }
+
+    public function test_submission_notifies_configured_extra_emails(): void
+    {
+        Notification::fake();
+
+        config(['anonymous_feedback.notify_emails' => ['backup-manager@example.com']]);
+
+        $response = $this->post('/feedback/'.$this->token, [
+            'category' => AnonymousFeedback::CATEGORY_SUGGESTION,
+            'body' => 'Please add more meeting rooms.',
+        ]);
+
+        $response->assertRedirect(route('anonymous-feedback.form', ['token' => $this->token]));
+
+        Notification::assertSentOnDemand(
+            AnonymousFeedbackSubmittedNotification::class,
+            function ($notification, $channels, $notifiable) {
+                return in_array('mail', $channels, true)
+                    && ($notifiable->routes['mail'] ?? null) === 'backup-manager@example.com';
+            }
+        );
     }
 
     public function test_submission_does_not_notify_users_without_permission(): void

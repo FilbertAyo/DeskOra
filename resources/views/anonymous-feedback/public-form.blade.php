@@ -24,7 +24,7 @@
                                 </div>
                             @endif
 
-                            <form method="POST" action="{{ route('anonymous-feedback.store', ['token' => request()->route('token')]) }}" class="pt-1">
+                            <form method="POST" action="{{ route('anonymous-feedback.store', ['token' => request()->route('token')]) }}" class="pt-1" id="anonymous-feedback-form">
                                 @csrf
 
                                 <div class="mb-3" style="position: absolute; left: -9999px;" aria-hidden="true">
@@ -62,7 +62,9 @@
                                 </div>
 
                                 <div class="d-grid">
-                                    <button type="submit" class="btn btn-primary">Submit anonymously</button>
+                                    <button type="submit" class="btn btn-primary" id="anonymous-feedback-submit">
+                                        Submit anonymously
+                                    </button>
                                 </div>
                             </form>
                         </div>
@@ -72,4 +74,28 @@
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('anonymous-feedback-form');
+            const submitBtn = document.getElementById('anonymous-feedback-submit');
+            if (!form || !submitBtn) {
+                return;
+            }
+
+            let isSubmitting = false;
+
+            form.addEventListener('submit', function (event) {
+                if (isSubmitting) {
+                    event.preventDefault();
+                    return;
+                }
+
+                isSubmitting = true;
+                submitBtn.disabled = true;
+                submitBtn.setAttribute('aria-busy', 'true');
+                submitBtn.textContent = 'Submitting...';
+            });
+        })();
+    </script>
 </x-guest-layout>

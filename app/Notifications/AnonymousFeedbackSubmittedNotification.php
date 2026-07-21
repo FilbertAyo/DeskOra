@@ -25,10 +25,12 @@ class AnonymousFeedbackSubmittedNotification extends Notification
     {
         $categoryLabel = str_replace('_', ' ', ucfirst($this->feedback->category));
         $preview = Str::limit($this->feedback->body, 200);
+        $name = trim((string) ($notifiable->name ?? ''));
+        $greeting = $name !== '' ? 'Hello '.$name.',' : 'Hello,';
 
         return (new MailMessage)
             ->subject('New anonymous feedback received')
-            ->greeting('Hello '.$notifiable->name.',')
+            ->greeting($greeting)
             ->line('A new anonymous message has been submitted.')
             ->line('Type: '.$categoryLabel)
             ->line('Status: New')
