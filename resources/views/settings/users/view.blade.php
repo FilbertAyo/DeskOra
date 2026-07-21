@@ -29,6 +29,29 @@
         </div>
     </div>
 
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>{{ $errors->first() }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @php
+        $notificationChannel = $user->notification_channel ?: 'sms';
+        $notificationChannelLabel = match ($notificationChannel) {
+            'email' => 'Email',
+            'both' => 'Email & SMS',
+            default => 'SMS',
+        };
+    @endphp
+
     <div class="tab-content" id="myTabContent">
         <!-- Profile Tab -->
         <div class="tab-pane fade show active" id="profile" role="tabpanel" aria-labelledby="profile-tab">
@@ -200,9 +223,51 @@
                                         @endif
                                     </div>
                                 </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="text-muted small mb-1">Notification Channel</label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-light-info border border-info">
+                                            <i class="ti ti-bell me-1"></i>{{ $notificationChannelLabel }}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    @can('users management settings')
+                        <div class="card shadow-none border mb-4">
+                            <div class="card-header bg-white border-bottom">
+                                <h5 class="mb-0"><i class="ti ti-bell me-2"></i>Notification Channel</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">
+                                    Choose how this user receives workflow alerts (SMS, email, or both).
+                                </p>
+                                <form method="POST" action="{{ route('admin.notification-channel.update', $user) }}" class="row g-3 align-items-end">
+                                    @csrf
+                                    @method('PATCH')
+                                    <div class="col-md-8">
+                                        <label for="notification_channel" class="form-label">Channel</label>
+                                        <select name="notification_channel" id="notification_channel" class="form-select @error('notification_channel') is-invalid @enderror" required>
+                                            @php($currentChannel = old('notification_channel', $notificationChannel))
+                                            <option value="sms" @selected($currentChannel === 'sms')>SMS (default)</option>
+                                            <option value="email" @selected($currentChannel === 'email')>Email</option>
+                                            <option value="both" @selected($currentChannel === 'both')>Email &amp; SMS</option>
+                                        </select>
+                                        @error('notification_channel')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="ti ti-device-floppy me-1"></i> Save channel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    @endcan
 
       
                     <!-- Current Permissions Summary -->

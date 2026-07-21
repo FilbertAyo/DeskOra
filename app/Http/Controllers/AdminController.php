@@ -141,6 +141,7 @@ class AdminController extends Controller
             'is_department_head' => ['nullable', 'boolean'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
+            'notification_channel' => ['required', Rule::in(['sms', 'email', 'both'])],
         ]);
 
         $subDepartmentIds = array_values(array_unique($validated['sub_department_ids'] ?? []));
@@ -169,6 +170,7 @@ class AdminController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'department_id' => $validated['department_id'] ?? null,
+            'notification_channel' => $validated['notification_channel'],
         ]);
 
         $user->subDepartments()->sync($subDepartmentIds);
@@ -185,6 +187,23 @@ class AdminController extends Controller
         );
 
         return redirect()->back()->with('success', 'User updated successfully');
+    }
+
+    public function updateNotificationChannel(Request $request, User $user)
+    {
+        abort_unless($request->user()?->can('users management settings'), 403);
+
+        $validated = $request->validate([
+            'notification_channel' => ['required', Rule::in(['sms', 'email', 'both'])],
+        ]);
+
+        $user->update([
+            'notification_channel' => $validated['notification_channel'],
+        ]);
+
+        return redirect()
+            ->back()
+            ->with('success', 'Notification channel updated.');
     }
 
     public function destroy(User $admin)

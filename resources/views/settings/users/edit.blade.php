@@ -259,6 +259,33 @@
                                 </div>
                             </div>
 
+                            <!-- Notification Channel -->
+                            <div class="col-md-6 col-lg-6 mb-3">
+                                <div class="form-group">
+                                    <label for="notification_channel" class="form-label">
+                                        Notification Channel
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="ti ti-bell"></i>
+                                        </span>
+                                        <select class="form-control @error('notification_channel') is-invalid @enderror"
+                                            name="notification_channel"
+                                            id="notification_channel"
+                                            required>
+                                            @php($currentChannel = old('notification_channel', $user->notification_channel ?? 'sms'))
+                                            <option value="sms" {{ $currentChannel === 'sms' ? 'selected' : '' }}>SMS (default)</option>
+                                            <option value="email" {{ $currentChannel === 'email' ? 'selected' : '' }}>Email</option>
+                                            <option value="both" {{ $currentChannel === 'both' ? 'selected' : '' }}>Email &amp; SMS</option>
+                                        </select>
+                                    </div>
+                                    @error('notification_channel')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                    <small class="form-text text-muted">How this user receives workflow alerts.</small>
+                                </div>
+                            </div>
+
                         
                             <!-- Last Modified Info -->
                             <div class="col-12">
