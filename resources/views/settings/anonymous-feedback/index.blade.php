@@ -89,7 +89,6 @@
                             <thead class="thead-light">
                                 <tr>
                                     <th class="text-center" style="width: 56px;">#</th>
-                                    <th style="width: 140px;">Received</th>
                                     <th style="width: 120px;">Type</th>
                                     <th>Message</th>
                                     <th style="width: 130px;">Status</th>
@@ -110,7 +109,6 @@
                                     @endphp
                                     <tr>
                                         <td class="text-center text-muted small">{{ $rowNum }}</td>
-                                        <td class="text-muted small">{{ $row->created_at->format('Y-m-d H:i') }}</td>
                                         <td class="small">{{ str_replace('_', ' ', ucfirst($row->category)) }}</td>
                                         <td>
                                             <div class="small text-truncate" style="max-width: 360px;">
@@ -133,7 +131,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center py-4">
+                                        <td colspan="5" class="text-center py-4">
                                             <i class="ti ti-mail-opened fs-1 text-muted"></i>
                                             <p class="text-muted mb-0">No messages yet.</p>
                                         </td>
@@ -162,7 +160,7 @@
                         <div class="modal-header">
                             <div>
                                 <h5 class="modal-title" id="anonymousFeedbackModalLabel{{ $row->id }}">Anonymous feedback</h5>
-                                <p class="text-muted small mb-0">Entry #{{ $row->id }} · {{ $row->created_at->format('Y-m-d H:i') }}</p>
+                                <p class="text-muted small mb-0">Entry #{{ $row->id }}</p>
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>

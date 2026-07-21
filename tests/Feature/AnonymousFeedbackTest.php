@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AnonymousFeedback;
 use App\Models\User;
+use App\Notifications\AnonymousFeedbackSubmittedNotification;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -60,6 +62,63 @@ class AnonymousFeedbackTest extends TestCase
             'body' => 'More tea in the kitchen please.',
             'status' => AnonymousFeedback::STATUS_NEW,
         ]);
+    }
+
+    public function test_submission_notifies_managers_with_email_preference(): void
+    {
+        Notification::fake();
+
+        Permission::findOrCreate('manage anonymous feedback');
+
+        $managerEmail = User::factory()->create([
+            'status' => 'active',
+            'notification_channel' => 'email',
+        ]);
+        $managerEmail->givePermissionTo('manage anonymous feedback');
+
+        $managerBoth = User::factory()->create([
+            'status' => 'active',
+            'notification_channel' => 'both',
+        ]);
+        $managerBoth->givePermissionTo('manage anonymous feedback');
+
+        $managerSmsOnly = User::factory()->create([
+            'status' => 'active',
+            'notification_channel' => 'sms',
+        ]);
+        $managerSmsOnly->givePermissionTo('manage anonymous feedback');
+
+        $response = $this->post('/feedback/'.$this->token, [
+            'category' => AnonymousFeedback::CATEGORY_COMPLAINT,
+            'body' => 'The office heater is not working.',
+        ]);
+
+        $response->assertRedirect(route('anonymous-feedback.form', ['token' => $this->token]));
+
+        Notification::assertSentTo($managerEmail, AnonymousFeedbackSubmittedNotification::class);
+        Notification::assertSentTo($managerBoth, AnonymousFeedbackSubmittedNotification::class);
+        Notification::assertNotSentTo($managerSmsOnly, AnonymousFeedbackSubmittedNotification::class);
+    }
+
+    public function test_submission_does_not_notify_users_without_permission(): void
+    {
+        Notification::fake();
+
+        Permission::findOrCreate('manage anonymous feedback');
+
+        $otherUser = User::factory()->create([
+            'status' => 'active',
+            'notification_channel' => 'email',
+        ]);
+
+        $response = $this->post('/feedback/'.$this->token, [
+            'category' => AnonymousFeedback::CATEGORY_OTHER,
+            'body' => 'General feedback.',
+        ]);
+
+        $response->assertRedirect(route('anonymous-feedback.form', ['token' => $this->token]));
+
+        Notification::assertNothingSent();
     }
 
     public function test_honeypot_rejects_submission(): void

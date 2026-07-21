@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePublicAnonymousFeedbackRequest;
 use App\Models\AnonymousFeedback;
+use App\Services\AnonymousFeedbackNotificationService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class PublicAnonymousFeedbackController extends Controller
 {
+    public function __construct(
+        private readonly AnonymousFeedbackNotificationService $notificationService,
+    ) {}
+
     public function create(): View
     {
         return view('anonymous-feedback.public-form', [
@@ -23,11 +29,20 @@ class PublicAnonymousFeedbackController extends Controller
 
     public function store(StorePublicAnonymousFeedbackRequest $request): RedirectResponse
     {
-        AnonymousFeedback::query()->create([
+        $feedback = AnonymousFeedback::query()->create([
             'category' => $request->validated('category'),
             'body' => $request->validated('body'),
             'status' => AnonymousFeedback::STATUS_NEW,
         ]);
+
+        try {
+            $this->notificationService->notifySubmitted($feedback);
+        } catch (\Throwable $e) {
+            Log::error('PublicAnonymousFeedbackController: failed to notify managers', [
+                'feedback_id' => $feedback->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()
             ->route('anonymous-feedback.form', ['token' => config('anonymous_feedback.public_token')])

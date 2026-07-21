@@ -15,4 +15,18 @@ return [
 
     'public_token' => env('ANONYMOUS_FEEDBACK_PUBLIC_TOKEN', ''),
 
+  /*
+    |--------------------------------------------------------------------------
+    | Submission notifications
+    |--------------------------------------------------------------------------
+    |
+    | Active users with this permission and email notifications enabled receive
+    | an email when anonymous feedback is submitted.
+    |
+    */
+
+    'notify_permission' => 'manage anonymous feedback',
+
+    'log_missing_recipients' => true,
+
 ];
