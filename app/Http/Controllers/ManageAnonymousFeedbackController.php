@@ -77,4 +77,15 @@ class ManageAnonymousFeedbackController extends Controller
             ->back()
             ->with('success', 'Status updated.');
     }
+
+    public function destroy(AnonymousFeedback $anonymous_feedback): RedirectResponse
+    {
+        $this->authorize('delete', $anonymous_feedback);
+
+        $anonymous_feedback->delete();
+
+        return redirect()
+            ->back()
+            ->with('success', 'Feedback entry deleted.');
+    }
 }

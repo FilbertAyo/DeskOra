@@ -172,4 +172,39 @@ class AnonymousFeedbackTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_staff_can_delete_feedback(): void
+    {
+        Permission::findOrCreate('manage anonymous feedback');
+        $user = User::factory()->create();
+        $user->givePermissionTo('manage anonymous feedback');
+
+        $row = AnonymousFeedback::query()->create([
+            'category' => AnonymousFeedback::CATEGORY_COMPLAINT,
+            'body' => 'Test entry to remove',
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('anonymous-feedback.destroy', $row));
+
+        $response->assertRedirect();
+        $this->assertDatabaseMissing('anonymous_feedback', ['id' => $row->id]);
+    }
+
+    public function test_user_without_permission_cannot_delete_feedback(): void
+    {
+        Permission::findOrCreate('manage anonymous feedback');
+        $user = User::factory()->create();
+
+        $row = AnonymousFeedback::query()->create([
+            'category' => AnonymousFeedback::CATEGORY_COMPLAINT,
+            'body' => 'Test',
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('anonymous-feedback.destroy', $row));
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('anonymous_feedback', ['id' => $row->id]);
+    }
 }

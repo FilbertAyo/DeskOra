@@ -21,4 +21,9 @@ class AnonymousFeedbackPolicy
     {
         return $user->can('manage anonymous feedback');
     }
+
+    public function delete(User $user, AnonymousFeedback $anonymousFeedback): bool
+    {
+        return $user->can('manage anonymous feedback');
+    }
 }
