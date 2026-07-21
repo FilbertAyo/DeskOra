@@ -272,28 +272,6 @@
                 </div>
             @endif
 
-            @if($collaborationEvents->isNotEmpty())
-                <div class="card shadow-none border mt-3">
-                    <div class="card-body">
-                        <p class="fw-semibold mb-2"><i class="ti ti-users-group me-1"></i>Recent collaboration updates</p>
-                        @foreach($collaborationEvents as $event)
-                            <div class="d-flex align-items-start gap-2 mb-2">
-                                <span class="badge {{ $event['badge_class'] ?? 'bg-light' }} align-self-center">{{ $event['badge_label'] ?? '' }}</span>
-                                <div class="flex-grow-1 min-w-0">
-                                    @if(!empty($event['document_id']))
-                                        <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
-                                            {{ $event['message'] }}
-                                        </a>
-                                    @else
-                                        <span class="small d-block">{{ $event['message'] }}</span>
-                                    @endif
-                                </div>
-                                <small class="text-muted text-nowrap">{{ $event['created_at']->diffForHumans() }}</small>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
         </div>
 
         <div class="col-12 col-lg-4 col-md-4 mb-3">
@@ -373,7 +351,7 @@
             <div class="card shadow-none border">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-checklist me-2"></i>My Weekly Activities</h5>
-                    <small class="text-muted">Today's plan & revisions</small>
+                    <small class="text-muted">Today's plan, revisions &amp; shares</small>
                 </div>
                 <div class="card-body">
                     @if($showTodaysWeeklyTasks && $todaysWeeklyTasks->isNotEmpty())
@@ -446,7 +424,7 @@
                     @endif
 
                     @if($recentReviewerReturns->count() > 0)
-                        <div>
+                        <div class="mb-3">
                             <h6 class="text-primary mb-2"><i class="ti ti-arrow-back-up me-1"></i>Latest return reasons</h6>
                             @foreach($recentReviewerReturns as $doc)
                                 <div class="border-start border-3 border-primary ps-3 mb-2">
@@ -459,7 +437,28 @@
                         </div>
                     @endif
 
-                    @if($activeActionTaskCount === 0 && $todaysTasksClear && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty())
+                    @if($collaborationEvents->isNotEmpty())
+                        <div class="{{ ($showTodaysWeeklyTasks && $todaysWeeklyTasks->isNotEmpty()) || $returnedDocs->isNotEmpty() || $plainDraftDocs->isNotEmpty() || $recentReviewerReturns->isNotEmpty() ? 'mt-3 pt-3 border-top' : '' }}">
+                            <h6 class="mb-2"><i class="ti ti-users-group me-1"></i>Shared with you</h6>
+                            @foreach($collaborationEvents as $event)
+                                <div class="d-flex align-items-start gap-2 mb-2">
+                                    <span class="badge {{ $event['badge_class'] ?? 'bg-light' }} align-self-center">{{ $event['badge_label'] ?? '' }}</span>
+                                    <div class="flex-grow-1 min-w-0">
+                                        @if(!empty($event['document_id']))
+                                            <a href="{{ route('documents.show', $event['document_id']) }}" class="text-decoration-none small d-block">
+                                                {{ $event['message'] }}
+                                            </a>
+                                        @else
+                                            <span class="small d-block">{{ $event['message'] }}</span>
+                                        @endif
+                                    </div>
+                                    <small class="text-muted text-nowrap">{{ $event['created_at']->diffForHumans() }}</small>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($activeActionTaskCount === 0 && $todaysTasksClear && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty() && $collaborationEvents->isEmpty())
                         <div class="text-center py-4">
                             <i class="ti ti-mood-smile fs-1 text-success"></i>
                             <p class="text-muted mt-2 mb-0">Nothing pending right now.</p>
