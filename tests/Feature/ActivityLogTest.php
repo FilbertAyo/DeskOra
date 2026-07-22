@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Department;
+use App\Models\Document;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,7 +41,8 @@ class ActivityLogTest extends TestCase
         $this->actingAs($user)
             ->get(route('activity-log.index'))
             ->assertOk()
-            ->assertSee('Activity log', false);
+            ->assertSee('Activity log', false)
+            ->assertSee('activityLogDetailModal', false);
     }
 
     public function test_model_update_records_activity_for_authenticated_causer(): void
@@ -75,5 +77,76 @@ class ActivityLogTest extends TestCase
                 ->where('event', 'updated')
                 ->exists()
         );
+    }
+
+    public function test_document_content_update_records_activity(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $user = User::factory()->create();
+        $user->givePermissionTo('view activity log');
+
+        $this->actingAs($user);
+
+        $document = Document::create([
+            'user_id' => $user->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Staff plan',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['activities' => [['title' => 'A']]],
+        ]);
+
+        $document->update([
+            'content' => ['activities' => [['title' => 'B']]],
+        ]);
+
+        $activity = Activity::query()
+            ->where('subject_type', Document::class)
+            ->where('subject_id', $document->id)
+            ->where('event', 'updated')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertSame($user->id, $activity->causer_id);
+        $this->assertStringContainsString('weekly plan', strtolower($activity->description));
+        $this->assertTrue(data_get($activity->properties, 'attributes.content._summarized') === true);
+    }
+
+    public function test_activity_detail_returns_json_for_modal(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $user = User::factory()->create();
+        $user->givePermissionTo('view activity log');
+
+        $this->actingAs($user);
+
+        $department = Department::create([
+            'name' => 'ModalDept',
+            'status' => 'active',
+        ]);
+        $department->update(['name' => 'ModalDeptUpdated']);
+
+        $activity = Activity::query()
+            ->where('subject_id', $department->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->getJson(route('activity-log.show', $activity))
+            ->assertOk()
+            ->assertJsonPath('id', $activity->id)
+            ->assertJsonPath('staff', $user->name)
+            ->assertJsonStructure([
+                'id',
+                'when',
+                'staff',
+                'log_name',
+                'event',
+                'description',
+                'subject',
+                'properties',
+                'properties_pretty',
+            ]);
     }
 }

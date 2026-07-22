@@ -7,10 +7,29 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class MeetingMinute extends Model
 {
-    use HasFactory, HasShortId;
+    use HasFactory, HasShortId, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('meeting_minutes')
+            ->logOnly([
+                'period_id',
+                'stored_name',
+                'path',
+                'mime_type',
+                'size',
+                'uploaded_by',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName) => "Meeting minute {$eventName}");
+    }
 
     protected $fillable = [
         'period_id',

@@ -176,6 +176,16 @@ class AuthenticatedSessionController extends Controller
 
         $user->update(['last_login_at' => now()]);
 
+        activity('auth')
+            ->causedBy($user)
+            ->performedOn($user)
+            ->event('login')
+            ->withProperties([
+                'ip' => $request->ip(),
+                'user_agent' => (string) $request->userAgent(),
+            ])
+            ->log('User logged in');
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard', absolute: false));

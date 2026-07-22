@@ -91,6 +91,7 @@ class AdminController extends Controller
 
         $roleNames = $validated['roles'] ?? [];
         $user->syncRoles($roleNames);
+        $this->logUserRoleAssignment($user, $roleNames);
         WorkflowUserNotificationDefaults::apply($user->fresh(), $roleNames);
 
         $this->syncDepartmentHeadAssignment(
@@ -175,8 +176,10 @@ class AdminController extends Controller
 
         $user->subDepartments()->sync($subDepartmentIds);
 
+        $previousRoles = $user->getRoleNames()->values()->all();
         $roleNames = $validated['roles'] ?? [];
         $user->syncRoles($roleNames);
+        $this->logUserRoleAssignment($user, $roleNames, $previousRoles);
         WorkflowUserNotificationDefaults::apply($user->fresh(), $roleNames);
 
         $this->syncDepartmentHeadAssignment(
@@ -297,5 +300,33 @@ class AdminController extends Controller
         return Department::whereIn('id', $subDepartmentIds)
             ->where('parent_id', $departmentId)
             ->count() === count($subDepartmentIds);
+    }
+
+    /**
+     * @param  list<string>  $roleNames
+     * @param  list<string>|null  $previousRoles
+     */
+    private function logUserRoleAssignment(User $user, array $roleNames, ?array $previousRoles = null): void
+    {
+        $previous = $previousRoles ?? [];
+        sort($previous);
+        $next = array_values($roleNames);
+        sort($next);
+
+        if ($previous === $next) {
+            return;
+        }
+
+        activity('roles')
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->event($previous === [] ? 'assigned' : 'updated')
+            ->withProperties([
+                'old' => ['roles' => $previous],
+                'attributes' => ['roles' => $next],
+            ])
+            ->log($previous === []
+                ? 'Roles assigned: '.($next === [] ? '(none)' : implode(', ', $next))
+                : 'Roles updated for '.$user->name);
     }
 }

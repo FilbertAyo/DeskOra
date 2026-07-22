@@ -6,10 +6,31 @@ use App\Concerns\HasShortId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Request extends Model
 {
-    use HasFactory, HasShortId;
+    use HasFactory, HasShortId, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('requests')
+            ->logOnly([
+                'request_no',
+                'request_type',
+                'user_id',
+                'department_id',
+                'status',
+                'submitted_at',
+                'approved_at',
+                'paid_at',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName) => "Request {$eventName}");
+    }
 
     protected $fillable = [
         'request_no',

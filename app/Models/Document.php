@@ -62,11 +62,94 @@ class Document extends Model
                 'main_target',
                 'target_accomplished',
                 'target_explanation',
+                'review_rejection_reason',
+                'content',
                 'file_path',
+                'attachment',
                 'original_filename',
+                'budget_review_status',
+                'budget_reviewed_by',
+                'budget_reviewed_at',
+                'budget_provided_amount',
+                'budget_review_note',
+                'budget_review_items',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
+    }
+
+    public function tapActivity(\Spatie\Activitylog\Models\Activity $activity, string $eventName): void
+    {
+        $properties = $activity->properties?->toArray() ?? [];
+
+        foreach (['attributes', 'old'] as $bag) {
+            if (! array_key_exists('content', $properties[$bag] ?? [])) {
+                continue;
+            }
+
+            $properties[$bag]['content'] = $this->summarizeLoggedContent($properties[$bag]['content']);
+        }
+
+        if (array_key_exists('budget_review_items', $properties['attributes'] ?? [])) {
+            $properties['attributes']['budget_review_items'] = $this->summarizeLoggedContent(
+                $properties['attributes']['budget_review_items']
+            );
+        }
+
+        if (array_key_exists('budget_review_items', $properties['old'] ?? [])) {
+            $properties['old']['budget_review_items'] = $this->summarizeLoggedContent(
+                $properties['old']['budget_review_items']
+            );
+        }
+
+        $type = (string) ($this->type
+            ?? ($properties['attributes']['type'] ?? null)
+            ?? ($properties['old']['type'] ?? null)
+            ?? 'document');
+        $title = (string) ($this->title
+            ?? ($properties['attributes']['title'] ?? null)
+            ?? '');
+        $typeLabel = str_replace('_', ' ', $type);
+
+        $activity->description = trim(sprintf(
+            '%s %s%s',
+            ucfirst($typeLabel),
+            $eventName,
+            $title !== '' ? ': '.$title : ''
+        ));
+        $activity->properties = $properties;
+    }
+
+    /**
+     * Keep activity_log rows small when large JSON payloads change.
+     *
+     * @param  mixed  $content
+     * @return array<string, mixed>|null
+     */
+    private function summarizeLoggedContent(mixed $content): ?array
+    {
+        if ($content === null) {
+            return null;
+        }
+
+        if (is_string($content)) {
+            $decoded = json_decode($content, true);
+            $content = json_last_error() === JSON_ERROR_NONE ? $decoded : $content;
+        }
+
+        if (! is_array($content)) {
+            return [
+                '_summarized' => true,
+                'type' => gettype($content),
+                'bytes' => strlen((string) $content),
+            ];
+        }
+
+        return [
+            '_summarized' => true,
+            'keys' => array_values(array_map('strval', array_keys($content))),
+            'bytes' => strlen((string) json_encode($content)),
+        ];
     }
 
     /**
@@ -1534,9 +1617,29 @@ class Document extends Model
             return false;
         }
 
+        $creating = ! $this->exists;
+
+        // Spatie LogsActivity (and other observers) listen to creating/created and
+        // updating/updated. The domain-sync save path used to skip those events,
+        // so staff document work never appeared in the activity log.
+        if ($creating) {
+            if ($this->fireModelEvent('creating') === false) {
+                return false;
+            }
+        } elseif ($this->fireModelEvent('updating') === false) {
+            return false;
+        }
+
         app(DocumentDomainSyncService::class)->syncFromDocument($this);
 
         $this->exists = true;
+
+        if ($creating) {
+            $this->fireModelEvent('created', false);
+        } else {
+            $this->fireModelEvent('updated', false);
+        }
+
         $this->syncOriginal();
         $this->fireModelEvent('saved', false);
 
