@@ -118,10 +118,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | Number of hours since the last successful login before email OTP is
-    | required on the next sign-in attempt.
+    | required on the next sign-in attempt. Default is 5 days (120 hours).
     |
     */
 
-    'login_otp_inactivity_hours' => env('LOGIN_OTP_INACTIVITY_HOURS', 24),
+    'login_otp_inactivity_hours' => env('LOGIN_OTP_INACTIVITY_HOURS', 120),
 
 ];

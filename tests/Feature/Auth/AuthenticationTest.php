@@ -27,10 +27,10 @@ class AuthenticationTest extends TestCase
         $response->assertDontSee('name="remember"', false);
     }
 
-    public function test_users_can_authenticate_using_the_login_screen_within_24_hours(): void
+    public function test_users_can_authenticate_using_the_login_screen_within_5_days(): void
     {
         $user = User::factory()->create([
-            'last_login_at' => now()->subHours(12),
+            'last_login_at' => now()->subHours(48),
         ]);
 
         $response = $this->post('/login', [
@@ -41,6 +41,24 @@ class AuthenticationTest extends TestCase
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
         $this->assertNotNull($user->fresh()->last_login_at);
+    }
+
+    public function test_users_inactive_for_24_to_48_hours_skip_otp_verification(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create([
+            'last_login_at' => now()->subHours(36),
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+        Notification::assertNothingSent();
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
@@ -73,12 +91,12 @@ class AuthenticationTest extends TestCase
         $response->assertSessionHasErrors('email');
     }
 
-    public function test_users_inactive_for_24_hours_are_sent_to_otp_verification(): void
+    public function test_users_inactive_for_5_days_are_sent_to_otp_verification(): void
     {
         Notification::fake();
 
         $user = User::factory()->create([
-            'last_login_at' => now()->subHours(25),
+            'last_login_at' => now()->subHours(121),
         ]);
 
         $response = $this->post('/login', [
@@ -113,7 +131,7 @@ class AuthenticationTest extends TestCase
         Notification::fake();
 
         $user = User::factory()->create([
-            'last_login_at' => now()->subHours(30),
+            'last_login_at' => now()->subHours(121),
         ]);
 
         $this->post('/login', [
@@ -140,7 +158,7 @@ class AuthenticationTest extends TestCase
         Notification::fake();
 
         $user = User::factory()->create([
-            'last_login_at' => now()->subHours(30),
+            'last_login_at' => now()->subHours(121),
         ]);
 
         $this->post('/login', [

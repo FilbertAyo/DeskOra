@@ -130,7 +130,7 @@ class User extends Authenticatable
 
     public function requiresLoginOtp(?int $hours = null): bool
     {
-        $hours ??= (int) config('auth.login_otp_inactivity_hours', 24);
+        $hours ??= (int) config('auth.login_otp_inactivity_hours', 120);
 
         return $this->last_login_at === null
             || $this->last_login_at->lt(now()->subHours($hours));
