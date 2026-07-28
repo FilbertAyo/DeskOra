@@ -1,38 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grace Period Alert</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; background: #f8fafc; margin: 0; padding: 24px;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-        <tr>
-            <td style="background: #d97706; color: #ffffff; padding: 16px 20px;">
-                <h2 style="margin: 0; font-size: 20px;">Grace period is active</h2>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 20px;">
-                <p style="margin-top: 0;">Hello {{ $staffName }},</p>
-                <p>
-                    Your administrator extended the deadline for your <strong>{{ $activityLabel }}</strong>
-                    for <strong>{{ $periodLabel }}</strong>.
-                </p>
-                <p>
-                    You can still create or submit until
-                    <strong>{{ $graceEndsAt->format('M d, Y H:i') }}</strong>.
-                </p>
-                <p style="margin: 24px 0;">
-                    <a href="{{ $actionUrl }}" style="display: inline-block; background: #d97706; color: #ffffff; text-decoration: none; padding: 10px 14px; border-radius: 6px;">
-                        Open and submit now
-                    </a>
-                </p>
-                <p style="margin-bottom: 0; font-size: 14px; color: #6b7280;">
-                    If you have already submitted, you can ignore this message.
-                </p>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+@extends('mail.app')
+
+@section('title', 'Grace period active')
+
+@section('content')
+    <p class="eyebrow" style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;">Deadline</p>
+    <h1 class="title" style="margin:0 0 20px;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;line-height:1.3;font-weight:400;color:#18181b;">
+        Grace period is active
+    </h1>
+    <p>Hello {{ $staffName }},</p>
+    <p>
+        Your administrator extended the deadline for your <strong>{{ $activityLabel }}</strong>
+        for <strong>{{ $periodLabel }}</strong>.
+    </p>
+    <p>
+        You can still create or submit until
+        <strong>{{ $graceEndsAt->format('M d, Y H:i') }}</strong>.
+    </p>
+    @include('mail.partials.button', [
+        'buttonUrl' => $actionUrl,
+        'buttonLabel' => 'Open and submit',
+    ])
+    <p style="margin-top:18px;font-size:13px;color:#71717a;">
+        If you have already submitted, you can ignore this message.
+    </p>
+@endsection

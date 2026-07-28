@@ -1,6 +1,10 @@
-<p>
-    <a href="{{ $actionUrl }}"
-        style="display: inline-block; padding: 10px 20px; background-color: #1d72b8; color: white; text-decoration: none; border-radius: 4px;">
-        {{ $actionLabel }}
-    </a>
-</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 8px 0 4px;">
+    <tr>
+        <td>
+            <a href="{{ $actionUrl }}" class="btn"
+                style="display:inline-block;background-color:#18181b;color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;line-height:1;text-decoration:none;padding:12px 20px;border-radius:4px;">
+                {{ $actionLabel }}
+            </a>
+        </td>
+    </tr>
+</table>

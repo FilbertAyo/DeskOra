@@ -1,27 +1,34 @@
 @extends('mail.app')
 
-@section('content')
-    <div class="email-header">
-        <h2>Welcome to Adilisha Portal, {{ $name }}!</h2>
-    </div>
-    <div>
-        <p>Congratulations! Your registration is complete. Here are your login details:</p>
+@section('title', 'Welcome')
 
-        <ul>
-            <li><strong>Email:</strong> {{ $email }}</li>
-            @if (! empty($password))
-                <li><strong>Password:</strong> {{ $password }}</li>
-            @else
-                <li><strong>Password:</strong> Use the initial password your administrator set for you. You can change it anytime under Profile after you sign in.</li>
-            @endif
-        </ul>
-        <p>You can now log in to your account using the link below:</p>
-        <p>
-            <a href="{{ config('app.url') }}"
-                style="display: inline-block; padding: 10px 20px; background-color: #1d72b8; color: white; text-decoration: none; border-radius: 4px;">
-                Login
-            </a>
-        </p>
-        <p>Please keep this information secure and do not share it with anyone.</p>
-    </div>
+@section('content')
+    <p class="eyebrow" style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;">Account</p>
+    <h1 class="title" style="margin:0 0 20px;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;line-height:1.3;font-weight:400;color:#18181b;">
+        Welcome, {{ $name }}
+    </h1>
+    <p>Your registration is complete. Use the details below to sign in.</p>
+
+    <table role="presentation" class="meta-table" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:4px 0 20px;">
+        <tr>
+            <td class="meta-label" style="width:34%;padding:10px 12px 10px 0;border-bottom:1px solid #f4f4f5;color:#71717a;font-size:14px;">Email</td>
+            <td class="meta-value" style="padding:10px 0;border-bottom:1px solid #f4f4f5;color:#18181b;font-size:14px;font-weight:600;">{{ $email }}</td>
+        </tr>
+        <tr>
+            <td class="meta-label" style="width:34%;padding:10px 12px 10px 0;border-bottom:1px solid #f4f4f5;color:#71717a;font-size:14px;">Password</td>
+            <td class="meta-value" style="padding:10px 0;border-bottom:1px solid #f4f4f5;color:#18181b;font-size:14px;font-weight:600;">
+                @if (! empty($password))
+                    {{ $password }}
+                @else
+                    Use the initial password set by your administrator. You can change it under Profile after signing in.
+                @endif
+            </td>
+        </tr>
+    </table>
+
+    <p>Keep this information private.</p>
+    @include('mail.partials.button', [
+        'buttonUrl' => config('app.url'),
+        'buttonLabel' => 'Sign in',
+    ])
 @endsection

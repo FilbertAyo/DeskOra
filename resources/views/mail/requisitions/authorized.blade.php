@@ -1,17 +1,16 @@
 @extends('mail.app')
 
+@section('title', $headline ?? 'Requisition authorized')
+
 @section('content')
-    <div class="email-header">
-        <h2>{{ $headline }}</h2>
-    </div>
-    <div>
-        <p>Hello{{ !empty($recipientName) ? ' '.$recipientName : '' }},</p>
-        <p>{{ $intro }}</p>
-        @if (!empty($actorName))
-            <p>Authorized by <strong>{{ $actorName }}</strong>.</p>
-        @endif
-        @include('mail.requisitions._summary')
-        <p>You can view the full requisition details using the button below:</p>
-        @include('mail.requisitions._action-button')
-    </div>
+    <p class="eyebrow" style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;">Requisition</p>
+    <h1 class="title" style="margin:0 0 20px;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;line-height:1.3;font-weight:400;color:#18181b;">{{ $headline }}</h1>
+    <p>Hello{{ ! empty($recipientName) ? ' '.$recipientName : '' }},</p>
+    <p>{{ $intro }}</p>
+    @if (! empty($actorName))
+        <p>Authorized by <strong>{{ $actorName }}</strong>.</p>
+    @endif
+    @include('mail.requisitions._summary')
+    <p>View the full requisition details below.</p>
+    @include('mail.requisitions._action-button')
 @endsection

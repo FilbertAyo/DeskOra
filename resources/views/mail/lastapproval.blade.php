@@ -1,22 +1,19 @@
-
 @extends('mail.app')
 
-@section('content')
-    <div class="email-header">
-        <h2>Approved Petty Cash Request from {{ $name }}</h2>
-    </div>
-    <div>
-        <p>Hello,</p>
-        <p>The petty cash request for <strong>{{ $reason }}</strong> has been fully approved and is now ready for
-            disbursement.</p>
+@section('title', 'Petty cash approved')
 
-        <p>Please proceed with providing the funds to {{ $name }}. For your reference, click the button below to
-            view the request details:</p>
-        <p>
-            <a href="{{ config('app.url') }}/pettycash/request/{{ $id }}/details"
-                style="display: inline-block; padding: 10px 20px; background-color: #1d72b8; color: white; text-decoration: none; border-radius: 4px;">
-                View Request
-            </a>
-        </p>
-    </div>
+@section('content')
+    <p class="eyebrow" style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;">Petty cash</p>
+    <h1 class="title" style="margin:0 0 20px;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;line-height:1.3;font-weight:400;color:#18181b;">
+        Approved and ready for disbursement
+    </h1>
+    <p>Hello,</p>
+    <p>
+        The petty cash request for <strong>{{ $reason }}</strong> has been fully approved.
+        Please proceed with providing the funds to <strong>{{ $name }}</strong>.
+    </p>
+    @include('mail.partials.button', [
+        'buttonUrl' => config('app.url').'/pettycash/request/'.$id.'/details',
+        'buttonLabel' => 'View request',
+    ])
 @endsection
