@@ -21,16 +21,7 @@
                                     <i class="ti ti-pencil me-1"></i> Edit
                                 </a>
                             @endif
-                            @if($canDelete)
-                                <form method="POST" action="{{ route('official-letters.destroy', $letter) }}"
-                                      onsubmit="return confirm('Delete this official letter?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="ti ti-trash me-1"></i> Delete
-                                    </button>
-                                </form>
-                            @endif
+                       
                             <a href="{{ route('official-letters.index') }}" class="btn btn-sm btn-light">
                                 <i class="ti ti-arrow-left me-1"></i> Back
                             </a>
