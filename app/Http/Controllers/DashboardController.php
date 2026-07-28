@@ -10,6 +10,7 @@ use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
 use App\Services\ActionLogProgressService;
+use App\Services\RequestApprovalNavService;
 use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
@@ -25,6 +26,7 @@ class DashboardController extends Controller
         private readonly WorkPeriodService $workPeriodService,
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
         private readonly ActionLogProgressService $actionLogProgressService,
+        private readonly RequestApprovalNavService $requestApprovalNavService,
     ) {}
 
     public function redirect()
@@ -409,6 +411,8 @@ class DashboardController extends Controller
             ];
         }
 
+        $approvalActions = $this->approvalActionsFor($user);
+
         return view('dashboard', compact(
             'userNo',
             'pettyNo',
@@ -445,8 +449,39 @@ class DashboardController extends Controller
             'assignedWeeklyActivities',
             'todaysDayName',
             'todaysWeeklyTasks',
-            'yearPlanMonthCoverageAlert'
+            'yearPlanMonthCoverageAlert',
+            'approvalActions',
         ));
+    }
+
+    /**
+     * @return list<array{label: string, count: int, url: string}>
+     */
+    private function approvalActionsFor(User $user): array
+    {
+        $actions = [];
+
+        foreach ([
+            ['review', 'petty', 'Review petty cash', ['Petty Cash', 'Reimbursement']],
+            ['review', 'requisition', 'Review requisitions', ['Staff Requisition']],
+            ['approve', 'petty', 'Approve petty cash', ['Petty Cash', 'Reimbursement']],
+            ['approve', 'requisition', 'Approve requisitions', ['Staff Requisition']],
+            ['authorize', 'petty', 'Authorize petty cash', ['Petty Cash', 'Reimbursement']],
+            ['authorize', 'requisition', 'Authorize requisitions', ['Staff Requisition']],
+        ] as [$stage, $type, $label, $types]) {
+            $count = $this->requestApprovalNavService->countForStageAndTypes($user, $stage, $types);
+            if ($count < 1) {
+                continue;
+            }
+
+            $actions[] = [
+                'label' => $label,
+                'count' => $count,
+                'url' => route('petty.list', ['stage' => $stage, 'type' => $type]),
+            ];
+        }
+
+        return $actions;
     }
 
     private function withEffectiveWeeklyReportCollaborators($documents, User $viewer)

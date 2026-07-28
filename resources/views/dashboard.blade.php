@@ -1,28 +1,16 @@
 <x-app-layout>
     @php
         $dashboardData = $weeklyDashboardData ?? null;
-        $pendingDocs = $dashboardData['pendingDocuments'] ?? collect();
-        $allDocs = $dashboardData['allDocuments'] ?? collect();
         $deadlineStatuses = $dashboardData['deadlineStatuses'] ?? ($periodDeadlineStatuses ?? null);
         $availableTypes = $dashboardData['availableTypes'] ?? ($dashboardAvailableTypes ?? []);
-        $returnedDocs = collect($pendingDocs)->filter(fn ($doc) => method_exists($doc, 'isReturnedForRevision') && $doc->isReturnedForRevision());
-        $plainDraftDocs = collect($pendingDocs)->filter(fn ($doc) => !method_exists($doc, 'isReturnedForRevision') || !$doc->isReturnedForRevision());
-        $hasReviewerAccess = auth()->check() && auth()->user()->hasPermissionTo('view all documents');
-        $recentReviewerReturns = collect($allDocs)
-            ->filter(fn ($doc) => method_exists($doc, 'isReturnedForRevision') && $doc->isReturnedForRevision())
-            ->sortByDesc('updated_at')
-            ->take(5)
-            ->values();
-
         $activeActionTasks = collect($actionLogProgress['activeTasks'] ?? [])
             ->filter(function ($task) {
-                if (!is_array($task)) {
+                if (! is_array($task)) {
                     return false;
                 }
-
                 $latestProgress = strtolower(trim((string) ($task['latest_progress'] ?? 'Not Started')));
 
-                return !in_array($latestProgress, ['done', 'cancelled'], true);
+                return ! in_array($latestProgress, ['done', 'cancelled'], true);
             })
             ->values();
         $activeActionTaskCount = $activeActionTasks->count();
@@ -30,40 +18,12 @@
         $assignedWeeklyActivityCount = $assignedWeeklyActivities->count();
         $sharedWithMeCount = (int) ($sharedWithMeCount ?? 0);
         $collaborationEvents = collect($collaborationEvents ?? []);
-        $currentActionLogDraftId = $actionLogProgress['currentDraftId'] ?? null;
-        $hasCurrentActionDraft = !empty($currentActionLogDraftId);
-        $pendingDraftsTotal =
-            (int) ($dashboardPendingDocs['weekly_plan'] ?? 0)
-            + (int) ($dashboardPendingDocs['weekly_report'] ?? 0)
-            + (int) ($dashboardPendingDocs['monthly_report'] ?? 0);
-
+        $approvalActions = collect($approvalActions ?? []);
         $wr = $weeklySubmissionReminder ?? null;
         $showWeeklyToast = $wr?->showToast ?? false;
-        $showWeeklyPlanShortcut = isset($availableTypes['weekly_plan'])
-            && ($nextPeriod ?? null)
-            && $wr
-            && ($wr->plan !== null && $wr->plan->showCta);
-        $showWeeklyReportShortcut = isset($availableTypes['weekly_report'])
-            && ($currentPeriod ?? null)
-            && $wr
-            && ($wr->report !== null && $wr->report->showCta);
         $planGraceEntries = collect($weeklyPlanGraceEntries ?? []);
         $reportGraceEntries = collect($weeklyReportGraceEntries ?? []);
         $hasWeeklyGraceWindow = $planGraceEntries->isNotEmpty() || $reportGraceEntries->isNotEmpty();
-        $focusTaskShowRoute = function ($doc) {
-            if (($doc->type ?? null) === \App\Models\Document::TYPE_ACTION_LOG) {
-                return route('action-logs.show', $doc->id);
-            }
-
-            return route('documents.show', $doc->id);
-        };
-        $focusTaskEditRoute = function ($doc) {
-            if (($doc->type ?? null) === \App\Models\Document::TYPE_ACTION_LOG) {
-                return route('action-logs.edit', $doc->id);
-            }
-
-            return route('documents.edit', $doc->id);
-        };
         $planCoverageAlert = $yearPlanMonthCoverageAlert ?? null;
         $showPlanCoverageAlert = (bool) ($planCoverageAlert['show'] ?? false);
         $planCoverageMissingCount = (int) ($planCoverageAlert['missingMonthCount'] ?? 0);
@@ -128,27 +88,7 @@
 
         <div class="col-12 col-lg-8 col-md-8 mb-3">
             <div class="row g-3">
-                <div class="col-6 col-xl-2">
-                    <div class="card shadow-none border">
-                        <div class="card-body">
-                            <p class="mb-1 text-muted small">
-                                <i class="ti ti-arrow-back-up text-danger me-1"></i>Returned
-                            </p>
-                            <h4 class="mb-0 text-dark">{{ $returnedDocs->count() }}</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-xl-2">
-                    <div class="card shadow-none border">
-                        <div class="card-body">
-                            <p class="mb-1 text-muted small">
-                                <i class="ti ti-file-edit text-warning me-1"></i>Drafts
-                            </p>
-                            <h4 class="mb-0 text-dark">{{ $plainDraftDocs->count() }}</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-xl-2">
+                <div class="col-6 col-xl-4">
                     <div class="card shadow-none border">
                         <div class="card-body">
                             <p class="mb-1 text-muted small">
@@ -182,7 +122,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-xl-2">
+                <div class="col-6 col-xl-4">
                     <div class="card shadow-none border">
                         <div class="card-body">
                             <p class="mb-1 text-muted small">
@@ -275,8 +215,22 @@
         </div>
 
         <div class="col-12 col-lg-4 col-md-4 mb-3">
-            <div class="card shadow-none border">
+            <div class="card shadow-none border h-100">
+                <div class="card-header bg-white border-bottom">
+                    <h6 class="mb-0"><i class="ti ti-alert-circle me-1"></i>Action needed</h6>
+                </div>
                 <div class="card-body">
+                    @if($approvalActions->isNotEmpty())
+                        <div class="list-group list-group-flush mb-3">
+                            @foreach($approvalActions as $action)
+                                <a href="{{ $action['url'] }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                                    <span>{{ $action['label'] }}</span>
+                                    <span class="badge bg-dark">{{ $action['count'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+
                     @if($showWeeklyToast && $wr)
                         <ul class="mb-3 ps-3 small text-muted">
                             @if($wr->plan && $wr->plan->showCta)
@@ -292,7 +246,7 @@
                                 </li>
                             @endif
                             @if($wr->report && $wr->report->showCta)
-                                <li class="{{ ($wr->plan && $wr->plan->showCta) ? 'mb-0' : 'mb-2' }}">
+                                <li class="mb-0">
                                     <strong class="text-dark">Report</strong> for this week (W{{ $wr->report->period->week_number }}, {{ $wr->report->period->year }}) —
                                     @if($wr->report->document && $wr->report->document->isReturnedForRevision())
                                         reviewer asked for changes; please revise and resubmit.
@@ -336,11 +290,10 @@
                                 </a>
                             @endif
                         </div>
-                    @else
-                        <div class="text-center">
+                    @elseif($approvalActions->isEmpty())
+                        <div class="text-center py-3">
                             <i class="ti ti-mood-smile fs-1 text-success"></i>
-                            <p class="text-muted mb-0 mt-2">No action needed. Your weekly plan and report are up to date.</p>
-                        
+                            <p class="text-muted mb-0 mt-2">No action needed right now.</p>
                         </div>
                     @endif
                 </div>
@@ -368,77 +321,8 @@
                         </div>
                     @endif
 
-                    @if($returnedDocs->count() > 0)
-                        <div class="mb-3">
-                            <h6 class="text-danger mb-2"><i class="ti ti-arrow-back-up me-1"></i>Needs Immediate Revision</h6>
-                            @foreach($returnedDocs->take(3) as $doc)
-                                @php
-                                    $docSharedUsers = $doc->relationLoaded('effectiveSharedUsers')
-                                        ? $doc->getRelation('effectiveSharedUsers')
-                                        : $doc->sharedUsers;
-                                @endphp
-                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
-                                    <div>
-                                        <strong>{{ $doc->display_title }}</strong>
-                                        <div class="small text-muted">
-                                            {{ $doc->type_name }} • Updated {{ $doc->updated_at?->diffForHumans() }}
-                                        </div>
-                                        @if(($doc->type ?? null) === \App\Models\Document::TYPE_WEEKLY_REPORT && $docSharedUsers->isNotEmpty())
-                                            <div class="small text-info">
-                                                Shared with: {{ $docSharedUsers->pluck('name')->join(', ') }}
-                                            </div>
-                                        @endif
-                                    </div>
-                                    <div class="d-flex gap-2">
-                                        <a href="{{ $focusTaskShowRoute($doc) }}" class="btn btn-sm btn-outline-secondary">View</a>
-                                        <a href="{{ $focusTaskEditRoute($doc) }}" class="btn btn-sm btn-danger">Revise</a>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @if($plainDraftDocs->count() > 0)
-                        <div class="mb-3">
-                            <h6 class="text-warning mb-2"><i class="ti ti-file-edit me-1"></i>Drafts To Finalize</h6>
-                            @foreach($plainDraftDocs->take(3) as $doc)
-                                @php
-                                    $docSharedUsers = $doc->relationLoaded('effectiveSharedUsers')
-                                        ? $doc->getRelation('effectiveSharedUsers')
-                                        : $doc->sharedUsers;
-                                @endphp
-                                <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
-                                    <div>
-                                        <strong>{{ $doc->display_title }}</strong>
-                                        <div class="small text-muted">{{ $doc->type_name }} • Created {{ $doc->created_at?->format('M d, Y') }}</div>
-                                        @if(($doc->type ?? null) === \App\Models\Document::TYPE_WEEKLY_REPORT && $docSharedUsers->isNotEmpty())
-                                            <div class="small text-info">
-                                                Shared with: {{ $docSharedUsers->pluck('name')->join(', ') }}
-                                            </div>
-                                        @endif
-                                    </div>
-                                    <a href="{{ $focusTaskEditRoute($doc) }}" class="btn btn-sm btn-warning text-dark">Continue</a>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @if($recentReviewerReturns->count() > 0)
-                        <div class="mb-3">
-                            <h6 class="text-primary mb-2"><i class="ti ti-arrow-back-up me-1"></i>Latest return reasons</h6>
-                            @foreach($recentReviewerReturns as $doc)
-                                <div class="border-start border-3 border-primary ps-3 mb-2">
-                                    <div class="small fw-semibold">{{ $doc->display_title }}</div>
-                                    <div class="small text-muted">
-                                        {{ $doc->latestRejectionReason() }}
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
                     @if($collaborationEvents->isNotEmpty())
-                        <div class="{{ ($showTodaysWeeklyTasks && $todaysWeeklyTasks->isNotEmpty()) || $returnedDocs->isNotEmpty() || $plainDraftDocs->isNotEmpty() || $recentReviewerReturns->isNotEmpty() ? 'mt-3 pt-3 border-top' : '' }}">
+                        <div class="{{ ($showTodaysWeeklyTasks && $todaysWeeklyTasks->isNotEmpty()) ? 'mt-3 pt-3 border-top' : '' }}">
                             <h6 class="mb-2"><i class="ti ti-users-group me-1"></i>Shared with you</h6>
                             @foreach($collaborationEvents as $event)
                                 <div class="d-flex align-items-start gap-2 mb-2">
@@ -458,7 +342,7 @@
                         </div>
                     @endif
 
-                    @if($activeActionTaskCount === 0 && $todaysTasksClear && $returnedDocs->isEmpty() && $plainDraftDocs->isEmpty() && $recentReviewerReturns->isEmpty() && $collaborationEvents->isEmpty())
+                    @if($activeActionTaskCount === 0 && $todaysTasksClear && $collaborationEvents->isEmpty())
                         <div class="text-center py-4">
                             <i class="ti ti-mood-smile fs-1 text-success"></i>
                             <p class="text-muted mt-2 mb-0">Nothing pending right now.</p>
