@@ -39,7 +39,7 @@
                 <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'action-logs.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
-                        <span class="pc-mtext">Weekly Activities</span>
+                        <span class="pc-mtext">Activities</span>
                         <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                     </a>
                     <ul class="pc-submenu">
@@ -63,6 +63,11 @@
                                 <span class="pc-mtext">Minutes</span>
                             </a>
                         </li>
+                        <li class="{{ Request::routeIs('documents.monthly-report') ? 'active' : '' }}">
+                            <a href="{{ route('documents.monthly-report') }}" class="pc-link">
+                                <span class="pc-mtext">Monthly Reports </span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
 
@@ -70,12 +75,7 @@
                     $isMonthlyReportsNav = Request::routeIs('documents.monthly-report');
                     $isAllDocumentsNav = Request::routeIs('documents.index');
                 @endphp
-                <li class="pc-item {{ $isMonthlyReportsNav ? 'active' : '' }}">
-                    <a href="{{ route('documents.monthly-report') }}" class="pc-link">
-                        <span class="pc-micon"><i class="ti ti-folder"></i></span>
-                        <span class="pc-mtext">Monthly Reports </span>
-                    </a>
-                </li>
+              
                 <li class="pc-item {{ $isAllDocumentsNav ? 'active' : '' }}">
                     <a href="{{ route('documents.index') }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-stack"></i></span>
@@ -361,7 +361,6 @@
                 @endcanany
                
 
-              
                
                     <li class="pc-item {{ Request::routeIs('reports') ? 'active' : '' }}">
                         <a href="{{ route('reports') }}" class="pc-link">

@@ -18,7 +18,10 @@
         }
 
         @page {
-            margin: 40px 45px 50px;
+            margin-top: 40px;
+            margin-right: 50px;
+            margin-bottom: 88px;
+            margin-left: 50px;
         }
 
         * { box-sizing: border-box; }
@@ -28,7 +31,7 @@
             font-size: 12pt;
             color: #111;
             margin: 0;
-            padding: 0;
+            padding: 0 0 72px;
         }
 
         .header {
@@ -110,12 +113,6 @@
         table.items .total-label {
             text-align: right;
             font-weight: bold;
-            border-right: none;
-        }
-
-        table.items .total-spacer {
-            border-left: none;
-            border-right: none;
         }
 
         table.items .total-amount {
@@ -126,7 +123,7 @@
 
         .receipt-note {
             text-align: right;
-            font-size: 10pt;
+            font-size: 9pt;
             font-style: italic;
             margin: 4px 0 18px;
             color: #333;
@@ -137,10 +134,11 @@
             border-collapse: collapse;
             font-size: 12pt;
             margin-top: 8px;
+            margin-bottom: 12px;
         }
 
         .signatories td {
-            padding: 8px 6px 10px 0;
+            padding: 8px 4px 10px;
             vertical-align: bottom;
         }
 
@@ -173,13 +171,29 @@
         .footer-qr {
             position: fixed;
             right: 0;
-            bottom: 0;
+            bottom: 12px;
             text-align: right;
+            z-index: 10;
         }
 
         .footer-qr img {
-            width: 58px;
-            height: 58px;
+            width: 52px;
+            height: 52px;
+        }
+
+        .meta .line-continue {
+            border-bottom: 1px solid #222;
+            padding: 0 4px 1px;
+            min-height: 18px;
+            display: block;
+            width: 100%;
+            word-wrap: break-word;
+            line-height: 1.35;
+        }
+
+        .meta td.title-continue {
+            padding-top: 2px;
+            padding-bottom: 2px;
         }
     </style>
 </head>
@@ -189,6 +203,65 @@
     </div>
 
     <div class="title">FUND REQUISITION FORM</div>
+
+    @php
+        $activityTitle = trim((string) ($request->activity_title ?? ''));
+        // Match paper form: line 1 beside label, then up to 2 full-width underline rows.
+        $titleLineMax = [40, 100, 100];
+        $titleLines = ['', '', ''];
+        $words = $activityTitle !== ''
+            ? (preg_split('/\s+/u', $activityTitle, -1, PREG_SPLIT_NO_EMPTY) ?: [])
+            : [];
+        $lineIdx = 0;
+
+        foreach ($words as $word) {
+            if ($lineIdx > 2) {
+                $titleLines[2] = trim($titleLines[2].' '.$word);
+                continue;
+            }
+
+            $candidate = $titleLines[$lineIdx] === '' ? $word : $titleLines[$lineIdx].' '.$word;
+            if (mb_strlen($candidate) <= $titleLineMax[$lineIdx] || $titleLines[$lineIdx] === '') {
+                $titleLines[$lineIdx] = $candidate;
+                continue;
+            }
+
+            $lineIdx++;
+            if ($lineIdx > 2) {
+                $titleLines[2] = trim($titleLines[2].' '.$word);
+                continue;
+            }
+            $titleLines[$lineIdx] = $word;
+        }
+
+        $titleLine1 = $titleLines[0] !== '' ? $titleLines[0] : "\u{00A0}";
+        $titleNeedsContinue = $titleLines[1] !== '' || $titleLines[2] !== '';
+        // When title overflows, always show both continuation underlines (form-style).
+        $titleContinueLines = $titleNeedsContinue
+            ? [
+                $titleLines[1] !== '' ? $titleLines[1] : "\u{00A0}",
+                $titleLines[2] !== '' ? $titleLines[2] : "\u{00A0}",
+            ]
+            : [];
+
+        $items = $request->requisitionItems ?? collect();
+        $charsPerDescLine = 55;
+        $usedItemLines = 0;
+        foreach ($items as $item) {
+            $descLen = mb_strlen(trim((string) ($item->description ?? '')));
+            $usedItemLines += max(1, (int) ceil(max(1, $descLen) / $charsPerDescLine));
+        }
+        if ($items->isEmpty()) {
+            $usedItemLines = 0;
+        }
+
+        // Keep form on one page: fewer blank rows when descriptions/title consume vertical space.
+        $baseMinRows = 9;
+        $extraLines = max(0, $usedItemLines - $items->count());
+        $extraLines += count($titleContinueLines);
+        $minRows = max($items->count(), $baseMinRows - $extraLines);
+        $blankRows = max(0, $minRows - $items->count());
+    @endphp
 
     <table class="meta">
         <tr>
@@ -201,8 +274,15 @@
             <td style="width: 12%;" class="label">Activity code:</td>
             <td style="width: 18%;"><span class="line">{{ $request->activity_code ?: "\u{00A0}" }}</span></td>
             <td style="width: 12%;" class="label">Activity Title:</td>
-            <td style="width: 58%;" colspan="3"><span class="line">{{ $request->activity_title ?: "\u{00A0}" }}</span></td>
+            <td style="width: 58%;" colspan="3"><span class="line">{{ $titleLine1 }}</span></td>
         </tr>
+        @foreach ($titleContinueLines as $continueLine)
+            <tr>
+                <td colspan="6" class="title-continue">
+                    <span class="line-continue">{{ $continueLine }}</span>
+                </td>
+            </tr>
+        @endforeach
         <tr>
             <td class="label">Budget code:</td>
             <td><span class="line">{{ $request->budget_code ?: "\u{00A0}" }}</span></td>
@@ -212,12 +292,6 @@
             <td style="width: 24%;"><span class="line">{{ optional($request->date_of_requirement)->format('d/m/Y') ?: "\u{00A0}" }}</span></td>
         </tr>
     </table>
-
-    @php
-        $items = $request->requisitionItems ?? collect();
-        $minRows = 9;
-        $blankRows = max(0, $minRows - $items->count());
-    @endphp
 
     <table class="items">
         <thead>
@@ -246,8 +320,7 @@
                 </tr>
             @endfor
             <tr>
-                <td class="total-spacer">&nbsp;</td>
-                <td class="total-label" colspan="2">TOTAL AMOUNT</td>
+                <td class="total-label" colspan="3">TOTAL AMOUNT</td>
                 <td class="total-amount">TSh {{ number_format((float) $request->amount, 2) }}</td>
             </tr>
         </tbody>
