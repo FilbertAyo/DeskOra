@@ -23,6 +23,7 @@ use App\Http\Controllers\ReplenishmentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StaffAppreciationNominationController;
+use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\WeeklyMatrixController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
@@ -225,6 +226,7 @@ Route::middleware(['auth', 'permission:request pettycash'])->group(function () {
     Route::get('/requisition/{petty}', [PettyController::class, 'requisitionShow'])->name('requisition.show');
     Route::get('/requisition/{petty}/edit', [PettyController::class, 'requisitionEdit'])->name('requisition.edit');
     Route::put('/requisition/{petty}', [PettyController::class, 'requisitionUpdate'])->name('requisition.update');
+    Route::delete('/requisition/{petty}', [PettyController::class, 'destroy'])->name('requisition.destroy');
 });
 
 Route::middleware(['auth', 'permission:view requested pettycash'])->group(function () {
@@ -315,6 +317,11 @@ Route::middleware(['auth', 'permission:manage anonymous feedback'])->group(funct
     Route::get('/settings/anonymous-feedback', [ManageAnonymousFeedbackController::class, 'index'])->name('anonymous-feedback.index');
     Route::get('/settings/anonymous-feedback/qr.png', [ManageAnonymousFeedbackController::class, 'downloadQr'])->name('anonymous-feedback.qr-download');
     Route::patch('/settings/anonymous-feedback/{anonymous_feedback}', [ManageAnonymousFeedbackController::class, 'update'])->name('anonymous-feedback.update');
+});
+
+Route::middleware(['auth', 'permission:manage system settings'])->prefix('settings/system')->name('settings.system.')->group(function () {
+    Route::get('/', [SystemSettingController::class, 'edit'])->name('edit');
+    Route::put('/', [SystemSettingController::class, 'update'])->name('update');
 });
 
 Route::middleware(['auth', 'permission:view activity log'])->group(function () {

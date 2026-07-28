@@ -110,15 +110,29 @@ class PettyController extends Controller
         return $code;
     }
 
-    private function ensureUserHasSignature(): ?\Illuminate\Http\RedirectResponse
+    private function ensureUserHasSignature(?string $message = null): ?\Illuminate\Http\RedirectResponse
     {
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        if (! $user || empty($user->signature)) {
-            return redirect()->back()->with('error', 'Please upload your signature in profile settings before signing this requisition.');
+        if ($user && filled($user->signature)) {
+            return null;
         }
 
-        return null;
+        return redirect()
+            ->back()
+            ->withInput()
+            ->with(
+                'error',
+                $message ?? 'Please upload your signature in Profile Settings before continuing.'
+            );
+    }
+
+    private function userHasSignature(): bool
+    {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        return $user !== null && filled($user->signature);
     }
 
     private function canSignRequest(FinanceRequest $request, string $stage): bool
@@ -216,8 +230,9 @@ class PettyController extends Controller
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
         $planActivities = $this->requisitionPlanActivitiesForUser($user);
+        $hasSignature = $this->userHasSignature();
 
-        return view('requests.requisition.create', compact('planActivities'));
+        return view('requests.requisition.create', compact('planActivities', 'hasSignature'));
     }
 
     public function store(Request $request)
@@ -275,12 +290,18 @@ class PettyController extends Controller
 
     private function storeStaffRequisition(Request $request): \Illuminate\Http\RedirectResponse
     {
+        if ($redirect = $this->ensureUserHasSignature(
+            'Please upload your signature in Profile Settings before creating a requisition.'
+        )) {
+            return $redirect;
+        }
+
         $isDraft = $this->isRequisitionDraftAction($request);
         $baseRules = [
             'user_id' => ['required', 'string', 'short_id', 'exists:users,id'],
             'department_id' => ['required', 'string', 'short_id', 'exists:departments,id'],
             'request_type' => 'required|string|in:Staff Requisition',
-            'action' => 'nullable|string|in:draft,submit',
+            'action' => 'required|string|in:draft,submit',
         ];
         $validated = $request->validate(array_merge(
             $baseRules,
@@ -390,6 +411,7 @@ class PettyController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $canActOnRequest = $request->userCanActAtStage($user, $request->approvalStage());
+        $hasSignature = $this->userHasSignature();
 
         return view('requests.approval.details', compact(
             'request',
@@ -400,13 +422,16 @@ class PettyController extends Controller
             'approvedBy',
             'gm',
             'returnStage',
-            'canActOnRequest'
+            'canActOnRequest',
+            'hasSignature'
         ));
     }
 
     public function f_approve(FinanceRequest $petty)
     {
-        if ($redirect = $this->ensureUserHasSignature()) {
+        if ($redirect = $this->ensureUserHasSignature(
+            'Please upload your signature in Profile Settings before reviewing this request.'
+        )) {
             return $redirect;
         }
         if (! $this->canSignRequest($petty, 'review')) {
@@ -428,7 +453,9 @@ class PettyController extends Controller
 
     public function l_approve(FinanceRequest $petty)
     {
-        if ($redirect = $this->ensureUserHasSignature()) {
+        if ($redirect = $this->ensureUserHasSignature(
+            'Please upload your signature in Profile Settings before approving this request.'
+        )) {
             return $redirect;
         }
         if (! $this->canSignRequest($petty, 'approve')) {
@@ -450,7 +477,9 @@ class PettyController extends Controller
 
     public function authorizeRequest(FinanceRequest $petty)
     {
-        if ($redirect = $this->ensureUserHasSignature()) {
+        if ($redirect = $this->ensureUserHasSignature(
+            'Please upload your signature in Profile Settings before authorizing this request.'
+        )) {
             return $redirect;
         }
         if (! $this->canSignRequest($petty, 'authorize')) {
@@ -589,8 +618,14 @@ class PettyController extends Controller
     {
         abort_unless($petty->request_type === 'Staff Requisition', 404);
         abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
-        if (! in_array($petty->status, ['draft', 'pending', 'resubmission'])) {
-            return redirect()->route('requisition.show', $petty)->with('error', 'Only draft, pending, or resubmission requisitions can be edited.');
+        if (! in_array($petty->status, ['draft', 'resubmission'], true)) {
+            return redirect()->route('requisition.show', $petty)->with('error', 'Submitted requisitions cannot be edited.');
+        }
+
+        if (! $this->userHasSignature()) {
+            return redirect()
+                ->route('requisition.index')
+                ->with('error', 'Please upload your signature in Profile Settings before editing a requisition.');
         }
 
         $request = $petty->load(['requisitionDetails', 'requisitionItems']);
@@ -605,8 +640,14 @@ class PettyController extends Controller
     {
         abort_unless($petty->request_type === 'Staff Requisition', 404);
         abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
-        if (! in_array($petty->status, ['draft', 'pending', 'resubmission'])) {
-            return redirect()->route('requisition.show', $petty)->with('error', 'Only draft, pending, or resubmission requisitions can be updated.');
+        if (! in_array($petty->status, ['draft', 'resubmission'], true)) {
+            return redirect()->route('requisition.show', $petty)->with('error', 'Submitted requisitions cannot be updated.');
+        }
+
+        if ($redirect = $this->ensureUserHasSignature(
+            'Please upload your signature in Profile Settings before updating a requisition.'
+        )) {
+            return $redirect;
         }
 
         $isDraft = $petty->status === 'draft';
@@ -617,9 +658,13 @@ class PettyController extends Controller
             ? $this->requisitionDraftValidationRules()
             : $this->requisitionSubmitValidationRules();
 
+        $actionRule = $isDraft
+            ? 'required|string|in:draft,submit'
+            : 'nullable|string|in:draft,submit';
+
         $validated = $request->validate(array_merge([
             'department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
-            'action' => 'nullable|string|in:draft,submit',
+            'action' => $actionRule,
         ], $rules));
 
         $items = $this->normalizeRequisitionItems($request->input('items', []));
@@ -675,7 +720,36 @@ class PettyController extends Controller
         }
 
         $request = $petty->load(['user', 'department', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
-        $pdf = Pdf::loadView('requests.requisition.pdf', compact('request'));
+
+        $settings = app(\App\Services\SystemSettingService::class);
+        $logoAbsolutePath = $settings->formsLogoAbsolutePath();
+
+        $formUrl = route('requisition.show', $request);
+        $qrCodeDataUri = null;
+        try {
+            $qrResult = (new \Endroid\QrCode\Writer\PngWriter)->write(new \Endroid\QrCode\QrCode(
+                data: $formUrl,
+                size: 120,
+                margin: 4,
+            ));
+            $qrCodeDataUri = 'data:image/png;base64,'.base64_encode($qrResult->getString());
+        } catch (\Throwable $e) {
+            Log::warning('Failed to generate requisition PDF QR code', [
+                'request_id' => $request->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $calibriRegularPath = resource_path('fonts/Carlito-Regular.ttf');
+        $calibriBoldPath = resource_path('fonts/Carlito-Bold.ttf');
+
+        $pdf = Pdf::loadView('requests.requisition.pdf', compact(
+            'request',
+            'logoAbsolutePath',
+            'qrCodeDataUri',
+            'calibriRegularPath',
+            'calibriBoldPath',
+        ));
 
         return $pdf->download('staff-requisition-'.$request->id.'.pdf');
     }
@@ -683,8 +757,18 @@ class PettyController extends Controller
     public function destroy(FinanceRequest $petty)
     {
         abort_unless((string) $petty->user_id === (string) Auth::id(), 403);
-        if (! in_array($petty->status, ['draft', 'pending', 'resubmission', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only draft, pending, resubmission, or rejected requests can be deleted.');
+
+        if ($petty->request_type === 'Staff Requisition') {
+            if ($petty->status !== 'draft') {
+                return redirect()->back()->with('error', 'Only draft requisitions can be deleted.');
+            }
+            $petty->delete();
+
+            return redirect()->route('requisition.index')->with('success', 'Draft requisition deleted successfully.');
+        }
+
+        if (! in_array($petty->status, ['pending', 'resubmission', 'rejected'], true)) {
+            return redirect()->back()->with('error', 'Only pending, resubmission, or rejected requests can be deleted.');
         }
         $petty->delete();
 
@@ -765,7 +849,7 @@ class PettyController extends Controller
 
     private function isRequisitionSubmitAction(Request $request): bool
     {
-        return $request->input('action', 'submit') === 'submit';
+        return $request->input('action') === 'submit';
     }
 
     /**

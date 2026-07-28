@@ -7,7 +7,7 @@
 
 @if ($showTrigger)
     <button
-        class="btn btn-sm btn-light d-inline-flex align-items-center"
+        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
         type="button"
         data-bs-toggle="offcanvas"
         data-bs-target="#{{ $offcanvasId }}"

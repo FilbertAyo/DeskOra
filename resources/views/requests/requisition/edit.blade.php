@@ -1,15 +1,25 @@
 <x-app-layout>
-    <div class="row align-items-center mb-3 border-bottom no-gutters">
-        <div class="col">
-            <h5 class="mb-0">Edit Requisition</h5>
-        </div>
-        <div class="col-auto">
-            <a href="{{ route('requisition.show', $request->id) }}" class="btn btn-outline-secondary btn-sm">
-                <i class="ti ti-arrow-left me-1"></i>Back
-            </a>
+
+<div class="page-header">
+    <div class="page-block">
+        <div class="row align-items-center">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="page-header-title">
+                        <h5 class="m-b-10">Edit Requisition</h5>
+                        <ul class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
+                            <li class="breadcrumb-item">Requests</li>
+                            <li class="breadcrumb-item" aria-current="page">Edit Requisition</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
+    
     @php
         $requisitionDetails = $request->requisitionDetails;
         $selectedActivityCode = old('activity_code', $requisitionDetails?->activity_code);

@@ -172,7 +172,8 @@
                         'roles.*',
                         'departments',
                         'activity-log.*',
-                        'settings.*'
+                        'settings.*',
+                        'anonymous-feedback.*'
                     );
                 @endphp
 
@@ -394,6 +395,14 @@
                                 <li class="{{ Request::routeIs('departments') ? 'active' : '' }}">
                                     <a href="{{ route('departments') }}" class="pc-link">
                                         <span class="pc-mtext">Departments</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('manage system settings')
+                                <li class="{{ Request::routeIs('settings.system.*') ? 'active' : '' }}">
+                                    <a href="{{ route('settings.system.edit') }}" class="pc-link">
+                                        <span class="pc-mtext">System</span>
                                     </a>
                                 </li>
                             @endcan

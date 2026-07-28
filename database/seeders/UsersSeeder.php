@@ -58,7 +58,7 @@ class UsersSeeder extends Seeder
         $admin = User::create([
             'name' => 'Administrator',
             'title' => 'System Administrator',
-            'email' => 'admin@adilisha.or.tz',
+            'email' => 'filbertayo09@gmail.com',
             'password' => Hash::make('password'),
             'phone' => '0000000000',
             'department_id' => $programsDept->id,

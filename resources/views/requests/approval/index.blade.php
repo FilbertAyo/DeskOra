@@ -45,7 +45,7 @@
     <div class="col-md-12">
         <div class="card shadow-none border">
             <div class="card-body">
-                <table class="table table-bordered table-striped datatables" id="dataTable-1">
+                <table class="table table-bordered">
                     <thead class="thead-light">
                         <tr>
                             <th>No.</th>
@@ -63,10 +63,6 @@
                         @forelse ($requests as $item)
                             @php
                                 $isStaffRequisition = $item->request_type === 'Staff Requisition';
-                                $isPettyMissingAttachment =
-                                    !$isStaffRequisition &&
-                                    (($item->is_transporter == true && $item->attachment == null) ||
-                                        ($item->request_for == 'Office Supplies' && $item->attachment == null));
                                 $statusClass = match ($item->status) {
                                     'pending' => 'danger',
                                     'processing' => 'warning',
@@ -79,10 +75,7 @@
                                 $hasCompleted = isset($stage) && $item->userHasCompletedStage(auth()->user(), $stage);
                                 $actionLabel = isset($stage) ? \App\Models\Request::stageLabel($stage) : 'View';
                             @endphp
-                            <tr @class([
-                                'table-warning' => $canAct,
-                                'alert alert-danger' => $isPettyMissingAttachment,
-                            ])>
+                            <tr>
                                 <td>{{ $loop->iteration }}</td>
                                 <td>{{ $item->user->name ?? 'N/A' }}</td>
                                 <td>{{ $isStaffRequisition ? ($item->activity_title ?: $item->request_for) : $item->request_for }}</td>

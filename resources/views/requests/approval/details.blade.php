@@ -37,7 +37,7 @@
                             </a>
                           
                             @include('requests.approval.logs')
-                            @if ($canActOnRequest ?? false)
+                            @if (($canActOnRequest ?? false) && ($hasSignature ?? false))
                         <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
                             data-toggle="modal" data-target="#approvalModal" data-bs-toggle="modal" data-bs-target="#approvalModal">
                             <i class="ti ti-check-circle me-2"></i>
@@ -75,6 +75,19 @@
             </div>
         </div>
     </div>
+
+    @if (($canActOnRequest ?? false) && ! ($hasSignature ?? false))
+        <div class="alert alert-warning border-warning mb-4">
+            <div class="d-flex align-items-start gap-2">
+                <i class="ti ti-signature fs-4 mt-1"></i>
+                <div>
+                    <strong>Signature required to {{ strtolower($actionLabel) }}</strong>
+                    <p class="mb-2">Upload your signature in Profile Settings before you can review, approve, or authorize requests.</p>
+                    <a href="{{ route('profile.edit') }}" class="btn btn-sm btn-primary">Upload Signature</a>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @if (! ($canActOnRequest ?? false) && $currentStage !== 'completed')
         <div class="alert alert-light border mb-4">
@@ -281,9 +294,7 @@
                             <div class="small text-muted text-truncate">{{ $modalApprovalLabel }} · {{ $request->request_type }}</div>
                         </div>
                     </div>
-                    <button type="button" class="close ms-2" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                  
                 </div>
                 <div class="modal-body p-0">
                     <!-- Step 1: approve or go to reject -->

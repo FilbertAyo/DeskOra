@@ -23,6 +23,27 @@
     </div>
 </div>
 
+@if (session('error'))
+    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+        <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
+        <a href="{{ route('profile.edit') }}" class="alert-link ms-1">Go to Profile Settings</a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if (! ($hasSignature ?? false))
+    <div class="alert alert-warning border-warning mb-4">
+        <div class="d-flex align-items-start gap-2">
+            <i class="ti ti-signature fs-4 mt-1"></i>
+            <div>
+                <strong>Signature required</strong>
+                <p class="mb-2">You must upload your signature in Profile Settings before you can create a requisition.</p>
+                <a href="{{ route('profile.edit') }}" class="btn btn-sm btn-primary">Upload Signature</a>
+                <a href="{{ route('requisition.index') }}" class="btn btn-sm btn-outline-secondary">Back to Requisitions</a>
+            </div>
+        </div>
+    </div>
+@else
 <form method="POST" action="{{ route('requisition.store') }}" id="requisitionForm" novalidate>
     @csrf
     <input type="hidden" name="user_id" value="{{ Auth::user()->id }}">
@@ -184,4 +205,5 @@
     recalc();
 })();
 </script>
+@endif
 </x-app-layout>

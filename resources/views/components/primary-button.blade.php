@@ -37,6 +37,20 @@
                     ? event.submitter
                     : form.querySelector('button[type="submit"]');
 
+                // Disabled controls are omitted from form submission. Preserve the
+                // clicked button's name/value (e.g. action=draft) via a hidden field.
+                if (submitter && submitter.name) {
+                    let proxy = form.querySelector('input[data-submitter-proxy="1"]');
+                    if (! proxy) {
+                        proxy = document.createElement('input');
+                        proxy.type = 'hidden';
+                        proxy.setAttribute('data-submitter-proxy', '1');
+                        form.appendChild(proxy);
+                    }
+                    proxy.name = submitter.name;
+                    proxy.value = submitter.value;
+                }
+
                 form.querySelectorAll('button[type="submit"]').forEach((button) => {
                     button.disabled = true;
                 });

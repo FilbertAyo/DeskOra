@@ -51,8 +51,8 @@ class DepartmentController extends Controller
                 })->ignore($departmentId),
             ],
             'status' => 'required|in:active,inactive',
-            'parent_id' => 'nullable|string|ulid|exists:departments,id',
-            'head_user_id' => 'nullable|string|ulid|exists:users,id',
+            'parent_id' => 'nullable|string|short_id|exists:departments,id',
+            'head_user_id' => 'nullable|string|short_id|exists:users,id',
             'plan_section_number' => 'nullable|integer|min:1|max:999',
         ]);
 
@@ -121,8 +121,8 @@ class DepartmentController extends Controller
                 })->ignore($department->id),
             ],
             'status' => 'required|in:active,inactive',
-            'parent_id' => 'nullable|string|ulid|exists:departments,id',
-            'head_user_id' => 'nullable|string|ulid|exists:users,id',
+            'parent_id' => 'nullable|string|short_id|exists:departments,id',
+            'head_user_id' => 'nullable|string|short_id|exists:users,id',
             'plan_section_number' => 'nullable|integer|min:1|max:999',
         ]);
 

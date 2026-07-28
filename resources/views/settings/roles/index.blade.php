@@ -27,12 +27,10 @@
     <div class="row">
         <div class="col-md-12">
             <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0"><i class="ti ti-shield me-2"></i>Roles</h5>
-                </div>
+              
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered table-striped">
+                        <table class="table table-hover table-sm table-bordered">
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px;">No.</th>

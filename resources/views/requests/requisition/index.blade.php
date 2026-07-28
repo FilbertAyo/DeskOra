@@ -27,11 +27,23 @@
         </div>
     </div>
 
- 
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+            <i class="ti ti-circle-check me-2"></i>{{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
+            <a href="{{ route('profile.edit') }}" class="alert-link ms-1">Go to Profile Settings</a>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
 
     <div class="card shadow-none border">
         <div class="card-body">
-            <table class="table table-bordered table-striped datatables">
+            <table class="table table-bordered datatables">
                 <thead>
                     <tr>
                         <th>No.</th>
@@ -73,6 +85,18 @@
     @if ($item->status === 'draft')
     <a class="dropdown-item" href="{{ route('requisition.edit', $item->id) }}">
     <i class="ti ti-edit me-2"></i> Continue Draft
+    </a>
+    <form action="{{ route('requisition.destroy', $item->id) }}" method="POST"
+    onsubmit="return confirm('Delete this draft requisition?');">
+    @csrf
+    @method('DELETE')
+    <button type="submit" class="dropdown-item text-danger">
+    <i class="ti ti-trash me-2"></i> Delete Draft
+    </button>
+    </form>
+    @elseif ($item->status === 'resubmission')
+    <a class="dropdown-item" href="{{ route('requisition.edit', $item->id) }}">
+    <i class="ti ti-edit me-2"></i> Edit
     </a>
     @endif
 </x-table-action-dropdown>

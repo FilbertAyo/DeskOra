@@ -22,10 +22,20 @@
                             <a href="{{ route('requisition.index') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="ti ti-arrow-left me-1"></i>Back
             </a>
-            @if (in_array($request->status, ['draft', 'pending', 'resubmission']))
+            @if (in_array($request->status, ['draft', 'resubmission'], true))
                 <a href="{{ route('requisition.edit', $request->id) }}" class="btn btn-primary btn-sm text-white">
                     <i class="ti ti-edit me-1"></i>{{ $request->status === 'draft' ? 'Continue Draft' : 'Edit' }}
                 </a>
+            @endif
+            @if ($request->status === 'draft')
+                <form action="{{ route('requisition.destroy', $request->id) }}" method="POST" class="d-inline"
+                    onsubmit="return confirm('Delete this draft requisition?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="ti ti-trash me-1"></i>Delete Draft
+                    </button>
+                </form>
             @endif
                         </div>
                     </div>
