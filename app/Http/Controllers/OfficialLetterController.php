@@ -1,0 +1,433 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\OfficialLetter;
+use App\Models\User;
+use App\Services\OfficialLetterReferenceService;
+use App\Services\SystemSettingService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+
+class OfficialLetterController extends Controller
+{
+    public function __construct(
+        private readonly OfficialLetterReferenceService $referenceService,
+    ) {}
+
+    public function index(Request $request)
+    {
+        $this->authorize('viewAny', OfficialLetter::class);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $canManage = $user->can('manage official letters');
+
+        $query = OfficialLetter::query()
+            ->visibleTo($user)
+            ->with(['creator', 'signatory', 'sharedUsers:id,name'])
+            ->orderByDesc('letter_date')
+            ->orderByDesc('created_at');
+
+        if ($request->filled('department_code')) {
+            $query->where('department_code', strtoupper((string) $request->input('department_code')));
+        }
+
+        if ($request->filled('year')) {
+            $query->whereYear('letter_date', $request->integer('year'));
+        }
+
+        if ($request->filled('month')) {
+            $query->whereMonth('letter_date', $request->integer('month'));
+        }
+
+        $letters = $query->paginate(15)->withQueryString();
+        $departments = config('official-letters.departments', []);
+        $years = OfficialLetter::query()
+            ->visibleTo($user)
+            ->orderByDesc('letter_date')
+            ->pluck('letter_date')
+            ->map(fn ($date) => Carbon::parse($date)->year)
+            ->unique()
+            ->values();
+
+        return view('official-letters.index', compact(
+            'letters',
+            'departments',
+            'years',
+            'canManage',
+            'user',
+        ));
+    }
+
+    public function create()
+    {
+        $this->authorize('create', OfficialLetter::class);
+
+        return view('official-letters.create', $this->formOptions());
+    }
+
+    public function store(Request $request)
+    {
+        $this->authorize('create', OfficialLetter::class);
+
+        $validated = $this->validateLetter($request);
+        $letterDate = Carbon::parse($validated['letter_date'])->startOfDay();
+
+        $allocated = $this->referenceService->allocate($validated['department_code'], $letterDate);
+
+        $letter = new OfficialLetter($validated);
+        $letter->created_by = Auth::id();
+        $letter->reference_number = $allocated['reference_number'];
+        $letter->sequence = $allocated['sequence'];
+        $letter->save();
+
+        return redirect()
+            ->route('official-letters.show', $letter)
+            ->with('success', 'Official letter created with reference '.$letter->reference_number.'.');
+    }
+
+    public function show(OfficialLetter $officialLetter)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (! $officialLetter->userHasFullAccess($user)) {
+            return redirect()->route('official-letters.verify', $officialLetter);
+        }
+
+        $this->authorize('view', $officialLetter);
+
+        $officialLetter->load(['creator', 'signatory', 'sharedUsers:id,name']);
+        $shareableUsers = $this->shareableUsersFor($user, $officialLetter);
+        $canShare = $user->can('share', $officialLetter);
+        $canUpdate = $user->can('update', $officialLetter);
+        $canDelete = $user->can('delete', $officialLetter);
+        $isSharedWithMe = ! $officialLetter->isOwnedBy($user) && $officialLetter->isSharedWith($user);
+
+        return view('official-letters.show', [
+            'letter' => $officialLetter,
+            'shareableUsers' => $shareableUsers,
+            'canShare' => $canShare,
+            'canUpdate' => $canUpdate,
+            'canDelete' => $canDelete,
+            'isSharedWithMe' => $isSharedWithMe,
+        ]);
+    }
+
+    public function verify(OfficialLetter $officialLetter)
+    {
+        $this->authorize('verify', $officialLetter);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if ($officialLetter->userHasFullAccess($user)) {
+            return redirect()->route('official-letters.show', $officialLetter);
+        }
+
+        $officialLetter->load(['creator:id,name', 'signatory:id,name,title']);
+
+        return view('official-letters.verify', [
+            'letter' => $officialLetter,
+        ]);
+    }
+
+    public function share(Request $request, OfficialLetter $officialLetter)
+    {
+        $this->authorize('share', $officialLetter);
+
+        /** @var \App\Models\User $actor */
+        $actor = Auth::user();
+
+        $validated = $request->validate([
+            'shared_user_ids' => ['nullable', 'array'],
+            'shared_user_ids.*' => ['nullable', 'string', 'short_id', 'exists:users,id'],
+        ]);
+
+        $desiredIds = array_values(array_unique(array_filter(
+            array_map(static fn ($id) => trim((string) $id), $validated['shared_user_ids'] ?? []),
+            static fn ($id) => $id !== '' && $id !== (string) $officialLetter->created_by
+        )));
+
+        $existingIds = $officialLetter->sharedUsers()
+            ->pluck('users.id')
+            ->map(static fn ($id) => (string) $id)
+            ->all();
+
+        $syncPayload = [];
+        foreach ($desiredIds as $userId) {
+            $syncPayload[$userId] = ['shared_by' => $actor->id];
+        }
+
+        $officialLetter->sharedUsers()->sync($syncPayload);
+
+        $addedIds = array_values(array_diff($desiredIds, $existingIds));
+        if ($addedIds !== []) {
+            $recipients = User::query()
+                ->active()
+                ->whereIn('id', $addedIds)
+                ->get();
+
+            \Illuminate\Support\Facades\Notification::send(
+                $recipients,
+                new \App\Notifications\OfficialLetterSharedNotification($officialLetter, $actor)
+            );
+        }
+
+        return redirect()
+            ->route('official-letters.show', $officialLetter)
+            ->with('success', 'Letter sharing updated.'.($addedIds !== [] ? ' Newly shared staff were notified by email.' : ''));
+    }
+
+    public function edit(OfficialLetter $officialLetter)
+    {
+        $this->authorize('update', $officialLetter);
+
+        return view('official-letters.edit', array_merge(
+            $this->formOptions(),
+            ['letter' => $officialLetter],
+        ));
+    }
+
+    public function update(Request $request, OfficialLetter $officialLetter)
+    {
+        $this->authorize('update', $officialLetter);
+
+        $validated = $this->validateLetter($request);
+        $letterDate = Carbon::parse($validated['letter_date'])->startOfDay();
+
+        $departmentChanged = strtoupper($validated['department_code']) !== strtoupper($officialLetter->department_code);
+        $monthChanged = $letterDate->format('Y-m') !== $officialLetter->letter_date->format('Y-m');
+
+        if ($departmentChanged || $monthChanged) {
+            $allocated = $this->referenceService->allocate($validated['department_code'], $letterDate);
+            $officialLetter->reference_number = $allocated['reference_number'];
+            $officialLetter->sequence = $allocated['sequence'];
+        } elseif ($letterDate->format('Y-m-d') !== $officialLetter->letter_date->format('Y-m-d')) {
+            $officialLetter->reference_number = $this->referenceService->formatReference(
+                strtoupper($validated['department_code']),
+                strtoupper($letterDate->format('M')),
+                $letterDate->format('y'),
+                $letterDate->format('d'),
+                str_pad((string) $officialLetter->sequence, 3, '0', STR_PAD_LEFT),
+            );
+        }
+
+        $officialLetter->fill($validated);
+        $officialLetter->save();
+
+        return redirect()
+            ->route('official-letters.show', $officialLetter)
+            ->with('success', 'Official letter updated.');
+    }
+
+    public function destroy(OfficialLetter $officialLetter)
+    {
+        $this->authorize('delete', $officialLetter);
+
+        $officialLetter->delete();
+
+        return redirect()
+            ->route('official-letters.index')
+            ->with('success', 'Official letter deleted.');
+    }
+
+    public function download(OfficialLetter $officialLetter)
+    {
+        $this->authorize('download', $officialLetter);
+
+        $officialLetter->loadMissing('signatory');
+
+        $settings = app(SystemSettingService::class);
+        $logoAbsolutePath = $settings->formsLogoAbsolutePath();
+        $calibriRegularPath = resource_path('fonts/Carlito-Regular.ttf');
+        $calibriBoldPath = resource_path('fonts/Carlito-Bold.ttf');
+        $letterhead = config('official-letters.letterhead', []);
+        $signatorySignaturePath = null;
+        if ($officialLetter->usesDigitalSignature()) {
+            $signatorySignaturePath = $this->resolveUserSignatureAbsolutePath($officialLetter->signatory);
+        }
+
+        $letterUrl = route('official-letters.show', $officialLetter);
+        $qrCodeDataUri = null;
+        try {
+            $qrResult = (new \Endroid\QrCode\Writer\PngWriter)->write(new \Endroid\QrCode\QrCode(
+                data: $letterUrl,
+                size: 160,
+                margin: 2,
+            ));
+            $qrCodeDataUri = 'data:image/png;base64,'.base64_encode($qrResult->getString());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to generate official letter PDF QR code', [
+                'letter_id' => $officialLetter->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // DomPDF sometimes fails on data-URI images; also write a temp PNG fallback.
+        $qrCodeAbsolutePath = null;
+        if (is_string($qrCodeDataUri) && $qrCodeDataUri !== '') {
+            $qrCodeAbsolutePath = storage_path('app/temp/official-letter-qr-'.$officialLetter->id.'.png');
+            $dir = dirname($qrCodeAbsolutePath);
+            if (! is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            file_put_contents($qrCodeAbsolutePath, base64_decode(substr($qrCodeDataUri, strlen('data:image/png;base64,')), true));
+        }
+
+        $pdf = Pdf::loadView('official-letters.pdf', [
+            'letter' => $officialLetter,
+            'logoAbsolutePath' => $logoAbsolutePath,
+            'calibriRegularPath' => $calibriRegularPath,
+            'calibriBoldPath' => $calibriBoldPath,
+            'letterhead' => $letterhead,
+            'qrCodeDataUri' => $qrCodeDataUri,
+            'qrCodeAbsolutePath' => $qrCodeAbsolutePath,
+            'signatorySignaturePath' => $signatorySignaturePath,
+            'footerPhoneIconPath' => public_path('assets/images/letterhead/phone.png'),
+            'footerEmailIconPath' => public_path('assets/images/letterhead/email.png'),
+            'footerGlobeIconPath' => public_path('assets/images/letterhead/globe.png'),
+        ])->setPaper('a4', 'portrait');
+
+        $safeName = str_replace(['/', ' '], ['-', '_'], $officialLetter->reference_number);
+
+        $response = $pdf->download($safeName.'.pdf');
+
+        if (is_string($qrCodeAbsolutePath) && is_file($qrCodeAbsolutePath)) {
+            @unlink($qrCodeAbsolutePath);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Resolve an absolute filesystem path for a user's uploaded signature image.
+     */
+    private function resolveUserSignatureAbsolutePath(?User $user): ?string
+    {
+        if (! $user) {
+            return null;
+        }
+
+        $signature = trim((string) $user->signature);
+        if ($signature === '') {
+            return null;
+        }
+
+        $candidates = [
+            public_path($signature),
+            public_path(ltrim($signature, '/')),
+            storage_path('app/public/'.ltrim(preg_replace('#^storage/#', '', $signature) ?? $signature, '/')),
+        ];
+
+        foreach ($candidates as $path) {
+            if (is_string($path) && is_file($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validateLetter(Request $request): array
+    {
+        $departmentCodes = array_keys(config('official-letters.departments', []));
+        $salutations = config('official-letters.salutations', []);
+        $closings = config('official-letters.closings', []);
+
+        $validated = $request->validate([
+            'department_code' => ['required', 'string', Rule::in($departmentCodes)],
+            'letter_date' => ['required', 'date'],
+            'recipient' => ['required', 'string', 'max:5000'],
+            'subject' => ['required', 'string', 'max:500'],
+            'salutation' => ['required', 'string', Rule::in($salutations)],
+            'body' => ['required', 'string', 'max:100000'],
+            'closing' => ['required', 'string', Rule::in($closings)],
+            'signatory_id' => ['required', 'string', 'short_id', 'exists:users,id'],
+            'signature_mode' => [
+                'required',
+                'string',
+                Rule::in([
+                    OfficialLetter::SIGNATURE_MODE_DIGITAL,
+                    OfficialLetter::SIGNATURE_MODE_MANUAL,
+                ]),
+            ],
+        ]);
+
+        $signatory = User::query()->findOrFail($validated['signatory_id']);
+        $validated['department_code'] = strtoupper($validated['department_code']);
+        $validated['recipient'] = mb_strtoupper($validated['recipient'], 'UTF-8');
+        $validated['subject'] = mb_strtoupper($validated['subject'], 'UTF-8');
+        $validated['body'] = $this->sanitizeBodyHtml($validated['body']);
+        $validated['signatory_name'] = (string) $signatory->name;
+        $validated['signatory_title'] = (string) ($signatory->title ?? '');
+
+        unset($validated['reference_number'], $validated['sequence']);
+
+        return $validated;
+    }
+
+    private function sanitizeBodyHtml(string $html): string
+    {
+        $cleaned = strip_tags(
+            $html,
+            '<p><br><br/><strong><b><em><i><u><ul><ol><li><span><div>'
+        );
+
+        $cleaned = preg_replace('/\son\w+="[^"]*"/i', '', $cleaned) ?? $cleaned;
+        $cleaned = preg_replace('/\son\w+=\'[^\']*\'/i', '', $cleaned) ?? $cleaned;
+        $cleaned = preg_replace('/javascript:/i', '', $cleaned) ?? $cleaned;
+
+        if (trim(strip_tags($cleaned)) === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'body' => ['Letter body cannot be empty.'],
+            ]);
+        }
+
+        return $cleaned;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formOptions(): array
+    {
+        return [
+            'departments' => config('official-letters.departments', []),
+            'salutations' => config('official-letters.salutations', []),
+            'closings' => config('official-letters.closings', []),
+            'signatories' => $this->signatoryOptions(),
+        ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    private function signatoryOptions()
+    {
+        return User::query()
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name', 'title']);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    private function shareableUsersFor(User $actor, OfficialLetter $letter)
+    {
+        return User::query()
+            ->active()
+            ->select('id', 'name')
+            ->where('id', '!=', $letter->created_by)
+            ->orderBy('name')
+            ->get();
+    }
+}

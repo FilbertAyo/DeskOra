@@ -44,6 +44,8 @@ final class ShortIdSchema
             'nomination_periods',
             'nomination_participations',
             'nominations',
+            'meeting_minutes',
+            'official_letters',
         ];
     }
 
@@ -135,6 +137,13 @@ final class ShortIdSchema
             ['nomination_participations', 'user_id'],
             ['nominations', 'nomination_period_id'],
             ['nominations', 'nominee_id'],
+            ['meeting_minutes', 'period_id'],
+            ['meeting_minutes', 'uploaded_by'],
+            ['official_letters', 'created_by'],
+            ['official_letters', 'signatory_id'],
+            ['official_letter_user_shares', 'official_letter_id'],
+            ['official_letter_user_shares', 'user_id'],
+            ['official_letter_user_shares', 'shared_by'],
         ];
     }
 

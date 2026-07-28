@@ -77,6 +77,9 @@ class RolesAndPermissionsSeeder extends Seeder
             // Meeting minutes permissions
             'manage minutes',
 
+            // Official letters permissions
+            'manage official letters',
+
         ];
 
         // Combine all permissions

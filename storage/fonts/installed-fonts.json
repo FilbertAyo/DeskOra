@@ -2,5 +2,9 @@
     "calibri": {
         "normal": "\/Users\/ayo\/develop\/WorkHub\/storage\/fonts\/calibri_normal_0043c19594be62010456d65781fc8fa4",
         "bold": "calibri_bold_eabfbe1ed3da35065880a7b32d8530fb"
+    },
+    "poppins": {
+        "normal": "\/Users\/ayo\/develop\/WorkHub\/storage\/fonts\/poppins_normal_51bb9c84147c571d34de78674069b685",
+        "bold": "poppins_bold_269320ab13b2bd7335a7f001b3658330"
     }
 }

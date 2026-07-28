@@ -15,6 +15,7 @@ use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OfficialLetterController;
 use App\Http\Controllers\PettyController;
 use App\Http\Controllers\PortalAiAssistantController;
 use App\Http\Controllers\ProfileController;
@@ -144,6 +145,23 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:manage minutes')
             ->name('update');
         Route::get('/{meetingMinute}', [MeetingMinuteController::class, 'show'])->name('show');
+    });
+
+    Route::prefix('official-letters')->name('official-letters.')->group(function () {
+        Route::get('/', [OfficialLetterController::class, 'index'])->name('index');
+        Route::get('/create', [OfficialLetterController::class, 'create'])
+            ->middleware('permission:manage official letters')
+            ->name('create');
+        Route::post('/', [OfficialLetterController::class, 'store'])
+            ->middleware('permission:manage official letters')
+            ->name('store');
+        Route::get('/{officialLetter}/download', [OfficialLetterController::class, 'download'])->name('download');
+        Route::get('/{officialLetter}/verify', [OfficialLetterController::class, 'verify'])->name('verify');
+        Route::get('/{officialLetter}/edit', [OfficialLetterController::class, 'edit'])->name('edit');
+        Route::put('/{officialLetter}', [OfficialLetterController::class, 'update'])->name('update');
+        Route::post('/{officialLetter}/share', [OfficialLetterController::class, 'share'])->name('share');
+        Route::delete('/{officialLetter}', [OfficialLetterController::class, 'destroy'])->name('destroy');
+        Route::get('/{officialLetter}', [OfficialLetterController::class, 'show'])->name('show');
     });
 
     Route::middleware('permission:manage year plans')->prefix('year-plans')->name('year-plan.')->group(function () {

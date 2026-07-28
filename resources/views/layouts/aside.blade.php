@@ -72,10 +72,15 @@
                 </li>
 
                 @php
-                    $isMonthlyReportsNav = Request::routeIs('documents.monthly-report');
+                    $isOfficialLettersNav = Request::routeIs('official-letters.*');
                     $isAllDocumentsNav = Request::routeIs('documents.index');
                 @endphp
-              
+                <li class="pc-item {{ $isOfficialLettersNav ? 'active' : '' }}">
+                    <a href="{{ route('official-letters.index') }}" class="pc-link">
+                        <span class="pc-micon"><i class="ti ti-mail"></i></span>
+                        <span class="pc-mtext">Official Letters</span>
+                    </a>
+                </li>
                 <li class="pc-item {{ $isAllDocumentsNav ? 'active' : '' }}">
                     <a href="{{ route('documents.index') }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-stack"></i></span>
