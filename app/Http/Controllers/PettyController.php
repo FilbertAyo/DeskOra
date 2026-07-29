@@ -307,6 +307,13 @@ class PettyController extends Controller
             $baseRules,
             $isDraft ? $this->requisitionDraftValidationRules() : $this->requisitionSubmitValidationRules()
         ));
+        $validated = $this->resolveRequisitionActivityFields($request, $validated, $isDraft);
+
+        if ($validated === null) {
+            return redirect()->back()->withInput()->withErrors([
+                'activity_code' => 'Enter a valid activity code when the request is not on the year plan.',
+            ]);
+        }
 
         $items = $this->normalizeRequisitionItems($request->input('items', []));
 
@@ -666,6 +673,13 @@ class PettyController extends Controller
             'department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
             'action' => $actionRule,
         ], $rules));
+        $validated = $this->resolveRequisitionActivityFields($request, $validated, $saveAsDraft);
+
+        if ($validated === null) {
+            return redirect()->back()->withInput()->withErrors([
+                'activity_code' => 'Enter a valid activity code when the request is not on the year plan.',
+            ]);
+        }
 
         $items = $this->normalizeRequisitionItems($request->input('items', []));
 
@@ -858,8 +872,10 @@ class PettyController extends Controller
     private function requisitionDraftValidationRules(): array
     {
         return [
+            'activity_selection' => 'nullable|string|max:255',
+            'is_off_plan' => 'nullable|boolean',
             'project_program' => 'nullable|string|max:255',
-            'activity_code' => 'nullable|string|max:255',
+            'activity_code' => 'nullable|string|max:255|not_in:__off_plan__',
             'activity_title' => 'nullable|string|max:255',
             'budget_code' => 'nullable|string|max:255',
             'date_of_request' => 'nullable|date',
@@ -878,8 +894,10 @@ class PettyController extends Controller
     private function requisitionSubmitValidationRules(): array
     {
         return [
+            'activity_selection' => 'nullable|string|max:255',
+            'is_off_plan' => 'nullable|boolean',
             'project_program' => 'required|string|max:255',
-            'activity_code' => 'required|string|max:255',
+            'activity_code' => 'nullable|string|max:255|not_in:__off_plan__',
             'activity_title' => 'required|string|max:255',
             'budget_code' => 'required|string|max:255',
             'date_of_request' => 'nullable|date',
@@ -890,6 +908,56 @@ class PettyController extends Controller
             'items.*.unit' => 'nullable|string|max:255',
             'items.*.cost' => 'required|numeric|min:0',
         ];
+    }
+
+    /**
+     * Resolve activity_code / is_off_plan from activity_selection or manual entry.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>|null  Null when activity code cannot be resolved for submit.
+     */
+    private function resolveRequisitionActivityFields(Request $request, array $validated, bool $isDraft): ?array
+    {
+        $selection = trim((string) ($validated['activity_selection'] ?? $request->input('activity_selection', '')));
+        $isOffPlan = $selection === '__off_plan__'
+            || filter_var($validated['is_off_plan'] ?? $request->input('is_off_plan'), FILTER_VALIDATE_BOOLEAN);
+
+        if ($isOffPlan) {
+            $activityCode = trim((string) ($validated['activity_code'] ?? ''));
+            if ($activityCode === '' || $activityCode === '__off_plan__') {
+                if ($isDraft) {
+                    $validated['activity_code'] = null;
+                    $validated['is_off_plan'] = true;
+
+                    return $validated;
+                }
+
+                return null;
+            }
+
+            $validated['activity_code'] = $activityCode;
+            $validated['is_off_plan'] = true;
+
+            return $validated;
+        }
+
+        if ($selection !== '' && $selection !== '__off_plan__') {
+            $validated['activity_code'] = $selection;
+        }
+
+        $activityCode = trim((string) ($validated['activity_code'] ?? ''));
+        if ($activityCode === '__off_plan__') {
+            return null;
+        }
+
+        if (! $isDraft && $activityCode === '') {
+            return null;
+        }
+
+        $validated['activity_code'] = $activityCode !== '' ? $activityCode : null;
+        $validated['is_off_plan'] = false;
+
+        return $validated;
     }
 
     /**
@@ -923,6 +991,7 @@ class PettyController extends Controller
                 'activity_code' => $validated['activity_code'] ?? null,
                 'activity_title' => $validated['activity_title'] ?? null,
                 'budget_code' => $validated['budget_code'] ?? null,
+                'is_off_plan' => (bool) ($validated['is_off_plan'] ?? false),
                 'date_of_request' => $validated['date_of_request'] ?? null,
                 'date_of_requirement' => $validated['date_of_requirement'] ?? null,
                 'reason' => $validated['reason'] ?? null,

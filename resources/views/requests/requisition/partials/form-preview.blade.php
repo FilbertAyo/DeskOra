@@ -13,6 +13,9 @@
             <div class="col-md-3">
                 <label class="form-label">Activity code</label>
                 <input class="form-control bg-light" value="{{ $request->activity_code }}" disabled>
+                @if ($request->is_off_plan)
+                    <small class="text-muted">Not on the year plan</small>
+                @endif
             </div>
             <div class="col-md-9">
                 <label class="form-label">Activity title</label>

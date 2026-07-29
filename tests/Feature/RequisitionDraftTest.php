@@ -373,4 +373,135 @@ class RequisitionDraftTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('DR002');
     }
+
+    public function test_staff_can_submit_off_plan_requisition_with_manual_codes(): void
+    {
+        Notification::fake();
+
+        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        $requester = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'signature' => 'signatures/test.png',
+        ]);
+        $requester->givePermissionTo('request pettycash');
+
+        $response = $this->actingAs($requester)->post(route('requisition.store'), [
+            'user_id' => $requester->id,
+            'department_id' => $department->id,
+            'request_type' => 'Staff Requisition',
+            'action' => 'submit',
+            'project_program' => 'Emergency Support',
+            'activity_selection' => '__off_plan__',
+            'is_off_plan' => '1',
+            'activity_code' => 'OP-99',
+            'activity_title' => 'Unplanned field visit',
+            'budget_code' => 'BUD-OFF-01',
+            'items' => [
+                ['description' => 'Transport', 'unit' => 'trip', 'cost' => '75000'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('requisition.index'));
+
+        $requisition = FinanceRequest::query()->where('user_id', $requester->id)->first();
+        $this->assertNotNull($requisition);
+        $details = $requisition->fresh('requisitionDetails')->requisitionDetails;
+        $this->assertNotNull($details);
+        $this->assertTrue($details->is_off_plan);
+        $this->assertSame('OP-99', $details->activity_code);
+        $this->assertSame('BUD-OFF-01', $details->budget_code);
+        $this->assertSame('Unplanned field visit', $details->activity_title);
+        $this->assertTrue($requisition->fresh('requisitionDetails')->is_off_plan);
+    }
+
+    public function test_off_plan_submit_rejects_sentinel_as_activity_code(): void
+    {
+        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        $requester = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'signature' => 'signatures/test.png',
+        ]);
+        $requester->givePermissionTo('request pettycash');
+
+        $response = $this->actingAs($requester)->from(route('requisition.create'))->post(route('requisition.store'), [
+            'user_id' => $requester->id,
+            'department_id' => $department->id,
+            'request_type' => 'Staff Requisition',
+            'action' => 'submit',
+            'project_program' => 'Emergency Support',
+            'activity_selection' => '__off_plan__',
+            'is_off_plan' => '1',
+            'activity_code' => '__off_plan__',
+            'activity_title' => 'Unplanned field visit',
+            'budget_code' => 'BUD-OFF-01',
+            'items' => [
+                ['description' => 'Transport', 'unit' => 'trip', 'cost' => '75000'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('requisition.create'));
+        $response->assertSessionHasErrors('activity_code');
+        $this->assertSame(0, FinanceRequest::query()->count());
+    }
+
+    public function test_off_plan_draft_round_trips_on_edit(): void
+    {
+        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        $requester = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'signature' => 'signatures/test.png',
+        ]);
+        $requester->givePermissionTo('request pettycash');
+
+        $draft = FinanceRequest::create([
+            'request_no' => 'DR-OFF-1',
+            'request_type' => 'Staff Requisition',
+            'user_id' => $requester->id,
+            'department_id' => $department->id,
+            'status' => 'draft',
+            'submitted_at' => null,
+        ]);
+
+        RequisitionRequest::create([
+            'request_id' => $draft->id,
+            'project_program' => 'Emergency Support',
+            'activity_code' => 'OP-99',
+            'activity_title' => 'Unplanned field visit',
+            'budget_code' => 'BUD-OFF-01',
+            'is_off_plan' => true,
+            'amount' => 0,
+        ]);
+
+        $this->actingAs($requester)
+            ->get(route('requisition.edit', $draft->id))
+            ->assertOk()
+            ->assertSee('Not on the year plan')
+            ->assertSee('OP-99')
+            ->assertSee('BUD-OFF-01');
+
+        $response = $this->actingAs($requester)->put(route('requisition.update', $draft->id), [
+            'action' => 'draft',
+            'project_program' => 'Emergency Support Updated',
+            'activity_selection' => '__off_plan__',
+            'is_off_plan' => '1',
+            'activity_code' => 'OP-100',
+            'activity_title' => 'Updated off-plan title',
+            'budget_code' => 'BUD-OFF-02',
+            'items' => [
+                ['description' => 'Fuel', 'unit' => 'litre', 'cost' => '20000'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('requisition.edit', $draft->id));
+
+        $details = $draft->fresh('requisitionDetails')->requisitionDetails;
+        $this->assertTrue($details->is_off_plan);
+        $this->assertSame('OP-100', $details->activity_code);
+        $this->assertSame('BUD-OFF-02', $details->budget_code);
+        $this->assertSame('Updated off-plan title', $details->activity_title);
+        $this->assertSame('Emergency Support Updated', $details->project_program);
+    }
 }

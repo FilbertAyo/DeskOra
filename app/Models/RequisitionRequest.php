@@ -23,6 +23,7 @@ class RequisitionRequest extends Model
                 'activity_code',
                 'activity_title',
                 'budget_code',
+                'is_off_plan',
                 'date_of_request',
                 'date_of_requirement',
                 'reason',
@@ -39,6 +40,7 @@ class RequisitionRequest extends Model
         'activity_code',
         'activity_title',
         'budget_code',
+        'is_off_plan',
         'date_of_request',
         'date_of_requirement',
         'reason',
@@ -49,6 +51,7 @@ class RequisitionRequest extends Model
         'date_of_request' => 'date',
         'date_of_requirement' => 'date',
         'amount' => 'decimal:2',
+        'is_off_plan' => 'boolean',
     ];
 
     public function request()

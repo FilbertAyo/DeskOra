@@ -272,7 +272,12 @@
         </tr>
         <tr>
             <td style="width: 12%;" class="label">Activity code:</td>
-            <td style="width: 18%;"><span class="line">{{ $request->activity_code ?: "\u{00A0}" }}</span></td>
+            <td style="width: 18%;">
+                <span class="line">{{ $request->activity_code ?: "\u{00A0}" }}</span>
+                @if ($request->is_off_plan)
+                    <div style="font-size: 9px; color: #555; margin-top: 2px;">Not on the year plan</div>
+                @endif
+            </td>
             <td style="width: 12%;" class="label">Activity Title:</td>
             <td style="width: 58%;" colspan="3"><span class="line">{{ $titleLine1 }}</span></td>
         </tr>

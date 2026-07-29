@@ -151,6 +151,11 @@ class Request extends Model
         return $this->requisitionDetails?->budget_code;
     }
 
+    public function getIsOffPlanAttribute(): bool
+    {
+        return (bool) ($this->requisitionDetails?->is_off_plan ?? false);
+    }
+
     public function getDateOfRequestAttribute()
     {
         return $this->requisitionDetails?->date_of_request;

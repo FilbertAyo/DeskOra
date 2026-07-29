@@ -58,32 +58,53 @@
                     <label class="form-label">Project / Program</label>
                     <input type="text" class="form-control" name="project_program" value="{{ old('project_program') }}" required>
                 </div>
+                @php
+                    $oldSelection = old('activity_selection');
+                    if ($oldSelection === null) {
+                        $oldSelection = filter_var(old('is_off_plan'), FILTER_VALIDATE_BOOLEAN)
+                            ? '__off_plan__'
+                            : old('activity_code');
+                    }
+                    $isOffPlan = $oldSelection === '__off_plan__';
+                @endphp
                 <div class="col-md-3 mt-2">
                     <label class="form-label">Activity Code</label>
-                    <select class="form-control" name="activity_code" id="activity_code" required>
-                        <option value="" disabled {{ old('activity_code') ? '' : 'selected' }}>Select activity code</option>
+                    <select class="form-control" name="activity_selection" id="activity_selection" required>
+                        <option value="" disabled {{ $oldSelection ? '' : 'selected' }}>Select activity code</option>
                         @foreach (($planActivities ?? collect()) as $activity)
                             <option
                                 value="{{ $activity['code'] }}"
                                 data-description="{{ $activity['description'] }}"
                                 data-year="{{ $activity['year'] }}"
                                 data-department-id="{{ $activity['department_id'] }}"
-                                {{ old('activity_code') === $activity['code'] ? 'selected' : '' }}>
+                                {{ $oldSelection === $activity['code'] ? 'selected' : '' }}>
                                 {{ $activity['code'] }} - {{ \Illuminate\Support\Str::limit($activity['description'], 90) }} @if($activity['year']) ({{ $activity['year'] }}) @endif
                             </option>
                         @endforeach
+                        <option value="__off_plan__" {{ $isOffPlan ? 'selected' : '' }}>Not on the year plan</option>
                     </select>
+                    <input type="hidden" name="is_off_plan" id="is_off_plan" value="{{ $isOffPlan ? '1' : '0' }}">
+                    <div class="mt-2" id="manual_activity_wrap" @if(! $isOffPlan) style="display:none;" @endif>
+                        <input
+                            type="text"
+                            class="form-control"
+                            name="activity_code"
+                            id="activity_code"
+                            value="{{ $isOffPlan ? old('activity_code') : ($oldSelection && $oldSelection !== '__off_plan__' ? $oldSelection : '') }}"
+                            placeholder="Enter activity code"
+                            @if($isOffPlan) required @endif>
+                    </div>
                     @if (($planActivities ?? collect())->isEmpty())
-                        <small class="text-danger">No year plan activities found for your department.</small>
+                        <small class="text-muted">No year plan activities found for your department. Select “Not on the year plan” to enter codes manually.</small>
                     @endif
                 </div>
                 <div class="col-md-3 mt-2">
                     <label class="form-label">Budget Code</label>
-                    <input type="text" class="form-control" id="budget_code" name="budget_code" value="{{ old('budget_code') }}" required readonly>
+                    <input type="text" class="form-control" id="budget_code" name="budget_code" value="{{ old('budget_code') }}" required @if(! $isOffPlan) readonly @endif>
                 </div>
                 <div class="col-md-6 mt-2">
                     <label class="form-label">Activity Title</label>
-                    <input type="text" class="form-control" id="activity_title" name="activity_title" value="{{ old('activity_title') }}" required readonly>
+                    <input type="text" class="form-control" id="activity_title" name="activity_title" value="{{ old('activity_title') }}" required @if(! $isOffPlan) readonly @endif>
                 </div>
                 <div class="col-md-3 mt-2">
                     <label class="form-label">Date of Request</label>
@@ -150,10 +171,61 @@
     const tableBody = document.querySelector('#itemsTable tbody');
     const addRowBtn = document.getElementById('addItemRow');
     const totalField = document.getElementById('requisitionTotal');
+    const activitySelectionField = document.getElementById('activity_selection');
     const activityCodeField = document.getElementById('activity_code');
+    const manualActivityWrap = document.getElementById('manual_activity_wrap');
+    const isOffPlanField = document.getElementById('is_off_plan');
     const budgetCodeField = document.getElementById('budget_code');
     const activityTitleField = document.getElementById('activity_title');
     const departmentField = document.getElementById('department_id');
+    let previousWasOffPlan = activitySelectionField?.value === '__off_plan__';
+
+    function setReadonly(field, readonly) {
+        if (!field) return;
+        if (readonly) {
+            field.setAttribute('readonly', 'readonly');
+        } else {
+            field.removeAttribute('readonly');
+        }
+    }
+
+    function syncActivityMode({ clearManual = false } = {}) {
+        const selected = activitySelectionField?.options[activitySelectionField.selectedIndex];
+        const isOffPlan = selected?.value === '__off_plan__';
+
+        if (isOffPlanField) isOffPlanField.value = isOffPlan ? '1' : '0';
+        if (manualActivityWrap) manualActivityWrap.style.display = isOffPlan ? '' : 'none';
+
+        if (isOffPlan) {
+            if (activityCodeField) {
+                activityCodeField.required = true;
+                if (clearManual || !previousWasOffPlan) {
+                    activityCodeField.value = '';
+                }
+            }
+            setReadonly(budgetCodeField, false);
+            setReadonly(activityTitleField, false);
+            if (clearManual || !previousWasOffPlan) {
+                if (budgetCodeField) budgetCodeField.value = '';
+                if (activityTitleField) activityTitleField.value = '';
+            }
+        } else {
+            if (activityCodeField) {
+                activityCodeField.required = false;
+                activityCodeField.value = selected?.value || '';
+            }
+            setReadonly(budgetCodeField, true);
+            setReadonly(activityTitleField, true);
+            if (selected && selected.value) {
+                if (budgetCodeField) budgetCodeField.value = selected.dataset.year || '';
+                if (activityTitleField) activityTitleField.value = selected.dataset.description || '';
+                if (departmentField) departmentField.value = selected.dataset.departmentId || departmentField.value;
+            }
+        }
+
+        previousWasOffPlan = isOffPlan;
+    }
+
     function recalc() {
         let total = 0;
         document.querySelectorAll('.item-cost').forEach((input) => total += parseFloat(input.value || 0));
@@ -188,20 +260,8 @@
     tableBody?.addEventListener('input', (e) => {
         if (e.target.classList.contains('item-cost')) recalc();
     });
-    activityCodeField?.addEventListener('change', () => {
-        const selected = activityCodeField.options[activityCodeField.selectedIndex];
-        if (selected) {
-            if (budgetCodeField) budgetCodeField.value = selected.dataset.year || '';
-            if (activityTitleField) activityTitleField.value = selected.dataset.description || '';
-            if (departmentField) departmentField.value = selected.dataset.departmentId || departmentField.value;
-        }
-    });
-    if (activityCodeField && activityCodeField.selectedIndex > 0) {
-        const selected = activityCodeField.options[activityCodeField.selectedIndex];
-        if (budgetCodeField) budgetCodeField.value = selected?.dataset.year || budgetCodeField.value;
-        if (activityTitleField) activityTitleField.value = selected?.dataset.description || activityTitleField.value;
-        if (departmentField) departmentField.value = selected?.dataset.departmentId || departmentField.value;
-    }
+    activitySelectionField?.addEventListener('change', () => syncActivityMode({ clearManual: true }));
+    syncActivityMode({ clearManual: false });
     recalc();
 })();
 </script>
