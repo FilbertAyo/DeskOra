@@ -381,6 +381,64 @@ class OfficialLetterTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_index_shows_only_own_and_shared_letters_not_other_managers(): void
+    {
+        /** @var User $creator */
+        $creator = User::factory()->create(['status' => 'active']);
+        $creator->givePermissionTo('manage official letters');
+
+        /** @var User $colleague */
+        $colleague = User::factory()->create(['status' => 'active']);
+        $colleague->givePermissionTo('manage official letters');
+
+        /** @var User $sharee */
+        $sharee = User::factory()->create(['status' => 'active']);
+        $sharee->assignRole('staff');
+
+        $this->actingAs($creator)
+            ->post(route('official-letters.store'), $this->validPayload([
+                'subject' => 'CREATOR PRIVATE LETTER',
+            ]))
+            ->assertRedirect();
+
+        $letter = OfficialLetter::query()->firstOrFail();
+
+        $this->actingAs($creator)
+            ->post(route('official-letters.share', $letter), [
+                'shared_user_ids' => [$sharee->id],
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($creator)
+            ->get(route('official-letters.index'))
+            ->assertOk()
+            ->assertSee($letter->reference_number)
+            ->assertSee('CREATOR PRIVATE LETTER');
+
+        $this->actingAs($sharee)
+            ->get(route('official-letters.index'))
+            ->assertOk()
+            ->assertSee($letter->reference_number);
+
+        $this->actingAs($colleague)
+            ->get(route('official-letters.index'))
+            ->assertOk()
+            ->assertDontSee($letter->reference_number)
+            ->assertDontSee('CREATOR PRIVATE LETTER');
+
+        $this->actingAs($colleague)
+            ->get(route('official-letters.show', $letter))
+            ->assertRedirect(route('official-letters.verify', $letter));
+
+        $this->actingAs($colleague)
+            ->get(route('official-letters.download', $letter))
+            ->assertForbidden();
+
+        $this->actingAs($colleague)
+            ->get(route('official-letters.edit', $letter))
+            ->assertForbidden();
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>

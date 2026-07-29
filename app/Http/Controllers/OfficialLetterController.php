@@ -10,6 +10,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class OfficialLetterController extends Controller
@@ -74,16 +75,28 @@ class OfficialLetterController extends Controller
     {
         $this->authorize('create', OfficialLetter::class);
 
-        $validated = $this->validateLetter($request);
-        $letterDate = Carbon::parse($validated['letter_date'])->startOfDay();
+        $lock = Cache::lock('official-letter-store:'.Auth::id(), 15);
 
-        $allocated = $this->referenceService->allocate($validated['department_code'], $letterDate);
+        if (! $lock->get()) {
+            return redirect()
+                ->route('official-letters.index')
+                ->with('error', 'Your letter is already being created. Please wait a moment and check the list.');
+        }
 
-        $letter = new OfficialLetter($validated);
-        $letter->created_by = Auth::id();
-        $letter->reference_number = $allocated['reference_number'];
-        $letter->sequence = $allocated['sequence'];
-        $letter->save();
+        try {
+            $validated = $this->validateLetter($request);
+            $letterDate = Carbon::parse($validated['letter_date'])->startOfDay();
+
+            $allocated = $this->referenceService->allocate($validated['department_code'], $letterDate);
+
+            $letter = new OfficialLetter($validated);
+            $letter->created_by = Auth::id();
+            $letter->reference_number = $allocated['reference_number'];
+            $letter->sequence = $allocated['sequence'];
+            $letter->save();
+        } finally {
+            $lock->release();
+        }
 
         return redirect()
             ->route('official-letters.show', $letter)

@@ -187,8 +187,14 @@
         </div>
     </div>
     <div class="card-footer bg-white border-top d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
-            <i class="ti ti-device-floppy me-1"></i> {{ $isEdit ? 'Save Changes' : 'Create Letter' }}
+        <button type="submit" class="btn btn-primary" id="officialLetterSubmitBtn">
+            <span class="official-letter-submit-label">
+                <i class="ti ti-device-floppy me-1"></i> {{ $isEdit ? 'Save Changes' : 'Create Letter' }}
+            </span>
+            <span class="official-letter-submit-busy d-none">
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                {{ $isEdit ? 'Saving...' : 'Creating...' }}
+            </span>
         </button>
         <a href="{{ $isEdit ? route('official-letters.show', $letter) : route('official-letters.index') }}" class="btn btn-light">Cancel</a>
     </div>

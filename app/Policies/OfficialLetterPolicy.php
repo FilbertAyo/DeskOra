@@ -34,12 +34,12 @@ class OfficialLetterPolicy
 
     public function share(User $user, OfficialLetter $officialLetter): bool
     {
-        return $user->can('manage official letters') || $officialLetter->isOwnedBy($user);
+        return $officialLetter->isOwnedBy($user);
     }
 
     public function delete(User $user, OfficialLetter $officialLetter): bool
     {
-        return $user->can('manage official letters') || $officialLetter->isOwnedBy($user);
+        return $officialLetter->isOwnedBy($user);
     }
 
     public function download(User $user, OfficialLetter $officialLetter): bool

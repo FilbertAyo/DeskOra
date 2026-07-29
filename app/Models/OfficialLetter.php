@@ -103,17 +103,13 @@ class OfficialLetter extends Model
 
     public function userHasFullAccess(User $user): bool
     {
-        return $user->can('manage official letters')
-            || $this->isOwnedBy($user)
-            || $this->isSharedWith($user);
+        return $this->isOwnedBy($user) || $this->isSharedWith($user);
     }
 
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        if ($user->can('manage official letters')) {
-            return $query;
-        }
-
+        // Only the creator and explicitly shared users can list/see full letter content.
+        // Having "manage official letters" (create permission) does not reveal others' letters.
         return $query->where(function (Builder $inner) use ($user) {
             $inner->where('created_by', $user->id)
                 ->orWhereHas('sharedUsers', function (Builder $shared) use ($user) {

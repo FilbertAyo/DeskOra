@@ -45,9 +45,32 @@
             }
         });
 
-        document.getElementById('officialLetterForm').addEventListener('submit', function () {
+        const form = document.getElementById('officialLetterForm');
+        const submitBtn = document.getElementById('officialLetterSubmitBtn');
+        let isSubmitting = false;
+
+        form.addEventListener('submit', function (event) {
+            if (isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+
             if (window.tinymce) {
                 tinymce.triggerSave();
+            }
+
+            isSubmitting = true;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.setAttribute('aria-busy', 'true');
+                const label = submitBtn.querySelector('.official-letter-submit-label');
+                const busy = submitBtn.querySelector('.official-letter-submit-busy');
+                if (label) {
+                    label.classList.add('d-none');
+                }
+                if (busy) {
+                    busy.classList.remove('d-none');
+                }
             }
         });
     })();

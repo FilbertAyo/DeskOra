@@ -29,6 +29,13 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-triangle me-2"></i>{{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="row">
         <div class="col-md-12">
             <div class="card tbl-card mb-2">
@@ -36,7 +43,7 @@
                     <div class="row align-items-center">
                         <div class="col-md-4 mb-2 mb-md-0">
                             <h5 class="mb-0">
-                                <i class="ti ti-mail me-2 text-primary"></i>All Official Letters
+                                <i class="ti ti-mail me-2 text-primary"></i>My Official Letters
                             </h5>
                         </div>
                         <div class="col-md-8">
@@ -97,7 +104,7 @@
                                             $isSharedWithMe = ! $isOwned && $letter->sharedUsers->contains(
                                                 fn ($shared) => (string) $shared->id === (string) $user->id
                                             );
-                                            $canEditLetter = $canManage || $isOwned || $isSharedWithMe;
+                                            $canEditLetter = $isOwned || $isSharedWithMe;
                                         @endphp
                                         <tr>
                                             <td class="text-center">{{ ($letters->currentPage() - 1) * $letters->perPage() + $loop->iteration }}</td>
