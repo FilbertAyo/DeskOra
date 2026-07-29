@@ -91,7 +91,7 @@
                             name="activity_code"
                             id="activity_code"
                             value="{{ $isOffPlan ? old('activity_code') : ($oldSelection && $oldSelection !== '__off_plan__' ? $oldSelection : '') }}"
-                            placeholder="Enter activity code"
+                            placeholder="Enter activity code e.g 19"
                             @if($isOffPlan) required @endif>
                     </div>
                     @if (($planActivities ?? collect())->isEmpty())
