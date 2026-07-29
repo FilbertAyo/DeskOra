@@ -172,7 +172,7 @@ class RequisitionEmailNotificationTest extends TestCase
 
         $department = $this->createDepartment();
         $requester = $this->createRequester($department, 'email');
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department, 'email');
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department, 'email');
 
         $petty = FinanceRequest::create([
             'request_no' => 'PC123',

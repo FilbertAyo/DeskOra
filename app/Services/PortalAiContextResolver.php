@@ -498,14 +498,12 @@ class PortalAiContextResolver
     private function approvalsSection(User $user): string
     {
         if (! $user->canAny([
-            'first pettycash approval',
-            'last pettycash approval',
+            'review pettycash',
+            'approve pettycash',
+            'authorize pettycash',
             'review staff requisition',
             'approve staff requisition',
             'authorize staff requisition',
-            'review requests',
-            'approve requests',
-            'authorize requests',
         ])) {
             return 'ACCESS NOTE: This user is not an approver, so they have no approval queue.';
         }

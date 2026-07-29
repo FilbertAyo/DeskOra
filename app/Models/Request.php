@@ -375,9 +375,9 @@ class Request extends Model
         }
 
         return match ($stage) {
-            'review' => ['first pettycash approval', 'review requests'],
-            'approve' => ['last pettycash approval', 'approve requests'],
-            'authorize' => ['authorize requests'],
+            'review' => ['review pettycash'],
+            'approve' => ['approve pettycash'],
+            'authorize' => ['authorize pettycash'],
             default => [],
         };
     }
@@ -388,9 +388,9 @@ class Request extends Model
     public static function permissionsForStage(string $stage): array
     {
         return match ($stage) {
-            'review' => ['first pettycash approval', 'review staff requisition', 'review requests'],
-            'approve' => ['last pettycash approval', 'approve staff requisition', 'approve requests'],
-            'authorize' => ['authorize requests', 'authorize staff requisition'],
+            'review' => ['review pettycash', 'review staff requisition'],
+            'approve' => ['approve pettycash', 'approve staff requisition'],
+            'authorize' => ['authorize pettycash', 'authorize staff requisition'],
             default => [],
         };
     }

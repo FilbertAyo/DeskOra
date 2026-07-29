@@ -259,15 +259,15 @@ Route::middleware(['auth', 'permission:view requested pettycash'])->group(functi
     Route::get('/replenishment/{replenishment}/download', [ReplenishmentController::class, 'downloadPDF'])->name('replenishment.download');
 });
 
-Route::middleware(['auth', 'permission:review requests|review staff requisition|first pettycash approval'])->group(function () {
+Route::middleware(['auth', 'permission:review pettycash|review staff requisition'])->group(function () {
     Route::post('f_approve/{petty}', [PettyController::class, 'f_approve'])->name('f_approve.approve');
 });
 
-Route::middleware(['auth', 'permission:approve requests|approve staff requisition|last pettycash approval'])->group(function () {
+Route::middleware(['auth', 'permission:approve pettycash|approve staff requisition'])->group(function () {
     Route::post('l_approve/{petty}', [PettyController::class, 'l_approve'])->name('l_approve.approve');
 });
 
-Route::middleware(['auth', 'permission:authorize requests|authorize staff requisition'])->group(function () {
+Route::middleware(['auth', 'permission:authorize pettycash|authorize staff requisition'])->group(function () {
     Route::post('authorize/{petty}', [PettyController::class, 'authorizeRequest'])->name('requests.authorize');
 });
 
@@ -283,7 +283,7 @@ Route::middleware(['auth', 'permission:download staff requisition|authorize staf
     Route::get('pettycash/requisitions/{petty}/download', [PettyController::class, 'downloadRequisition'])->name('petty.requisition.download');
 });
 
-Route::middleware(['auth', 'permission:last pettycash approval'])->group(function () {
+Route::middleware(['auth', 'permission:approve pettycash'])->group(function () {
     Route::get('pettycash/all/requests/list', [PettyController::class, 'all_requests'])->name('all.pettycash');
 });
 

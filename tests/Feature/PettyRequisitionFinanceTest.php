@@ -205,11 +205,11 @@ class PettyRequisitionFinanceTest extends TestCase
         $response->assertSee((string) $authorized->code);
     }
 
-    public function test_review_requests_permission_does_not_allow_staff_requisition_review(): void
+    public function test_review_pettycash_permission_does_not_allow_staff_requisition_review(): void
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $reviewer = $this->userWithPermissions(['review requests'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $requisition = $this->createStaffRequisition($department, $requester, 'pending', 90000, false);
 

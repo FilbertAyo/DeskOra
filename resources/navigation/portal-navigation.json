@@ -346,8 +346,7 @@
                 "type": "petty"
             },
             "permissions_any": [
-                "first pettycash approval",
-                "review requests"
+                "review pettycash"
             ],
             "description": "First-stage review queue for petty cash and reimbursement requests.",
             "intents": [
@@ -382,8 +381,7 @@
                 "type": "petty"
             },
             "permissions_any": [
-                "last pettycash approval",
-                "approve requests"
+                "approve pettycash"
             ],
             "description": "Final approval queue for petty cash and reimbursement requests.",
             "intents": [
@@ -418,7 +416,7 @@
                 "stage": "authorize",
                 "type": "petty"
             },
-            "permission": "authorize requests",
+            "permission": "authorize pettycash",
             "description": "Authorization queue for petty cash after approval.",
             "intents": [
                 "authorize petty cash",

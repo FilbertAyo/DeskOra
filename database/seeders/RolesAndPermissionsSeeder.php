@@ -4,11 +4,25 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
+    /**
+     * Legacy petty-cash stage permissions → dedicated names (requisition-style).
+     *
+     * @var array<string, string|null>
+     */
+    private const PETTY_PERMISSION_MIGRATION = [
+        'first pettycash approval' => 'review pettycash',
+        'last pettycash approval' => 'approve pettycash',
+        'authorize requests' => 'authorize pettycash',
+        'review requests' => null,
+        'approve requests' => null,
+    ];
+
     /**
      * Run the database seeds.
      */
@@ -23,8 +37,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $existingPermissions = [
             'request pettycash',
             'view requested pettycash',
-            'first pettycash approval',
-            'last pettycash approval',
+            'review pettycash',
+            'approve pettycash',
+            'authorize pettycash',
             'approve pettycash payments',
             'view cashflow movements',
             'view reports',
@@ -44,9 +59,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'approve staff requisition',
             'authorize staff requisition',
             'download staff requisition',
-            'review requests',
-            'approve requests',
-            'authorize requests',
         ];
 
         // ============================================
@@ -90,6 +102,8 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission]);
         }
 
+        $this->migrateLegacyPettyPermissions();
+
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
         $documentApproverRole = Role::firstOrCreate(['name' => 'document_approver']);
@@ -100,6 +114,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $requisitionReviewerRole = Role::firstOrCreate(['name' => 'requisition_reviewer']);
         $requisitionApproverRole = Role::firstOrCreate(['name' => 'requisition_approver']);
         $requisitionAuthorizerRole = Role::firstOrCreate(['name' => 'requisition_authorizer']);
+        $pettycashReviewerRole = Role::firstOrCreate(['name' => 'pettycash_reviewer']);
+        $pettycashApproverRole = Role::firstOrCreate(['name' => 'pettycash_approver']);
+        $pettycashAuthorizerRole = Role::firstOrCreate(['name' => 'pettycash_authorizer']);
 
         $budgetReviewerPermissions = [
             'view weekly budgets',
@@ -136,6 +153,15 @@ class RolesAndPermissionsSeeder extends Seeder
             'authorize staff requisition',
             'download staff requisition',
         ];
+        $pettycashReviewerPermissions = [
+            'review pettycash',
+        ];
+        $pettycashApproverPermissions = [
+            'approve pettycash',
+        ];
+        $pettycashAuthorizerPermissions = [
+            'authorize pettycash',
+        ];
 
         // Superadmin always mirrors the full permission catalog.
         $superadminRole->syncPermissions($allPermissions);
@@ -151,6 +177,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $this->ensureRolePermissions($requisitionReviewerRole, $requisitionReviewerPermissions);
         $this->ensureRolePermissions($requisitionApproverRole, $requisitionApproverPermissions);
         $this->ensureRolePermissions($requisitionAuthorizerRole, $requisitionAuthorizerPermissions);
+        $this->ensureRolePermissions($pettycashReviewerRole, $pettycashReviewerPermissions);
+        $this->ensureRolePermissions($pettycashApproverRole, $pettycashApproverPermissions);
+        $this->ensureRolePermissions($pettycashAuthorizerRole, $pettycashAuthorizerPermissions);
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.
@@ -161,6 +190,87 @@ class RolesAndPermissionsSeeder extends Seeder
                     $user->assignRole($superadminRole);
                 }
             });
+
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+    }
+
+    /**
+     * Remap legacy petty-cash stage permissions onto roles/users, then delete them.
+     */
+    private function migrateLegacyPettyPermissions(): void
+    {
+        $legacyNames = array_keys(self::PETTY_PERMISSION_MIGRATION);
+        $legacyPermissions = Permission::query()
+            ->whereIn('name', $legacyNames)
+            ->get()
+            ->keyBy('name');
+
+        if ($legacyPermissions->isEmpty()) {
+            return;
+        }
+
+        $newPermissions = Permission::query()
+            ->whereIn('name', array_filter(array_values(self::PETTY_PERMISSION_MIGRATION)))
+            ->get()
+            ->keyBy('name');
+
+        foreach (self::PETTY_PERMISSION_MIGRATION as $oldName => $newName) {
+            $oldPermission = $legacyPermissions->get($oldName);
+            if (! $oldPermission) {
+                continue;
+            }
+
+            $newPermission = $newName ? $newPermissions->get($newName) : null;
+
+            if ($newPermission) {
+                $this->reassignPermission($oldPermission->id, $newPermission->id, 'role_has_permissions', 'role_id');
+                $this->reassignPermission($oldPermission->id, $newPermission->id, 'model_has_permissions', 'model_id', 'model_type');
+            }
+        }
+
+        $legacyIds = $legacyPermissions->pluck('id')->all();
+
+        DB::table('role_has_permissions')->whereIn('permission_id', $legacyIds)->delete();
+        DB::table('model_has_permissions')->whereIn('permission_id', $legacyIds)->delete();
+        Permission::query()->whereIn('id', $legacyIds)->delete();
+    }
+
+    /**
+     * Copy assignments from an old permission to a new one without duplicating rows.
+     */
+    private function reassignPermission(
+        int $oldPermissionId,
+        int $newPermissionId,
+        string $table,
+        string $ownerColumn,
+        ?string $typeColumn = null
+    ): void {
+        $rows = DB::table($table)->where('permission_id', $oldPermissionId)->get();
+
+        foreach ($rows as $row) {
+            $query = DB::table($table)
+                ->where('permission_id', $newPermissionId)
+                ->where($ownerColumn, $row->{$ownerColumn});
+
+            if ($typeColumn) {
+                $query->where($typeColumn, $row->{$typeColumn});
+            }
+
+            if ($query->exists()) {
+                continue;
+            }
+
+            $insert = [
+                'permission_id' => $newPermissionId,
+                $ownerColumn => $row->{$ownerColumn},
+            ];
+
+            if ($typeColumn) {
+                $insert[$typeColumn] = $row->{$typeColumn};
+            }
+
+            DB::table($table)->insert($insert);
+        }
     }
 
     /**

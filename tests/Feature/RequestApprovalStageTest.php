@@ -99,7 +99,7 @@ class RequestApprovalStageTest extends TestCase
     public function test_bare_approvals_route_redirects_to_first_accessible_stage(): void
     {
         $department = $this->createDepartment();
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $response = $this->actingAs($reviewer)->get(route('petty.list'));
 
@@ -110,7 +110,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $completed = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 60000);
         $this->addStageApproval($completed, 'review', $reviewer);
@@ -126,7 +126,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $completed = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 60000);
         $this->addStageApproval($completed, 'review', $reviewer);
@@ -145,7 +145,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $pendingReview = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'pending', 50000);
         $awaitingApprove = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 75000);
@@ -162,7 +162,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $approver = $this->userWithPermissions(['last pettycash approval'], $department);
+        $approver = $this->userWithPermissions(['approve pettycash'], $department);
 
         $pendingReview = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'pending', 50000);
         $awaitingApprove = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 75000);
@@ -179,7 +179,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $authorizer = $this->userWithPermissions(['authorize requests'], $department);
+        $authorizer = $this->userWithPermissions(['authorize pettycash'], $department);
 
         $awaitingApprove = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 75000);
         $this->addStageApproval($awaitingApprove, 'review');
@@ -198,7 +198,7 @@ class RequestApprovalStageTest extends TestCase
     public function test_user_without_stage_permission_gets_forbidden(): void
     {
         $department = $this->createDepartment();
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'authorize']));
 
@@ -209,7 +209,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $this->createFinanceRequest($department, $requester);
         $this->createFinanceRequest($department, $requester);
@@ -225,7 +225,7 @@ class RequestApprovalStageTest extends TestCase
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
-        $reviewer = $this->userWithPermissions(['first pettycash approval'], $department);
+        $reviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $awaitingAuthorize = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing');
         $this->addStageApproval($awaitingAuthorize, 'review');

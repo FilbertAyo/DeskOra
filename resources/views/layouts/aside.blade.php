@@ -203,7 +203,7 @@
                 </li>
            
 
-                @canany(['first pettycash approval', 'last pettycash approval', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'review requests', 'approve requests', 'authorize requests'])
+                @canany(['review pettycash', 'approve pettycash', 'authorize pettycash', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition'])
                     <li class="pc-item pc-hasmenu {{ Request::routeIs('petty.list') ? 'active pc-trigger' : '' }}">
                         <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-users"></i></span>
@@ -214,7 +214,7 @@
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
-                            @canany(['first pettycash approval', 'review requests'])
+                            @can('review pettycash')
                                 @php $pettyReviewCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'review', ['Petty Cash', 'Reimbursement']); @endphp
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' && request('type') === 'petty' ? 'active' : '' }}">
                                     <a href="{{ route('petty.list', ['stage' => 'review', 'type' => 'petty']) }}" class="pc-link">
@@ -224,7 +224,7 @@
                                         @endif
                                     </a>
                                 </li>
-                            @endcanany
+                            @endcan
                             @can('review staff requisition')
                                 @php $requisitionReviewCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'review', ['Staff Requisition']); @endphp
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' && request('type') === 'requisition' ? 'active' : '' }}">
@@ -236,7 +236,7 @@
                                     </a>
                                 </li>
                             @endcan
-                            @canany(['last pettycash approval', 'approve requests'])
+                            @can('approve pettycash')
                                 @php $pettyApproveCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'approve', ['Petty Cash', 'Reimbursement']); @endphp
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' && request('type') === 'petty' ? 'active' : '' }}">
                                     <a href="{{ route('petty.list', ['stage' => 'approve', 'type' => 'petty']) }}" class="pc-link">
@@ -246,7 +246,7 @@
                                         @endif
                                     </a>
                                 </li>
-                            @endcanany
+                            @endcan
                             @can('approve staff requisition')
                                 @php $requisitionApproveCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'approve', ['Staff Requisition']); @endphp
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'approve' && request('type') === 'requisition' ? 'active' : '' }}">
@@ -258,7 +258,7 @@
                                     </a>
                                 </li>
                             @endcan
-                            @can('authorize requests')
+                            @can('authorize pettycash')
                                 @php $pettyAuthorizeCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'authorize', ['Petty Cash', 'Reimbursement']); @endphp
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'authorize' && request('type') === 'petty' ? 'active' : '' }}">
                                     <a href="{{ route('petty.list', ['stage' => 'authorize', 'type' => 'petty']) }}" class="pc-link">

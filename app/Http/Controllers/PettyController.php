@@ -282,7 +282,7 @@ class PettyController extends Controller
 
             [$name, $reason, $encodedId] = $this->buildRequestMailArgs($requestRow->fresh(['pettyDetails', 'requisitionDetails']));
             $sms = "New request from {$name} for {$reason}. Ref: {$encodedId}";
-            $this->notifyApprovers('first pettycash approval', $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
+            $this->notifyApprovers('review pettycash', $requestRow->department_id, new PettyRequestMail($name, $reason, $encodedId), $sms);
         });
 
         return redirect()->route('petty.index')->with('success', 'Request created successfully!');
@@ -452,7 +452,7 @@ class PettyController extends Controller
             $this->requisitionNotifications->notifyStageApprovers($petty, 'reviewed');
         } else {
             [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
-            $this->notifyApprovers('last pettycash approval', $petty->department_id, new FirstApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been reviewed and is awaiting approval.");
+            $this->notifyApprovers('approve pettycash', $petty->department_id, new FirstApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been reviewed and is awaiting approval.");
         }
 
         return redirect()->back()->with('success', 'Request reviewed successfully.');
@@ -476,7 +476,7 @@ class PettyController extends Controller
             $this->requisitionNotifications->notifyStageApprovers($petty, 'approved');
         } else {
             [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
-            $this->notifyApprovers('authorize requests', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been approved and is awaiting authorization.");
+            $this->notifyApprovers('authorize pettycash', $petty->department_id, new LastApprovalMail($name, $reason, $encodedId), "Petty cash request {$encodedId} has been approved and is awaiting authorization.");
         }
 
         return redirect()->back()->with('success', 'Request approved successfully.');
