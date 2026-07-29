@@ -237,6 +237,14 @@ class Request extends Model
     public const REQUEST_TYPES = ['Petty Cash', 'Reimbursement', 'Staff Requisition'];
 
     /**
+     * Staff requisition review/approve/authorize is org-wide (matches notification routing).
+     * Petty cash / reimbursement stay department-scoped.
+     *
+     * @var list<string>
+     */
+    public const ORG_WIDE_REQUEST_TYPES = ['Staff Requisition'];
+
+    /**
      * @return list<string>|null
      */
     public static function requestTypesForFilter(?string $filter): ?array
@@ -260,6 +268,35 @@ class Request extends Model
         $allScopeIds = array_values(array_unique(array_merge($scopeIds, $parentScopeIds)));
 
         return $query->whereIn('department_id', $allScopeIds);
+    }
+
+    /**
+     * Limit to request types the user can act on, applying department scope only
+     * where the request type is not org-wide.
+     *
+     * @param  list<string>  $types
+     */
+    public function scopeForUserApprovalTypes(Builder $query, User $user, array $types): Builder
+    {
+        if ($types === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $orgWideTypes = array_values(array_intersect($types, self::ORG_WIDE_REQUEST_TYPES));
+        $departmentScopedTypes = array_values(array_diff($types, self::ORG_WIDE_REQUEST_TYPES));
+
+        return $query->where(function (Builder $q) use ($user, $orgWideTypes, $departmentScopedTypes) {
+            if ($orgWideTypes !== []) {
+                $q->orWhereIn('request_type', $orgWideTypes);
+            }
+
+            if ($departmentScopedTypes !== []) {
+                $q->orWhere(function (Builder $inner) use ($user, $departmentScopedTypes) {
+                    $inner->whereIn('request_type', $departmentScopedTypes)
+                        ->inDepartmentScope($user);
+                });
+            }
+        });
     }
 
     public function scopeAwaitingApprovalStage(Builder $query, string $stage): Builder
@@ -293,9 +330,8 @@ class Request extends Model
         $types = self::requestTypesUserCanActOnAtStage($user, $stage);
 
         return $query
-            ->inDepartmentScope($user)
-            ->awaitingApprovalStage($stage)
-            ->whereIn('request_type', $types);
+            ->forUserApprovalTypes($user, $types)
+            ->awaitingApprovalStage($stage);
     }
 
     public function approvalStage(): string
@@ -416,8 +452,7 @@ class Request extends Model
         $types = self::requestTypesUserCanActOnAtStage($user, $stage);
 
         return $query
-            ->inDepartmentScope($user)
-            ->whereIn('request_type', $types)
+            ->forUserApprovalTypes($user, $types)
             ->where(function (Builder $q) use ($user, $stage) {
                 $q->where(function (Builder $awaiting) use ($stage) {
                     $awaiting->awaitingApprovalStage($stage);

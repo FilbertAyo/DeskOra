@@ -250,4 +250,48 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertRedirect(route('petty.list', ['stage' => 'review']));
     }
+
+    public function test_staff_requisition_authorizer_sees_requests_across_departments(): void
+    {
+        $authorizerDepartment = $this->createDepartment('Finance');
+        $requesterDepartment = $this->createDepartment('Programs');
+        $requester = $this->createRequester($requesterDepartment);
+        $authorizer = $this->userWithPermissions(['authorize staff requisition'], $authorizerDepartment);
+
+        $awaitingAuthorize = $this->createFinanceRequest(
+            $requesterDepartment,
+            $requester,
+            'Staff Requisition',
+            'processing',
+            150000
+        );
+        $this->addStageApproval($awaitingAuthorize, 'review');
+        $this->addStageApproval($awaitingAuthorize, 'approve');
+
+        $otherDeptPetty = $this->createFinanceRequest(
+            $requesterDepartment,
+            $requester,
+            'Petty Cash',
+            'processing',
+            25000
+        );
+        $this->addStageApproval($otherDeptPetty, 'review');
+        $this->addStageApproval($otherDeptPetty, 'approve');
+
+        $count = app(RequestApprovalNavService::class)
+            ->countForStageAndTypes($authorizer, 'authorize', ['Staff Requisition']);
+
+        $this->assertSame(1, $count);
+
+        $response = $this->actingAs($authorizer)->get(route('petty.list', [
+            'stage' => 'authorize',
+            'type' => 'requisition',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Staff Requisition');
+        $response->assertSee('Pending');
+        $response->assertDontSee((string) $otherDeptPetty->request_no);
+        $response->assertDontSee('No authorization requests found.');
+    }
 }
