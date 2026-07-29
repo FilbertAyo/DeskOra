@@ -142,7 +142,6 @@ class AdminController extends Controller
             'is_department_head' => ['nullable', 'boolean'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
-            'notification_channel' => ['required', Rule::in(['sms', 'email', 'both'])],
         ]);
 
         $subDepartmentIds = array_values(array_unique($validated['sub_department_ids'] ?? []));
@@ -171,7 +170,6 @@ class AdminController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'department_id' => $validated['department_id'] ?? null,
-            'notification_channel' => $validated['notification_channel'],
         ]);
 
         $user->subDepartments()->sync($subDepartmentIds);
@@ -207,6 +205,25 @@ class AdminController extends Controller
         return redirect()
             ->back()
             ->with('success', 'Notification channel updated.');
+    }
+
+    public function updateSignature(Request $request, User $admin)
+    {
+        abort_unless($request->user()?->can('users management settings'), 403);
+
+        $request->validate([
+            'signature' => ['required', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+        ]);
+
+        $signaturePath = $request->file('signature')->store('signatures', 'public');
+
+        $admin->update([
+            'signature' => 'storage/'.$signaturePath,
+        ]);
+
+        return redirect()
+            ->back()
+            ->with('success', 'Signature uploaded successfully.');
     }
 
     public function destroy(User $admin)

@@ -28,6 +28,13 @@
 
     <div class="row">
         <div class="col-md-12">
+            @if (session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
             <form method="POST" action="{{ route('admin.update', $user->id) }}" id="editUserForm">
                 @csrf
                 @method('PUT')
@@ -259,34 +266,6 @@
                                 </div>
                             </div>
 
-                            <!-- Notification Channel -->
-                            <div class="col-md-6 col-lg-6 mb-3">
-                                <div class="form-group">
-                                    <label for="notification_channel" class="form-label">
-                                        Notification Channel
-                                    </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">
-                                            <i class="ti ti-bell"></i>
-                                        </span>
-                                        <select class="form-control @error('notification_channel') is-invalid @enderror"
-                                            name="notification_channel"
-                                            id="notification_channel"
-                                            required>
-                                            @php($currentChannel = old('notification_channel', $user->notification_channel ?? 'sms'))
-                                            <option value="sms" {{ $currentChannel === 'sms' ? 'selected' : '' }}>SMS (default)</option>
-                                            <option value="email" {{ $currentChannel === 'email' ? 'selected' : '' }}>Email</option>
-                                            <option value="both" {{ $currentChannel === 'both' ? 'selected' : '' }}>Email &amp; SMS</option>
-                                        </select>
-                                    </div>
-                                    @error('notification_channel')
-                                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                                    @enderror
-                                    <small class="form-text text-muted">How this user receives workflow alerts.</small>
-                                </div>
-                            </div>
-
-                        
                             <!-- Last Modified Info -->
                             <div class="col-12">
                                 <div class="alert alert-light border" role="alert">
@@ -329,6 +308,58 @@
                     </div>
                 </div>
             </form>
+
+            <div class="card shadow-none border mt-4">
+                <div class="card-header bg-white border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-md-7 mb-2 mb-md-0">
+                            <h5 class="mb-0"><i class="ti ti-signature me-2"></i>Signature</h5>
+                        </div>
+                        <div class="col-md-5 text-md-end">
+                            <small class="text-muted">Used on reports and approvals. Clear image (jpeg, png, jpg, gif), max 2MB.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if ($user->signature)
+                        <div class="mb-3">
+                            <img src="{{ asset($user->signature) }}" alt="Signature"
+                                class="border rounded" style="height: 120px; width: auto;">
+                        </div>
+                    @else
+                        <p class="text-muted small mb-3">No signature uploaded yet.</p>
+                    @endif
+
+                    <form method="POST" action="{{ route('admin.signature.update', $user->id) }}" enctype="multipart/form-data">
+                        @csrf
+                        <div class="row align-items-end">
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label for="signature" class="form-label">Upload Signature</label>
+                                <input type="file"
+                                    class="form-control @error('signature') is-invalid @enderror"
+                                    name="signature"
+                                    id="signature"
+                                    accept="image/jpeg,image/png,image/jpg,image/gif"
+                                    required>
+                                @error('signature')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-md-6">
+                                @can('users management settings')
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="ti ti-upload me-1"></i> Upload Signature
+                                    </button>
+                                @else
+                                    <button type="button" class="btn btn-primary permission-alert">
+                                        <i class="ti ti-upload me-1"></i> Upload Signature
+                                    </button>
+                                @endcan
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

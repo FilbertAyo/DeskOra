@@ -36,27 +36,10 @@
        
         <div class="col-md-12">
             <div class="card shadow-none border">
-                <div class="card-header bg-white border-bottom">
-                    <div class="row align-items-center">
-                        <div class="col-md-6 mb-2 mb-md-0">
-                            <h5 class="mb-0"><i class="ti ti-list me-2"></i>Users List</h5>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <span class="input-group-text bg-white">
-                                    <i class="ti ti-search"></i>
-                                </span>
-                                <input type="text" class="form-control border-start-0" id="searchInput"
-                                    placeholder="Search users by name, email, phone...">
-                            </div>
-                        </div>
-                    </div>
-                </div>
+              
                 <div class="card-body">
-                 
-
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered table-striped" id="usersTable">
+                        <table class="table table-hover table-bordered" id="usersTable">
                             <thead class="thead-light">
                                 <tr>
                                     <th class="text-center" style="width: 50px;">No.</th>

@@ -199,6 +199,8 @@ Route::middleware('auth')->group(function () {
     // admin
     Route::patch('/admin/{user}/notification-channel', [AdminController::class, 'updateNotificationChannel'])
         ->name('admin.notification-channel.update');
+    Route::post('/admin/{admin}/signature', [AdminController::class, 'updateSignature'])
+        ->name('admin.signature.update');
     Route::resource('admin', AdminController::class);
     Route::post('/activate/{user}', [AdminController::class, 'activate'])->name('admin.activate');
 
