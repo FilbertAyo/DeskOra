@@ -215,85 +215,126 @@
         </div>
 
         <div class="col-12 col-lg-4 col-md-4 mb-3">
+            @php
+                $approvalActionMeta = [
+                    'Review petty cash' => ['icon' => 'ti-cash', 'tone' => 'warning', 'cta' => 'Review'],
+                    'Review requisitions' => ['icon' => 'ti-file-text', 'tone' => 'warning', 'cta' => 'Review'],
+                    'Approve petty cash' => ['icon' => 'ti-circle-check', 'tone' => 'primary', 'cta' => 'Approve'],
+                    'Approve requisitions' => ['icon' => 'ti-file-check', 'tone' => 'primary', 'cta' => 'Approve'],
+                    'Authorize petty cash' => ['icon' => 'ti-shield-check', 'tone' => 'danger', 'cta' => 'Authorize'],
+                    'Authorize requisitions' => ['icon' => 'ti-certificate', 'tone' => 'danger', 'cta' => 'Authorize'],
+                ];
+                $hasWeeklyActions = $showWeeklyToast && $wr && (
+                    ($wr->plan && $wr->plan->showCta) || ($wr->report && $wr->report->showCta)
+                );
+                $hasActionNeeded = $approvalActions->isNotEmpty() || $hasWeeklyActions;
+            @endphp
             <div class="card shadow-none border h-100">
-                <div class="card-header bg-white border-bottom">
-                    <h6 class="mb-0"><i class="ti ti-alert-circle me-1"></i>Action needed</h6>
+                <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0"><i class="ti ti-alert-circle me-1 text-warning"></i>Action needed</h6>
+                    @if($hasActionNeeded)
+                        <span class="badge bg-light-warning text-warning border border-warning">
+                            {{ $approvalActions->sum('count') + ($hasWeeklyActions ? (($wr->plan && $wr->plan->showCta ? 1 : 0) + ($wr->report && $wr->report->showCta ? 1 : 0)) : 0) }}
+                        </span>
+                    @endif
                 </div>
-                <div class="card-body">
-                    @if($approvalActions->isNotEmpty())
-                        <div class="list-group list-group-flush mb-3">
+                <div class="card-body p-0">
+                    @if($hasActionNeeded)
+                        <div class="list-group list-group-flush">
                             @foreach($approvalActions as $action)
-                                <a href="{{ $action['url'] }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
-                                    <span>{{ $action['label'] }}</span>
-                                    <span class="badge bg-dark">{{ $action['count'] }}</span>
+                                @php
+                                    $meta = $approvalActionMeta[$action['label']] ?? ['icon' => 'ti-bell', 'tone' => 'secondary', 'cta' => 'Open'];
+                                    $tone = $meta['tone'];
+                                @endphp
+                                <a href="{{ $action['url'] }}" class="list-group-item list-group-item-action py-2 px-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="avtar avtar-s rounded-circle text-{{ $tone }} bg-light-{{ $tone }}">
+                                                <i class="ti {{ $meta['icon'] }} f-18"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3 min-w-0">
+                                            <h6 class="mb-0 text-truncate">{{ $action['label'] }}</h6>
+                                            <p class="mb-0 text-muted small">{{ $action['count'] }} {{ \Illuminate\Support\Str::plural('item', $action['count']) }} waiting</p>
+                                        </div>
+                                        <div class="flex-shrink-0 text-end ms-2">
+                                            <span class="badge bg-light-{{ $tone }} text-{{ $tone }} mb-1 d-block">{{ $action['count'] }}</span>
+                                            <span class="btn btn-sm btn-{{ $tone }} py-0 px-2 lh-sm">{{ $meta['cta'] }}</span>
+                                        </div>
+                                    </div>
                                 </a>
                             @endforeach
-                        </div>
-                    @endif
 
-                    @if($showWeeklyToast && $wr)
-                        <ul class="mb-3 ps-3 small text-muted">
-                            @if($wr->plan && $wr->plan->showCta)
-                                <li class="mb-2">
-                                    <strong class="text-dark">Plan</strong> for next week (W{{ $wr->plan->period->week_number }}, {{ $wr->plan->period->year }}) —
-                                    @if($wr->plan->document && $wr->plan->document->isReturnedForRevision())
-                                        reviewer asked for changes; please revise and resubmit.
-                                    @elseif($wr->plan->document)
-                                        finish your draft and submit before the deadline.
-                                    @else
-                                        not started yet.
-                                    @endif
-                                </li>
-                            @endif
-                            @if($wr->report && $wr->report->showCta)
-                                <li class="mb-0">
-                                    <strong class="text-dark">Report</strong> for this week (W{{ $wr->report->period->week_number }}, {{ $wr->report->period->year }}) —
-                                    @if($wr->report->document && $wr->report->document->isReturnedForRevision())
-                                        reviewer asked for changes; please revise and resubmit.
-                                    @elseif($wr->report->document)
-                                        finish your draft and submit before the deadline.
-                                    @else
-                                        not started yet.
-                                    @endif
-                                </li>
-                            @endif
-                        </ul>
-                        <div class="d-flex flex-wrap gap-2">
-                            @if($wr->plan && $wr->plan->showCta)
-                                <a href="{{ $wr->plan->document
-                                    ? route('documents.edit', $wr->plan->document->id)
-                                    : route('documents.create', ['type' => 'weekly_plan', 'period_id' => $wr->plan->period->id]) }}"
-                                   class="btn btn-sm btn-primary">
-                                    <i class="ti {{ $wr->plan->document ? 'ti-edit' : 'ti-circle-plus' }} me-1"></i>
-                                    @if($wr->plan->document && $wr->plan->document->isReturnedForRevision())
-                                        Revise plan
-                                    @elseif($wr->plan->document)
-                                        Open plan
-                                    @else
-                                        Create plan
-                                    @endif
+                            @if($hasWeeklyActions && $wr->plan && $wr->plan->showCta)
+                                @php
+                                    $planNeedsRevision = $wr->plan->document && $wr->plan->document->isReturnedForRevision();
+                                    $planUrl = $wr->plan->document
+                                        ? route('documents.edit', $wr->plan->document->id)
+                                        : route('documents.create', ['type' => 'weekly_plan', 'period_id' => $wr->plan->period->id]);
+                                    $planTone = $planNeedsRevision ? 'danger' : 'info';
+                                    $planCta = $planNeedsRevision ? 'Revise' : ($wr->plan->document ? 'Open' : 'Create');
+                                    $planSubtitle = $planNeedsRevision
+                                        ? 'Returned for revision — resubmit soon'
+                                        : ($wr->plan->document
+                                            ? 'Draft in progress — submit before deadline'
+                                            : 'Not started yet');
+                                @endphp
+                                <a href="{{ $planUrl }}" class="list-group-item list-group-item-action py-2 px-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="avtar avtar-s rounded-circle text-{{ $planTone }} bg-light-{{ $planTone }}">
+                                                <i class="ti {{ $planNeedsRevision ? 'ti-alert-triangle' : 'ti-calendar-event' }} f-18"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3 min-w-0">
+                                            <h6 class="mb-0 text-truncate">Weekly plan</h6>
+                                            <p class="mb-0 text-muted small text-truncate">W{{ $wr->plan->period->week_number }}, {{ $wr->plan->period->year }} · {{ $planSubtitle }}</p>
+                                        </div>
+                                        <div class="flex-shrink-0 text-end ms-2">
+                                            <span class="btn btn-sm btn-{{ $planTone }} py-0 px-2 lh-sm">{{ $planCta }}</span>
+                                        </div>
+                                    </div>
                                 </a>
                             @endif
-                            @if($wr->report && $wr->report->showCta)
-                                <a href="{{ $wr->report->document
-                                    ? route('documents.edit', $wr->report->document->id)
-                                    : route('documents.create', ['type' => 'weekly_report', 'period_id' => $wr->report->period->id]) }}"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="ti {{ $wr->report->document ? 'ti-edit' : 'ti-circle-plus' }} me-1"></i>
-                                    @if($wr->report->document && $wr->report->document->isReturnedForRevision())
-                                        Revise report
-                                    @elseif($wr->report->document)
-                                        Open report
-                                    @else
-                                        Create report
-                                    @endif
+
+                            @if($hasWeeklyActions && $wr->report && $wr->report->showCta)
+                                @php
+                                    $reportNeedsRevision = $wr->report->document && $wr->report->document->isReturnedForRevision();
+                                    $reportUrl = $wr->report->document
+                                        ? route('documents.edit', $wr->report->document->id)
+                                        : route('documents.create', ['type' => 'weekly_report', 'period_id' => $wr->report->period->id]);
+                                    $reportTone = $reportNeedsRevision ? 'danger' : 'success';
+                                    $reportCta = $reportNeedsRevision ? 'Revise' : ($wr->report->document ? 'Open' : 'Create');
+                                    $reportSubtitle = $reportNeedsRevision
+                                        ? 'Returned for revision — resubmit soon'
+                                        : ($wr->report->document
+                                            ? 'Draft in progress — submit before deadline'
+                                            : 'Not started yet');
+                                @endphp
+                                <a href="{{ $reportUrl }}" class="list-group-item list-group-item-action py-2 px-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="avtar avtar-s rounded-circle text-{{ $reportTone }} bg-light-{{ $reportTone }}">
+                                                <i class="ti {{ $reportNeedsRevision ? 'ti-alert-triangle' : 'ti-report' }} f-18"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3 min-w-0">
+                                            <h6 class="mb-0 text-truncate">Weekly report</h6>
+                                            <p class="mb-0 text-muted small text-truncate">W{{ $wr->report->period->week_number }}, {{ $wr->report->period->year }} · {{ $reportSubtitle }}</p>
+                                        </div>
+                                        <div class="flex-shrink-0 text-end ms-2">
+                                            <span class="btn btn-sm btn-{{ $reportTone }} py-0 px-2 lh-sm">{{ $reportCta }}</span>
+                                        </div>
+                                    </div>
                                 </a>
                             @endif
                         </div>
-                    @elseif($approvalActions->isEmpty())
-                        <div class="text-center py-3">
-                            <i class="ti ti-mood-smile fs-1 text-success"></i>
-                            <p class="text-muted mb-0 mt-2">No action needed right now.</p>
+                    @else
+                        <div class="text-center py-4 px-3">
+                            <div class="avtar avtar-l rounded-circle text-success bg-light-success mx-auto mb-2">
+                                <i class="ti ti-mood-smile f-24"></i>
+                            </div>
+                            <p class="text-muted mb-0">No action needed right now.</p>
                         </div>
                     @endif
                 </div>

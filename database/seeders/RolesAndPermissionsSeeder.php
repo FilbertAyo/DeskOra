@@ -137,16 +137,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'download staff requisition',
         ];
 
+        // Superadmin always mirrors the full permission catalog.
         $superadminRole->syncPermissions($allPermissions);
-        $staffRole->syncPermissions($staffPermissions);
-        $documentApproverRole->syncPermissions($documentApproverPermissions);
-        $budgetReviewerRole->syncPermissions($budgetReviewerPermissions);
-        $budgetApproverRole->syncPermissions($budgetApproverPermissions);
-        $budgetAuthorizerRole->syncPermissions($budgetAuthorizerPermissions);
-        $budgetOperatorRole->syncPermissions($budgetOperatorPermissions);
-        $requisitionReviewerRole->syncPermissions($requisitionReviewerPermissions);
-        $requisitionApproverRole->syncPermissions($requisitionApproverPermissions);
-        $requisitionAuthorizerRole->syncPermissions($requisitionAuthorizerPermissions);
+
+        // Other roles keep admin-assigned extras (e.g. manage official letters on staff)
+        // so deploy.sh reseeds do not wipe production customizations.
+        $this->ensureRolePermissions($staffRole, $staffPermissions);
+        $this->ensureRolePermissions($documentApproverRole, $documentApproverPermissions);
+        $this->ensureRolePermissions($budgetReviewerRole, $budgetReviewerPermissions);
+        $this->ensureRolePermissions($budgetApproverRole, $budgetApproverPermissions);
+        $this->ensureRolePermissions($budgetAuthorizerRole, $budgetAuthorizerPermissions);
+        $this->ensureRolePermissions($budgetOperatorRole, $budgetOperatorPermissions);
+        $this->ensureRolePermissions($requisitionReviewerRole, $requisitionReviewerPermissions);
+        $this->ensureRolePermissions($requisitionApproverRole, $requisitionApproverPermissions);
+        $this->ensureRolePermissions($requisitionAuthorizerRole, $requisitionAuthorizerPermissions);
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.
@@ -157,5 +161,21 @@ class RolesAndPermissionsSeeder extends Seeder
                     $user->assignRole($superadminRole);
                 }
             });
+    }
+
+    /**
+     * Ensure baseline permissions exist on a role without removing manually added ones.
+     *
+     * @param  array<int, string>  $baselinePermissions
+     */
+    private function ensureRolePermissions(Role $role, array $baselinePermissions): void
+    {
+        $merged = collect($baselinePermissions)
+            ->merge($role->permissions()->pluck('name'))
+            ->unique()
+            ->values()
+            ->all();
+
+        $role->syncPermissions($merged);
     }
 }
