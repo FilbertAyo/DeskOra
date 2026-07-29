@@ -258,7 +258,7 @@
                                             <p class="mb-0 text-muted small">{{ $action['count'] }} {{ \Illuminate\Support\Str::plural('item', $action['count']) }} waiting</p>
                                         </div>
                                         <div class="flex-shrink-0 text-end ms-2">
-                                          <span class="badge bg-{{ $tone }} py-0 px-2 lh-sm">{{ $meta['cta'] }}</span>
+                                          <span class="badge bg-{{ $tone }}">{{ $meta['cta'] }}</span>
                                         </div>
                                     </div>
                                 </a>
@@ -290,7 +290,7 @@
                                             <p class="mb-0 text-muted small text-truncate">W{{ $wr->plan->period->week_number }}, {{ $wr->plan->period->year }} · {{ $planSubtitle }}</p>
                                         </div>
                                         <div class="flex-shrink-0 text-end ms-2">
-                                            <span class="badge bg-{{ $planTone }} py-0 px-2 lh-sm">{{ $planCta }}</span>
+                                            <span class="badge bg-{{ $planTone }}">{{ $planCta }}</span>
                                         </div>
                                     </div>
                                 </a>
@@ -322,7 +322,7 @@
                                             <p class="mb-0 text-muted small text-truncate">W{{ $wr->report->period->week_number }}, {{ $wr->report->period->year }} · {{ $reportSubtitle }}</p>
                                         </div>
                                         <div class="flex-shrink-0 text-end ms-2">
-                                            <span class="btn btn-sm btn-{{ $reportTone }} py-0 px-2 lh-sm">{{ $reportCta }}</span>
+                                            <span class="badge bg-{{ $reportTone }}">{{ $reportCta }}</span>
                                         </div>
                                     </div>
                                 </a>
