@@ -229,8 +229,8 @@
                 );
                 $hasActionNeeded = $approvalActions->isNotEmpty() || $hasWeeklyActions;
             @endphp
-            <div class="card shadow-none border h-100">
-                <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <div class="card shadow-none border">
+                <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between p-0">
                     <h6 class="mb-0"><i class="ti ti-alert-circle me-1 text-warning"></i>Action needed</h6>
                     @if($hasActionNeeded)
                         <span class="badge bg-light-warning text-warning border border-warning">
@@ -258,8 +258,7 @@
                                             <p class="mb-0 text-muted small">{{ $action['count'] }} {{ \Illuminate\Support\Str::plural('item', $action['count']) }} waiting</p>
                                         </div>
                                         <div class="flex-shrink-0 text-end ms-2">
-                                            <span class="badge bg-light-{{ $tone }} text-{{ $tone }} mb-1 d-block">{{ $action['count'] }}</span>
-                                            <span class="btn btn-sm btn-{{ $tone }} py-0 px-2 lh-sm">{{ $meta['cta'] }}</span>
+                                          <span class="btn btn-sm btn-{{ $tone }} py-0 px-2 lh-sm">{{ $meta['cta'] }}</span>
                                         </div>
                                     </div>
                                 </a>
