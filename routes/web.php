@@ -326,10 +326,10 @@ Route::middleware(['auth', 'permission:view cashflow movements|review staff requ
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/executive-pulse', [ExecutivePulseController::class, 'index'])
-        ->middleware('permission:view reports|view all documents')
+        ->middleware('permission:view reports')
         ->name('executive-pulse.index');
     Route::get('/executive-pulse/pdf', [ExecutivePulseController::class, 'download'])
-        ->middleware('permission:view reports|view all documents')
+        ->middleware('permission:view reports')
         ->name('executive-pulse.download');
 });
 

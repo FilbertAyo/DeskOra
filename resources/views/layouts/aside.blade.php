@@ -23,8 +23,7 @@
                         || Auth::user()->can('manage anonymous feedback')
                         || Auth::user()->can('view appreciation nominations')
                         || Auth::user()->can('manage work periods')
-                        || Auth::user()->can('view reports')
-                        || Auth::user()->can('view all documents');
+                        || Auth::user()->can('view reports');
 
                     $reviewActivitiesSubmittedCount = 0;
                     $reviewActivitiesPendingBudgetCount = 0;
@@ -65,13 +64,13 @@
                         </a>
                         <ul class="pc-submenu">
 
-                        @canany(['view reports', 'view all documents'])
+                            @can('view reports')
                                 <li class="{{ Request::routeIs('executive-pulse.*') ? 'active' : '' }}">
                                     <a href="{{ route('executive-pulse.index') }}" class="pc-link">
                                         <span class="pc-mtext">Executive Pulse</span>
                                     </a>
                                 </li>
-                            @endcanany
+                            @endcan
 
                             @if($canReviewSubmissions)
                                 <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">

@@ -43,7 +43,6 @@ class ExecutivePulseController extends Controller
 
     private function canViewPulse($user): bool
     {
-        return $user->can('view reports')
-            || $user->can('view all documents');
+        return $user->can('view reports');
     }
 }
