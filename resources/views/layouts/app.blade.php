@@ -108,6 +108,51 @@
 
     @stack('scripts')
 
+    @if(Auth::check() && Auth::user()->status === 'active')
+        <script>
+            (function () {
+                const endpoint = @json(route('analytics.events.store'));
+                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                if (!endpoint || !token) return;
+
+                const recent = new Map();
+
+                function trackFeature(featureKey, properties) {
+                    if (!featureKey || typeof featureKey !== 'string') return;
+
+                    const now = Date.now();
+                    const last = recent.get(featureKey) || 0;
+                    if (now - last < 1500) return;
+                    recent.set(featureKey, now);
+
+                    fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            feature_key: featureKey,
+                            properties: properties || null,
+                        }),
+                        keepalive: true,
+                    }).catch(function () {});
+                }
+
+                window.trackFeatureUsage = trackFeature;
+
+                document.addEventListener('click', function (event) {
+                    const target = event.target.closest('[data-feature]');
+                    if (!target) return;
+                    trackFeature(target.getAttribute('data-feature'));
+                }, true);
+            })();
+        </script>
+    @endif
+
 </body>
 
 </html>

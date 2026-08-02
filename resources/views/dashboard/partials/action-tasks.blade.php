@@ -6,7 +6,7 @@
                 <span class="badge bg-light-primary border border-primary ms-1">{{ $activeActionTaskCount }}</span>
             @endif
         </h6>
-        <a href="{{ route('action-logs.index') }}" class="dash-panel__meta text-decoration-none">View all</a>
+        <a href="{{ route('action-logs.index') }}" class="dash-panel__meta text-decoration-none" data-feature="feature.dashboard.action_tasks">View all</a>
     </div>
     <div class="dash-panel__body">
         @if($activeActionTaskCount > 0)
@@ -47,6 +47,7 @@
                                 @if(!empty($task['editable']))
                                     <button type="button"
                                         class="btn btn-sm btn-primary js-quick-update-task"
+                                        data-feature="feature.dashboard.action_tasks"
                                         data-task="{{ $task['task'] ?? 'Task' }}"
                                         data-task-uid="{{ $task['task_uid'] }}"
                                         data-document-id="{{ $task['document_id'] }}"

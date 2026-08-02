@@ -14,6 +14,7 @@
     <button
         type="button"
         class="deskora-ai-fab btn p-0 border-0"
+        data-feature="feature.ai.assistant_open"
         data-bs-toggle="offcanvas"
         data-bs-target="#{{ $offcanvasId }}"
         aria-controls="{{ $offcanvasId }}"

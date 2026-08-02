@@ -229,6 +229,7 @@
                         'roles.*',
                         'departments',
                         'activity-log.*',
+                        'feature-usage.*',
                         'settings.*',
                         'anonymous-feedback.*'
                     );
@@ -394,7 +395,8 @@
                             || Auth::user()->can('manage roles and permissions')
                             || Auth::user()->can('manage departments')
                             || Auth::user()->can('manage system settings')
-                            || Auth::user()->can('view activity log');
+                            || Auth::user()->can('view activity log')
+                            || Auth::user()->can('view feature usage');
                     @endphp
 
                     @if($canSeeSettings)
@@ -441,6 +443,14 @@
                                     <li class="{{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
                                         <a href="{{ route('activity-log.index') }}" class="pc-link">
                                             <span class="pc-mtext">Activity log</span>
+                                        </a>
+                                    </li>
+                                @endcan
+
+                                @can('view feature usage')
+                                    <li class="{{ Request::routeIs('feature-usage.*') ? 'active' : '' }}">
+                                        <a href="{{ route('feature-usage.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Feature usage</span>
                                         </a>
                                     </li>
                                 @endcan

@@ -22,6 +22,7 @@
             </span>
             <button type="button"
                 class="btn btn-sm btn-outline-primary"
+                data-feature="feature.dashboard.performance_details"
                 data-bs-toggle="modal"
                 data-bs-target="#staffPerformanceDetailsModal"
                 title="View performance details and coach tips">

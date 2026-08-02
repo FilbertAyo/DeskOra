@@ -9,7 +9,7 @@
                     </div>
                     @if (($currentPeriod ?? null))
                         <span class="wm-matrix-cta-wrap">
-                            <button type="button" class="wm-matrix-cta-btn" data-bs-toggle="modal" data-bs-target="#dashboardMatrixModal">
+                            <button type="button" class="wm-matrix-cta-btn" data-feature="feature.dashboard.matrix_modal" data-bs-toggle="modal" data-bs-target="#dashboardMatrixModal">
                                 <i class="ti ti-layout-grid me-1"></i>
                                 View weekly matrix
                             </button>

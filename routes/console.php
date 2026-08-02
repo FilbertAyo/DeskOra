@@ -46,3 +46,9 @@ Schedule::command('nominations:manage')
     ->dailyAt('00:05')
     ->timezone($appTimezone)
     ->description('Manage monthly staff appreciation nomination periods');
+
+// Prune feature usage analytics older than retention (default 365 days).
+Schedule::command('feature-usage:prune')
+    ->dailyAt('01:20')
+    ->timezone($appTimezone)
+    ->description('Prune old feature usage analytics events');

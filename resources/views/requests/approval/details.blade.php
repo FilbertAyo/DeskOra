@@ -39,6 +39,7 @@
                             @include('requests.approval.logs')
                             @if (($canActOnRequest ?? false) && ($hasSignature ?? false))
                         <button type="button" class="btn btn-primary btn-sm d-flex align-items-center shadow-sm"
+                            data-feature="feature.approvals.review_action"
                             data-toggle="modal" data-target="#approvalModal" data-bs-toggle="modal" data-bs-target="#approvalModal">
                             <i class="ti ti-check-circle me-2"></i>
                             <span>{{ $actionLabel }}</span>

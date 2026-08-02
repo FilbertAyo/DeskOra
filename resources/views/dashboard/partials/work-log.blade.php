@@ -8,7 +8,7 @@
         <h6 class="dash-panel__title">
             <i class="ti ti-notebook text-primary"></i>Today’s work log
         </h6>
-        <a href="{{ route('weekly-work-logs.index') }}" class="small">Open log</a>
+        <a href="{{ route('weekly-work-logs.index') }}" class="small" data-feature="feature.dashboard.work_log_open">Open log</a>
     </div>
     <div class="dash-panel__body">
         @if($todayWorkLog)
@@ -21,7 +21,7 @@
             @endif
         @else
             <p class="mb-3 text-muted">Capture what you did today — it helps fill your weekly report later.</p>
-            <a href="{{ route('weekly-work-logs.index') }}" class="btn btn-sm btn-primary">
+            <a href="{{ route('weekly-work-logs.index') }}" class="btn btn-sm btn-primary" data-feature="feature.dashboard.work_log_open">
                 <i class="ti ti-plus me-1"></i>Log today
             </a>
         @endif

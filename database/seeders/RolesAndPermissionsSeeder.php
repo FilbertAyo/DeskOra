@@ -55,6 +55,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage system settings',
             'view appreciation nominations',
             'view activity log',
+            'view feature usage',
             'review staff requisition',
             'approve staff requisition',
             'authorize staff requisition',

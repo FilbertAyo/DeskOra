@@ -3,7 +3,7 @@
 @endphp
 
 @if($scorecard && ($scorecard['period'] ?? null))
-    <div class="dash-panel">
+    <div class="dash-panel" data-feature="feature.dashboard.scorecard">
         <div class="dash-panel__header">
             <h6 class="dash-panel__title">
                 <i class="ti ti-chart-bar text-info"></i>Weekly scorecard

@@ -36,7 +36,7 @@
                     $meta = $approvalActionMeta[$action['label']] ?? ['icon' => 'ti-bell', 'tone' => 'secondary', 'cta' => 'Open'];
                     $tone = $meta['tone'];
                 @endphp
-                <a href="{{ $action['url'] }}" class="dash-action-item">
+                <a href="{{ $action['url'] }}" class="dash-action-item" data-feature="feature.dashboard.action_needed">
                     <div class="dash-action-item__icon text-{{ $tone }} bg-light-{{ $tone }}">
                         <i class="ti {{ $meta['icon'] }}"></i>
                     </div>
@@ -62,7 +62,7 @@
                             ? 'Draft in progress — submit before deadline'
                             : 'Not started yet');
                 @endphp
-                <a href="{{ $planUrl }}" class="dash-action-item">
+                <a href="{{ $planUrl }}" class="dash-action-item" data-feature="feature.dashboard.action_needed">
                     <div class="dash-action-item__icon text-{{ $planTone }} bg-light-{{ $planTone }}">
                         <i class="ti {{ $planNeedsRevision ? 'ti-alert-triangle' : 'ti-calendar-event' }}"></i>
                     </div>
@@ -88,7 +88,7 @@
                             ? 'Draft in progress — submit before deadline'
                             : 'Not started yet');
                 @endphp
-                <a href="{{ $reportUrl }}" class="dash-action-item">
+                <a href="{{ $reportUrl }}" class="dash-action-item" data-feature="feature.dashboard.action_needed">
                     <div class="dash-action-item__icon text-{{ $reportTone }} bg-light-{{ $reportTone }}">
                         <i class="ti {{ $reportNeedsRevision ? 'ti-alert-triangle' : 'ti-report' }}"></i>
                     </div>

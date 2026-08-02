@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureAnonymousFeedbackToken;
 use App\Http\Middleware\PreventAuthResponseCache;
+use App\Http\Middleware\TrackFeatureUsage;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Required when the app sits behind HTTPS reverse proxies (nginx, Cloudflare, Render, etc.).
         $middleware->trustProxies(at: '*');
+
+        $middleware->web(append: [
+            TrackFeatureUsage::class,
+        ]);
 
         $middleware->alias([ // Use 'alias' for route middleware
             'permission' => PermissionMiddleware::class,

@@ -14,6 +14,8 @@ use App\Http\Controllers\DocumentCrudController;
 use App\Http\Controllers\DocumentDashboardController;
 use App\Http\Controllers\DocumentWorkflowController;
 use App\Http\Controllers\ExecutivePulseController;
+use App\Http\Controllers\FeatureUsageController;
+use App\Http\Controllers\FeatureUsageEventController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\MeetingMinuteController;
@@ -86,6 +88,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/commands', [CommandPaletteController::class, 'index'])
         ->middleware('throttle:60,1')
         ->name('commands.index');
+
+    Route::post('/analytics/events', [FeatureUsageEventController::class, 'store'])
+        ->middleware('throttle:120,1')
+        ->name('analytics.events.store');
 
     // Documents routes
     Route::prefix('documents')->name('documents.')->group(function () {
@@ -391,6 +397,10 @@ Route::middleware(['auth', 'permission:manage system settings'])->prefix('settin
 Route::middleware(['auth', 'permission:view activity log'])->group(function () {
     Route::get('/settings/activity-log', [ActivityLogController::class, 'index'])->name('activity-log.index');
     Route::get('/settings/activity-log/{activity}', [ActivityLogController::class, 'show'])->name('activity-log.show');
+});
+
+Route::middleware(['auth', 'permission:view feature usage'])->group(function () {
+    Route::get('/settings/feature-usage', [FeatureUsageController::class, 'index'])->name('feature-usage.index');
 });
 
 Route::middleware(['auth', 'permission:users management settings'])->group(function () {

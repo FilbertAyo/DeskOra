@@ -50,6 +50,9 @@
         document.body.classList.add('deskora-go-open');
         input.value = '';
         activeIndex = 0;
+        if (typeof window.trackFeatureUsage === 'function') {
+            window.trackFeatureUsage('feature.ai.command_palette');
+        }
         ensureLoaded().then(() => {
             render(input.value);
             input.focus();

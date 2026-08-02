@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\AnonymousFeedback;
 use App\Models\Document;
+use App\Models\FeatureUsageEvent;
 use App\Models\MeetingMinute;
 use App\Models\NominationPeriod;
 use App\Models\OfficialLetter;
@@ -11,6 +12,7 @@ use App\Models\WeeklyWorkLog;
 use App\Policies\ActivityPolicy;
 use App\Policies\AnonymousFeedbackPolicy;
 use App\Policies\DocumentPolicy;
+use App\Policies\FeatureUsageEventPolicy;
 use App\Policies\MeetingMinutePolicy;
 use App\Policies\NominationPeriodPolicy;
 use App\Policies\OfficialLetterPolicy;
@@ -29,6 +31,7 @@ class AuthServiceProvider extends ServiceProvider
         Activity::class => ActivityPolicy::class,
         Document::class => DocumentPolicy::class,
         AnonymousFeedback::class => AnonymousFeedbackPolicy::class,
+        FeatureUsageEvent::class => FeatureUsageEventPolicy::class,
         MeetingMinute::class => MeetingMinutePolicy::class,
         NominationPeriod::class => NominationPeriodPolicy::class,
         OfficialLetter::class => OfficialLetterPolicy::class,
