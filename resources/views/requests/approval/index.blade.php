@@ -72,7 +72,8 @@
                                 };
                                 $statusTextClass = 'text-'.$statusClass;
                                 $canAct = isset($stage) && $item->userCanActAtStage(auth()->user(), $stage);
-                                $hasCompleted = isset($stage) && $item->userHasCompletedStage(auth()->user(), $stage);
+                                $stageApproved = isset($stage) && $item->stageHasApproval($stage);
+                                $closedAtStage = isset($stage) && $item->wasClosedAtStage($stage);
                                 $actionLabel = isset($stage) ? \App\Models\Request::stageLabel($stage) : 'View';
                             @endphp
                             <tr>
@@ -87,7 +88,11 @@
                                 <td>
                                     @if ($canAct)
                                         <span class="badge bg-light-warning border border-warning text-warning">Pending</span>
-                                    @elseif ($hasCompleted)
+                                    @elseif ($closedAtStage)
+                                        <span class="badge bg-light-danger border border-danger text-danger">
+                                            {{ $item->status === 'resubmission' ? 'Resubmission' : 'Rejected' }}
+                                        </span>
+                                    @elseif ($stageApproved)
                                         <span class="badge bg-light-success border border-success text-success">Completed</span>
                                     @else
                                         <span class="badge bg-light-secondary border border-secondary text-secondary">—</span>

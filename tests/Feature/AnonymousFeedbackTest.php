@@ -266,4 +266,83 @@ class AnonymousFeedbackTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('anonymous-feedback-fab', false);
     }
+
+    public function test_inbox_shows_status_chips_and_quick_actions(): void
+    {
+        Permission::findOrCreate('manage anonymous feedback');
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage anonymous feedback');
+
+        AnonymousFeedback::query()->create([
+            'category' => AnonymousFeedback::CATEGORY_COMPLAINT,
+            'body' => 'Needs attention',
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]);
+        AnonymousFeedback::query()->create([
+            'category' => AnonymousFeedback::CATEGORY_SUGGESTION,
+            'body' => 'Already moving',
+            'status' => AnonymousFeedback::STATUS_IN_PROGRESS,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('anonymous-feedback.index'));
+
+        $response->assertOk();
+        $response->assertSee('New (1)', false);
+        $response->assertSee('In progress (1)', false);
+        $response->assertSee('Mark in progress', false);
+        $response->assertSee('Mark resolved', false);
+        $response->assertSee('anonymous-feedback-status-form', false);
+    }
+
+    public function test_marking_feedback_resolved_clears_fab_new_count(): void
+    {
+        Permission::findOrCreate('manage anonymous feedback');
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage anonymous feedback');
+
+        $row = AnonymousFeedback::query()->create([
+            'category' => AnonymousFeedback::CATEGORY_COMPLAINT,
+            'body' => 'Needs attention',
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('profile.edit'))
+            ->assertSee('anonymous-feedback-fab', false);
+
+        $this->actingAs($manager)->patch(
+            route('anonymous-feedback.update', $row),
+            ['status' => AnonymousFeedback::STATUS_RESOLVED]
+        )->assertRedirect();
+
+        $this->assertSame(AnonymousFeedback::STATUS_RESOLVED, $row->fresh()->status);
+
+        $this->actingAs($manager)
+            ->get(route('profile.edit'))
+            ->assertDontSee('anonymous-feedback-fab', false);
+    }
+
+    public function test_marking_feedback_in_progress_clears_fab_new_count(): void
+    {
+        Permission::findOrCreate('manage anonymous feedback');
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage anonymous feedback');
+
+        $row = AnonymousFeedback::query()->create([
+            'category' => AnonymousFeedback::CATEGORY_ASSISTANCE,
+            'body' => 'Help needed',
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]);
+
+        $this->actingAs($manager)->patch(
+            route('anonymous-feedback.update', $row),
+            ['status' => AnonymousFeedback::STATUS_IN_PROGRESS]
+        )->assertRedirect();
+
+        $this->assertSame(AnonymousFeedback::STATUS_IN_PROGRESS, $row->fresh()->status);
+
+        $this->actingAs($manager)
+            ->get(route('profile.edit'))
+            ->assertDontSee('anonymous-feedback-fab', false);
+    }
 }

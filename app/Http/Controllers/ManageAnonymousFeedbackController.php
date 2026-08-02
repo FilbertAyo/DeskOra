@@ -28,6 +28,12 @@ class ManageAnonymousFeedbackController extends Controller
 
         $items = $query->paginate(20)->withQueryString();
 
+        $statusCounts = [
+            AnonymousFeedback::STATUS_NEW => AnonymousFeedback::query()->status(AnonymousFeedback::STATUS_NEW)->count(),
+            AnonymousFeedback::STATUS_IN_PROGRESS => AnonymousFeedback::query()->status(AnonymousFeedback::STATUS_IN_PROGRESS)->count(),
+            AnonymousFeedback::STATUS_RESOLVED => AnonymousFeedback::query()->status(AnonymousFeedback::STATUS_RESOLVED)->count(),
+        ];
+
         $feedbackUrl = url('/feedback/'.config('anonymous_feedback.public_token'));
 
         $writer = new SvgWriter;
@@ -40,6 +46,7 @@ class ManageAnonymousFeedbackController extends Controller
         return view('settings.anonymous-feedback.index', [
             'items' => $items,
             'statuses' => AnonymousFeedback::statuses(),
+            'statusCounts' => $statusCounts,
             'feedbackUrl' => $feedbackUrl,
             'qrSvg' => $qrSvg,
         ]);

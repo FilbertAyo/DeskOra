@@ -8,6 +8,16 @@ use Illuminate\Support\Facades\Cache;
 
 class RequestApprovalNavService
 {
+    public static function cacheKeyFor(User $user): string
+    {
+        return 'request-approval-nav-counts-user-'.$user->id;
+    }
+
+    public function forgetCountsFor(User $user): void
+    {
+        Cache::forget(self::cacheKeyFor($user));
+    }
+
     /**
      * @return array{
      *     review: int,
@@ -19,7 +29,7 @@ class RequestApprovalNavService
     public function countsFor(User $user): array
     {
         return Cache::remember(
-            'request-approval-nav-counts-user-'.$user->id,
+            self::cacheKeyFor($user),
             now()->addSeconds(45),
             function () use ($user) {
                 $counts = [

@@ -141,21 +141,91 @@ class RequestApprovalStageTest extends TestCase
         );
     }
 
-    public function test_reviewer_sees_only_pending_review_items(): void
+    public function test_reviewer_sees_pending_and_already_reviewed_items(): void
     {
         $department = $this->createDepartment();
         $requester = $this->createRequester($department);
         $reviewer = $this->userWithPermissions(['review pettycash'], $department);
+        $otherReviewer = $this->userWithPermissions(['review pettycash'], $department);
 
         $pendingReview = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'pending', 50000);
         $awaitingApprove = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 75000);
-        $this->addStageApproval($awaitingApprove, 'review');
+        $this->addStageApproval($awaitingApprove, 'review', $otherReviewer);
 
         $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'review']));
 
         $response->assertOk();
         $response->assertSee('50,000.00');
-        $response->assertDontSee('75,000.00');
+        $response->assertSee('75,000.00');
+        $response->assertSee('Pending', false);
+        $response->assertSee('Completed', false);
+    }
+
+    public function test_rejected_request_stays_on_stage_list_but_is_not_counted(): void
+    {
+        $department = $this->createDepartment();
+        $requester = $this->createRequester($department);
+        $approver = $this->userWithPermissions(['approve pettycash'], $department);
+
+        $rejectedAtApprove = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'rejected', 88000);
+        $this->addStageApproval($rejectedAtApprove, 'review');
+        RequestApproval::create([
+            'request_id' => $rejectedAtApprove->id,
+            'step' => 'system',
+            'action' => 'rejected',
+            'actor_id' => $approver->id,
+            'acted_at' => now(),
+        ]);
+
+        $pendingApprove = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 44000);
+        $this->addStageApproval($pendingApprove, 'review');
+
+        $count = app(RequestApprovalNavService::class)
+            ->countForStageAndTypes($approver, 'approve', ['Petty Cash', 'Reimbursement']);
+
+        $this->assertSame(1, $count);
+
+        $response = $this->actingAs($approver)->get(route('petty.list', ['stage' => 'approve']));
+
+        $response->assertOk();
+        $response->assertSee('88,000.00');
+        $response->assertSee('44,000.00');
+        $response->assertSee('Rejected', false);
+        $response->assertSee('Pending', false);
+    }
+
+    public function test_reject_endpoint_logs_current_stage_and_clears_actionable_count(): void
+    {
+        $department = $this->createDepartment();
+        $requester = $this->createRequester($department);
+        $approver = $this->userWithPermissions(['approve pettycash'], $department);
+
+        $request = $this->createFinanceRequest($department, $requester, 'Petty Cash', 'processing', 33000);
+        $this->addStageApproval($request, 'review');
+
+        Cache::flush();
+        $this->assertSame(
+            1,
+            app(RequestApprovalNavService::class)->countForStageAndTypes($approver, 'approve', ['Petty Cash'])
+        );
+
+        $response = $this->actingAs($approver)->post(route('petty.reject', $request), [
+            'comment' => 'Not justified',
+            'action' => 'rejected',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('request_approvals', [
+            'request_id' => $request->id,
+            'step' => 'approve',
+            'action' => 'rejected',
+            'actor_id' => $approver->id,
+        ]);
+        $this->assertSame('rejected', $request->fresh()->status);
+        $this->assertSame(
+            0,
+            app(RequestApprovalNavService::class)->countForStageAndTypes($approver, 'approve', ['Petty Cash'])
+        );
     }
 
     public function test_approver_sees_only_post_review_items(): void

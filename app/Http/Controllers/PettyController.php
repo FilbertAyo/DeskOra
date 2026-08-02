@@ -18,6 +18,7 @@ use App\Models\RequisitionRequest;
 use App\Models\User;
 use App\Models\YearPlanActivity;
 use App\Services\NotificationService;
+use App\Services\RequestApprovalNavService;
 use App\Services\RequisitionNotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -33,7 +34,16 @@ class PettyController extends Controller
 {
     public function __construct(
         private readonly RequisitionNotificationService $requisitionNotifications,
+        private readonly RequestApprovalNavService $requestApprovalNavService,
     ) {}
+
+    private function forgetApprovalNavCounts(): void
+    {
+        $user = Auth::user();
+        if ($user instanceof User) {
+            $this->requestApprovalNavService->forgetCountsFor($user);
+        }
+    }
 
     private function buildRequestMailArgs(FinanceRequest $request): array
     {
@@ -447,6 +457,7 @@ class PettyController extends Controller
 
         $this->createApproval($petty, 'review', 'approved');
         $petty->update(['status' => 'processing']);
+        $this->forgetApprovalNavCounts();
 
         if ($petty->request_type === 'Staff Requisition') {
             $this->requisitionNotifications->notifyStageApprovers($petty, 'reviewed');
@@ -471,6 +482,7 @@ class PettyController extends Controller
 
         $this->createApproval($petty, 'approve', 'approved');
         $petty->update(['status' => 'processing']);
+        $this->forgetApprovalNavCounts();
 
         if ($petty->request_type === 'Staff Requisition') {
             $this->requisitionNotifications->notifyStageApprovers($petty, 'approved');
@@ -495,6 +507,7 @@ class PettyController extends Controller
 
         $this->createApproval($petty, 'authorize', 'approved');
         $petty->update(['status' => 'approved', 'approved_at' => now()]);
+        $this->forgetApprovalNavCounts();
 
         if ($petty->request_type === 'Staff Requisition') {
             $this->requisitionNotifications->notifyRequester($petty, 'authorized', Auth::user());
@@ -557,8 +570,14 @@ class PettyController extends Controller
             'action' => 'required|string|in:rejected,resubmission',
         ]);
 
-        $this->createApproval($petty, 'system', $validated['action'], $validated['comment']);
+        $rejectStage = $petty->approvalStage();
+        if ($rejectStage === 'completed' || ! in_array($rejectStage, FinanceRequest::APPROVAL_STAGES, true)) {
+            $rejectStage = 'authorize';
+        }
+
+        $this->createApproval($petty, $rejectStage, $validated['action'], $validated['comment']);
         $petty->update(['status' => $validated['action']]);
+        $this->forgetApprovalNavCounts();
 
         if ($petty->request_type === 'Staff Requisition') {
             $event = $validated['action'] === 'rejected' ? 'rejected' : 'resubmission_requested';

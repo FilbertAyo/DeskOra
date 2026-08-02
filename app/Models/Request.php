@@ -234,6 +234,12 @@ class Request extends Model
 
     public const APPROVAL_STAGES = ['review', 'approve', 'authorize'];
 
+    /** Statuses that still need workflow action at a stage. */
+    public const OPEN_APPROVAL_STATUSES = ['pending', 'processing', 'resubmitted'];
+
+    /** Statuses that close a request at the stage where it was awaiting action. */
+    public const CLOSED_AT_STAGE_STATUSES = ['rejected', 'resubmission'];
+
     public const REQUEST_TYPES = ['Petty Cash', 'Reimbursement', 'Staff Requisition'];
 
     /**
@@ -301,9 +307,10 @@ class Request extends Model
 
     public function scopeAwaitingApprovalStage(Builder $query, string $stage): Builder
     {
+        $query->whereIn('status', self::OPEN_APPROVAL_STATUSES);
+
         return match ($stage) {
             'review' => $query
-                ->whereIn('status', ['pending', 'processing', 'resubmitted'])
                 ->whereDoesntHave('approvals', fn (Builder $q) => $q
                     ->where('step', 'review')
                     ->where('action', 'approved')),
@@ -322,6 +329,36 @@ class Request extends Model
                     ->where('step', 'authorize')
                     ->where('action', 'approved')),
             default => $query,
+        };
+    }
+
+    /**
+     * Requests that were rejected or sent for resubmission while awaiting this stage.
+     */
+    public function scopeClosedAtApprovalStage(Builder $query, string $stage): Builder
+    {
+        $query->whereIn('status', self::CLOSED_AT_STAGE_STATUSES);
+
+        return match ($stage) {
+            'review' => $query
+                ->whereDoesntHave('approvals', fn (Builder $q) => $q
+                    ->where('step', 'review')
+                    ->where('action', 'approved')),
+            'approve' => $query
+                ->whereHas('approvals', fn (Builder $q) => $q
+                    ->where('step', 'review')
+                    ->where('action', 'approved'))
+                ->whereDoesntHave('approvals', fn (Builder $q) => $q
+                    ->where('step', 'approve')
+                    ->where('action', 'approved')),
+            'authorize' => $query
+                ->whereHas('approvals', fn (Builder $q) => $q
+                    ->where('step', 'approve')
+                    ->where('action', 'approved'))
+                ->whereDoesntHave('approvals', fn (Builder $q) => $q
+                    ->where('step', 'authorize')
+                    ->where('action', 'approved')),
+            default => $query->whereRaw('1 = 0'),
         };
     }
 
@@ -351,8 +388,17 @@ class Request extends Model
         return 'review';
     }
 
+    public function isOpenForApproval(): bool
+    {
+        return in_array($this->status, self::OPEN_APPROVAL_STATUSES, true);
+    }
+
     public function userCanActAtStage(User $user, string $stage): bool
     {
+        if (! $this->isOpenForApproval()) {
+            return false;
+        }
+
         if ($this->approvalStage() !== $stage) {
             return false;
         }
@@ -453,14 +499,46 @@ class Request extends Model
 
         return $query
             ->forUserApprovalTypes($user, $types)
-            ->where(function (Builder $q) use ($user, $stage) {
+            ->where(function (Builder $q) use ($stage) {
                 $q->where(function (Builder $awaiting) use ($stage) {
                     $awaiting->awaitingApprovalStage($stage);
-                })->orWhereHas('approvals', fn (Builder $approval) => $approval
-                    ->where('step', $stage)
-                    ->where('action', 'approved')
-                    ->where('actor_id', $user->id));
+                })
+                    ->orWhereHas('approvals', fn (Builder $approval) => $approval
+                        ->where('step', $stage)
+                        ->where('action', 'approved'))
+                    ->orWhere(function (Builder $closed) use ($stage) {
+                        $closed->closedAtApprovalStage($stage);
+                    });
             });
+    }
+
+    public function stageHasApproval(string $stage): bool
+    {
+        if ($this->relationLoaded('approvals')) {
+            return $this->approvals
+                ->where('step', $stage)
+                ->where('action', 'approved')
+                ->isNotEmpty();
+        }
+
+        return $this->approvals()
+            ->where('step', $stage)
+            ->where('action', 'approved')
+            ->exists();
+    }
+
+    public function wasClosedAtStage(string $stage): bool
+    {
+        if (! in_array($this->status, self::CLOSED_AT_STAGE_STATUSES, true)) {
+            return false;
+        }
+
+        return match ($stage) {
+            'review' => ! $this->stageHasApproval('review'),
+            'approve' => $this->stageHasApproval('review') && ! $this->stageHasApproval('approve'),
+            'authorize' => $this->stageHasApproval('approve') && ! $this->stageHasApproval('authorize'),
+            default => false,
+        };
     }
 
     public function userHasCompletedStage(User $user, string $stage): bool
