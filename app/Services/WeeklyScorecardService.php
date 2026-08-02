@@ -68,7 +68,7 @@ class WeeklyScorecardService
                     continue;
                 }
                 $progress = trim((string) ($row['progress'] ?? ''));
-                if in_array($progress, ['Partially done', 'Done and carry'], true)) {
+                if (in_array($progress, ['Partially done', 'Done and carry'], true)) {
                     $carryOvers++;
                 }
             }
