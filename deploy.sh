@@ -45,6 +45,14 @@ git pull --ff-only
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
 
+# Clear compiled views early — removing packages (e.g. Livewire) leaves stale
+# Blade caches that cause 500s if migrate fails later in this script.
+echo "==> Clearing compiled views (pre-migrate)..."
+rm -rf "$SCRIPT_DIR/storage/framework/views/"* || true
+"$PHP_BIN" artisan view:clear || true
+"$PHP_BIN" artisan config:clear || true
+"$PHP_BIN" artisan route:clear || true
+
 if grep -qE '^APP_ENV=production' .env 2>/dev/null; then
   echo "==> Production environment detected."
   echo "    Deploy uses forward-only migrations (migrate --force)."
