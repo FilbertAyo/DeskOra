@@ -385,13 +385,15 @@
                         </a>
                     </li>
              
-                    @canany([
-                        'users management settings',
-                        'manage roles and permissions',
-                        'manage departments',
-                        'manage system settings',
-                        'view activity log',
-                    ])
+                    @php
+                        $canSeeSettings = Auth::user()->can('users management settings')
+                            || Auth::user()->can('manage roles and permissions')
+                            || Auth::user()->can('manage departments')
+                            || Auth::user()->can('manage system settings')
+                            || Auth::user()->can('view activity log');
+                    @endphp
+
+                    @if($canSeeSettings)
                         <li class="pc-item pc-hasmenu {{ $isSettingsMenuOpen ? 'active pc-trigger' : '' }}">
                             <a href="javascript:void(0);" class="pc-link">
                                 <span class="pc-micon"><i class="ti ti-settings"></i></span>
@@ -440,7 +442,7 @@
                                 @endcan
                             </ul>
                         </li>
-                    @endcanany
+                    @endif
                
             </ul>
             <div class="px-3 py-3 border-top border-secondary border-opacity-10 mt-2">
