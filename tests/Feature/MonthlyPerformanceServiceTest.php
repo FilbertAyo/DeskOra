@@ -88,6 +88,8 @@ class MonthlyPerformanceServiceTest extends TestCase
 
         $this->assertStringContainsString('My monthly performance', $html);
         $this->assertStringContainsString('staffPerformanceChart', $html);
+        $this->assertStringContainsString('staffPerformanceDetailsModal', $html);
         $this->assertStringContainsString('Coach tips', $html);
+        $this->assertStringContainsString('Details', $html);
     }
 }
