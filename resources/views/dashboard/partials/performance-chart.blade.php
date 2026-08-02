@@ -65,7 +65,7 @@
                             data-ai-assist-only
                             data-ai-polish-performance-tips
                             title="Rewrite tips with AI">
-                            <i class="ti ti-sparkles me-1"></i>Polish with AI
+                            <i class="ti ti-flare me-1"></i>Polish with AI
                         </button>
                     </div>
                     <ul class="staff-performance-tips__list mb-0" id="staffPerformanceTips">
