@@ -324,6 +324,8 @@ trait HandlesDocumentBudgetReview
                 'budget_review_note' => null,
             ]);
 
+            $this->notifyWeeklyBudgetStageAdvance($document, $user, $newStage, $budgetUid, $note);
+
             return redirect()
                 ->back()
                 ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
@@ -406,11 +408,55 @@ trait HandlesDocumentBudgetReview
             'budget_review_note' => null,
         ]);
 
+        $this->notifyWeeklyBudgetStageAdvance($document, $user, $newStage, $budgetUid, $note);
+
         $stageLabel = ucfirst($actionStage);
 
         return redirect()
             ->back()
             ->with('success', 'Budget item "'.$budgetUid.'" has passed '.$stageLabel.' stage.');
+    }
+
+    private function notifyWeeklyBudgetStageAdvance(
+        Document $document,
+        User $actor,
+        string $newStage,
+        string $itemLabel,
+        ?string $note = null,
+    ): void {
+        $notifier = $this->weeklyBudgetNotificationService;
+
+        match ($newStage) {
+            Document::BUDGET_REVIEW_STAGE_REVIEWED => $notifier->notifyStageApprovers(
+                $document,
+                'reviewed',
+                $actor,
+                $itemLabel,
+                $note
+            ),
+            Document::BUDGET_REVIEW_STAGE_APPROVED => $notifier->notifyStageApprovers(
+                $document,
+                'approved',
+                $actor,
+                $itemLabel,
+                $note
+            ),
+            Document::BUDGET_REVIEW_STAGE_AUTHORIZED => $notifier->notifyOwner(
+                $document,
+                'authorized',
+                $actor,
+                $itemLabel,
+                $note
+            ),
+            Document::BUDGET_REVIEW_STAGE_REJECTED => $notifier->notifyOwner(
+                $document,
+                'rejected',
+                $actor,
+                $itemLabel,
+                $note
+            ),
+            default => null,
+        };
     }
 
     public function addMidWeekBudgetEntry(Request $request)

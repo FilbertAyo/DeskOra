@@ -11,6 +11,7 @@
   <!-- [Favicon] icon -->
   <link rel="icon" href="{{ asset('assets/images/logo-icon.png') }}" type="image/png">
   <link rel="apple-touch-icon" href="{{ asset('assets/images/logo-icon.png') }}">
+  @include('partials.pwa-head')
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" id="main-font-link">
 <!-- [Tabler Icons] https://tablericons.com -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/tabler-icons.min.css') }}" >
@@ -75,6 +76,7 @@
     @if(Auth::check() && Auth::user()->status === 'active')
         @include('partials.deskora-go')
         @include('partials.ai-assist-actions')
+        @include('partials.pwa')
     @endif
 
 

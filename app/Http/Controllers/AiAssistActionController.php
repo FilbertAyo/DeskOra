@@ -27,11 +27,17 @@ class AiAssistActionController extends Controller
 
         $validated = $request->validate([
             'period_id' => ['nullable', 'string', 'max:40'],
+            'activity_progress' => ['nullable', 'array'],
+            'activity_progress.*.activity_output' => ['nullable', 'string', 'max:2000'],
+            'activity_progress.*.progress' => ['nullable', 'string', 'max:100'],
+            'activity_progress.*.remarks_challenges' => ['nullable', 'string', 'max:4000'],
+            'activity_progress.*.next_step' => ['nullable', 'string', 'max:4000'],
         ]);
 
         $result = $this->aiAssist->draftWeeklyReportFromActionTasks(
             $user,
-            $validated['period_id'] ?? null
+            $validated['period_id'] ?? null,
+            is_array($validated['activity_progress'] ?? null) ? $validated['activity_progress'] : []
         );
 
         return response()->json($result);

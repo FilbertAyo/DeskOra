@@ -129,5 +129,41 @@ class AiAssistActionTest extends TestCase
 
         $this->assertFalse($result['used_ai']);
         $this->assertSame('', $result['draft']['summary']);
+        $this->assertSame([], $result['draft']['activity_progress']);
+    }
+
+    public function test_draft_weekly_report_fills_activity_progress_from_work_logs(): void
+    {
+        config(['services.groq.api_key' => '']);
+
+        $user = User::factory()->create(['status' => 'active']);
+        $period = WorkPeriod::factory()->create([
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        \App\Models\WeeklyWorkLog::create([
+            'user_id' => $user->id,
+            'period_id' => $period->id,
+            'log_date' => now()->toDateString(),
+            'done' => 'Visited partner site',
+            'blocker' => 'Waiting on clearance',
+            'next' => 'Follow up tomorrow',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('ai-assist.draft-weekly-report'), [
+            'period_id' => $period->id,
+            'activity_progress' => [[
+                'activity_output' => 'Monday - Partner visit',
+                'progress' => '',
+                'remarks_challenges' => '',
+                'next_step' => '',
+            ]],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('used_ai', false);
+        $this->assertNotEmpty($response->json('draft.activity_progress'));
+        $this->assertSame('Monday - Partner visit', $response->json('draft.activity_progress.0.activity_output'));
+        $this->assertContains('Visited partner site', $response->json('draft.achievements'));
     }
 }

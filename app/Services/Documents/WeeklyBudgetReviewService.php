@@ -49,6 +49,56 @@ class WeeklyBudgetReviewService
         return $query->get()->filter(fn (Document $document) => $document->hasBudgetItems())->count();
     }
 
+    /**
+     * Count budget line items awaiting a specific approval stage for the given user.
+     *
+     * @return array{review: int, approve: int, authorize: int}
+     */
+    public function actionableStageCountsFor(User $user): array
+    {
+        $counts = [
+            'review' => 0,
+            'approve' => 0,
+            'authorize' => 0,
+        ];
+
+        if (! Schema::hasTable('weekly_plan_budget_reviews') || ! Schema::hasTable('weekly_plan_budget_items')) {
+            return $counts;
+        }
+
+        $stageMap = [
+            'review' => [Document::BUDGET_REVIEW_STAGE_PENDING, 'review weekly budgets'],
+            'approve' => [Document::BUDGET_REVIEW_STAGE_REVIEWED, 'approve weekly budgets'],
+            'authorize' => [Document::BUDGET_REVIEW_STAGE_APPROVED, 'authorize weekly budgets'],
+        ];
+
+        foreach ($stageMap as $key => [$approvalStage, $permission]) {
+            if (! $user->can($permission)) {
+                continue;
+            }
+
+            $counts[$key] = (int) \App\Models\WeeklyPlanBudgetReview::query()
+                ->where('approval_stage', $approvalStage)
+                ->whereHas('budgetItem.weeklyPlan', function ($planQuery) {
+                    $planQuery->where('state', Document::STATE_SUBMITTED);
+                })
+                ->count();
+        }
+
+        // Items with no review row yet still sit at pending for reviewers.
+        if ($user->can('review weekly budgets') && Schema::hasTable('weekly_plan_budget_items')) {
+            $pendingWithoutReview = (int) \App\Models\WeeklyPlanBudgetItem::query()
+                ->whereDoesntHave('review')
+                ->whereHas('weeklyPlan', function ($planQuery) {
+                    $planQuery->where('state', Document::STATE_SUBMITTED);
+                })
+                ->count();
+            $counts['review'] += $pendingWithoutReview;
+        }
+
+        return $counts;
+    }
+
     public function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
     {
         if ($request->filled('period_id')) {

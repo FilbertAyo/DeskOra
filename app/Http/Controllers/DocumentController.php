@@ -16,6 +16,7 @@ use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\MonthlyReportYearPlanActivities;
 use App\Services\WeeklyActivityAssignmentService;
+use App\Services\WeeklyBudgetNotificationService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Services\WorkflowEmailNotificationService;
 use App\Services\WorkPeriodService;
@@ -39,6 +40,7 @@ class DocumentController extends Controller
         protected readonly WeeklySubmissionReminderService $weeklySubmissionReminderService,
         protected readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
         protected readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
+        protected readonly WeeklyBudgetNotificationService $weeklyBudgetNotificationService,
         protected readonly DocumentListingService $documentListingService,
         protected readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
         protected readonly DocumentDomainSyncService $documentDomainSyncService,

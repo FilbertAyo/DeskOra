@@ -51,6 +51,10 @@
                     @include('dashboard.partials.stats')
                 </div>
 
+                <div class="dashboard-slot dashboard-slot--work-log">
+                    @include('dashboard.partials.work-log')
+                </div>
+
                 @if($hasSubmissionAlerts)
                     <div class="dashboard-slot dashboard-slot--alerts">
                         <div class="dashboard-alerts">
@@ -67,6 +71,10 @@
             <div class="dashboard-col dashboard-col--side">
                 <div class="dashboard-slot dashboard-slot--action">
                     @include('dashboard.partials.action-needed')
+                </div>
+
+                <div class="dashboard-slot dashboard-slot--scorecard">
+                    @include('dashboard.partials.scorecard')
                 </div>
 
                 <div class="dashboard-slot dashboard-slot--tasks">

@@ -6,12 +6,15 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
+use App\Models\WeeklyWorkLog;
 use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
 use App\Services\ActionLogProgressService;
+use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\RequestApprovalNavService;
 use App\Services\WeeklyActivityAssignmentService;
+use App\Services\WeeklyScorecardService;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -27,6 +30,8 @@ class DashboardController extends Controller
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
         private readonly ActionLogProgressService $actionLogProgressService,
         private readonly RequestApprovalNavService $requestApprovalNavService,
+        private readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
+        private readonly WeeklyScorecardService $weeklyScorecardService,
     ) {}
 
     public function redirect()
@@ -413,6 +418,20 @@ class DashboardController extends Controller
 
         $approvalActions = $this->approvalActionsFor($user);
 
+        $todayWorkLog = $currentPeriod
+            ? WeeklyWorkLog::query()
+                ->where('user_id', $user->id)
+                ->where('period_id', $currentPeriod->id)
+                ->whereDate('log_date', now()->toDateString())
+                ->first()
+            : null;
+
+        $weeklyScorecard = $this->weeklyScorecardService->forUser($user, $currentPeriod);
+        $reportReadyHint = $currentPeriod
+            && $weeklyScorecard['work_log_days'] > 0
+            && ! $weeklyScorecard['report_submitted']
+            && Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT);
+
         return view('dashboard', compact(
             'userNo',
             'pettyNo',
@@ -451,6 +470,9 @@ class DashboardController extends Controller
             'todaysWeeklyTasks',
             'yearPlanMonthCoverageAlert',
             'approvalActions',
+            'todayWorkLog',
+            'weeklyScorecard',
+            'reportReadyHint',
         ));
     }
 
@@ -478,6 +500,24 @@ class DashboardController extends Controller
                 'label' => $label,
                 'count' => $count,
                 'url' => route('petty.list', ['stage' => $stage, 'type' => $type]),
+            ];
+        }
+
+        $budgetCounts = $this->weeklyBudgetReviewService->actionableStageCountsFor($user);
+        foreach ([
+            ['review', 'Review weekly budgets'],
+            ['approve', 'Approve weekly budgets'],
+            ['authorize', 'Authorize weekly budgets'],
+        ] as [$stage, $label]) {
+            $count = (int) ($budgetCounts[$stage] ?? 0);
+            if ($count < 1) {
+                continue;
+            }
+
+            $actions[] = [
+                'label' => $label,
+                'count' => $count,
+                'url' => route('documents.weekly-budget-review', ['status' => 'pending']),
             ];
         }
 

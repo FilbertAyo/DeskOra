@@ -7,12 +7,14 @@ use App\Models\Document;
 use App\Models\MeetingMinute;
 use App\Models\NominationPeriod;
 use App\Models\OfficialLetter;
+use App\Models\WeeklyWorkLog;
 use App\Policies\ActivityPolicy;
 use App\Policies\AnonymousFeedbackPolicy;
 use App\Policies\DocumentPolicy;
 use App\Policies\MeetingMinutePolicy;
 use App\Policies\NominationPeriodPolicy;
 use App\Policies\OfficialLetterPolicy;
+use App\Policies\WeeklyWorkLogPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 
@@ -30,6 +32,7 @@ class AuthServiceProvider extends ServiceProvider
         MeetingMinute::class => MeetingMinutePolicy::class,
         NominationPeriod::class => NominationPeriodPolicy::class,
         OfficialLetter::class => OfficialLetterPolicy::class,
+        WeeklyWorkLog::class => WeeklyWorkLogPolicy::class,
     ];
 
     /**

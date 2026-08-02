@@ -47,6 +47,6 @@ class WeeklyBudgetSubmissionNotification extends Notification
             ->action('Open Weekly Budget Review', route('documents.weekly-budget-review', [
                 'period_id' => $this->document->period_id,
             ]))
-            ->line('You are receiving this because you process weekly plan budgets.');
+            ->line('You are receiving this because you review weekly plan budgets.');
     }
 }

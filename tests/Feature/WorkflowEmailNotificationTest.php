@@ -77,13 +77,13 @@ class WorkflowEmailNotificationTest extends TestCase
         $owner->givePermissionTo('create weekly plan');
 
         $budgetReviewerEmail = $this->createActiveUserWithChannel('email');
-        $budgetReviewerEmail->givePermissionTo('process weekly budgets');
+        $budgetReviewerEmail->givePermissionTo('review weekly budgets');
 
         $budgetReviewerBoth = $this->createActiveUserWithChannel('both');
-        $budgetReviewerBoth->givePermissionTo('process weekly budgets');
+        $budgetReviewerBoth->givePermissionTo('review weekly budgets');
 
         $budgetReviewerSms = $this->createActiveUserWithChannel('sms');
-        $budgetReviewerSms->givePermissionTo('process weekly budgets');
+        $budgetReviewerSms->givePermissionTo('review weekly budgets');
 
         $document = Document::create([
             'user_id' => $owner->id,
@@ -269,7 +269,7 @@ class WorkflowEmailNotificationTest extends TestCase
         $owner->givePermissionTo('create weekly plan');
 
         $finance = $this->createActiveUserWithChannel('email');
-        $finance->givePermissionTo('process weekly budgets');
+        $finance->givePermissionTo('review weekly budgets');
 
         $document = Document::create([
             'user_id' => $owner->id,

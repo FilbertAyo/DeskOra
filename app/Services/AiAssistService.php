@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ActionLog;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyWorkLog;
 use App\Models\WorkPeriod;
 use App\Support\ActionLogTaskSupport;
 use Illuminate\Support\Facades\Http;
@@ -25,9 +26,10 @@ class AiAssistService
     }
 
     /**
-     * Draft weekly-report fields from the user's action-log tasks.
+     * Draft weekly-report fields from action tasks, personal work logs, and activity rows.
      * Always returns a usable payload; AI is optional (fail-open).
      *
+     * @param  list<array{activity_output?: string, progress?: string, remarks_challenges?: string, next_step?: string}>  $activityRows
      * @return array{
      *     available: bool,
      *     used_ai: bool,
@@ -35,12 +37,16 @@ class AiAssistService
      *     draft: array{
      *         summary: string,
      *         achievements: list<string>,
-     *         challenges: list<array{challenge: string, action_taken_planned: string}>
+     *         challenges: list<array{challenge: string, action_taken_planned: string}>,
+     *         activity_progress: list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>
      *     }
      * }
      */
-    public function draftWeeklyReportFromActionTasks(User $user, ?string $periodId = null): array
-    {
+    public function draftWeeklyReportFromActionTasks(
+        User $user,
+        ?string $periodId = null,
+        array $activityRows = [],
+    ): array {
         $period = $periodId
             ? WorkPeriod::query()->find($periodId)
             : WorkPeriod::getCurrent();
@@ -48,51 +54,61 @@ class AiAssistService
         $tasks = $period
             ? $this->collectUserActionTasksForPeriod($user, $period)
             : [];
+        $workLogs = $period
+            ? $this->collectUserWorkLogsForPeriod($user, $period)
+            : [];
+        $normalizedActivities = $this->normalizeActivityRowsForDraft($activityRows);
 
-        if ($tasks === []) {
+        $emptyDraft = [
+            'summary' => '',
+            'achievements' => [],
+            'challenges' => [],
+            'activity_progress' => $normalizedActivities,
+        ];
+
+        if ($tasks === [] && $workLogs === [] && $normalizedActivities === []) {
             return [
                 'available' => $this->isConfigured(),
                 'used_ai' => false,
-                'message' => 'No action tasks found for this period to draft from.',
-                'draft' => [
-                    'summary' => '',
-                    'achievements' => [],
-                    'challenges' => [],
-                ],
+                'message' => 'No work logs, action tasks, or activities found for this period to draft from.',
+                'draft' => $emptyDraft,
             ];
         }
 
-        $heuristic = $this->heuristicWeeklyReportDraft($tasks, $period);
+        $heuristic = $this->heuristicWeeklyReportDraft($tasks, $period, $workLogs, $normalizedActivities);
 
         if (! $this->isConfigured()) {
             return [
                 'available' => false,
                 'used_ai' => false,
-                'message' => 'AI currently unavailable. A basic draft was built from your action tasks.',
+                'message' => 'AI currently unavailable. A basic draft was built from your logs and tasks.',
                 'draft' => $heuristic,
             ];
         }
 
         try {
-            $snapshot = $this->formatActionTasksForPrompt($tasks, $period);
+            $snapshot = $this->formatWeeklyReportDraftPrompt($tasks, $workLogs, $normalizedActivities, $period);
             $raw = $this->generate(
                 $this->plainTextInstruction()
-                    .'You help staff draft a weekly report from their action-log tasks. '
+                    .'You help staff draft a full weekly report from daily work logs, action-log tasks, and planned activities. '
                     .'Return ONLY valid JSON with keys: summary (string), achievements (array of strings), '
-                    .'challenges (array of objects with challenge and action_taken_planned strings). '
-                    .'Use only facts from the tasks. Keep summary to 2-4 sentences. '
+                    .'challenges (array of objects with challenge and action_taken_planned strings), '
+                    .'activity_progress (array of objects with activity_output, progress, remarks_challenges, next_step). '
+                    .'progress must be one of: Done, Done and carry, Partially done, Not started, In progress. '
+                    .'Include one activity_progress object for EVERY listed planned activity, matching activity_output exactly. '
+                    .'Use only facts from the provided notes. Keep summary to 2-4 sentences. '
                     .'Include at most 5 achievements and 4 challenges. Do not invent work that is not listed.',
-                "Staff action tasks for the week:\n\n".$snapshot,
-                (int) config('services.groq.assistant_max_tokens', 700),
+                $snapshot,
+                (int) config('services.groq.assistant_max_tokens', 1200),
                 formatAsSummary: false
             );
 
-            $parsed = $this->parseWeeklyReportDraftJson($raw);
+            $parsed = $this->parseWeeklyReportDraftJson($raw, $normalizedActivities);
             if ($parsed === null) {
                 return [
                     'available' => true,
                     'used_ai' => false,
-                    'message' => 'AI response could not be used. A basic draft was built from your action tasks.',
+                    'message' => 'AI response could not be used. A basic draft was built from your logs and tasks.',
                     'draft' => $heuristic,
                 ];
             }
@@ -107,7 +123,7 @@ class AiAssistService
             return [
                 'available' => false,
                 'used_ai' => false,
-                'message' => 'AI currently unavailable. A basic draft was built from your action tasks.',
+                'message' => 'AI currently unavailable. A basic draft was built from your logs and tasks.',
                 'draft' => $heuristic,
             ];
         }
@@ -206,14 +222,21 @@ class AiAssistService
 
     /**
      * @param  list<array{task: string, progress: string, notes: string}>  $tasks
+     * @param  list<array{date: string, done: string, blocker: string, next: string}>  $workLogs
+     * @param  list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>  $activityRows
      * @return array{
      *     summary: string,
      *     achievements: list<string>,
-     *     challenges: list<array{challenge: string, action_taken_planned: string}>
+     *     challenges: list<array{challenge: string, action_taken_planned: string}>,
+     *     activity_progress: list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>
      * }
      */
-    private function heuristicWeeklyReportDraft(array $tasks, ?WorkPeriod $period): array
-    {
+    private function heuristicWeeklyReportDraft(
+        array $tasks,
+        ?WorkPeriod $period,
+        array $workLogs = [],
+        array $activityRows = [],
+    ): array {
         $weekLabel = $period
             ? 'Week '.$period->week_number.' of '.$period->year
             : 'this week';
@@ -240,17 +263,66 @@ class AiAssistService
             }
         }
 
-        $summaryParts = ["During {$weekLabel}, work focused on assigned action-log tasks."];
+        $logDoneLines = [];
+        foreach ($workLogs as $workLog) {
+            if ($workLog['done'] !== '') {
+                $logDoneLines[] = $workLog['done'];
+                $done[] = $workLog['done'];
+            }
+            if ($workLog['blocker'] !== '') {
+                $blocked[] = [
+                    'challenge' => $workLog['blocker'],
+                    'action_taken_planned' => $workLog['next'] !== '' ? $workLog['next'] : 'Follow up and resolve.',
+                ];
+            }
+        }
+
+        $summaryParts = ["During {$weekLabel}, work focused on planned activities and assigned tasks."];
+        if ($logDoneLines !== []) {
+            $summaryParts[] = 'Daily notes: '.implode('; ', array_slice($logDoneLines, 0, 4)).'.';
+        }
         if ($done !== []) {
-            $summaryParts[] = 'Completed: '.implode('; ', array_slice($done, 0, 5)).'.';
+            $summaryParts[] = 'Completed: '.implode('; ', array_slice(array_unique($done), 0, 5)).'.';
         }
         if ($active !== []) {
             $summaryParts[] = 'Still in progress: '.implode('; ', array_slice($active, 0, 5)).'.';
         }
 
+        $remarksPool = implode("\n", array_slice($logDoneLines, 0, 6));
+        $nextPool = collect($workLogs)
+            ->pluck('next')
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->take(4)
+            ->implode('; ');
+
+        $activityProgress = [];
+        foreach ($activityRows as $row) {
+            $label = $row['activity_output'];
+            $progress = $row['progress'];
+            $remarks = $row['remarks_challenges'];
+            $nextStep = $row['next_step'];
+
+            if ($progress === '') {
+                $progress = $this->guessActivityProgress($label, $tasks, $workLogs);
+            }
+            if ($remarks === '' && $remarksPool !== '') {
+                $remarks = $remarksPool;
+            }
+            if ($nextStep === '' && $nextPool !== '') {
+                $nextStep = $nextPool;
+            }
+
+            $activityProgress[] = [
+                'activity_output' => $label,
+                'progress' => $progress,
+                'remarks_challenges' => $remarks,
+                'next_step' => $nextStep,
+            ];
+        }
+
         return [
             'summary' => implode(' ', $summaryParts),
-            'achievements' => array_slice($done, 0, 5),
+            'achievements' => array_values(array_slice(array_unique($done), 0, 5)),
             'challenges' => array_slice($blocked !== [] ? $blocked : (
                 $active !== []
                     ? [[
@@ -263,7 +335,141 @@ class AiAssistService
                     ]]
                     : []
             ), 0, 4),
+            'activity_progress' => $activityProgress,
         ];
+    }
+
+    /**
+     * @return list<array{date: string, done: string, blocker: string, next: string}>
+     */
+    private function collectUserWorkLogsForPeriod(User $user, WorkPeriod $period): array
+    {
+        return WeeklyWorkLog::query()
+            ->where('user_id', $user->id)
+            ->where('period_id', $period->id)
+            ->orderBy('log_date')
+            ->get(['log_date', 'done', 'blocker', 'next'])
+            ->map(fn (WeeklyWorkLog $log) => [
+                'date' => $log->log_date?->toDateString() ?? '',
+                'done' => trim((string) $log->done),
+                'blocker' => trim((string) $log->blocker),
+                'next' => trim((string) $log->next),
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  list<array{activity_output?: string, progress?: string, remarks_challenges?: string, next_step?: string}>  $activityRows
+     * @return list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>
+     */
+    private function normalizeActivityRowsForDraft(array $activityRows): array
+    {
+        $normalized = [];
+        foreach ($activityRows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $label = trim((string) ($row['activity_output'] ?? ''));
+            if ($label === '' || $label === '__off_plan__') {
+                continue;
+            }
+            $normalized[] = [
+                'activity_output' => $label,
+                'progress' => trim((string) ($row['progress'] ?? '')),
+                'remarks_challenges' => trim((string) ($row['remarks_challenges'] ?? '')),
+                'next_step' => trim((string) ($row['next_step'] ?? '')),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  list<array{task: string, progress: string, notes: string}>  $tasks
+     * @param  list<array{date: string, done: string, blocker: string, next: string}>  $workLogs
+     * @param  list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>  $activityRows
+     */
+    private function formatWeeklyReportDraftPrompt(
+        array $tasks,
+        array $workLogs,
+        array $activityRows,
+        ?WorkPeriod $period,
+    ): string {
+        $sections = [];
+        if ($period) {
+            $sections[] = 'Period: Week '.$period->week_number.' of '.$period->year.' ('.$period->date_range.')';
+        }
+
+        if ($workLogs !== []) {
+            $sections[] = "Daily work logs:\n".$this->formatWorkLogsForPrompt($workLogs);
+        }
+
+        if ($tasks !== []) {
+            $sections[] = "Action-log tasks:\n".$this->formatActionTasksForPrompt($tasks, null);
+        }
+
+        if ($activityRows !== []) {
+            $lines = [];
+            foreach ($activityRows as $index => $row) {
+                $lines[] = sprintf(
+                    '%d. %s | current progress: %s | remarks: %s | next: %s',
+                    $index + 1,
+                    $row['activity_output'],
+                    $row['progress'] !== '' ? $row['progress'] : '(empty)',
+                    $row['remarks_challenges'] !== '' ? $row['remarks_challenges'] : '(empty)',
+                    $row['next_step'] !== '' ? $row['next_step'] : '(empty)'
+                );
+            }
+            $sections[] = "Planned activities to fill:\n".implode("\n", $lines);
+        }
+
+        return implode("\n\n", $sections);
+    }
+
+    /**
+     * @param  list<array{date: string, done: string, blocker: string, next: string}>  $workLogs
+     */
+    private function formatWorkLogsForPrompt(array $workLogs): string
+    {
+        $lines = [];
+        foreach ($workLogs as $index => $log) {
+            $lines[] = sprintf(
+                '%d. [%s] done: %s | blocker: %s | next: %s',
+                $index + 1,
+                $log['date'],
+                $log['done'] !== '' ? $log['done'] : '(none)',
+                $log['blocker'] !== '' ? $log['blocker'] : '(none)',
+                $log['next'] !== '' ? $log['next'] : '(none)'
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  list<array{task: string, progress: string, notes: string}>  $tasks
+     * @param  list<array{date: string, done: string, blocker: string, next: string}>  $workLogs
+     */
+    private function guessActivityProgress(string $activityLabel, array $tasks, array $workLogs): string
+    {
+        $haystack = strtolower($activityLabel);
+        foreach ($tasks as $task) {
+            $needle = strtolower($task['task']);
+            if ($needle !== '' && (str_contains($haystack, $needle) || str_contains($needle, $haystack))) {
+                return match ($task['progress']) {
+                    ActionLogTaskSupport::PROGRESS_DONE => 'Done',
+                    ActionLogTaskSupport::PROGRESS_CANCELLED => 'Not started',
+                    ActionLogTaskSupport::PROGRESS_IN_PROGRESS => 'In progress',
+                    default => 'In progress',
+                };
+            }
+        }
+
+        if ($workLogs !== []) {
+            return 'In progress';
+        }
+
+        return 'Not started';
     }
 
     /**
@@ -290,13 +496,15 @@ class AiAssistService
     }
 
     /**
+     * @param  list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>  $seededActivities
      * @return array{
      *     summary: string,
      *     achievements: list<string>,
-     *     challenges: list<array{challenge: string, action_taken_planned: string}>
+     *     challenges: list<array{challenge: string, action_taken_planned: string}>,
+     *     activity_progress: list<array{activity_output: string, progress: string, remarks_challenges: string, next_step: string}>
      * }|null
      */
-    private function parseWeeklyReportDraftJson(string $raw): ?array
+    private function parseWeeklyReportDraftJson(string $raw, array $seededActivities = []): ?array
     {
         $raw = trim($raw);
         if (preg_match('/\{.*\}/s', $raw, $matches)) {
@@ -333,7 +541,45 @@ class AiAssistService
             ];
         }
 
-        if ($summary === '' && $achievements === [] && $challenges === []) {
+        $allowedProgress = ['Done', 'Done and carry', 'Partially done', 'Not started', 'In progress'];
+        $parsedActivitiesByLabel = [];
+        foreach (($decoded['activity_progress'] ?? []) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $label = trim((string) ($item['activity_output'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $progress = trim((string) ($item['progress'] ?? ''));
+            if (! in_array($progress, $allowedProgress, true)) {
+                $progress = 'In progress';
+            }
+            $parsedActivitiesByLabel[$label] = [
+                'activity_output' => $label,
+                'progress' => $progress,
+                'remarks_challenges' => trim((string) ($item['remarks_challenges'] ?? '')),
+                'next_step' => trim((string) ($item['next_step'] ?? '')),
+            ];
+        }
+
+        $activityProgress = [];
+        if ($seededActivities !== []) {
+            foreach ($seededActivities as $seeded) {
+                $label = $seeded['activity_output'];
+                $parsed = $parsedActivitiesByLabel[$label] ?? null;
+                $activityProgress[] = [
+                    'activity_output' => $label,
+                    'progress' => $parsed['progress'] ?? ($seeded['progress'] !== '' ? $seeded['progress'] : 'In progress'),
+                    'remarks_challenges' => $parsed['remarks_challenges'] ?? $seeded['remarks_challenges'],
+                    'next_step' => $parsed['next_step'] ?? $seeded['next_step'],
+                ];
+            }
+        } else {
+            $activityProgress = array_values($parsedActivitiesByLabel);
+        }
+
+        if ($summary === '' && $achievements === [] && $challenges === [] && $activityProgress === []) {
             return null;
         }
 
@@ -341,6 +587,7 @@ class AiAssistService
             'summary' => $summary,
             'achievements' => array_values(array_slice($achievements, 0, 5)),
             'challenges' => array_values(array_slice($challenges, 0, 4)),
+            'activity_progress' => $activityProgress,
         ];
     }
 

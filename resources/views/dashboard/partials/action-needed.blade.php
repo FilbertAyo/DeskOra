@@ -2,10 +2,13 @@
     $approvalActionMeta = [
         'Review petty cash' => ['icon' => 'ti-cash', 'tone' => 'warning', 'cta' => 'Review'],
         'Review requisitions' => ['icon' => 'ti-file-text', 'tone' => 'warning', 'cta' => 'Review'],
+        'Review weekly budgets' => ['icon' => 'ti-wallet', 'tone' => 'warning', 'cta' => 'Review'],
         'Approve petty cash' => ['icon' => 'ti-circle-check', 'tone' => 'primary', 'cta' => 'Approve'],
         'Approve requisitions' => ['icon' => 'ti-file-check', 'tone' => 'primary', 'cta' => 'Approve'],
+        'Approve weekly budgets' => ['icon' => 'ti-cash', 'tone' => 'primary', 'cta' => 'Approve'],
         'Authorize petty cash' => ['icon' => 'ti-shield-check', 'tone' => 'danger', 'cta' => 'Authorize'],
         'Authorize requisitions' => ['icon' => 'ti-certificate', 'tone' => 'danger', 'cta' => 'Authorize'],
+        'Authorize weekly budgets' => ['icon' => 'ti-shield-check', 'tone' => 'danger', 'cta' => 'Authorize'],
     ];
     $hasWeeklyActions = $showWeeklyToast && $wr && (
         ($wr->plan && $wr->plan->showCta) || ($wr->report && $wr->report->showCta)

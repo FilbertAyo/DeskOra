@@ -28,6 +28,12 @@ Schedule::command('work-periods:send-reminders')
     ->timezone($appTimezone)
     ->description('Dispatch configured weekly plan/report reminders');
 
+// Morning personal digest (work log, actions, approvals, budgets).
+Schedule::command('workhub:send-daily-digests')
+    ->dailyAt('07:30')
+    ->timezone($appTimezone)
+    ->description('Send rule-based daily digests to active users');
+
 // Drain the database queue without a long-running worker (cPanel-friendly).
 // Safe with existing schedule:run cron; does not require Supervisor.
 Schedule::command('queue:work database --stop-when-empty --max-time=50 --tries=3')

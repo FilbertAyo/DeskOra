@@ -79,12 +79,25 @@
             || document.getElementById('period_id_hidden')
             || document.querySelector('[name="period_id"]');
         const periodId = periodInput ? periodInput.value : '';
+        const activityProgress = collectActivityProgressRows();
+        const hasFilledFields = Boolean(
+            (document.getElementById('weekly_report_summary')?.value || '').trim()
+            || activityProgress.some((row) => row.progress || row.remarks_challenges || row.next_step)
+        );
+
+        let overwrite = true;
+        if (hasFilledFields) {
+            overwrite = confirm('Replace filled report fields with the AI draft? Empty fields will always be filled.');
+        }
 
         setBusy(button, true, 'Drafting…');
         try {
             const { ok, data } = await fetchJson(draftUrl, {
                 method: 'POST',
-                body: JSON.stringify({ period_id: periodId || null }),
+                body: JSON.stringify({
+                    period_id: periodId || null,
+                    activity_progress: activityProgress,
+                }),
             });
 
             if (!ok || !data || !data.draft) {
@@ -96,15 +109,14 @@
             const summary = document.getElementById('weekly_report_summary')
                 || document.querySelector('textarea[name="content[summary]"]');
             if (summary && draft.summary) {
-                if (summary.value.trim() && !confirm('Replace the current summary with the AI draft?')) {
-                    // Still offer achievements/challenges below if empty.
-                } else {
+                if (!summary.value.trim() || overwrite) {
                     summary.value = draft.summary;
                 }
             }
 
-            fillAchievements(draft.achievements || []);
-            fillChallenges(draft.challenges || []);
+            fillActivityProgress(draft.activity_progress || [], overwrite);
+            fillAchievements(draft.achievements || [], overwrite);
+            fillChallenges(draft.challenges || [], overwrite);
 
             if (data.message) {
                 toast(data.message, data.used_ai ? 'success' : 'info');
@@ -118,33 +130,83 @@
         }
     }
 
-    function fillAchievements(items) {
+    function collectActivityProgressRows() {
+        const body = document.getElementById('reportActivityProgressBody');
+        if (!body) return [];
+
+        return Array.from(body.querySelectorAll('tr')).map((row) => {
+            const activity = row.querySelector('[name*="[activity_output]"]');
+            const progress = row.querySelector('[name*="[progress]"]');
+            const remarks = row.querySelector('[name*="[remarks_challenges]"]');
+            const next = row.querySelector('[name*="[next_step]"]');
+            return {
+                activity_output: activity ? activity.value : '',
+                progress: progress ? progress.value : '',
+                remarks_challenges: remarks ? remarks.value : '',
+                next_step: next ? next.value : '',
+            };
+        }).filter((row) => (row.activity_output || '').trim() !== '');
+    }
+
+    function fillActivityProgress(items, overwrite) {
+        if (!items.length) return;
+        const body = document.getElementById('reportActivityProgressBody');
+        if (!body) return;
+
+        const rows = Array.from(body.querySelectorAll('tr'));
+        items.forEach((item) => {
+            const label = (item.activity_output || '').trim();
+            if (!label) return;
+
+            const row = rows.find((candidate) => {
+                const select = candidate.querySelector('[name*="[activity_output]"]');
+                return select && select.value === label;
+            });
+            if (!row) return;
+
+            const progress = row.querySelector('[name*="[progress]"]');
+            const remarks = row.querySelector('[name*="[remarks_challenges]"]');
+            const next = row.querySelector('[name*="[next_step]"]');
+
+            if (progress && item.progress && (!progress.value || overwrite)) {
+                progress.value = item.progress;
+            }
+            if (remarks && item.remarks_challenges && (!remarks.value.trim() || overwrite)) {
+                remarks.value = item.remarks_challenges;
+            }
+            if (next && item.next_step && (!next.value.trim() || overwrite)) {
+                next.value = item.next_step;
+            }
+        });
+    }
+
+    function fillAchievements(items, overwrite = false) {
         if (!items.length) return;
         const body = document.getElementById('achievementsBody')
             || document.querySelector('textarea[name="content[key_achievements][0]"]')?.closest('tbody');
         if (!body) {
             const first = document.querySelector('textarea[name^="content[key_achievements]"]');
-            if (first && !first.value.trim()) first.value = items[0] || '';
+            if (first && (!first.value.trim() || overwrite)) first.value = items[0] || '';
             return;
         }
 
         const textareas = body.querySelectorAll('textarea[name^="content[key_achievements]"]');
         items.forEach((text, index) => {
             if (textareas[index]) {
-                if (!textareas[index].value.trim()) {
+                if (!textareas[index].value.trim() || overwrite) {
                     textareas[index].value = text;
                 }
             }
         });
     }
 
-    function fillChallenges(items) {
+    function fillChallenges(items, overwrite = false) {
         if (!items.length) return;
         items.forEach((item, index) => {
             const challenge = document.querySelector(`textarea[name="content[challenges_mitigation][${index}][challenge]"]`);
             const action = document.querySelector(`textarea[name="content[challenges_mitigation][${index}][action_taken_planned]"]`);
-            if (challenge && !challenge.value.trim()) challenge.value = item.challenge || '';
-            if (action && !action.value.trim()) action.value = item.action_taken_planned || '';
+            if (challenge && (!challenge.value.trim() || overwrite)) challenge.value = item.challenge || '';
+            if (action && (!action.value.trim() || overwrite)) action.value = item.action_taken_planned || '';
         });
     }
 

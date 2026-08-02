@@ -29,6 +29,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StaffAppreciationNominationController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\WeeklyMatrixController;
+use App\Http\Controllers\WeeklyWorkLogController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
 use Illuminate\Support\Facades\Route;
@@ -130,6 +131,14 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{document}', [DocumentCrudController::class, 'destroy'])->name('destroy');
         Route::post('/{document}/submit', [DocumentWorkflowController::class, 'submit'])->name('submit');
         Route::post('/{document}/reject', [DocumentWorkflowController::class, 'reject'])->name('reject');
+    });
+
+    Route::prefix('weekly-work-logs')->name('weekly-work-logs.')->group(function () {
+        Route::get('/', [WeeklyWorkLogController::class, 'index'])->name('index');
+        Route::post('/', [WeeklyWorkLogController::class, 'store'])->name('store');
+        Route::put('/{weeklyWorkLog}', [WeeklyWorkLogController::class, 'update'])->name('update');
+        Route::post('/{weeklyWorkLog}/create-action', [WeeklyWorkLogController::class, 'createAction'])
+            ->name('create-action');
     });
 
     // Action Logs routes (restricted to minutes_preparer and admin - authorization handled in controller)

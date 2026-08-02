@@ -129,7 +129,7 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*', 'weekly-work-logs.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Activities</span>
@@ -139,6 +139,11 @@
                         <li class="{{ Request::routeIs('documents.weekly-plans') ? 'active' : '' }}">
                             <a href="{{ route('documents.weekly-plans') }}" class="pc-link">
                                 <span class="pc-mtext">Weekly Plans</span>
+                            </a>
+                        </li>
+                        <li class="{{ Request::routeIs('weekly-work-logs.*') ? 'active' : '' }}">
+                            <a href="{{ route('weekly-work-logs.index') }}" class="pc-link">
+                                <span class="pc-mtext">Work Log</span>
                             </a>
                         </li>
                         <li class="{{ Request::routeIs('documents.weekly-reports') ? 'active' : '' }}">

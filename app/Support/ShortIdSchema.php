@@ -46,6 +46,7 @@ final class ShortIdSchema
             'nominations',
             'meeting_minutes',
             'official_letters',
+            'weekly_work_logs',
         ];
     }
 
@@ -144,6 +145,8 @@ final class ShortIdSchema
             ['official_letter_user_shares', 'official_letter_id'],
             ['official_letter_user_shares', 'user_id'],
             ['official_letter_user_shares', 'shared_by'],
+            ['weekly_work_logs', 'user_id'],
+            ['weekly_work_logs', 'period_id'],
         ];
     }
 

@@ -97,7 +97,7 @@
                 <button type="button"
                     class="btn btn-sm btn-outline-secondary"
                     data-ai-draft-weekly-report
-                    title="Draft from your action-log tasks">
+                    title="Draft the full report from your work logs and action tasks">
                     <i class="ti ti-sparkles me-1"></i> Draft with AI
                 </button>
             </div>
@@ -109,7 +109,7 @@
                 rows="5"
                 placeholder="Describe what this week focused on (and the overall progress)">{{ old('content.summary') }}</textarea>
             <small class="text-muted d-block mt-2">
-                Draft with AI uses your action-log tasks for this period. Always review before submitting.
+                Draft with AI fills summary, activity progress, achievements, and challenges from your work logs and action tasks. Always review before submitting.
             </small>
         </div>
     </div>
@@ -140,11 +140,26 @@
                     </thead>
                     <tbody id="reportActivityProgressBody">
                         @php
-                            $activityProgressRows = old('content.activity_progress', [
-                                ['activity_output' => '', 'progress' => '', 'remarks_challenges' => '', 'next_step' => ''],
-                            ]);
+                            $seededActivityProgress = collect($planActivities ?? [])
+                                ->map(fn ($planActivity) => [
+                                    'activity_output' => (string) ($planActivity['label'] ?? ''),
+                                    'progress' => '',
+                                    'remarks_challenges' => '',
+                                    'next_step' => '',
+                                ])
+                                ->filter(fn ($row) => trim((string) ($row['activity_output'] ?? '')) !== '')
+                                ->values()
+                                ->all();
+
+                            if ($seededActivityProgress === []) {
+                                $seededActivityProgress = [
+                                    ['activity_output' => '', 'progress' => '', 'remarks_challenges' => '', 'next_step' => ''],
+                                ];
+                            }
+
+                            $activityProgressRows = old('content.activity_progress', $seededActivityProgress);
                             if (!is_array($activityProgressRows) || empty($activityProgressRows)) {
-                                $activityProgressRows = [['activity_output' => '', 'progress' => '', 'remarks_challenges' => '', 'next_step' => '']];
+                                $activityProgressRows = $seededActivityProgress;
                             }
                         @endphp
                         @foreach($activityProgressRows as $i => $row)
