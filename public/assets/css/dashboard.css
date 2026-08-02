@@ -2,7 +2,7 @@
 
 .dashboard {
     --dash-gap: 0.75rem;
-    --dash-radius: 4px;
+    --dash-radius: 0;
     --dash-border: #e5e7eb;
     --dash-muted: #64748b;
     --dash-surface: #fff;
@@ -267,7 +267,11 @@
     gap: 0.65rem;
     padding: 0.55rem 0.65rem;
     border: 1px solid var(--dash-border);
-    border-radius: 4px;
+    border-radius: 0;
+    background: var(--dash-surface);
+}
+
+.dash-list-stack {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
@@ -302,7 +306,7 @@
 
 .dash-task-list {
     border: 1px solid var(--dash-border);
-    border-radius: 4px;
+    border-radius: 0;
     overflow: hidden;
 }
 
