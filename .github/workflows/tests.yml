@@ -19,11 +19,21 @@ jobs:
           extensions: mbstring, sqlite, pdo_sqlite, bcmath, gd
           coverage: none
 
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          # Composer post-scripts boot Laravel (package:discover) before tests use :memory: sqlite.
+          # Point at a file DB so early artisan hooks do not fail when MySQL is unavailable.
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=database\/database.sqlite/' .env
+          sed -i 's/^DB_HOST=.*/# DB_HOST=127.0.0.1/' .env
+          sed -i 's/^DB_PORT=.*/# DB_PORT=3306/' .env
+          sed -i 's/^DB_USERNAME=.*/# DB_USERNAME=/' .env
+          sed -i 's/^DB_PASSWORD=.*/# DB_PASSWORD=/' .env
+          touch database/database.sqlite
+
       - name: Install Composer dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Copy environment file
-        run: cp .env.example .env
 
       - name: Generate application key
         run: php artisan key:generate

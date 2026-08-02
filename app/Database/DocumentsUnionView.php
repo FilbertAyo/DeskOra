@@ -57,10 +57,15 @@ class DocumentsUnionView
 
     public static function canCreate(): bool
     {
-        foreach (self::REQUIRED_TABLES as $table) {
-            if (! Schema::hasTable($table)) {
-                return false;
+        try {
+            foreach (self::REQUIRED_TABLES as $table) {
+                if (! Schema::hasTable($table)) {
+                    return false;
+                }
             }
+        } catch (\Throwable) {
+            // DB may be unavailable during early artisan/composer hooks (e.g. package:discover).
+            return false;
         }
 
         return true;
@@ -74,7 +79,20 @@ class DocumentsUnionView
 
         $argv = $_SERVER['argv'] ?? [];
 
-        foreach (['migrate:fresh', 'migrate:refresh', 'migrate:reset', 'db:wipe', 'migrate'] as $command) {
+        foreach ([
+            'migrate:fresh',
+            'migrate:refresh',
+            'migrate:reset',
+            'db:wipe',
+            'migrate',
+            'package:discover',
+            'key:generate',
+            'config:clear',
+            'config:cache',
+            'route:cache',
+            'view:cache',
+            'event:cache',
+        ] as $command) {
             if (in_array($command, $argv, true)) {
                 return true;
             }

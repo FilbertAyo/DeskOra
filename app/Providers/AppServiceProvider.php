@@ -202,12 +202,20 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function ensureDocumentsUnionView(): void
     {
-        if (DocumentsUnionView::shouldDeferAutoEnsure() || ! DocumentsUnionView::canCreate()) {
+        if (DocumentsUnionView::shouldDeferAutoEnsure()) {
             return;
         }
 
-        if (! DocumentsUnionView::exists()) {
-            DocumentsUnionView::recreate(DB::connection()->getDriverName() === 'mysql');
+        try {
+            if (! DocumentsUnionView::canCreate()) {
+                return;
+            }
+
+            if (! DocumentsUnionView::exists()) {
+                DocumentsUnionView::recreate(DB::connection()->getDriverName() === 'mysql');
+            }
+        } catch (\Throwable) {
+            // Ignore when the database is not ready yet (CI composer hooks, missing sqlite file, etc.).
         }
     }
 

@@ -32,7 +32,7 @@ class WeeklyMatrixService
         $periods = WorkPeriod::query()
             ->where('year', $year)
             ->whereIn('status', [WorkPeriod::STATUS_OPEN, WorkPeriod::STATUS_CLOSED])
-            ->orderBy('week_number')
+            ->orderByDesc('week_number')
             ->get();
 
         $matrixCounts = WeeklyMatrix::query()
