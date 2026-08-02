@@ -196,13 +196,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/department/{department}', [DepartmentController::class, 'show'])->name('department.show');       // show
     });
 
-    // admin
-    Route::patch('/admin/{user}/notification-channel', [AdminController::class, 'updateNotificationChannel'])
-        ->name('admin.notification-channel.update');
-    Route::post('/admin/{admin}/signature', [AdminController::class, 'updateSignature'])
-        ->name('admin.signature.update');
-    Route::resource('admin', AdminController::class);
-    Route::post('/activate/{user}', [AdminController::class, 'activate'])->name('admin.activate');
+    // admin — restricted to users management settings
+    Route::middleware('permission:users management settings')->group(function () {
+        Route::patch('/admin/{user}/notification-channel', [AdminController::class, 'updateNotificationChannel'])
+            ->name('admin.notification-channel.update');
+        Route::post('/admin/{admin}/signature', [AdminController::class, 'updateSignature'])
+            ->name('admin.signature.update');
+        Route::resource('admin', AdminController::class);
+        Route::post('/activate/{user}', [AdminController::class, 'activate'])->name('admin.activate');
+    });
 
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');

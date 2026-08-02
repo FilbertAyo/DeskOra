@@ -1,0 +1,29 @@
+# Local development parity (optional). Production continues to use deploy.sh on cPanel.
+# Usage: docker compose up -d
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "${FORWARD_DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_DATABASE: '${DB_DATABASE:-adilisha_portal}'
+      MYSQL_USER: '${DB_USERNAME:-adilisha}'
+      MYSQL_PASSWORD: '${DB_PASSWORD:-secret}'
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD:-secret}'
+    volumes:
+      - workhub-mysql:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-p${DB_PASSWORD:-secret}']
+      retries: 3
+      timeout: 5s
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
+    volumes:
+      - workhub-redis:/data
+
+volumes:
+  workhub-mysql:
+  workhub-redis:

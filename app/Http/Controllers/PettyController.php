@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePettyCashRequest;
 use App\Mail\FirstApprovalMail;
 use App\Mail\LastApprovalMail;
 use App\Mail\PettyRequestMail;
@@ -253,17 +254,7 @@ class PettyController extends Controller
             return $this->storeStaffRequisition($request);
         }
 
-        $baseRules = [
-            'user_id' => ['required', 'string', 'short_id', 'exists:users,id'],
-            'department_id' => ['required', 'string', 'short_id', 'exists:departments,id'],
-            'request_type' => 'required|string|in:Petty Cash,Reimbursement,Staff Requisition',
-        ];
-        $rules = array_merge($baseRules, [
-            'request_for' => 'required|string|in:Sales Delivery,Transport,Office Supplies',
-            'amount' => 'required|numeric|min:0',
-            'reason' => 'required|string|max:1000',
-        ]);
-        $validated = $request->validate($rules);
+        $validated = $request->validate((new StorePettyCashRequest)->rules());
 
         DB::transaction(function () use ($requestType, $validated) {
             $requestRow = FinanceRequest::create([

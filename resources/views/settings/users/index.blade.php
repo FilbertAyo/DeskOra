@@ -56,7 +56,7 @@
                             <tbody>
                                 @forelse ($user as $index => $u)
                                     <tr>
-                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td class="text-center">{{ $user->firstItem() + $index }}</td>
                                         <td style="min-width: 150px;">
                                         {{ $u->name }}
                                         </td>
@@ -130,6 +130,11 @@
                             </tbody>
                         </table>
                     </div>
+                    @if(method_exists($user, 'links'))
+                        <div class="card-footer">
+                            {{ $user->links() }}
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

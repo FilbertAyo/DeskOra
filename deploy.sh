@@ -114,10 +114,18 @@ else
   fi
 fi
 
+echo "==> Queue worker note..."
+# Mailables implement ShouldQueue with QUEUE_CONNECTION=database.
+# The scheduler drains the queue each minute via:
+#   queue:work database --stop-when-empty --max-time=50
+# Optional long-running worker (Supervisor / screen) if you prefer:
+#   $PHP_BIN artisan queue:work database --sleep=3 --tries=3
+echo "    Queued mail/jobs are processed by schedule:run (queue:work --stop-when-empty)."
+
 echo "==> Ensuring Laravel scheduler cron is installed..."
 # The scheduler drives automatic work period creation (Thursday 00:01), deadline
-# reminders, and other recurring tasks. It only runs if `schedule:run` fires every
-# minute. Install the cron entry idempotently for the current user.
+# reminders, queue drain, and other recurring tasks. It only runs if `schedule:run`
+# fires every minute. Install the cron entry idempotently for the current user.
 #
 # If `crontab` is unavailable/restricted on this host (some cPanel setups), add the
 # following line manually via cPanel > Cron Jobs instead:

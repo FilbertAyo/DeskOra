@@ -107,7 +107,6 @@
                                         class="btn btn-sm btn-outline-secondary"
                                         href="{{ route('petty.details', array_filter(['petty' => $item->id, 'stage' => $stage ?? null, 'type' => $typeFilter ?? null])) }}"
                                     >
-                                        <i class="ti ti-eye me-1"></i>
                                         View
                                     </a>
                                 </td>

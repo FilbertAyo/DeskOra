@@ -5,11 +5,13 @@ namespace App\Providers;
 use App\Models\AnonymousFeedback;
 use App\Models\Document;
 use App\Models\MeetingMinute;
+use App\Models\NominationPeriod;
 use App\Models\OfficialLetter;
 use App\Policies\ActivityPolicy;
 use App\Policies\AnonymousFeedbackPolicy;
 use App\Policies\DocumentPolicy;
 use App\Policies\MeetingMinutePolicy;
+use App\Policies\NominationPeriodPolicy;
 use App\Policies\OfficialLetterPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
@@ -26,6 +28,7 @@ class AuthServiceProvider extends ServiceProvider
         Document::class => DocumentPolicy::class,
         AnonymousFeedback::class => AnonymousFeedbackPolicy::class,
         MeetingMinute::class => MeetingMinutePolicy::class,
+        NominationPeriod::class => NominationPeriodPolicy::class,
         OfficialLetter::class => OfficialLetterPolicy::class,
     ];
 

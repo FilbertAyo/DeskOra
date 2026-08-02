@@ -1077,43 +1077,8 @@ class Document extends Model
      */
     public static function canUserCreateType(User $user, string $type, ?WorkPeriod $period = null): bool
     {
-        // For weekly plans, reports, and minutes, check if period is open
-        if (in_array($type, [self::TYPE_WEEKLY_PLAN, self::TYPE_WEEKLY_REPORT, self::TYPE_ACTION_LOG])) {
-            // If period is provided, check if it's open
-            if ($period && ! $period->isOpen()) {
-                return false;
-            }
-
-            // If no period provided, try to get current period
-            if (! $period) {
-                $period = WorkPeriod::getCurrent();
-                if (! $period || ! $period->isOpen()) {
-                    return false;
-                }
-            }
-        }
-
-        // Users with approve documents permission can create any type
-        if ($user->hasPermissionTo('approve documents')) {
-            return true;
-        }
-
-        // Check specific create permissions for each document type
-        switch ($type) {
-            case self::TYPE_WEEKLY_PLAN:
-            case self::TYPE_WEEKLY_REPORT:
-            case self::TYPE_MONTHLY_REPORT:
-                return $user->hasAnyPermission([
-                    'create weekly plan',
-                    'create weekly report',
-                    'create monthly report',
-                ]);
-
-            case self::TYPE_ACTION_LOG:
-                return $user->hasPermissionTo('create action logs');
-        }
-
-        return false;
+        return app(\App\Services\Documents\DocumentPermissionService::class)
+            ->canUserCreateType($user, $type, $period);
     }
 
     /**
@@ -1121,16 +1086,8 @@ class Document extends Model
      */
     public static function getAvailableTypesForUser(User $user): array
     {
-        $allTypes = self::getTypes();
-        $availableTypes = [];
-
-        foreach ($allTypes as $type => $name) {
-            if (self::canUserCreateType($user, $type)) {
-                $availableTypes[$type] = $name;
-            }
-        }
-
-        return $availableTypes;
+        return app(\App\Services\Documents\DocumentPermissionService::class)
+            ->availableTypesForUser($user);
     }
 
     /**
@@ -1192,34 +1149,8 @@ class Document extends Model
      */
     public static function countPendingWeeklyBudgetReviewForPeriod(?string $periodId = null): int
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('documents')) {
-            return 0;
-        }
-
-        $query = static::query()
-            ->select(['id', 'content', 'budget_review_status', 'type', 'state', 'period_id'])
-            ->weeklyPlans()
-            ->submitted()
-            ->where(function ($budgetQuery) {
-                $budgetQuery
-                    ->whereHas('weeklyPlanDomain.budgetItems')
-                    ->orWhere(function ($legacyQuery) {
-                        $legacyQuery
-                            ->whereNotNull('budget_review_status')
-                            ->orWhere('content', 'like', '%"budget"%');
-                    });
-            })
-            ->where(function ($statusQuery) {
-                $statusQuery
-                    ->whereNull('budget_review_status')
-                    ->orWhere('budget_review_status', self::BUDGET_REVIEW_PENDING);
-            });
-
-        if ($periodId !== null && $periodId !== '') {
-            $query->forPeriod($periodId);
-        }
-
-        return $query->get()->filter(fn (Document $document) => $document->hasBudgetItems())->count();
+        return app(\App\Services\Documents\WeeklyBudgetReviewService::class)
+            ->countPendingForPeriod($periodId);
     }
 
     public function getBudgetReviewStatusLabelAttribute(): ?string

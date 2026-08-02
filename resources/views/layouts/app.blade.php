@@ -73,10 +73,7 @@
     @endif
 
 
-  <!-- [Page Specific JS] start -->
-  <script src="{{ asset('assets/js/plugins/apexcharts.min.js') }}"></script>
-  <script src="{{ asset('assets/js/pages/dashboard-default.js') }}"></script>
-  <!-- [Page Specific JS] end -->
+  {{-- Heavy chart/editor scripts load via @stack('scripts') / partials on pages that need them. --}}
   <!-- Required Js -->
   <script src="{{ asset('assets/js/plugins/popper.min.js') }}"></script>
   <script src="{{ asset('assets/js/plugins/simplebar.min.js') }}"></script>

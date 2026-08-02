@@ -8,6 +8,7 @@ use App\Models\WorkPeriod;
 use App\Services\WorkPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class WeeklyBudgetReviewService
@@ -15,6 +16,38 @@ class WeeklyBudgetReviewService
     public function __construct(
         private readonly WorkPeriodService $workPeriodService,
     ) {}
+
+    public function countPendingForPeriod(?string $periodId = null): int
+    {
+        if (! Schema::hasTable('documents')) {
+            return 0;
+        }
+
+        $query = Document::query()
+            ->select(['id', 'content', 'budget_review_status', 'type', 'state', 'period_id'])
+            ->weeklyPlans()
+            ->submitted()
+            ->where(function ($budgetQuery) {
+                $budgetQuery
+                    ->whereHas('weeklyPlanDomain.budgetItems')
+                    ->orWhere(function ($legacyQuery) {
+                        $legacyQuery
+                            ->whereNotNull('budget_review_status')
+                            ->orWhere('content', 'like', '%"budget"%');
+                    });
+            })
+            ->where(function ($statusQuery) {
+                $statusQuery
+                    ->whereNull('budget_review_status')
+                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
+            });
+
+        if ($periodId !== null && $periodId !== '') {
+            $query->forPeriod($periodId);
+        }
+
+        return $query->get()->filter(fn (Document $document) => $document->hasBudgetItems())->count();
+    }
 
     public function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
     {

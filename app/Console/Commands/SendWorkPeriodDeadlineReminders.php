@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\DispatchWeeklySubmissionRemindersJob;
 use App\Services\WeeklySubmissionReminderDispatcher;
 use Illuminate\Console\Command;
 
@@ -12,7 +13,7 @@ class SendWorkPeriodDeadlineReminders extends Command
      *
      * @var string
      */
-    protected $signature = 'work-periods:send-reminders';
+    protected $signature = 'work-periods:send-reminders {--sync : Run reminders inline instead of queueing}';
 
     /**
      * The console command description.
@@ -31,15 +32,22 @@ class SendWorkPeriodDeadlineReminders extends Command
      */
     public function handle()
     {
-        $result = $this->dispatcher->dispatchIfDue();
+        if ($this->option('sync') || config('queue.default') === 'sync') {
+            $result = $this->dispatcher->dispatchIfDue();
 
-        if (! ($result['due'] ?? false)) {
-            $this->info('No reminder window matched at this tick.');
+            if (! ($result['due'] ?? false)) {
+                $this->info('No reminder window matched at this tick.');
+
+                return Command::SUCCESS;
+            }
+
+            $this->info(sprintf('Weekly submission reminders sent: %d', (int) ($result['sent'] ?? 0)));
 
             return Command::SUCCESS;
         }
 
-        $this->info(sprintf('Weekly submission reminders sent: %d', (int) ($result['sent'] ?? 0)));
+        DispatchWeeklySubmissionRemindersJob::dispatch();
+        $this->info('Weekly submission reminder job queued.');
 
         return Command::SUCCESS;
     }

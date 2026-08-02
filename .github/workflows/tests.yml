@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, sqlite, pdo_sqlite, bcmath, gd
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Copy environment file
+        run: cp .env.example .env
+
+      - name: Generate application key
+        run: php artisan key:generate
+
+      - name: Run Pint (style)
+        run: vendor/bin/pint --test
+
+      - name: Run PHPUnit
+        run: php artisan test

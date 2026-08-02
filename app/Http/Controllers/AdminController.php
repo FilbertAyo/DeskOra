@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreAdminUserRequest;
+use App\Http\Requests\UpdateAdminUserRequest;
 use App\Mail\NotificationMail;
 use App\Models\Department;
 use App\Models\User;
@@ -10,7 +12,6 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
 
 class AdminController extends Controller
@@ -18,9 +19,11 @@ class AdminController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $user = User::with(['department.head', 'subDepartments', 'roles'])->latest()->get();
+        abort_unless($request->user()?->can('users management settings'), 403);
+
+        $user = User::with(['department.head', 'subDepartments', 'roles'])->latest()->paginate(20);
 
         return view('settings.users.index', compact('user'));
     }
@@ -28,8 +31,10 @@ class AdminController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
+        abort_unless($request->user()?->can('users management settings'), 403);
+
         $departments = $this->hierarchicalDepartments();
         $topDepartments = $this->topDepartmentsWithChildren();
         $roles = Role::all();
@@ -40,21 +45,9 @@ class AdminController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreAdminUserRequest $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'title' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'string', 'confirmed', Password::defaults()],
-            'phone' => ['required', 'regex:/^0[76][0-9]{8}$/'],
-            'department_id' => ['nullable', 'string', 'short_id', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNull('parent_id'))],
-            'sub_department_ids' => ['nullable', 'array'],
-            'sub_department_ids.*' => ['string', 'short_id', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNotNull('parent_id'))],
-            'is_department_head' => ['nullable', 'boolean'],
-            'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', Rule::exists('roles', 'name')],
-        ]);
+        $validated = $request->validated();
 
         $subDepartmentIds = array_values(array_unique($validated['sub_department_ids'] ?? []));
 
@@ -110,15 +103,19 @@ class AdminController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(User $admin)
+    public function show(Request $request, User $admin)
     {
+        abort_unless($request->user()?->can('users management settings'), 403);
+
         $user = $admin->load(['department', 'subDepartments', 'roles', 'permissions']);
 
         return view('settings.users.view', compact('user'));
     }
 
-    public function edit(User $admin)
+    public function edit(Request $request, User $admin)
     {
+        abort_unless($request->user()?->can('users management settings'), 403);
+
         $user = $admin->load(['department', 'subDepartments']);
         $departments = $this->hierarchicalDepartments();
         $topDepartments = $this->topDepartmentsWithChildren();
@@ -127,22 +124,11 @@ class AdminController extends Controller
         return view('settings.users.edit', compact('user', 'departments', 'topDepartments', 'roles'));
     }
 
-    public function update(Request $request, User $admin)
+    public function update(UpdateAdminUserRequest $request, User $admin)
     {
         $user = $admin;
         $oldDepartmentId = $user->department_id;
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'title' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$user->id],
-            'phone' => ['required', 'regex:/^0[76][0-9]{8}$/'],
-            'department_id' => ['nullable', 'string', 'short_id', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNull('parent_id'))],
-            'sub_department_ids' => ['nullable', 'array'],
-            'sub_department_ids.*' => ['string', 'short_id', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('status', 'active')->whereNotNull('parent_id'))],
-            'is_department_head' => ['nullable', 'boolean'],
-            'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', Rule::exists('roles', 'name')],
-        ]);
+        $validated = $request->validated();
 
         $subDepartmentIds = array_values(array_unique($validated['sub_department_ids'] ?? []));
 
@@ -226,8 +212,10 @@ class AdminController extends Controller
             ->with('success', 'Signature uploaded successfully.');
     }
 
-    public function destroy(User $admin)
+    public function destroy(Request $request, User $admin)
     {
+        abort_unless($request->user()?->can('users management settings'), 403);
+
         $user = $admin;
 
         if ($user) {
@@ -242,8 +230,9 @@ class AdminController extends Controller
         }
     }
 
-    public function activate(User $user)
+    public function activate(Request $request, User $user)
     {
+        abort_unless($request->user()?->can('users management settings'), 403);
 
         if ($user) {
             // Update the user's status to 'inactive'

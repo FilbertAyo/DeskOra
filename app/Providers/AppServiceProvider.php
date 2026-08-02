@@ -41,13 +41,28 @@ class AppServiceProvider extends ServiceProvider
         $this->ensureDocumentsUnionView();
         $this->configureSessionAndUrl();
 
-        View::composer('*', function ($view) {
+        View::composer('layouts.navigation', function ($view) {
+            $currentPeriod = Cache::remember('current-work-period-nav', now()->addSeconds(60), function () {
+                return WorkPeriod::getCurrent();
+            });
+
+            $view->with([
+                'currentPeriod' => $currentPeriod,
+            ]);
+        });
+
+        // Nav badges + nomination modal — only on the authenticated app shell
+        // (aside + FAB are @included here). Avoid View::composer('*').
+        View::composer('layouts.app', function ($view) {
             $approvedCount = 0;
             $processingCount = 0;
             $approvalsReviewCount = 0;
             $approvalsApproveCount = 0;
             $approvalsAuthorizeCount = 0;
             $approvalsTotalCount = 0;
+            $newAnonymousFeedbackCount = 0;
+            $showStaffNominationModal = false;
+            $staffNominationPeriod = null;
 
             if (Auth::check() && Schema::hasTable('requests')) {
                 /** @var \App\Models\User $user */
@@ -59,11 +74,16 @@ class AppServiceProvider extends ServiceProvider
                 $approvalsAuthorizeCount = (int) ($approvalCounts['authorize'] ?? 0);
                 $approvalsTotalCount = (int) ($approvalCounts['total'] ?? 0);
 
-                $approvedCount = (int) FinanceRequest::query()
-                    ->whereIn('department_id', $user->departmentScopeIds())
-                    ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
-                    ->where('status', 'approved')
-                    ->count();
+                $scopeKey = md5(implode(',', $user->departmentScopeIds()));
+                $approvedCount = (int) Cache::remember(
+                    'petty-nav-count-approved-'.$user->id.'-'.$scopeKey,
+                    now()->addSeconds(45),
+                    fn () => FinanceRequest::query()
+                        ->whereIn('department_id', $user->departmentScopeIds())
+                        ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
+                        ->where('status', 'approved')
+                        ->count()
+                );
             }
 
             if (Schema::hasTable('requests')) {
@@ -72,7 +92,6 @@ class AppServiceProvider extends ServiceProvider
                 });
             }
 
-            $newAnonymousFeedbackCount = 0;
             if (
                 Auth::check()
                 && Auth::user()->can('manage anonymous feedback')
@@ -84,32 +103,6 @@ class AppServiceProvider extends ServiceProvider
                     fn () => AnonymousFeedback::query()->new()->count()
                 );
             }
-
-            $view->with([
-                'approvalsReviewCount' => $approvalsReviewCount,
-                'approvalsApproveCount' => $approvalsApproveCount,
-                'approvalsAuthorizeCount' => $approvalsAuthorizeCount,
-                'approvalsTotalCount' => $approvalsTotalCount,
-                'processingPettiesCount' => $processingCount,
-                'approvedPettiesCount' => $approvedCount,
-                'newAnonymousFeedbackCount' => $newAnonymousFeedbackCount,
-            ]);
-        });
-
-        View::composer('layouts.navigation', function ($view) {
-            $currentPeriod = Cache::remember('current-work-period-nav', now()->addSeconds(60), function () {
-                return WorkPeriod::getCurrent();
-            });
-
-            $view->with([
-                'currentPeriod' => $currentPeriod,
-            ]);
-        });
-
-        // Decide whether to surface the monthly staff appreciation nomination modal.
-        View::composer('layouts.app', function ($view) {
-            $showStaffNominationModal = false;
-            $staffNominationPeriod = null;
 
             if (Auth::check() && Schema::hasTable('nomination_periods')) {
                 /** @var \App\Models\User $user */
@@ -126,11 +119,17 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $view->with([
+                'approvalsReviewCount' => $approvalsReviewCount,
+                'approvalsApproveCount' => $approvalsApproveCount,
+                'approvalsAuthorizeCount' => $approvalsAuthorizeCount,
+                'approvalsTotalCount' => $approvalsTotalCount,
+                'processingPettiesCount' => $processingCount,
+                'approvedPettiesCount' => $approvedCount,
+                'newAnonymousFeedbackCount' => $newAnonymousFeedbackCount,
                 'showStaffNominationModal' => $showStaffNominationModal,
                 'staffNominationPeriod' => $staffNominationPeriod,
             ]);
         });
-
         // Slot views do not inherit layout composer data; omit layouts.app (reminder toast is dashboard-only).
         $weeklyReminderViews = [
             'dashboard',

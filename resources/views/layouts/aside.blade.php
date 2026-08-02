@@ -381,11 +381,13 @@
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
+                            @can('users management settings')
                             <li class="{{ Request::routeIs('admin.index') ? 'active' : '' }}">
                                 <a href="{{ route('admin.index') }}" class="pc-link">
                                     <span class="pc-mtext">Users</span>
                                 </a>
                             </li>
+                            @endcan
                            
                             @can('manage roles and permissions')
                             <li class="{{ Request::routeIs('roles.*') ? 'active' : '' }}">

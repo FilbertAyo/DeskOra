@@ -4,12 +4,13 @@ namespace App\Mail;
 
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class WeeklyGracePeriodMail extends Mailable
+class WeeklyGracePeriodMail extends Mailable implements ShouldQueue
 {
     use Queueable;
     use SerializesModels;
