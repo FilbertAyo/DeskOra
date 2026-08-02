@@ -74,7 +74,6 @@
                                 $canAct = isset($stage) && $item->userCanActAtStage(auth()->user(), $stage);
                                 $stageApproved = isset($stage) && $item->stageHasApproval($stage);
                                 $closedAtStage = isset($stage) && $item->wasClosedAtStage($stage);
-                                $actionLabel = isset($stage) ? \App\Models\Request::stageLabel($stage) : 'View';
                             @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
@@ -105,11 +104,11 @@
                                 </td>
                                 <td>
                                     <a
-                                        class="btn btn-sm {{ $canAct ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        class="btn btn-sm btn-outline-secondary"
                                         href="{{ route('petty.details', array_filter(['petty' => $item->id, 'stage' => $stage ?? null, 'type' => $typeFilter ?? null])) }}"
                                     >
-                                
-                                        {{ $canAct ? $actionLabel : 'View' }}
+                                        <i class="ti ti-eye me-1"></i>
+                                        View
                                     </a>
                                 </td>
                             </tr>
