@@ -64,6 +64,15 @@
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
+
+                        @canany(['view reports', 'view all documents'])
+                                <li class="{{ Request::routeIs('executive-pulse.*') ? 'active' : '' }}">
+                                    <a href="{{ route('executive-pulse.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Executive Pulse</span>
+                                    </a>
+                                </li>
+                            @endcanany
+
                             @if($canReviewSubmissions)
                                 <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">
                                     <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
@@ -75,14 +84,7 @@
                                 </li>
                             @endif
 
-                            @canany(['view reports', 'view all documents'])
-                                <li class="{{ Request::routeIs('executive-pulse.*') ? 'active' : '' }}">
-                                    <a href="{{ route('executive-pulse.index') }}" class="pc-link">
-                                        <span class="pc-mtext">Executive Pulse</span>
-                                    </a>
-                                </li>
-                            @endcanany
-
+                         
                             @can('manage anonymous feedback')
                                 <li class="{{ Request::routeIs('anonymous-feedback.*') ? 'active' : '' }}">
                                     <a href="{{ route('anonymous-feedback.index') }}" class="pc-link">
@@ -147,6 +149,16 @@
                                 <span class="pc-mtext">Weekly Reports</span>
                             </a>
                         </li>
+                        @if($canWeeklyBudgetReview)
+                            <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
+                                <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
+                                    <span class="pc-mtext">Weekly Budget</span>
+                                    @if($reviewActivitiesPendingBudgetCount > 0)
+                                        <span class="badge bg-light-warning border border-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
+                                    @endif
+                                </a>
+                            </li>
+                        @endif
                         <li class="{{ Request::routeIs('action-logs.index', 'action-logs.show', 'action-logs.edit', 'action-logs.create') ? 'active' : '' }}">
                             <a href="{{ route('action-logs.index') }}" class="pc-link">
                                 <span class="pc-mtext">Action Log</span>
@@ -167,16 +179,7 @@
                                 <span class="pc-mtext">Monthly Reports </span>
                             </a>
                         </li>
-                        @if($canWeeklyBudgetReview)
-                            <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
-                                <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
-                                    <span class="pc-mtext">Weekly Budget</span>
-                                    @if($reviewActivitiesPendingBudgetCount > 0)
-                                        <span class="badge bg-light-warning border border-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
-                                    @endif
-                                </a>
-                            </li>
-                        @endif
+                   
                     </ul>
                 </li>
 
