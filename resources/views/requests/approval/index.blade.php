@@ -104,15 +104,13 @@
                                     <span class="badge bg-light-{{ $statusClass }} border border-{{ $statusClass }} {{ $statusTextClass }}">{{ $item->status }}</span>
                                 </td>
                                 <td>
-                                    <x-table-action-dropdown>
-                                        <a
-                                            class="dropdown-item"
-                                            href="{{ route('petty.details', array_filter(['petty' => $item->id, 'stage' => $stage ?? null, 'type' => $typeFilter ?? null])) }}"
-                                        >
-                                            <i class="ti ti-{{ $canAct ? 'check' : 'eye' }} me-2"></i>
-                                            {{ $canAct ? $actionLabel : 'View' }}
-                                        </a>
-                                    </x-table-action-dropdown>
+                                    <a
+                                        class="btn btn-sm {{ $canAct ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        href="{{ route('petty.details', array_filter(['petty' => $item->id, 'stage' => $stage ?? null, 'type' => $typeFilter ?? null])) }}"
+                                    >
+                                        <i class="ti ti-{{ $canAct ? 'check' : 'eye' }} me-1"></i>
+                                        {{ $canAct ? $actionLabel : 'View' }}
+                                    </a>
                                 </td>
                             </tr>
                         @empty
