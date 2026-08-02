@@ -1,0 +1,122 @@
+.deskora-go {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+}
+
+.deskora-go[hidden] {
+    display: none !important;
+}
+
+body.deskora-go-open {
+    overflow: hidden;
+}
+
+.deskora-go__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.deskora-go__panel {
+    position: relative;
+    width: min(640px, calc(100% - 2rem));
+    margin: 12vh auto 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.deskora-go__search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.deskora-go__search-icon {
+    color: #64748b;
+    font-size: 1.15rem;
+}
+
+.deskora-go__input {
+    flex: 1;
+    border: 0;
+    outline: none;
+    font-size: 1rem;
+    background: transparent;
+}
+
+.deskora-go__kbd {
+    font-size: 0.7rem;
+    border: 1px solid #dbe3ee;
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    color: #64748b;
+    background: #f8fafc;
+}
+
+.deskora-go__results {
+    list-style: none;
+    margin: 0;
+    padding: 0.35rem;
+    max-height: min(420px, 50vh);
+    overflow: auto;
+}
+
+.deskora-go__item {
+    border-radius: 8px;
+}
+
+.deskora-go__item.is-active,
+.deskora-go__item:hover {
+    background: #f1f5f9;
+}
+
+.deskora-go__link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.7rem 0.85rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.deskora-go__label {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.deskora-go__desc {
+    font-size: 0.8rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deskora-go__empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #64748b;
+}
+
+.deskora-go__footer {
+    display: flex;
+    gap: 1rem;
+    padding: 0.55rem 1rem;
+    border-top: 1px solid #eef2f7;
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+
+.deskora-go__footer kbd {
+    font-size: 0.68rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    padding: 0 0.28rem;
+    margin-right: 0.15rem;
+    background: #f8fafc;
+}

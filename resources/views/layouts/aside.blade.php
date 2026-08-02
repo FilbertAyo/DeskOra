@@ -203,17 +203,30 @@
                 </li>
            
 
-                @canany(['review pettycash', 'approve pettycash', 'authorize pettycash', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition'])
-                    <li class="pc-item pc-hasmenu {{ Request::routeIs('petty.list') ? 'active pc-trigger' : '' }}">
+                @canany(['review pettycash', 'approve pettycash', 'authorize pettycash', 'review staff requisition', 'approve staff requisition', 'authorize staff requisition', 'view weekly budgets', 'review weekly budgets', 'approve weekly budgets', 'authorize weekly budgets'])
+                    @php
+                        $unifiedApprovalCount = (int) ($approvalQueueSummary['total'] ?? $approvalsTotalCount ?? 0);
+                    @endphp
+                    <li class="pc-item pc-hasmenu {{ Request::routeIs('petty.list', 'approvals.queue') ? 'active pc-trigger' : '' }}">
                         <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-users"></i></span>
                             <span class="pc-mtext">Approvals</span>
-                            @if (($approvalsTotalCount ?? 0) > 0)
-                                <span class="badge bg-light-danger border border-danger">{{ $approvalsTotalCount }}</span>
-                            @endif
+                            <span
+                                class="badge bg-light-danger border border-danger {{ $unifiedApprovalCount > 0 ? '' : 'd-none' }}"
+                                data-approval-queue-nav-badge
+                            >{{ $unifiedApprovalCount > 99 ? '99+' : $unifiedApprovalCount }}</span>
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
+                            <li class="{{ Request::routeIs('approvals.queue') ? 'active' : '' }}">
+                                <a href="{{ route('approvals.queue') }}" class="pc-link">
+                                    <span class="pc-mtext">My Approval Queue</span>
+                                    <span
+                                        class="badge bg-light-danger border border-danger ms-2 {{ $unifiedApprovalCount > 0 ? '' : 'd-none' }}"
+                                        data-approval-queue-nav-badge
+                                    >{{ $unifiedApprovalCount > 99 ? '99+' : $unifiedApprovalCount }}</span>
+                                </a>
+                            </li>
                             @can('review pettycash')
                                 @php $pettyReviewCount = app(\App\Services\RequestApprovalNavService::class)->countForStageAndTypes(auth()->user(), 'review', ['Petty Cash', 'Reimbursement']); @endphp
                                 <li class="{{ Request::routeIs('petty.list') && request('stage') === 'review' && request('type') === 'petty' ? 'active' : '' }}">

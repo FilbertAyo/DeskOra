@@ -337,6 +337,33 @@
             ]
         },
         {
+            "id": "my_approval_queue",
+            "label": "My Approval Queue",
+            "menu_path": "Sidebar > Approvals > My Approval Queue",
+            "route": "approvals.queue",
+            "permissions_any": [
+                "review pettycash",
+                "approve pettycash",
+                "authorize pettycash",
+                "review staff requisition",
+                "approve staff requisition",
+                "authorize staff requisition",
+                "view weekly budgets",
+                "review weekly budgets",
+                "approve weekly budgets",
+                "authorize weekly budgets"
+            ],
+            "description": "Unified inbox of finance and budget items waiting for your action.",
+            "intents": [
+                "my approvals",
+                "approval queue",
+                "pending approvals",
+                "my approval queue",
+                "things to approve",
+                "approvals inbox"
+            ]
+        },
+        {
             "id": "review_petty_cash",
             "label": "Review petty cash",
             "menu_path": "Sidebar > Petty Cash > Approvals > Review Petty Cash",
@@ -545,6 +572,7 @@
             "label": "Users",
             "menu_path": "Sidebar > Reports and Settings > Settings > Users",
             "route": "admin.index",
+            "permission": "users management settings",
             "description": "Manage portal user accounts.",
             "intents": [
                 "users",

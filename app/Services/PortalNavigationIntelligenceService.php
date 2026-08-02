@@ -98,6 +98,43 @@ class PortalNavigationIntelligenceService
         return $url;
     }
 
+    /**
+     * Navigable commands for DeskOra Go (command palette).
+     *
+     * @return list<array{id: string, label: string, description: string, url: string, keywords: list<string>}>
+     */
+    public function commandsForUser(User $user): array
+    {
+        $commands = [];
+
+        foreach ($this->entriesForUser($user) as $entry) {
+            if (($entry['dynamic'] ?? false) === true) {
+                continue;
+            }
+
+            $url = $this->resolveUrl($entry);
+            if ($url === null) {
+                continue;
+            }
+
+            $keywords = array_values(array_filter(array_merge(
+                [(string) ($entry['label'] ?? '')],
+                is_array($entry['intents'] ?? null) ? $entry['intents'] : [],
+                [str_replace('Sidebar > ', '', (string) ($entry['menu_path'] ?? ''))],
+            )));
+
+            $commands[] = [
+                'id' => (string) ($entry['id'] ?? $url),
+                'label' => (string) ($entry['label'] ?? 'Go'),
+                'description' => (string) ($entry['description'] ?? ($entry['menu_path'] ?? '')),
+                'url' => $url,
+                'keywords' => $keywords,
+            ];
+        }
+
+        return $commands;
+    }
+
     public function navigationRulesForAi(): string
     {
         return implode(' ', [

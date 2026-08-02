@@ -72,6 +72,10 @@
         @include('partials.deskora-ai-assistant')
     @endif
 
+    @if(Auth::check() && Auth::user()->status === 'active')
+        @include('partials.deskora-go')
+    @endif
+
 
   {{-- Heavy chart/editor scripts load via @stack('scripts') / partials on pages that need them. --}}
   <!-- Required Js -->

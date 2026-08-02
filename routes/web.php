@@ -3,6 +3,8 @@
 use App\Http\Controllers\ActionLogController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ApprovalQueueController;
+use App\Http\Controllers\CommandPaletteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DepositController;
@@ -65,6 +67,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/ai-assistant/ask', [PortalAiAssistantController::class, 'ask'])
         ->middleware('throttle:20,1')
         ->name('ai-assistant.ask');
+
+    Route::get('/commands', [CommandPaletteController::class, 'index'])
+        ->middleware('throttle:60,1')
+        ->name('commands.index');
+
+    Route::get('/approvals/queue', [ApprovalQueueController::class, 'index'])
+        ->name('approvals.queue');
+    Route::get('/approvals/queue/counts', [ApprovalQueueController::class, 'counts'])
+        ->middleware('throttle:60,1')
+        ->name('approvals.queue.counts');
 
     // Documents routes
     Route::prefix('documents')->name('documents.')->group(function () {

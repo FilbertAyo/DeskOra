@@ -16,6 +16,7 @@ class RequestApprovalNavService
     public function forgetCountsFor(User $user): void
     {
         Cache::forget(self::cacheKeyFor($user));
+        Cache::forget(ApprovalQueueService::cacheKeyFor($user));
     }
 
     /**

@@ -56,6 +56,23 @@
 
         <div class="ms-auto">
             <ul class="list-unstyled">
+                <li class="pc-h-item d-none d-md-inline-flex align-items-center me-1">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-light border d-inline-flex align-items-center gap-2"
+                        data-deskora-go-open
+                        title="DeskOra Go (Ctrl/Cmd + K)"
+                    >
+                        <i class="ti ti-search"></i>
+                        <span class="small text-muted">Go</span>
+                        <kbd class="small border rounded px-1 bg-white text-muted" style="font-size: 0.65rem;">⌘K</kbd>
+                    </button>
+                </li>
+                <li class="pc-h-item d-md-none">
+                    <a href="#" class="pc-head-link me-0" data-deskora-go-open title="DeskOra Go">
+                        <i class="ti ti-search"></i>
+                    </a>
+                </li>
                 <li class="dropdown pc-h-item">
                     <a class="pc-head-link dropdown-toggle arrow-none me-0"
                        data-bs-toggle="dropdown"
