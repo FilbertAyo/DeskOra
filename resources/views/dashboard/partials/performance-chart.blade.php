@@ -33,11 +33,11 @@
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <h6 class="mb-0 small text-uppercase text-muted">Coach tips</h6>
                 <button type="button"
-                    class="btn btn-sm btn-outline-secondary d-none"
+                    class="btn btn-sm btn-outline-warning d-none"
                     data-ai-assist-only
                     data-ai-polish-performance-tips
                     title="Rewrite tips with AI">
-                    <i class="ti ti-sparkles me-1"></i>Polish with AI
+                    <i class="ti ti-click me-1"></i>Polish with AI
                 </button>
             </div>
             <ul class="staff-performance-tips__list mb-0" id="staffPerformanceTips">
