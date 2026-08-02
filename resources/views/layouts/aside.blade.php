@@ -23,6 +23,7 @@
                         || Auth::user()->can('manage anonymous feedback')
                         || Auth::user()->can('view appreciation nominations')
                         || Auth::user()->can('manage work periods')
+                        || Auth::user()->can('view reports');
 
                     $reviewActivitiesSubmittedCount = 0;
                     $reviewActivitiesPendingBudgetCount = 0;
