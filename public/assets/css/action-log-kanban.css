@@ -1,0 +1,114 @@
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(220px, 1fr));
+    gap: 0.75rem;
+    align-items: start;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.kanban-column {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+}
+
+.kanban-column__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.kanban-column__count {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.kanban-column__body {
+    padding: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 240px;
+    flex: 1;
+}
+
+.kanban-column__body.is-over {
+    background: #eff6ff;
+}
+
+.kanban-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.7rem 0.75rem;
+    cursor: grab;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+}
+
+.kanban-card:active {
+    cursor: grabbing;
+}
+
+.kanban-card.is-locked {
+    cursor: default;
+    opacity: 0.92;
+}
+
+.kanban-card.is-dragging {
+    opacity: 0.45;
+}
+
+.kanban-card__title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #0f172a;
+    margin-bottom: 0.35rem;
+}
+
+.kanban-card__meta,
+.kanban-card__notes,
+.kanban-card__due {
+    font-size: 0.75rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.kanban-card__notes {
+    margin-top: 0.3rem;
+}
+
+.kanban-card__due {
+    margin-top: 0.35rem;
+    color: #b45309;
+}
+
+.kanban-empty {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 1.25rem 0.5rem;
+}
+
+@media (max-width: 991px) {
+    .kanban-board {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+    }
+}
+
+@media (max-width: 575px) {
+    .kanban-board {
+        grid-template-columns: minmax(260px, 1fr);
+    }
+}

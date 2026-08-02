@@ -361,7 +361,22 @@
                                 </div>
                             </div>
                             <div class="mb-4">
-                                <label for="comment" class="form-label fw-semibold">Comment <span class="text-danger">*</span></label>
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                    <label for="comment" class="form-label fw-semibold mb-0">Comment <span class="text-danger">*</span></label>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-secondary d-none"
+                                        data-ai-assist-only
+                                        data-ai-suggest-rejection
+                                        data-ai-target="#comment"
+                                        data-ai-context="finance"
+                                        data-ai-title="{{ $request->request_for ?? $request->request_type }}"
+                                        data-ai-details="{{ $request->reason ?? '' }}"
+                                        data-ai-amount="{{ $request->amount ?? '' }}"
+                                        data-ai-requester="{{ $request->user?->name ?? '' }}"
+                                        data-ai-outcome="rejected">
+                                        <i class="ti ti-sparkles me-1"></i> Suggest with AI
+                                    </button>
+                                </div>
                                 <textarea class="form-control" name="comment" id="comment" rows="4"
                                     placeholder="Explain the reason or what needs to change…" required></textarea>
                             </div>

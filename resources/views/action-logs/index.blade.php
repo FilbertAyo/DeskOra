@@ -13,6 +13,9 @@
                       </div>
 
                         <div class="col-auto d-flex align-items-center gap-2">
+                            <a href="{{ route('action-logs.board') }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="ti ti-layout-kanban me-1"></i> Board
+                            </a>
                             @if(($canManageActionLogs ?? false) || auth()->user()->hasPermissionTo('create action logs'))
                                 <a href="{{ route('action-logs.create') }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-plus-circle me-1"></i> Open Current Week Log

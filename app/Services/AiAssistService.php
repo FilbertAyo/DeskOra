@@ -2,7 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\ActionLog;
+use App\Models\Document;
 use App\Models\User;
+use App\Models\WorkPeriod;
+use App\Support\ActionLogTaskSupport;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use RuntimeException;
@@ -18,6 +22,326 @@ class AiAssistService
     public function isConfigured(): bool
     {
         return filled(config('services.groq.api_key'));
+    }
+
+    /**
+     * Draft weekly-report fields from the user's action-log tasks.
+     * Always returns a usable payload; AI is optional (fail-open).
+     *
+     * @return array{
+     *     available: bool,
+     *     used_ai: bool,
+     *     message: ?string,
+     *     draft: array{
+     *         summary: string,
+     *         achievements: list<string>,
+     *         challenges: list<array{challenge: string, action_taken_planned: string}>
+     *     }
+     * }
+     */
+    public function draftWeeklyReportFromActionTasks(User $user, ?string $periodId = null): array
+    {
+        $period = $periodId
+            ? WorkPeriod::query()->find($periodId)
+            : WorkPeriod::getCurrent();
+
+        $tasks = $period
+            ? $this->collectUserActionTasksForPeriod($user, $period)
+            : [];
+
+        if ($tasks === []) {
+            return [
+                'available' => $this->isConfigured(),
+                'used_ai' => false,
+                'message' => 'No action tasks found for this period to draft from.',
+                'draft' => [
+                    'summary' => '',
+                    'achievements' => [],
+                    'challenges' => [],
+                ],
+            ];
+        }
+
+        $heuristic = $this->heuristicWeeklyReportDraft($tasks, $period);
+
+        if (! $this->isConfigured()) {
+            return [
+                'available' => false,
+                'used_ai' => false,
+                'message' => 'AI currently unavailable. A basic draft was built from your action tasks.',
+                'draft' => $heuristic,
+            ];
+        }
+
+        try {
+            $snapshot = $this->formatActionTasksForPrompt($tasks, $period);
+            $raw = $this->generate(
+                $this->plainTextInstruction()
+                    .'You help staff draft a weekly report from their action-log tasks. '
+                    .'Return ONLY valid JSON with keys: summary (string), achievements (array of strings), '
+                    .'challenges (array of objects with challenge and action_taken_planned strings). '
+                    .'Use only facts from the tasks. Keep summary to 2-4 sentences. '
+                    .'Include at most 5 achievements and 4 challenges. Do not invent work that is not listed.',
+                "Staff action tasks for the week:\n\n".$snapshot,
+                (int) config('services.groq.assistant_max_tokens', 700),
+                formatAsSummary: false
+            );
+
+            $parsed = $this->parseWeeklyReportDraftJson($raw);
+            if ($parsed === null) {
+                return [
+                    'available' => true,
+                    'used_ai' => false,
+                    'message' => 'AI response could not be used. A basic draft was built from your action tasks.',
+                    'draft' => $heuristic,
+                ];
+            }
+
+            return [
+                'available' => true,
+                'used_ai' => true,
+                'message' => null,
+                'draft' => $parsed,
+            ];
+        } catch (RuntimeException) {
+            return [
+                'available' => false,
+                'used_ai' => false,
+                'message' => 'AI currently unavailable. A basic draft was built from your action tasks.',
+                'draft' => $heuristic,
+            ];
+        }
+    }
+
+    /**
+     * @param  array{
+     *     context_type: string,
+     *     title?: string|null,
+     *     details?: string|null,
+     *     amount?: string|null,
+     *     requester?: string|null,
+     *     outcome?: string|null
+     * }  $context
+     */
+    public function suggestRejectionReason(array $context): string
+    {
+        $type = $context['context_type'] ?? 'finance';
+        $outcome = $context['outcome'] ?? 'rejected';
+
+        $lines = [
+            'Approval context type: '.$type,
+            'Intended outcome: '.$outcome,
+            'Title: '.trim((string) ($context['title'] ?? '')),
+            'Requester: '.trim((string) ($context['requester'] ?? '')),
+            'Amount: '.trim((string) ($context['amount'] ?? '')),
+            'Details: '.trim((string) ($context['details'] ?? '')),
+        ];
+
+        $guidance = $outcome === 'resubmission'
+            ? 'Write a short, professional request for resubmission that explains what must be corrected.'
+            : 'Write a short, professional rejection reason that is clear and respectful.';
+
+        return $this->generate(
+            $this->plainTextInstruction()
+                .'You help managers write approval feedback in DeskOra. '
+                .$guidance
+                .' Use 2 to 4 sentences. Do not invent missing facts. '
+                .'Do not include greetings or sign-offs. Return only the comment text.',
+            implode("\n", $lines),
+            250,
+            formatAsSummary: true
+        );
+    }
+
+    /**
+     * @return list<array{task: string, progress: string, notes: string}>
+     */
+    private function collectUserActionTasksForPeriod(User $user, WorkPeriod $period): array
+    {
+        $logs = ActionLog::query()
+            ->where('period_id', $period->id)
+            ->whereNull('superseded_by_action_log_id')
+            ->where(function ($query) use ($user) {
+                $query->where('state', Document::STATE_SUBMITTED)
+                    ->orWhere('user_id', $user->id);
+            })
+            ->get(['id', 'user_id', 'state', 'period_id']);
+
+        $rows = [];
+
+        foreach ($logs as $log) {
+            $document = Document::fromDomainId((string) $log->id);
+            if (! $document) {
+                continue;
+            }
+
+            foreach (ActionLogTaskSupport::extractTasks($document->content) as $task) {
+                if (! is_array($task)) {
+                    continue;
+                }
+
+                $label = trim((string) ($task['task'] ?? ''));
+                if ($label === '') {
+                    continue;
+                }
+
+                $responsibleIds = ActionLogTaskSupport::normalizeResponsibleIds($task['responsible_user_ids'] ?? []);
+                $isOwner = (string) $log->user_id === (string) $user->id;
+                $isAssignee = in_array((string) $user->id, $responsibleIds, true);
+
+                if (! $isOwner && ! $isAssignee) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'task' => $label,
+                    'progress' => trim((string) ($task['progress'] ?? ActionLogTaskSupport::PROGRESS_NOT_STARTED)),
+                    'notes' => trim((string) ($task['notes_progress'] ?? '')),
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  list<array{task: string, progress: string, notes: string}>  $tasks
+     * @return array{
+     *     summary: string,
+     *     achievements: list<string>,
+     *     challenges: list<array{challenge: string, action_taken_planned: string}>
+     * }
+     */
+    private function heuristicWeeklyReportDraft(array $tasks, ?WorkPeriod $period): array
+    {
+        $weekLabel = $period
+            ? 'Week '.$period->week_number.' of '.$period->year
+            : 'this week';
+
+        $done = [];
+        $active = [];
+        $blocked = [];
+
+        foreach ($tasks as $task) {
+            $line = $task['task'];
+            if ($task['notes'] !== '') {
+                $line .= ' ('.$task['notes'].')';
+            }
+
+            if ($task['progress'] === ActionLogTaskSupport::PROGRESS_DONE) {
+                $done[] = $task['task'];
+            } elseif ($task['progress'] === ActionLogTaskSupport::PROGRESS_CANCELLED) {
+                $blocked[] = [
+                    'challenge' => $task['task'].' was cancelled.',
+                    'action_taken_planned' => $task['notes'] !== '' ? $task['notes'] : 'Review and re-plan if still needed.',
+                ];
+            } else {
+                $active[] = $line;
+            }
+        }
+
+        $summaryParts = ["During {$weekLabel}, work focused on assigned action-log tasks."];
+        if ($done !== []) {
+            $summaryParts[] = 'Completed: '.implode('; ', array_slice($done, 0, 5)).'.';
+        }
+        if ($active !== []) {
+            $summaryParts[] = 'Still in progress: '.implode('; ', array_slice($active, 0, 5)).'.';
+        }
+
+        return [
+            'summary' => implode(' ', $summaryParts),
+            'achievements' => array_slice($done, 0, 5),
+            'challenges' => array_slice($blocked !== [] ? $blocked : (
+                $active !== []
+                    ? [[
+                        'challenge' => 'Some assigned tasks remain unfinished.',
+                        'action_taken_planned' => 'Continue follow-up on: '.implode('; ', array_slice(
+                            array_map(fn ($t) => $t['task'], array_filter($tasks, fn ($t) => ! in_array($t['progress'], ['Done', 'Cancelled'], true))),
+                            0,
+                            3
+                        )).'.',
+                    ]]
+                    : []
+            ), 0, 4),
+        ];
+    }
+
+    /**
+     * @param  list<array{task: string, progress: string, notes: string}>  $tasks
+     */
+    private function formatActionTasksForPrompt(array $tasks, ?WorkPeriod $period): string
+    {
+        $lines = [];
+        if ($period) {
+            $lines[] = 'Period: Week '.$period->week_number.' of '.$period->year.' ('.$period->date_range.')';
+        }
+
+        foreach ($tasks as $index => $task) {
+            $lines[] = sprintf(
+                '%d. [%s] %s%s',
+                $index + 1,
+                $task['progress'],
+                $task['task'],
+                $task['notes'] !== '' ? ' — notes: '.$task['notes'] : ''
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @return array{
+     *     summary: string,
+     *     achievements: list<string>,
+     *     challenges: list<array{challenge: string, action_taken_planned: string}>
+     * }|null
+     */
+    private function parseWeeklyReportDraftJson(string $raw): ?array
+    {
+        $raw = trim($raw);
+        if (preg_match('/\{.*\}/s', $raw, $matches)) {
+            $raw = $matches[0];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $summary = trim((string) ($decoded['summary'] ?? ''));
+        $achievements = [];
+        foreach (($decoded['achievements'] ?? []) as $item) {
+            $text = trim((string) $item);
+            if ($text !== '') {
+                $achievements[] = $text;
+            }
+        }
+
+        $challenges = [];
+        foreach (($decoded['challenges'] ?? []) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $challenge = trim((string) ($item['challenge'] ?? ''));
+            $action = trim((string) ($item['action_taken_planned'] ?? ''));
+            if ($challenge === '' && $action === '') {
+                continue;
+            }
+            $challenges[] = [
+                'challenge' => $challenge,
+                'action_taken_planned' => $action,
+            ];
+        }
+
+        if ($summary === '' && $achievements === [] && $challenges === []) {
+            return null;
+        }
+
+        return [
+            'summary' => $summary,
+            'achievements' => array_values(array_slice($achievements, 0, 5)),
+            'challenges' => array_values(array_slice($challenges, 0, 4)),
+        ];
     }
 
     public function summarizeWeeklySubmission(string $text, bool $hasPlan, bool $hasReport): string

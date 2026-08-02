@@ -45,6 +45,7 @@
                 <div class="row my-2">
                    
                     <div class="col-md-12">
+                        @include('partials.cash-flow-forecast')
                         <div class="card shadow-none border">
                             <div class="card-header mb-1" style="display: flex;justify-content: space-between;">
                                 <h4 class="h3 mb-3">

@@ -7,7 +7,6 @@ use App\Database\DocumentsUnionView;
 use App\Models\AnonymousFeedback;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
-use App\Services\ApprovalQueueService;
 use App\Services\RequestApprovalNavService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Support\ShortId;
@@ -61,36 +60,30 @@ class AppServiceProvider extends ServiceProvider
             $approvalsApproveCount = 0;
             $approvalsAuthorizeCount = 0;
             $approvalsTotalCount = 0;
-            $approvalQueueSummary = ['finance' => 0, 'budget' => 0, 'total' => 0];
             $newAnonymousFeedbackCount = 0;
             $showStaffNominationModal = false;
             $staffNominationPeriod = null;
 
-            if (Auth::check()) {
+            if (Auth::check() && Schema::hasTable('requests')) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
+                $approvalCounts = app(RequestApprovalNavService::class)->countsFor($user);
 
-                if (Schema::hasTable('requests')) {
-                    $approvalCounts = app(RequestApprovalNavService::class)->countsFor($user);
+                $approvalsReviewCount = (int) ($approvalCounts['review'] ?? 0);
+                $approvalsApproveCount = (int) ($approvalCounts['approve'] ?? 0);
+                $approvalsAuthorizeCount = (int) ($approvalCounts['authorize'] ?? 0);
+                $approvalsTotalCount = (int) ($approvalCounts['total'] ?? 0);
 
-                    $approvalsReviewCount = (int) ($approvalCounts['review'] ?? 0);
-                    $approvalsApproveCount = (int) ($approvalCounts['approve'] ?? 0);
-                    $approvalsAuthorizeCount = (int) ($approvalCounts['authorize'] ?? 0);
-                    $approvalsTotalCount = (int) ($approvalCounts['total'] ?? 0);
-
-                    $scopeKey = md5(implode(',', $user->departmentScopeIds()));
-                    $approvedCount = (int) Cache::remember(
-                        'petty-nav-count-approved-'.$user->id.'-'.$scopeKey,
-                        now()->addSeconds(45),
-                        fn () => FinanceRequest::query()
-                            ->whereIn('department_id', $user->departmentScopeIds())
-                            ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
-                            ->where('status', 'approved')
-                            ->count()
-                    );
-                }
-
-                $approvalQueueSummary = app(ApprovalQueueService::class)->summaryCounts($user);
+                $scopeKey = md5(implode(',', $user->departmentScopeIds()));
+                $approvedCount = (int) Cache::remember(
+                    'petty-nav-count-approved-'.$user->id.'-'.$scopeKey,
+                    now()->addSeconds(45),
+                    fn () => FinanceRequest::query()
+                        ->whereIn('department_id', $user->departmentScopeIds())
+                        ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
+                        ->where('status', 'approved')
+                        ->count()
+                );
             }
 
             if (Schema::hasTable('requests')) {
@@ -130,7 +123,6 @@ class AppServiceProvider extends ServiceProvider
                 'approvalsApproveCount' => $approvalsApproveCount,
                 'approvalsAuthorizeCount' => $approvalsAuthorizeCount,
                 'approvalsTotalCount' => $approvalsTotalCount,
-                'approvalQueueSummary' => $approvalQueueSummary,
                 'processingPettiesCount' => $processingCount,
                 'approvedPettiesCount' => $approvedCount,
                 'newAnonymousFeedbackCount' => $newAnonymousFeedbackCount,

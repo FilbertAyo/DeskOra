@@ -3,7 +3,7 @@
 use App\Http\Controllers\ActionLogController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\ApprovalQueueController;
+use App\Http\Controllers\AiAssistActionController;
 use App\Http\Controllers\CommandPaletteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
@@ -13,6 +13,7 @@ use App\Http\Controllers\DocumentBudgetReviewController;
 use App\Http\Controllers\DocumentCrudController;
 use App\Http\Controllers\DocumentDashboardController;
 use App\Http\Controllers\DocumentWorkflowController;
+use App\Http\Controllers\ExecutivePulseController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\MeetingMinuteController;
@@ -68,15 +69,19 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1')
         ->name('ai-assistant.ask');
 
+    Route::get('/ai-assist/status', [AiAssistActionController::class, 'status'])
+        ->middleware('throttle:60,1')
+        ->name('ai-assist.status');
+    Route::post('/ai-assist/draft-weekly-report', [AiAssistActionController::class, 'draftWeeklyReport'])
+        ->middleware('throttle:20,1')
+        ->name('ai-assist.draft-weekly-report');
+    Route::post('/ai-assist/suggest-rejection', [AiAssistActionController::class, 'suggestRejection'])
+        ->middleware('throttle:20,1')
+        ->name('ai-assist.suggest-rejection');
+
     Route::get('/commands', [CommandPaletteController::class, 'index'])
         ->middleware('throttle:60,1')
         ->name('commands.index');
-
-    Route::get('/approvals/queue', [ApprovalQueueController::class, 'index'])
-        ->name('approvals.queue');
-    Route::get('/approvals/queue/counts', [ApprovalQueueController::class, 'counts'])
-        ->middleware('throttle:60,1')
-        ->name('approvals.queue.counts');
 
     // Documents routes
     Route::prefix('documents')->name('documents.')->group(function () {
@@ -130,10 +135,14 @@ Route::middleware('auth')->group(function () {
     // Action Logs routes (restricted to minutes_preparer and admin - authorization handled in controller)
     Route::prefix('action-logs')->name('action-logs.')->group(function () {
         Route::get('/', [ActionLogController::class, 'index'])->name('index');
+        Route::get('/board', [ActionLogController::class, 'board'])->name('board');
         Route::get('/create', [ActionLogController::class, 'create'])->name('create');
         Route::post('/', [ActionLogController::class, 'store'])->name('store');
         Route::get('/{document}/download', [ActionLogController::class, 'downloadPdf'])->name('download');
         Route::put('/{document}/quick-update', [ActionLogController::class, 'quickUpdate'])->name('quick-update');
+        Route::patch('/{document}/board-move', [ActionLogController::class, 'boardMove'])
+            ->middleware('throttle:60,1')
+            ->name('board-move');
         Route::get('/{document}', [ActionLogController::class, 'show'])->name('show');
         Route::get('/{document}/edit', [ActionLogController::class, 'edit'])->name('edit');
         Route::put('/{document}', [ActionLogController::class, 'update'])->name('update');
@@ -313,6 +322,15 @@ Route::middleware(['auth', 'permission:view cashflow movements'])->group(functio
 Route::middleware(['auth', 'permission:view cashflow movements|review staff requisition|approve staff requisition|authorize staff requisition|download staff requisition'])->group(function () {
     Route::get('/requisitions/records', [DepositController::class, 'requisitionRecords'])->name('requisition.records');
     Route::get('/requisitions/records/download', [DepositController::class, 'downloadRequisitionRecords'])->name('requisition.records.download');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/executive-pulse', [ExecutivePulseController::class, 'index'])
+        ->middleware('permission:view reports|view all documents')
+        ->name('executive-pulse.index');
+    Route::get('/executive-pulse/pdf', [ExecutivePulseController::class, 'download'])
+        ->middleware('permission:view reports|view all documents')
+        ->name('executive-pulse.download');
 });
 
 Route::middleware(['auth', 'permission:view reports'])->group(function () {

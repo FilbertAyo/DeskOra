@@ -178,39 +178,5 @@
             openPalette();
         });
     });
-
-    // Light polling for unified approval-queue nav badges (fail open).
-    const queueBadges = document.querySelectorAll('[data-approval-queue-nav-badge]');
-    if (queueBadges.length) {
-        const countsUrl = @json(route('approvals.queue.counts'));
-
-        async function refreshQueueBadges() {
-            try {
-                const response = await fetch(countsUrl, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    credentials: 'same-origin',
-                });
-                if (!response.ok) return;
-                const data = await response.json();
-                const total = Number(data.total || 0);
-                queueBadges.forEach((el) => {
-                    if (total > 0) {
-                        el.textContent = total > 99 ? '99+' : String(total);
-                        el.classList.remove('d-none');
-                    } else {
-                        el.classList.add('d-none');
-                    }
-                });
-                const pageBadge = document.querySelector('[data-approval-queue-total]');
-                if (pageBadge) {
-                    pageBadge.textContent = total + ' pending';
-                }
-            } catch (e) {
-                // Keep last known counts.
-            }
-        }
-
-        setInterval(refreshQueueBadges, 45000);
-    }
 })();
 </script>

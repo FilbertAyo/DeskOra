@@ -5,18 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Models\Department;
 use App\Services\ActionLogCarryForwardService;
+use App\Services\ActionLogKanbanService;
+use App\Support\ActionLogTaskSupport;
 use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class ActionLogController extends Controller
 {
     public function __construct(
         private readonly ActionLogCarryForwardService $actionLogCarryForwardService,
+        private readonly ActionLogKanbanService $actionLogKanbanService,
     ) {}
 
     private const PROGRESS_NOT_STARTED = 'Not Started';
@@ -76,6 +81,135 @@ class ActionLogController extends Controller
         }
 
         return view('action-logs.index', compact('documents', 'canManageActionLogs'));
+    }
+
+    /**
+     * Visual Kanban board for action-log tasks in a work period.
+     */
+    public function board(Request $request): View
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $periodId = $request->query('period_id');
+        $assigneeId = $request->query('assignee_id');
+        $departmentId = $request->query('department_id');
+
+        $board = $this->actionLogKanbanService->boardFor(
+            $user,
+            is_string($periodId) ? $periodId : null,
+            is_string($assigneeId) && $assigneeId !== '' ? $assigneeId : null,
+            is_string($departmentId) && $departmentId !== '' ? $departmentId : null,
+        );
+
+        $workPeriods = WorkPeriod::query()
+            ->orderByDesc('year')
+            ->orderByDesc('week_number')
+            ->limit(40)
+            ->get();
+
+        $departments = Department::query()
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('action-logs.board', [
+            'board' => $board,
+            'workPeriods' => $workPeriods,
+            'departments' => $departments,
+            'progressOptions' => ActionLogTaskSupport::PROGRESS_OPTIONS,
+        ]);
+    }
+
+    /**
+     * Drag-and-drop / column move for a single task (JSON, fail-soft).
+     */
+    public function boardMove(Request $request, Document $document): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if ($document->type !== Document::TYPE_ACTION_LOG) {
+            abort(404, 'Document not found.');
+        }
+
+        $this->authorize('update', $document);
+
+        $validated = $request->validate([
+            'task_uid' => ['required', 'string', 'max:80'],
+            'progress' => ['required', 'string', 'in:'.implode(',', self::STAFF_PROGRESS_OPTIONS)],
+            'notes_progress' => ['nullable', 'string', 'max:4000'],
+        ]);
+
+        $document->loadMissing('period');
+        $period = $document->period;
+        if (! $period || ! $period->isOpen()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This action log belongs to a closed work period and cannot be updated.',
+            ], 422);
+        }
+
+        $notes = trim((string) ($validated['notes_progress'] ?? ''));
+        if ($notes === '') {
+            $notes = 'Moved on Kanban board.';
+        }
+
+        $isManager = $this->isActionLogManager($user);
+        $tasks = $this->extractTasks($document->content);
+        $found = false;
+        $updatedTask = null;
+
+        foreach ($tasks as &$task) {
+            if (! is_array($task)) {
+                continue;
+            }
+            if (trim((string) ($task['task_uid'] ?? '')) !== $validated['task_uid']) {
+                continue;
+            }
+
+            $responsibleIds = is_array($task['responsible_user_ids'] ?? null)
+                ? array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $task['responsible_user_ids'])))
+                : [];
+
+            if (! $isManager && ! in_array((string) $user->id, $responsibleIds, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only move tasks where you are assigned as the responsible person.',
+                ], 403);
+            }
+
+            $before = $task;
+            $task['progress'] = $validated['progress'];
+            $task['notes_progress'] = $notes;
+            $task = $this->appendTaskHistoryIfChanged($before, $task, $period, (string) $user->id);
+            $updatedTask = $task;
+            $found = true;
+            break;
+        }
+        unset($task);
+
+        if (! $found) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected task could not be found on this action log.',
+            ], 404);
+        }
+
+        $document->update([
+            'content' => $this->mergeActionLogContentWithTasks($document->content, $tasks),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Task moved.',
+            'task' => [
+                'task_uid' => $validated['task_uid'],
+                'progress' => $validated['progress'],
+                'notes_progress' => $notes,
+                'task' => $updatedTask['task'] ?? '',
+            ],
+        ]);
     }
 
     /**

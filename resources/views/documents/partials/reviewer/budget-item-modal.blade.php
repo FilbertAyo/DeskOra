@@ -94,8 +94,25 @@
                         <small class="text-muted">Required when decision is approve.</small>
                     </div>
                     <div class="mb-0 js-note-group">
-                        <label class="form-label">Note</label>
-                        <textarea name="note" rows="3" class="form-control js-note-input" placeholder="Reason for rejection">{{ $item['note'] ?? '' }}</textarea>
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                            <label class="form-label mb-0">Note</label>
+                            <button type="button"
+                                class="btn btn-sm btn-outline-secondary d-none"
+                                data-ai-assist-only
+                                data-ai-suggest-rejection
+                                data-ai-target="#budget-note-{{ $item['document_id'] }}_{{ $item['budget_uid'] }}"
+                                data-ai-context="budget"
+                                data-ai-title="{{ $item['item'] ?? ($item['description_purpose'] ?? 'Budget item') }}"
+                                data-ai-details="{{ $item['description_purpose'] ?? '' }}"
+                                data-ai-amount="{{ $item['amount'] ?? ($item['requested_amount'] ?? '') }}"
+                                data-ai-requester="{{ $item['owner_name'] ?? '' }}"
+                                data-ai-outcome="rejected">
+                                <i class="ti ti-sparkles me-1"></i> Suggest with AI
+                            </button>
+                        </div>
+                        <textarea name="note" rows="3" class="form-control js-note-input"
+                            id="budget-note-{{ $item['document_id'] }}_{{ $item['budget_uid'] }}"
+                            placeholder="Reason for rejection">{{ $item['note'] ?? '' }}</textarea>
                         <small class="text-muted">Required when decision is reject.</small>
                     </div>
                 </div>

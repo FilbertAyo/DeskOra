@@ -15,7 +15,21 @@
                             <p class="text-muted small mb-2">
                                 Provide a clear reason so staff can update and resubmit correctly.
                             </p>
-                            <label for="rejectReason" class="form-label">Reason <span class="text-danger">*</span></label>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                <label for="rejectReason" class="form-label mb-0">Reason <span class="text-danger">*</span></label>
+                                <button type="button"
+                                    class="btn btn-sm btn-outline-secondary d-none"
+                                    data-ai-assist-only
+                                    data-ai-suggest-rejection
+                                    data-ai-target="#rejectReason"
+                                    data-ai-context="document"
+                                    data-ai-title="{{ $document->title ?? $document->type_name }}"
+                                    data-ai-details="{{ $document->type_name ?? '' }}"
+                                    data-ai-requester="{{ $document->user?->name ?? '' }}"
+                                    data-ai-outcome="resubmission">
+                                    <i class="ti ti-sparkles me-1"></i> Suggest with AI
+                                </button>
+                            </div>
                             <textarea
                                 class="form-control @error('reason') is-invalid @enderror"
                                 id="rejectReason"

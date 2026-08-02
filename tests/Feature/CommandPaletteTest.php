@@ -36,7 +36,6 @@ class CommandPaletteTest extends TestCase
 
         $ids = collect($commands)->pluck('id')->all();
         $this->assertContains('dashboard', $ids);
-        $this->assertContains('my_approval_queue', $ids);
         $this->assertContains('review_petty_cash', $ids);
         $this->assertNotContains('approve_petty_cash', $ids);
         $this->assertNotContains('users_settings', $ids);

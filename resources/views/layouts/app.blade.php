@@ -74,6 +74,7 @@
 
     @if(Auth::check() && Auth::user()->status === 'active')
         @include('partials.deskora-go')
+        @include('partials.ai-assist-actions')
     @endif
 
 

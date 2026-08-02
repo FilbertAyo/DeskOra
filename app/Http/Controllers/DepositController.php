@@ -6,6 +6,7 @@ use App\Exports\RequisitionRecordsExport;
 use App\Exports\RunningBalanceExport;
 use App\Models\Deposit;
 use App\Models\Request as FinanceRequest;
+use App\Services\CashFlowForecastService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class DepositController extends Controller
 {
+    public function __construct(
+        private readonly CashFlowForecastService $cashFlowForecast,
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -30,8 +35,9 @@ class DepositController extends Controller
             ->whereIn('department_id', $scopeIds)
             ->first();
         $remaining = $latestDeposit ? $latestDeposit->remaining : 0;
+        $cashFlowForecast = $this->cashFlowForecast->forUser($user);
 
-        return view('requests.finance.cashier', compact('deposits', 'remaining'));
+        return view('requests.finance.cashier', compact('deposits', 'remaining', 'cashFlowForecast'));
     }
 
     private function getCashflowTransactions($filterType)
@@ -130,6 +136,7 @@ class DepositController extends Controller
     {
         $filterType = $request->input('filter_type');
         $data = $this->getCashflowTransactions($filterType);
+        $data['cashFlowForecast'] = $this->cashFlowForecast->forUser(Auth::user());
 
         return view('requests.finance.cashflow', $data);
     }

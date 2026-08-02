@@ -40,6 +40,8 @@
         </div>
     </div>
 
+    @include('partials.cash-flow-forecast')
+
     <div class="mb-3 d-flex justify-content-between gap-2">
         <form method="GET" action="{{ route('cashflow.index') }}">
 

@@ -491,6 +491,8 @@ class ShortIdMigrator
                     $table->text('status_reason')->nullable();
                     $table->timestamp('changed_at')->nullable();
                     $table->string('source')->nullable();
+                    $table->json('reassigned_from_user_ids')->nullable();
+                    $table->json('reassigned_to_user_ids')->nullable();
                     $table->timestamps();
 
                     $table->index(['action_log_task_id', 'changed_at']);

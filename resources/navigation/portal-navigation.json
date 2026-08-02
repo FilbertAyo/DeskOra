@@ -167,6 +167,20 @@
             ]
         },
         {
+            "id": "action_log_board",
+            "label": "Action Log Board",
+            "menu_path": "Sidebar > Activities > Weekly Activities > Action Board",
+            "route": "action-logs.board",
+            "description": "Kanban board for action-log tasks by progress status.",
+            "intents": [
+                "action board",
+                "kanban",
+                "action log board",
+                "task board",
+                "drag tasks"
+            ]
+        },
+        {
             "id": "assigned_tasks_overview",
             "label": "Assigned tasks (informational)",
             "menu_path": "Dashboard or Weekly Plans",
@@ -334,33 +348,6 @@
                 "submit petty cash",
                 "request petty cash",
                 "reimbursement"
-            ]
-        },
-        {
-            "id": "my_approval_queue",
-            "label": "My Approval Queue",
-            "menu_path": "Sidebar > Approvals > My Approval Queue",
-            "route": "approvals.queue",
-            "permissions_any": [
-                "review pettycash",
-                "approve pettycash",
-                "authorize pettycash",
-                "review staff requisition",
-                "approve staff requisition",
-                "authorize staff requisition",
-                "view weekly budgets",
-                "review weekly budgets",
-                "approve weekly budgets",
-                "authorize weekly budgets"
-            ],
-            "description": "Unified inbox of finance and budget items waiting for your action.",
-            "intents": [
-                "my approvals",
-                "approval queue",
-                "pending approvals",
-                "my approval queue",
-                "things to approve",
-                "approvals inbox"
             ]
         },
         {
@@ -551,6 +538,24 @@
                 "manage periods",
                 "open period",
                 "close period"
+            ]
+        },
+        {
+            "id": "executive_pulse",
+            "label": "Executive Pulse",
+            "menu_path": "Sidebar > Reports and Settings > Executive Pulse",
+            "route": "executive-pulse.index",
+            "permissions_any": [
+                "view reports",
+                "view all documents"
+            ],
+            "description": "Weekly organization snapshot: submissions, approvals, tasks, and blockers.",
+            "intents": [
+                "executive pulse",
+                "weekly snapshot",
+                "org health",
+                "management summary",
+                "leadership dashboard"
             ]
         },
         {

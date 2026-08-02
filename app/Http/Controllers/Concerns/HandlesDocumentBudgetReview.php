@@ -9,7 +9,6 @@ use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
-use App\Services\ApprovalQueueService;
 use App\Services\MonthlyReportYearPlanActivities;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -325,8 +324,6 @@ trait HandlesDocumentBudgetReview
                 'budget_review_note' => null,
             ]);
 
-            app(ApprovalQueueService::class)->forgetBudgetPending();
-
             return redirect()
                 ->back()
                 ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
@@ -410,8 +407,6 @@ trait HandlesDocumentBudgetReview
         ]);
 
         $stageLabel = ucfirst($actionStage);
-
-        app(ApprovalQueueService::class)->forgetBudgetPending();
 
         return redirect()
             ->back()
@@ -544,8 +539,6 @@ trait HandlesDocumentBudgetReview
             'budget_provided_amount' => $summary['provided_total'],
             'budget_review_note' => null,
         ]);
-
-        app(ApprovalQueueService::class)->forgetBudgetPending();
 
         return redirect()
             ->back()
