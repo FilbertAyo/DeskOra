@@ -130,6 +130,113 @@ class AiAssistService
     }
 
     /**
+     * Rewrite rule-based performance tips. Fail-open: returns originals if AI is unavailable.
+     *
+     * @param  list<string>  $tips
+     * @param  array<string, mixed>  $metricsSnapshot
+     * @return array{available: bool, used_ai: bool, message: ?string, tips: list<string>}
+     */
+    public function polishPerformanceTips(array $tips, array $metricsSnapshot = []): array
+    {
+        $normalized = [];
+        foreach ($tips as $tip) {
+            $text = trim((string) $tip);
+            if ($text !== '') {
+                $normalized[] = $text;
+            }
+        }
+        $normalized = array_values(array_slice($normalized, 0, 3));
+
+        if ($normalized === []) {
+            return [
+                'available' => $this->isConfigured(),
+                'used_ai' => false,
+                'message' => 'No tips to polish.',
+                'tips' => [],
+            ];
+        }
+
+        if (! $this->isConfigured()) {
+            return [
+                'available' => false,
+                'used_ai' => false,
+                'message' => 'AI currently unavailable. Showing original tips.',
+                'tips' => $normalized,
+            ];
+        }
+
+        try {
+            $snapshotLines = [];
+            foreach ($metricsSnapshot as $key => $value) {
+                if (is_scalar($value) || $value === null) {
+                    $snapshotLines[] = $key.': '.(string) $value;
+                }
+            }
+
+            $raw = $this->generate(
+                $this->plainTextInstruction()
+                    .'You polish short workplace coaching tips for a staff dashboard. '
+                    .'Return ONLY valid JSON: {"tips":["..."]} with at most 3 tips. '
+                    .'Keep the same facts; make wording clearer and encouraging. Do not invent new metrics.',
+                "Original tips:\n- ".implode("\n- ", $normalized)
+                    ."\n\nMetrics snapshot:\n".implode("\n", $snapshotLines),
+                150,
+                formatAsSummary: false
+            );
+
+            $polished = $this->parseTipsJson($raw, count($normalized));
+            if ($polished === []) {
+                return [
+                    'available' => true,
+                    'used_ai' => false,
+                    'message' => 'AI response could not be used. Showing original tips.',
+                    'tips' => $normalized,
+                ];
+            }
+
+            return [
+                'available' => true,
+                'used_ai' => true,
+                'message' => null,
+                'tips' => $polished,
+            ];
+        } catch (RuntimeException) {
+            return [
+                'available' => false,
+                'used_ai' => false,
+                'message' => 'AI currently unavailable. Showing original tips.',
+                'tips' => $normalized,
+            ];
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseTipsJson(string $raw, int $maxTips = 3): array
+    {
+        $raw = trim($raw);
+        if (preg_match('/\{.*\}/s', $raw, $matches)) {
+            $raw = $matches[0];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $tips = [];
+        foreach (($decoded['tips'] ?? []) as $tip) {
+            $text = trim((string) $tip);
+            if ($text !== '') {
+                $tips[] = $text;
+            }
+        }
+
+        return array_values(array_slice($tips, 0, max(1, $maxTips)));
+    }
+
+    /**
      * @param  array{
      *     context_type: string,
      *     title?: string|null,

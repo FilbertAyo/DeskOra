@@ -132,6 +132,26 @@ class AiAssistActionTest extends TestCase
         $this->assertSame([], $result['draft']['activity_progress']);
     }
 
+    public function test_polish_performance_tips_fails_open_without_api_key(): void
+    {
+        config(['services.groq.api_key' => '']);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $this->actingAs($user)
+            ->postJson(route('ai-assist.polish-performance-tips'), [
+                'tips' => [
+                    'You missed 1 weekly report in July.',
+                    'Work-log consistency is below 60% for July.',
+                ],
+                'metrics' => ['overall_score' => 42],
+            ])
+            ->assertOk()
+            ->assertJsonPath('used_ai', false)
+            ->assertJsonPath('available', false)
+            ->assertJsonPath('tips.0', 'You missed 1 weekly report in July.');
+    }
+
     public function test_draft_weekly_report_fills_activity_progress_from_work_logs(): void
     {
         config(['services.groq.api_key' => '']);

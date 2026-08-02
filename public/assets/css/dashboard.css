@@ -25,10 +25,13 @@
 }
 
 .dashboard-slot--stats { order: 1; }
-.dashboard-slot--action { order: 2; }
-.dashboard-slot--alerts { order: 3; }
-.dashboard-slot--activities { order: 4; }
-.dashboard-slot--tasks { order: 5; }
+.dashboard-slot--performance { order: 2; }
+.dashboard-slot--work-log { order: 3; }
+.dashboard-slot--action { order: 4; }
+.dashboard-slot--scorecard { order: 5; }
+.dashboard-slot--alerts { order: 6; }
+.dashboard-slot--activities { order: 7; }
+.dashboard-slot--tasks { order: 8; }
 
 .dashboard-slot--alerts:empty {
     display: none;
@@ -447,4 +450,24 @@
             #7dd3fc
         );
     }
+}
+
+/* Personalized monthly performance chart */
+.dash-panel--performance .staff-performance-chart {
+    min-height: 260px;
+}
+
+.staff-performance-tips__list {
+    padding-left: 1.1rem;
+    margin: 0;
+}
+
+.staff-performance-tips__list li {
+    margin-bottom: 0.35rem;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.staff-performance-tips__list li:last-child {
+    margin-bottom: 0;
 }

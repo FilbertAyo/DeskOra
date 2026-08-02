@@ -12,6 +12,7 @@ use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
 use App\Services\ActionLogProgressService;
 use App\Services\Documents\WeeklyBudgetReviewService;
+use App\Services\MonthlyPerformanceService;
 use App\Services\RequestApprovalNavService;
 use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WeeklyScorecardService;
@@ -32,6 +33,7 @@ class DashboardController extends Controller
         private readonly RequestApprovalNavService $requestApprovalNavService,
         private readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
         private readonly WeeklyScorecardService $weeklyScorecardService,
+        private readonly MonthlyPerformanceService $monthlyPerformanceService,
     ) {}
 
     public function redirect()
@@ -431,6 +433,7 @@ class DashboardController extends Controller
             && $weeklyScorecard['work_log_days'] > 0
             && ! $weeklyScorecard['report_submitted']
             && Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT);
+        $monthlyPerformance = $this->monthlyPerformanceService->forUser($user, 6);
 
         return view('dashboard', compact(
             'userNo',
@@ -473,6 +476,7 @@ class DashboardController extends Controller
             'todayWorkLog',
             'weeklyScorecard',
             'reportReadyHint',
+            'monthlyPerformance',
         ));
     }
 

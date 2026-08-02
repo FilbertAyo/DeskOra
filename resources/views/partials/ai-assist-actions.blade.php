@@ -6,6 +6,7 @@
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const statusUrl = @json(route('ai-assist.status'));
     const draftUrl = @json(route('ai-assist.draft-weekly-report'));
+    const polishTipsUrl = @json(route('ai-assist.polish-performance-tips'));
     const rejectUrl = @json(route('ai-assist.suggest-rejection'));
 
     let availableCache = null;
@@ -210,6 +211,54 @@
         });
     }
 
+    async function polishPerformanceTips(button) {
+        const list = document.getElementById('staffPerformanceTips');
+        if (!list) return;
+
+        const tips = Array.from(list.querySelectorAll('li'))
+            .map((li) => (li.textContent || '').trim())
+            .filter(Boolean);
+        if (!tips.length) {
+            toast('No tips to polish.', 'info');
+            return;
+        }
+
+        const metrics = window.__staffPerformancePayload
+            ? {
+                overall_score: window.__staffPerformancePayload.overall_score,
+                pending_reviews: window.__staffPerformancePayload.pending_reviews,
+            }
+            : {};
+
+        setBusy(button, true, 'Polishing…');
+        try {
+            const { ok, data } = await fetchJson(polishTipsUrl, {
+                method: 'POST',
+                body: JSON.stringify({ tips, metrics }),
+            });
+
+            if (!ok || !data || !Array.isArray(data.tips) || !data.tips.length) {
+                toast((data && data.message) || 'Could not polish tips right now.', 'warning');
+                return;
+            }
+
+            list.innerHTML = data.tips.map((tip) => '<li>' + String(tip)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;') + '</li>').join('');
+
+            if (data.message) {
+                toast(data.message, data.used_ai ? 'success' : 'info');
+            } else {
+                toast(data.used_ai ? 'Tips polished — still based on your metrics.' : 'Original tips kept.', 'success');
+            }
+        } catch (e) {
+            toast('AI currently unavailable.', 'warning');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
     async function suggestRejection(button) {
         const targetSelector = button.getAttribute('data-ai-target');
         const target = targetSelector ? document.querySelector(targetSelector) : null;
@@ -268,6 +317,12 @@
             draftWeeklyReport(draftBtn);
             return;
         }
+        const polishBtn = event.target.closest('[data-ai-polish-performance-tips]');
+        if (polishBtn) {
+            event.preventDefault();
+            polishPerformanceTips(polishBtn);
+            return;
+        }
         const rejectBtn = event.target.closest('[data-ai-suggest-rejection]');
         if (rejectBtn) {
             event.preventDefault();
@@ -277,6 +332,6 @@
 
     document.addEventListener('DOMContentLoaded', () => revealAiButtons(document));
 
-    window.DeskOraAiAssist = { isAvailable, revealAiButtons, draftWeeklyReport, suggestRejection };
+    window.DeskOraAiAssist = { isAvailable, revealAiButtons, draftWeeklyReport, polishPerformanceTips, suggestRejection };
 })();
 </script>

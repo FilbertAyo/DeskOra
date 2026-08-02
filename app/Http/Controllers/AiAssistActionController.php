@@ -43,6 +43,25 @@ class AiAssistActionController extends Controller
         return response()->json($result);
     }
 
+    public function polishPerformanceTips(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->status ?? '') === 'active', 403);
+
+        $validated = $request->validate([
+            'tips' => ['required', 'array', 'max:5'],
+            'tips.*' => ['required', 'string', 'max:500'],
+            'metrics' => ['nullable', 'array'],
+        ]);
+
+        $result = $this->aiAssist->polishPerformanceTips(
+            $validated['tips'],
+            is_array($validated['metrics'] ?? null) ? $validated['metrics'] : []
+        );
+
+        return response()->json($result);
+    }
+
     public function suggestRejection(Request $request): JsonResponse
     {
         $user = $request->user();

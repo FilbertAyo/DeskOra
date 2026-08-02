@@ -51,6 +51,10 @@
                     @include('dashboard.partials.stats')
                 </div>
 
+                <div class="dashboard-slot dashboard-slot--performance">
+                    @include('dashboard.partials.performance-chart')
+                </div>
+
                 <div class="dashboard-slot dashboard-slot--work-log">
                     @include('dashboard.partials.work-log')
                 </div>

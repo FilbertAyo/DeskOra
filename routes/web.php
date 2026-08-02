@@ -76,6 +76,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/ai-assist/draft-weekly-report', [AiAssistActionController::class, 'draftWeeklyReport'])
         ->middleware('throttle:20,1')
         ->name('ai-assist.draft-weekly-report');
+    Route::post('/ai-assist/polish-performance-tips', [AiAssistActionController::class, 'polishPerformanceTips'])
+        ->middleware('throttle:20,1')
+        ->name('ai-assist.polish-performance-tips');
     Route::post('/ai-assist/suggest-rejection', [AiAssistActionController::class, 'suggestRejection'])
         ->middleware('throttle:20,1')
         ->name('ai-assist.suggest-rejection');
