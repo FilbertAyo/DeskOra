@@ -108,7 +108,7 @@
                                         class="btn btn-sm {{ $canAct ? 'btn-primary' : 'btn-outline-secondary' }}"
                                         href="{{ route('petty.details', array_filter(['petty' => $item->id, 'stage' => $stage ?? null, 'type' => $typeFilter ?? null])) }}"
                                     >
-                                        <i class="ti ti-{{ $canAct ? 'check' : 'eye' }} me-1"></i>
+                                
                                         {{ $canAct ? $actionLabel : 'View' }}
                                     </a>
                                 </td>
