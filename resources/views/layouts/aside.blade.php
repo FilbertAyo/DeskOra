@@ -22,8 +22,7 @@
                     $canSeeManagement = $canReviewSubmissions
                         || Auth::user()->can('manage anonymous feedback')
                         || Auth::user()->can('view appreciation nominations')
-                        || Auth::user()->can('manage work periods')
-                        || Auth::user()->can('view reports');
+                        || Auth::user()->can('manage work periods');
 
                     $reviewActivitiesSubmittedCount = 0;
                     $reviewActivitiesPendingBudgetCount = 0;
@@ -54,6 +53,7 @@
                         }
                     }
                 @endphp
+           
 
                 @if($canSeeManagement)
                     <li class="pc-item pc-hasmenu {{ Request::routeIs('management.*', 'anonymous-feedback.*', 'work-periods.*', 'documents.reviewer-dashboard', 'documents.reviewer-show', 'executive-pulse.*') ? 'active pc-trigger' : '' }}">
@@ -64,13 +64,11 @@
                         </a>
                         <ul class="pc-submenu">
 
-                            @can('view reports')
                                 <li class="{{ Request::routeIs('executive-pulse.*') ? 'active' : '' }}">
                                     <a href="{{ route('executive-pulse.index') }}" class="pc-link">
                                         <span class="pc-mtext">Executive Pulse</span>
-                                    </a>
-                                </li>
-                            @endcan
+                                </a>
+                            </li>
 
                             @if($canReviewSubmissions)
                                 <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">
