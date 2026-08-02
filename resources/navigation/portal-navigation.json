@@ -266,7 +266,7 @@
         {
             "id": "review_submissions",
             "label": "Review submissions",
-            "menu_path": "Sidebar > Review Activities > Submissions",
+            "menu_path": "Sidebar > Management > Submissions",
             "route": "documents.reviewer-dashboard",
             "permission": "approve documents",
             "description": "Review submitted weekly plans and weekly reports as an approver.",
@@ -281,7 +281,7 @@
         {
             "id": "weekly_budget_review",
             "label": "Weekly Budget review",
-            "menu_path": "Sidebar > Review Activities > Weekly Budget",
+            "menu_path": "Sidebar > Activities > Weekly Budget",
             "route": "documents.weekly-budget-review",
             "permission": "view weekly budgets",
             "description": "Review and process weekly budget entries for submitted plans.",
@@ -516,7 +516,7 @@
         {
             "id": "staff_appreciation",
             "label": "Staff Appreciation",
-            "menu_path": "Sidebar > Reports and Settings > Management > Staff Appreciation",
+            "menu_path": "Sidebar > Management > Staff Appreciation",
             "route": "management.appreciation.index",
             "permission": "view appreciation nominations",
             "description": "View staff appreciation nomination periods and results (management).",
@@ -529,7 +529,7 @@
         {
             "id": "work_periods",
             "label": "Work Periods",
-            "menu_path": "Sidebar > Reports and Settings > Management > Work Periods",
+            "menu_path": "Sidebar > Management > Work Periods",
             "route": "work-periods.index",
             "permission": "manage work periods",
             "description": "Create, close, and manage weekly work periods.",
@@ -543,7 +543,7 @@
         {
             "id": "executive_pulse",
             "label": "Executive Pulse",
-            "menu_path": "Sidebar > Reports and Settings > Executive Pulse",
+            "menu_path": "Sidebar > Management > Executive Pulse",
             "route": "executive-pulse.index",
             "permissions_any": [
                 "view reports",

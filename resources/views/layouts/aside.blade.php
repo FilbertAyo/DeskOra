@@ -15,7 +15,101 @@
                         <span class="pc-mtext">Dashboard</span>
                     </a>
                 </li>
-               
+
+                @php
+                    $canReviewSubmissions = Auth::user()->hasPermissionTo('approve documents');
+                    $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');
+                    $canSeeManagement = $canReviewSubmissions
+                        || Auth::user()->can('manage anonymous feedback')
+                        || Auth::user()->can('view appreciation nominations')
+                        || Auth::user()->can('manage work periods')
+                        || Auth::user()->can('view reports')
+                        || Auth::user()->can('view all documents');
+
+                    $reviewActivitiesSubmittedCount = 0;
+                    $reviewActivitiesPendingBudgetCount = 0;
+                    if ($canReviewSubmissions || $canWeeklyBudgetReview) {
+                        $currentPeriod = \App\Models\WorkPeriod::getCurrent();
+                        $nextPeriod = $currentPeriod?->getNextPeriod();
+
+                        if ($canReviewSubmissions) {
+                            if ($currentPeriod) {
+                                $reviewActivitiesSubmittedCount += \App\Models\WeeklyReport::query()
+                                    ->where('state', 'submitted')
+                                    ->where('period_id', (string) $currentPeriod->id)
+                                    ->count();
+                            }
+
+                            if ($nextPeriod) {
+                                $reviewActivitiesSubmittedCount += \App\Models\WeeklyPlan::query()
+                                    ->where('state', \App\Models\WeeklyPlan::STATE_SUBMITTED)
+                                    ->where('period_id', (string) $nextPeriod->id)
+                                    ->count();
+                            }
+                        }
+
+                        if ($canWeeklyBudgetReview) {
+                            $reviewActivitiesPendingBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
+                                null
+                            );
+                        }
+                    }
+                @endphp
+
+                @if($canSeeManagement)
+                    <li class="pc-item pc-hasmenu {{ Request::routeIs('management.*', 'anonymous-feedback.*', 'work-periods.*', 'documents.reviewer-dashboard', 'documents.reviewer-show', 'executive-pulse.*') ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-settings"></i></span>
+                            <span class="pc-mtext">Management</span>
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
+                        </a>
+                        <ul class="pc-submenu">
+                            @if($canReviewSubmissions)
+                                <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">
+                                    <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
+                                        <span class="pc-mtext">Submissions</span>
+                                        @if($reviewActivitiesSubmittedCount > 0)
+                                            <span class="badge bg-light-primary border border-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endif
+
+                            @canany(['view reports', 'view all documents'])
+                                <li class="{{ Request::routeIs('executive-pulse.*') ? 'active' : '' }}">
+                                    <a href="{{ route('executive-pulse.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Executive Pulse</span>
+                                    </a>
+                                </li>
+                            @endcanany
+
+                            @can('manage anonymous feedback')
+                                <li class="{{ Request::routeIs('anonymous-feedback.*') ? 'active' : '' }}">
+                                    <a href="{{ route('anonymous-feedback.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Anonymous Feedback</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('view appreciation nominations')
+                                <li class="{{ Request::routeIs('management.appreciation.*') ? 'active' : '' }}">
+                                    <a href="{{ route('management.appreciation.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Staff Appreciation</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('manage work periods')
+                                <li class="{{ Request::routeIs('work-periods.*') ? 'active' : '' }}">
+                                    <a href="{{ route('work-periods.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Work Periods</span>
+                                    </a>
+                                </li>
+                            @endcan
+                        </ul>
+                    </li>
+                @endif
+
                     <li class="pc-item {{ Request::routeIs('year-plan.*') ? 'active' : '' }}">
                         <a href="{{ route('year-plan.index') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-chart-line"></i></span>
@@ -36,7 +130,7 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'action-logs.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Activities</span>
@@ -73,6 +167,16 @@
                                 <span class="pc-mtext">Monthly Reports </span>
                             </a>
                         </li>
+                        @if($canWeeklyBudgetReview)
+                            <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
+                                <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
+                                    <span class="pc-mtext">Weekly Budget</span>
+                                    @if($reviewActivitiesPendingBudgetCount > 0)
+                                        <span class="badge bg-light-warning border border-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
+                                    @endif
+                                </a>
+                            </li>
+                        @endif
                     </ul>
                 </li>
 
@@ -92,68 +196,6 @@
                         <span class="pc-mtext">All Documents</span>
                     </a>
                 </li>
-
-                @php
-                    $canReviewSubmissions = Auth::user()->hasPermissionTo('approve documents');
-                    $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');
-                @endphp
-                @if($canReviewSubmissions || $canWeeklyBudgetReview)
-                    @php
-                        $currentPeriod = \App\Models\WorkPeriod::getCurrent();
-                        $nextPeriod = $currentPeriod?->getNextPeriod();
-                        $reviewActivitiesSubmittedCount = 0;
-                        if ($canReviewSubmissions) {
-                            if ($currentPeriod) {
-                                $reviewActivitiesSubmittedCount += \App\Models\WeeklyReport::query()
-                                    ->where('state', 'submitted')
-                                    ->where('period_id', (string) $currentPeriod->id)
-                                    ->count();
-                            }
-
-                            if ($nextPeriod) {
-                                $reviewActivitiesSubmittedCount += \App\Models\WeeklyPlan::query()
-                                    ->where('state', \App\Models\WeeklyPlan::STATE_SUBMITTED)
-                                    ->where('period_id', (string) $nextPeriod->id)
-                                    ->count();
-                            }
-                        }
-                        $reviewActivitiesPendingBudgetCount = 0;
-                        if ($canWeeklyBudgetReview) {
-                            $reviewActivitiesPendingBudgetCount = \App\Models\Document::countPendingWeeklyBudgetReviewForPeriod(
-                                null
-                            );
-                        }
-                    @endphp
-                    <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show', 'documents.weekly-budget-review') ? 'active pc-trigger' : '' }}">
-                        <a href="javascript:void(0);" class="pc-link">
-                            <span class="pc-micon"><i class="ti ti-eye-check"></i></span>
-                            <span class="pc-mtext">Review Activities</span>
-                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
-                        </a>
-                        <ul class="pc-submenu">
-                            @if($canReviewSubmissions)
-                                <li class="{{ Request::routeIs('documents.reviewer-dashboard', 'documents.reviewer-show') ? 'active' : '' }}">
-                                    <a href="{{ route('documents.reviewer-dashboard') }}" class="pc-link">
-                                        <span class="pc-mtext">Submissions</span>
-                                        @if($reviewActivitiesSubmittedCount > 0)
-                                            <span class="badge bg-light-primary border border-primary ms-2">{{ $reviewActivitiesSubmittedCount }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                            @endif
-                            @can('view weekly budgets')
-                                <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
-                                    <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
-                                        <span class="pc-mtext">Weekly Budget</span>
-                                        @if($reviewActivitiesPendingBudgetCount > 0)
-                                            <span class="badge bg-light-warning border border-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                            @endcan
-                        </ul>
-                    </li>
-                @endif
 
                 <!-- Finance & Accounting -->
                 <li class="pc-item pc-caption">
@@ -335,51 +377,6 @@
                     <i class="ti ti-settings"></i>
                 </li>
 
-                @canany(['manage anonymous feedback', 'view appreciation nominations', 'manage work periods'])
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('management.*', 'anonymous-feedback.*', 'work-periods.*') ? 'active pc-trigger' : '' }}">
-                    <a href="javascript:void(0);" class="pc-link">
-                        <span class="pc-micon"><i class="ti ti-settings"></i></span>
-                        <span class="pc-mtext">Management</span>
-                        <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
-                    </a>
-                    <ul class="pc-submenu">
-                        @can('manage anonymous feedback')
-                            <li class="{{ Request::routeIs('anonymous-feedback.*') ? 'active' : '' }}">
-                                <a href="{{ route('anonymous-feedback.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Anonymous Feedback</span>
-                                </a>
-                            </li>
-                        @endcan
-
-                        @can('view appreciation nominations')
-                            <li class="{{ Request::routeIs('management.appreciation.*') ? 'active' : '' }}">
-                                <a href="{{ route('management.appreciation.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Staff Appreciation</span>
-                                </a>
-                            </li>
-                        @endcan
-
-                        @can('manage work periods')
-                            <li class="{{ Request::routeIs('work-periods.*') ? 'active' : '' }}">
-                                <a href="{{ route('work-periods.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Work Periods</span>
-                                </a>
-                            </li>
-                        @endcan
-                    </ul>
-                </li>
-                @endcanany
-               
-
-               
-                    @canany(['view reports', 'view all documents'])
-                        <li class="pc-item {{ Request::routeIs('executive-pulse.*') ? 'active' : '' }}">
-                            <a href="{{ route('executive-pulse.index') }}" class="pc-link">
-                                <span class="pc-micon"><i class="ti ti-heartbeat"></i></span>
-                                <span class="pc-mtext">Executive Pulse</span>
-                            </a>
-                        </li>
-                    @endcanany
                     <li class="pc-item {{ Request::routeIs('reports') ? 'active' : '' }}">
                         <a href="{{ route('reports') }}" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-file-text"></i></span>
