@@ -23,7 +23,6 @@
                         || Auth::user()->can('manage anonymous feedback')
                         || Auth::user()->can('view appreciation nominations')
                         || Auth::user()->can('manage work periods')
-                        || Auth::user()->can('view reports');
 
                     $reviewActivitiesSubmittedCount = 0;
                     $reviewActivitiesPendingBudgetCount = 0;
@@ -386,55 +385,62 @@
                         </a>
                     </li>
              
-                    <li class="pc-item pc-hasmenu {{ $isSettingsMenuOpen ? 'active pc-trigger' : '' }}">
-                        <a href="javascript:void(0);" class="pc-link">
-                            <span class="pc-micon"><i class="ti ti-settings"></i></span>
-                            <span class="pc-mtext">Settings</span>
-                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
-                        </a>
-                        <ul class="pc-submenu">
-                            @can('users management settings')
-                            <li class="{{ Request::routeIs('admin.index') ? 'active' : '' }}">
-                                <a href="{{ route('admin.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Users</span>
-                                </a>
-                            </li>
-                            @endcan
-                           
-                            @can('manage roles and permissions')
-                            <li class="{{ Request::routeIs('roles.*') ? 'active' : '' }}">
-                                <a href="{{ route('roles.index') }}" class="pc-link">
-                                    <span class="pc-mtext">Roles</span>
-                                </a>
-                            </li>
-                            @endcan
+                    @canany([
+                        'users management settings',
+                        'manage roles and permissions',
+                        'manage departments',
+                        'manage system settings',
+                        'view activity log',
+                    ])
+                        <li class="pc-item pc-hasmenu {{ $isSettingsMenuOpen ? 'active pc-trigger' : '' }}">
+                            <a href="javascript:void(0);" class="pc-link">
+                                <span class="pc-micon"><i class="ti ti-settings"></i></span>
+                                <span class="pc-mtext">Settings</span>
+                                <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
+                            </a>
+                            <ul class="pc-submenu">
+                                @can('users management settings')
+                                    <li class="{{ Request::routeIs('admin.index') ? 'active' : '' }}">
+                                        <a href="{{ route('admin.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Users</span>
+                                        </a>
+                                    </li>
+                                @endcan
 
-                            @can('manage departments')
-                                <li class="{{ Request::routeIs('departments') ? 'active' : '' }}">
-                                    <a href="{{ route('departments') }}" class="pc-link">
-                                        <span class="pc-mtext">Departments</span>
-                                    </a>
-                                </li>
-                            @endcan
+                                @can('manage roles and permissions')
+                                    <li class="{{ Request::routeIs('roles.*') ? 'active' : '' }}">
+                                        <a href="{{ route('roles.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Roles</span>
+                                        </a>
+                                    </li>
+                                @endcan
 
-                            @can('manage system settings')
-                                <li class="{{ Request::routeIs('settings.system.*') ? 'active' : '' }}">
-                                    <a href="{{ route('settings.system.edit') }}" class="pc-link">
-                                        <span class="pc-mtext">System</span>
-                                    </a>
-                                </li>
-                            @endcan
-                           
-                         
-                            @can('view activity log')
-                                <li class="{{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
-                                    <a href="{{ route('activity-log.index') }}" class="pc-link">
-                                        <span class="pc-mtext">Activity log</span>
-                                    </a>
-                                </li>
-                            @endcan
-                        </ul>
-                    </li>
+                                @can('manage departments')
+                                    <li class="{{ Request::routeIs('departments') ? 'active' : '' }}">
+                                        <a href="{{ route('departments') }}" class="pc-link">
+                                            <span class="pc-mtext">Departments</span>
+                                        </a>
+                                    </li>
+                                @endcan
+
+                                @can('manage system settings')
+                                    <li class="{{ Request::routeIs('settings.system.*') ? 'active' : '' }}">
+                                        <a href="{{ route('settings.system.edit') }}" class="pc-link">
+                                            <span class="pc-mtext">System</span>
+                                        </a>
+                                    </li>
+                                @endcan
+
+                                @can('view activity log')
+                                    <li class="{{ Request::routeIs('activity-log.*') ? 'active' : '' }}">
+                                        <a href="{{ route('activity-log.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Activity log</span>
+                                        </a>
+                                    </li>
+                                @endcan
+                            </ul>
+                        </li>
+                    @endcanany
                
             </ul>
             <div class="px-3 py-3 border-top border-secondary border-opacity-10 mt-2">
