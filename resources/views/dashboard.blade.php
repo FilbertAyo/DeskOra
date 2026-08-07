@@ -94,5 +94,6 @@
         'teamUsers' => $teamUsers ?? collect(),
     ])
 
+    @include('dashboard.partials.work-log-modal')
     @include('dashboard.partials.matrix-modal')
 </x-app-layout>

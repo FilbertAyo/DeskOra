@@ -137,7 +137,7 @@ class WeeklyWorkLogController extends Controller
         }
 
         return redirect()
-            ->route('weekly-work-logs.index', ['period_id' => $period->id])
+            ->back()
             ->with('success', 'Work log saved for '.$logDate->format('D, M j').'.');
     }
 
@@ -158,7 +158,7 @@ class WeeklyWorkLogController extends Controller
         ]);
 
         return redirect()
-            ->route('weekly-work-logs.index', ['period_id' => $weeklyWorkLog->period_id])
+            ->back()
             ->with('success', 'Work log updated.');
     }
 

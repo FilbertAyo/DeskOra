@@ -1,6 +1,8 @@
 @php
     $todayWorkLog = $todayWorkLog ?? null;
     $reportReadyHint = (bool) ($reportReadyHint ?? false);
+    $currentPeriod = $currentPeriod ?? null;
+    $canLogToday = (bool) $currentPeriod;
 @endphp
 
 <div class="dash-panel">
@@ -8,7 +10,15 @@
         <h6 class="dash-panel__title">
             <i class="ti ti-notebook text-primary"></i>Today’s work log
         </h6>
-        <a href="{{ route('weekly-work-logs.index') }}" class="small" data-feature="feature.dashboard.work_log_open">Open log</a>
+        @if($canLogToday)
+            <button type="button"
+                class="btn btn-link btn-sm p-0 small text-decoration-none"
+                data-bs-toggle="modal"
+                data-bs-target="#dashboardWorkLogModal"
+                data-feature="feature.dashboard.work_log_open">
+                {{ $todayWorkLog ? 'Edit' : 'Add' }}
+            </button>
+        @endif
     </div>
     <div class="dash-panel__body">
         @if($todayWorkLog)
@@ -19,11 +29,24 @@
                     <i class="ti ti-alert-triangle me-1"></i>{{ \Illuminate\Support\Str::limit($todayWorkLog->blocker, 120) }}
                 </p>
             @endif
-        @else
+            <button type="button"
+                class="btn btn-sm btn-outline-primary mt-3"
+                data-bs-toggle="modal"
+                data-bs-target="#dashboardWorkLogModal"
+                data-feature="feature.dashboard.work_log_open">
+                <i class="ti ti-edit me-1"></i>Edit today
+            </button>
+        @elseif($canLogToday)
             <p class="mb-3 text-muted">Capture what you did today — it helps fill your weekly report later.</p>
-            <a href="{{ route('weekly-work-logs.index') }}" class="btn btn-sm btn-primary" data-feature="feature.dashboard.work_log_open">
-                <i class="ti ti-plus me-1"></i>Log today
-            </a>
+            <button type="button"
+                class="btn btn-sm btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#dashboardWorkLogModal"
+                data-feature="feature.dashboard.work_log_open">
+                <i class="ti ti-plus me-1"></i>Add work log
+            </button>
+        @else
+            <p class="mb-0 text-muted">No work period is available yet.</p>
         @endif
 
         @if($reportReadyHint)
