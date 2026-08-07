@@ -50,15 +50,14 @@
                 <div class="dashboard-slot dashboard-slot--stats">
                     @include('dashboard.partials.stats')
                 </div>
-
+                <div class="dashboard-slot dashboard-slot--work-log">
+                    @include('dashboard.partials.work-log')
+                </div>
                 <div class="dashboard-slot dashboard-slot--performance">
                     @include('dashboard.partials.performance-chart')
                 </div>
 
-                <div class="dashboard-slot dashboard-slot--work-log">
-                    @include('dashboard.partials.work-log')
-                </div>
-
+            
                 @if($hasSubmissionAlerts)
                     <div class="dashboard-slot dashboard-slot--alerts">
                         <div class="dashboard-alerts">
