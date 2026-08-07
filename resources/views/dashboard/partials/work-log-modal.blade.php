@@ -6,7 +6,7 @@
 
 @if($currentPeriod)
     <div class="modal fade" id="dashboardWorkLogModal" tabindex="-1" aria-labelledby="dashboardWorkLogModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST"
                     action="{{ $todayWorkLog ? route('weekly-work-logs.update', $todayWorkLog) : route('weekly-work-logs.store') }}"
