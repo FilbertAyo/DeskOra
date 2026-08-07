@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\YearPlanExport;
 use App\Models\Department;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class YearPlanController extends Controller
 {
@@ -45,36 +52,7 @@ class YearPlanController extends Controller
 
     public function show(YearPlan $year)
     {
-        $activities = $year->activities()
-            ->with(['department.parent'])
-            ->get();
-
-        $groupedByDept = $activities->groupBy('department_id');
-
-        $sortedDepartments = Department::query()
-            ->whereIn('id', $groupedByDept->keys())
-            ->with('parent')
-            ->get()
-            ->sortBy(function (Department $d) {
-                return [
-                    sprintf('%05d', $d->plan_section_number ?? 99999),
-                    $d->name,
-                ];
-            })
-            ->values();
-
-        $sections = $sortedDepartments->map(function (Department $dept) use ($groupedByDept) {
-            $rows = $groupedByDept->get($dept->id, collect())->sortBy('sort_order')->values();
-            $subtotal = $rows->sum(fn (YearPlanActivity $a) => (float) (string) $a->total_cost_tzs);
-
-            return [
-                'department' => $dept,
-                'activities' => $rows,
-                'subtotal' => $subtotal,
-            ];
-        });
-
-        $grandTotal = $activities->sum(fn (YearPlanActivity $a) => (float) (string) $a->total_cost_tzs);
+        $built = $this->buildSections($year);
 
         $subDepartments = Department::query()
             ->whereNotNull('parent_id')
@@ -85,10 +63,48 @@ class YearPlanController extends Controller
 
         return view('year-plan.show', [
             'yearPlan' => $year,
-            'sections' => $sections,
-            'grandTotal' => $grandTotal,
+            'sections' => $built['sections'],
+            'grandTotal' => $built['grandTotal'],
             'subDepartments' => $subDepartments,
         ]);
+    }
+
+    public function download(Request $request, YearPlan $year): Response|BinaryFileResponse
+    {
+        $built = $this->buildSections($year);
+
+        return $this->downloadExport(
+            $request,
+            $year,
+            $built['sections'],
+            $built['grandTotal'],
+            "year_plan_{$year->year}",
+            null,
+        );
+    }
+
+    public function downloadDepartment(Request $request, YearPlan $year, Department $department): Response|BinaryFileResponse
+    {
+        abort_unless($department->parent_id !== null, 404);
+
+        $built = $this->buildSections($year, $department);
+
+        abort_if($built['sections']->isEmpty(), 404, 'No activities for this sub-department in the year plan.');
+
+        $deptLabel = $department->parent
+            ? $department->parent->name.' — '.$department->name
+            : $department->name;
+
+        $slug = Str::slug($department->name, '_');
+
+        return $this->downloadExport(
+            $request,
+            $year,
+            $built['sections'],
+            $built['grandTotal'],
+            "year_plan_{$year->year}_{$slug}",
+            $deptLabel,
+        );
     }
 
     public function storeActivity(Request $request, YearPlan $year)
@@ -146,6 +162,87 @@ class YearPlanController extends Controller
         return redirect()
             ->route('year-plan.show', $year)
             ->with('success', 'Activity removed.');
+    }
+
+    /**
+     * @return array{sections: Collection, grandTotal: float}
+     */
+    private function buildSections(YearPlan $year, ?Department $onlyDepartment = null): array
+    {
+        $query = $year->activities()->with(['department.parent']);
+
+        if ($onlyDepartment !== null) {
+            $query->where('department_id', $onlyDepartment->id);
+        }
+
+        $activities = $query->get();
+        $groupedByDept = $activities->groupBy('department_id');
+
+        $sortedDepartments = Department::query()
+            ->whereIn('id', $groupedByDept->keys())
+            ->with('parent')
+            ->get()
+            ->sortBy(function (Department $d) {
+                return [
+                    sprintf('%05d', $d->plan_section_number ?? 99999),
+                    $d->name,
+                ];
+            })
+            ->values();
+
+        $sections = $sortedDepartments->map(function (Department $dept) use ($groupedByDept) {
+            $rows = $groupedByDept->get($dept->id, collect())->sortBy('sort_order')->values();
+            $subtotal = $rows->sum(fn (YearPlanActivity $a) => (float) (string) $a->total_cost_tzs);
+
+            return [
+                'department' => $dept,
+                'activities' => $rows,
+                'subtotal' => $subtotal,
+            ];
+        });
+
+        $grandTotal = $activities->sum(fn (YearPlanActivity $a) => (float) (string) $a->total_cost_tzs);
+
+        return [
+            'sections' => $sections,
+            'grandTotal' => $grandTotal,
+        ];
+    }
+
+    private function downloadExport(
+        Request $request,
+        YearPlan $year,
+        Collection $sections,
+        float $grandTotal,
+        string $filenameBase,
+        ?string $departmentTitle,
+    ): Response|BinaryFileResponse {
+        $format = $request->get('format', 'pdf');
+
+        if ($format === 'excel') {
+            $rawTitle = $departmentTitle
+                ? 'YP '.$year->year.' '.$departmentTitle
+                : 'Year Plan '.$year->year;
+            $sheetTitle = Str::limit(preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/', '-', $rawTitle) ?? $rawTitle, 31, '');
+
+            return Excel::download(
+                new YearPlanExport($sections, (int) $year->year, $grandTotal, $sheetTitle),
+                $filenameBase.'.xlsx'
+            );
+        }
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('year-plan.pdf', [
+                'yearPlan' => $year,
+                'sections' => $sections,
+                'grandTotal' => $grandTotal,
+                'departmentTitle' => $departmentTitle,
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download($filenameBase.'.pdf');
+        }
+
+        return back()->with('error', 'Invalid format requested.');
     }
 
     private function validateActivityPayload(Request $request, ?YearPlan $yearPlan = null, ?YearPlanActivity $existing = null): array

@@ -14,10 +14,20 @@
                     <span class="badge bg-light-warning border border-warning text-dark mt-1">Section number not set — codes show as —.n</span>
                 @endif
             </div>
-            <button type="button" class="btn btn-sm btn-outline-primary btn-add-activity" data-bs-toggle="modal"
-                data-bs-target="#activityModal" data-department-id="{{ $dept->id }}">
-                <i class="ti ti-plus me-1"></i> Add Activity to {{ $dept->name }}
-            </button>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ route('year-plan.department.download', [$yearPlan->year, $dept, 'format' => 'pdf']) }}"
+                    class="btn btn-sm btn-outline-danger" title="Download this sub-department as PDF">
+                    <i class="ti ti-file-type-pdf me-1"></i> PDF
+                </a>
+                <a href="{{ route('year-plan.department.download', [$yearPlan->year, $dept, 'format' => 'excel']) }}"
+                    class="btn btn-sm btn-outline-danger" title="Download this sub-department as Excel">
+                    <i class="ti ti-file-spreadsheet me-1"></i> Excel
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-primary btn-add-activity" data-bs-toggle="modal"
+                    data-bs-target="#activityModal" data-department-id="{{ $dept->id }}">
+                    <i class="ti ti-plus me-1"></i> Add Activity to {{ $dept->name }}
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">

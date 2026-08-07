@@ -16,18 +16,14 @@
                             id="btnAddActivityTop">
                             <i class="ti ti-circle-plus me-1"></i> Add activity
                         </button>
-                        @can('create', \App\Models\Document::class)
-                            @if(\App\Models\Document::canUserCreateType(auth()->user(), 'monthly_report'))
-                                @php
-                                    $ypY = (int) $yearPlan->year;
-                                    $cy = (int) now()->year;
-                                    $defaultMrMonth = $ypY === $cy
-                                        ? ((int) now()->month === 1 ? 12 : (int) now()->month - 1)
-                                        : ($ypY < $cy ? 12 : 1);
-                                @endphp
-                               
-                            @endif
-                        @endcan
+                        <a href="{{ route('year-plan.download', [$yearPlan->year, 'format' => 'pdf']) }}"
+                            class="btn btn-sm btn-outline-danger">
+                            <i class="ti ti-file-type-pdf me-1"></i> Download PDF
+                        </a>
+                        <a href="{{ route('year-plan.download', [$yearPlan->year, 'format' => 'excel']) }}"
+                            class="btn btn-sm btn-outline-danger">
+                            <i class="ti ti-file-spreadsheet me-1"></i> Download Excel
+                        </a>
                         <a href="{{ route('year-plan.index') }}" class="btn btn-light btn-sm">
                             <i class="ti ti-arrow-left me-1"></i> All years
                         </a>

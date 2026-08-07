@@ -207,6 +207,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [YearPlanController::class, 'index'])->name('index');
         Route::post('/', [YearPlanController::class, 'store'])->name('store');
         Route::get('/{year}', [YearPlanController::class, 'show'])->name('show');
+        Route::get('/{year}/download', [YearPlanController::class, 'download'])->name('download');
+        Route::get('/{year}/departments/{department}/download', [YearPlanController::class, 'downloadDepartment'])->name('department.download');
         Route::post('/{year}/activities', [YearPlanController::class, 'storeActivity'])->name('activities.store');
         Route::put('/{year}/activities/{activity}', [YearPlanController::class, 'updateActivity'])->name('activities.update');
         Route::delete('/{year}/activities/{activity}', [YearPlanController::class, 'destroyActivity'])->name('activities.destroy');
