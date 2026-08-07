@@ -1,6 +1,6 @@
 # Queue operations (cPanel / production)
 
-WorkHub uses `QUEUE_CONNECTION=database`. Mailables implement `ShouldQueue`.
+DeskOra uses `QUEUE_CONNECTION=database`. Mailables implement `ShouldQueue`.
 
 ## How jobs are processed
 

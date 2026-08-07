@@ -28,11 +28,12 @@ Schedule::command('work-periods:send-reminders')
     ->timezone($appTimezone)
     ->description('Dispatch configured weekly plan/report reminders');
 
-// Morning personal digest (work log, actions, approvals, budgets).
-Schedule::command('workhub:send-daily-digests')
-    ->dailyAt('07:30')
+// Personal digest (work log, actions, approvals, budgets) — Mon & Sat mornings.
+Schedule::command('deskora:send-digests')
+    ->days([1, 6])
+    ->at('08:00')
     ->timezone($appTimezone)
-    ->description('Send rule-based daily digests to active users');
+    ->description('Send rule-based digests to active users (Monday & Saturday)');
 
 // Drain the database queue without a long-running worker (cPanel-friendly).
 // Safe with existing schedule:run cron; does not require Supervisor.

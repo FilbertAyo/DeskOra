@@ -7,14 +7,14 @@ use Illuminate\Console\Command;
 
 class SendDailyDigests extends Command
 {
-    protected $signature = 'workhub:send-daily-digests';
+    protected $signature = 'deskora:send-digests';
 
-    protected $description = 'Send rule-based daily digests to active users';
+    protected $description = 'Send rule-based digests to active users (scheduled Mon & Sat)';
 
     public function handle(DailyDigestService $dailyDigestService): int
     {
         $sent = $dailyDigestService->sendToAllActiveUsers();
-        $this->info("Daily digests processed for {$sent} active users.");
+        $this->info("Digests processed for {$sent} active users.");
 
         return self::SUCCESS;
     }

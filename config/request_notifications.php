@@ -78,7 +78,7 @@ return [
                 'label' => 'View Requisition',
             ],
             'view' => 'mail.requisitions.rejected',
-            'sms' => 'Your staff requisition :ref was rejected. Check WorkHub for feedback.',
+            'sms' => 'Your staff requisition :ref was rejected. Check DeskOra for feedback.',
         ],
         'resubmission_requested' => [
             'subject' => 'Staff Requisition requires updates',

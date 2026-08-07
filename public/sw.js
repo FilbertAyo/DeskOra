@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workhub-shell-v1';
+const CACHE_NAME = 'deskora-shell-v1';
 const SHELL_URLS = [
   '/dashboard',
   '/weekly-work-logs',

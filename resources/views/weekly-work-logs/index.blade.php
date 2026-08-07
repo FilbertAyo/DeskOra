@@ -258,12 +258,12 @@
                 // Offline-friendly: if submit fails while offline, queue the draft locally.
                 document.querySelectorAll('form[action*="weekly-work-logs"]').forEach((form) => {
                     form.addEventListener('submit', function (event) {
-                        if (navigator.onLine || !window.WorkHubOfflineLogs) {
+                        if (navigator.onLine || !window.DeskOraOfflineLogs) {
                             return;
                         }
                         event.preventDefault();
                         const data = Object.fromEntries(new FormData(form).entries());
-                        window.WorkHubOfflineLogs.saveDraft(data);
+                        window.DeskOraOfflineLogs.saveDraft(data);
                         alert('You are offline. This work log was saved on this device and will sync when you are back online.');
                     });
                 });

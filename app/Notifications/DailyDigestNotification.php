@@ -31,9 +31,9 @@ class DailyDigestNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $message = (new MailMessage)
-            ->subject('DeskOra daily digest')
+            ->subject('DeskOra digest')
             ->greeting('Hello '.($notifiable->name ?? '').',')
-            ->line('Here is what needs your attention today:');
+            ->line('Here is what needs your attention:');
 
         foreach (($this->payload['lines'] ?? []) as $line) {
             $message->line('• '.$line);
@@ -52,11 +52,11 @@ class DailyDigestNotification extends Notification
         $lines = $this->payload['lines'] ?? [];
 
         return [
-            'title' => 'Daily digest',
+            'title' => 'DeskOra digest',
             'message' => implode(' ', $lines),
             'lines' => $lines,
             'url' => $this->payload['dashboard_url'] ?? route('dashboard'),
-            'type' => 'daily_digest',
+            'type' => 'digest',
         ];
     }
 }

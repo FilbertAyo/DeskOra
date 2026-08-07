@@ -2,7 +2,7 @@
     <div class="card shadow border-0">
         <div class="card-body d-flex align-items-center gap-3 py-3">
             <div class="flex-grow-1">
-                <strong class="d-block">Install WorkHub</strong>
+                <strong class="d-block">Install DeskOra</strong>
                 <span class="small text-muted">Add to your home screen for faster work logs.</span>
             </div>
             <button type="button" class="btn btn-sm btn-primary" id="pwaInstallBtn">Install</button>
@@ -13,7 +13,10 @@
 
 <script>
 (() => {
-    const DISMISS_KEY = 'workhub_pwa_install_dismissed';
+    const DISMISS_KEY = 'deskora_pwa_install_dismissed';
+    const LEGACY_DISMISS_KEY = 'workhub_pwa_install_dismissed';
+    const OFFLINE_KEY = 'deskora_offline_work_logs';
+    const LEGACY_OFFLINE_KEY = 'workhub_offline_work_logs';
     const banner = document.getElementById('pwaInstallBanner');
     const installBtn = document.getElementById('pwaInstallBtn');
     const dismissBtn = document.getElementById('pwaInstallDismiss');
@@ -25,8 +28,27 @@
         });
     }
 
-    window.WorkHubOfflineLogs = {
-        key: 'workhub_offline_work_logs',
+    // Migrate legacy offline drafts once.
+    (function migrateLegacyOfflineDrafts() {
+        try {
+            const legacy = localStorage.getItem(LEGACY_OFFLINE_KEY);
+            if (!legacy) return;
+            const existing = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]');
+            const legacyItems = JSON.parse(legacy || '[]');
+            if (Array.isArray(legacyItems) && legacyItems.length) {
+                localStorage.setItem(OFFLINE_KEY, JSON.stringify([...existing, ...legacyItems]));
+            }
+            localStorage.removeItem(LEGACY_OFFLINE_KEY);
+        } catch (e) {}
+    })();
+
+    if (localStorage.getItem(LEGACY_DISMISS_KEY) === '1' && localStorage.getItem(DISMISS_KEY) !== '1') {
+        localStorage.setItem(DISMISS_KEY, '1');
+        localStorage.removeItem(LEGACY_DISMISS_KEY);
+    }
+
+    window.DeskOraOfflineLogs = {
+        key: OFFLINE_KEY,
         saveDraft(payload) {
             const items = JSON.parse(localStorage.getItem(this.key) || '[]');
             items.push({ ...payload, saved_at: Date.now() });
@@ -74,9 +96,9 @@
     };
 
     window.addEventListener('online', () => {
-        window.WorkHubOfflineLogs.flush();
+        window.DeskOraOfflineLogs.flush();
     });
-    window.WorkHubOfflineLogs.flush();
+    window.DeskOraOfflineLogs.flush();
 
     window.addEventListener('beforeinstallprompt', (event) => {
         event.preventDefault();

@@ -138,7 +138,7 @@
                 <table role="presentation" class="container" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background-color:#ffffff;border:1px solid #e4e4e7;">
                     <tr>
                         <td class="pad" style="padding: 28px 32px 20px; border-bottom: 1px solid #f4f4f5;">
-                            <p class="brand" style="margin:0;">{{ config('app.name', 'WorkHub') }}</p>
+                            <p class="brand" style="margin:0;">{{ config('app.name', 'DeskOra') }}</p>
                         </td>
                     </tr>
                     <tr>

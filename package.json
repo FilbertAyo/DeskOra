@@ -1,4 +1,5 @@
 {
+    "name": "deskora",
     "private": true,
     "type": "module",
     "scripts": {

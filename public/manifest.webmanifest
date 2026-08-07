@@ -1,6 +1,6 @@
 {
-  "name": "DeskOra WorkHub",
-  "short_name": "WorkHub",
+  "name": "DeskOra",
+  "short_name": "DeskOra",
   "description": "Weekly plans, reports, work logs, and approvals.",
   "start_url": "/dashboard",
   "scope": "/",

@@ -24,7 +24,7 @@
 <!-- [Template CSS Files] -->
 <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}" id="main-style-link" >
 <link rel="stylesheet" href="{{ asset('assets/css/style-preset.css') }}" >
-<link rel="stylesheet" href="{{ asset('assets/css/workhub-document-thead.css') }}" >
+<link rel="stylesheet" href="{{ asset('assets/css/deskora-document-thead.css') }}" >
 
    
 </head>
