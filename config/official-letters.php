@@ -63,7 +63,7 @@ return [
         'Dear Sir,',
         'Dear Madam,',
         'Dear Sirs,',
-        'Dear All Staffs,',
+        'Dear Team,',
         'To Whom It May Concern,',
     ],
 
