@@ -208,12 +208,13 @@
             right: 0;
             bottom: 0;
             width: 100%;
-            height: 58px;
-            background-color: #0a2744;
+            height: 60px;
+            background-color: #072649;
             color: #ffffff;
         }
 
         .footer-inner {
+            margin-left: 18px;
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
@@ -226,7 +227,7 @@
             vertical-align: middle;
             text-align: center;
             padding: 0 12px;
-            font-size: 8.5pt;
+            font-size: 10pt;
             white-space: nowrap;
         }
 
