@@ -114,6 +114,8 @@ return [
                     ['label' => 'Meeting / Engagement', 'required_on_submit' => false],
                     ['label' => 'Participant(s)', 'required_on_submit' => false],
                     ['label' => 'Status', 'required_on_submit' => false, 'options' => ['Done', 'Not done']],
+                    ['label' => 'Location', 'required_on_submit' => false, 'options' => ['Office', 'Field', 'Virtual', 'On site']],
+                    ['label' => 'Notes', 'required_on_submit' => false],
                 ],
                 'notes' => 'Some meetings assigned from other plans may be view-only.',
             ],

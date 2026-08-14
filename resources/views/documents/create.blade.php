@@ -674,8 +674,6 @@
                             <input type="hidden" name="content[key_meetings][${idx}][source_plan_id]" value="${escapeHtml(sourcePlanId)}">
                             <input type="hidden" name="content[key_meetings][${idx}][source_owner_user_id]" value="${escapeHtml(sourceOwnerUserId)}">
                             <input type="hidden" name="content[key_meetings][${idx}][is_readonly_for_current_user]" value="${isReadonly ? '1' : '0'}">
-                            <input type="hidden" name="content[key_meetings][${idx}][location]" value="${escapeHtml(row.location || '')}">
-                            <input type="hidden" name="content[key_meetings][${idx}][reactions_notes]" value="${escapeHtml(row.reactions_notes || '')}">
                             ${isReadonly ? `<input type="hidden" name="content[key_meetings][${idx}][date]" value="${escapeHtml(row.date || '')}">` : ''}
                             <input type="date" class="form-control" ${isReadonly ? '' : `name="content[key_meetings][${idx}][date]"`} value="${escapeHtml(row.date || '')}" ${isReadonly ? 'disabled' : ''}>
                         </td>
@@ -693,6 +691,20 @@
                                 <option value="Done" ${(row.status || '') === 'Done' ? 'selected' : ''}>Done</option>
                                 <option value="Not done" ${(row.status || '') === 'Not done' ? 'selected' : ''}>Not done</option>
                             </select>
+                        </td>
+                        <td>
+                            ${isReadonly ? `<input type="hidden" name="content[key_meetings][${idx}][location]" value="${escapeHtml(row.location || '')}">` : ''}
+                            <select class="form-select" ${isReadonly ? '' : `name="content[key_meetings][${idx}][location]"`} ${isReadonly ? 'disabled' : ''}>
+                                <option value="" ${(row.location || '') === '' ? 'selected' : ''}>-- Select --</option>
+                                <option value="Office" ${(row.location || '') === 'Office' ? 'selected' : ''}>Office</option>
+                                <option value="Field" ${(row.location || '') === 'Field' ? 'selected' : ''}>Field</option>
+                                <option value="Virtual" ${(row.location || '') === 'Virtual' ? 'selected' : ''}>Virtual</option>
+                                <option value="On site" ${(row.location || '') === 'On site' ? 'selected' : ''}>On site</option>
+                            </select>
+                        </td>
+                        <td>
+                            ${isReadonly ? `<input type="hidden" name="content[key_meetings][${idx}][reactions_notes]" value="${escapeHtml(row.reactions_notes || '')}">` : ''}
+                            <textarea class="form-control" rows="4" ${isReadonly ? '' : `name="content[key_meetings][${idx}][reactions_notes]"`} placeholder="Notes" ${isReadonly ? 'disabled' : ''}>${escapeHtml(row.reactions_notes || '')}</textarea>
                         </td>
                         <td class="text-center align-middle">
                             ${isReadonly ? '' : '<button type="button" class="btn btn-sm btn-outline-danger remove-report-meeting-row">&times;</button>'}

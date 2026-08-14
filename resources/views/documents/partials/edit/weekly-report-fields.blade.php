@@ -216,7 +216,9 @@
                                                             <th style="width: 160px;">Date</th>
                                                             <th>Meeting / Engagement</th>
                                                             <th style="width: 160px;">Participant(s)</th>
-                                                            <th style="width: 170px;">Status</th>
+                                                            <th style="width: 140px;">Status</th>
+                                                            <th style="width: 140px;">Location</th>
+                                                            <th>Notes</th>
                                                             <th style="width: 50px;"></th>
                                                         </tr>
                                                     </thead>
@@ -243,8 +245,6 @@
                                                                     <input type="hidden" name="content[key_meetings][{{ $i }}][source_plan_id]" value="{{ $sourcePlanId }}">
                                                                     <input type="hidden" name="content[key_meetings][{{ $i }}][source_owner_user_id]" value="{{ $sourceOwnerUserId }}">
                                                                     <input type="hidden" name="content[key_meetings][{{ $i }}][is_readonly_for_current_user]" value="{{ $isReadonlyMeeting ? '1' : '0' }}">
-                                                                    <input type="hidden" name="content[key_meetings][{{ $i }}][location]" value="{{ old("content.key_meetings.$i.location", $meetingRow['location'] ?? '') }}">
-                                                                    <input type="hidden" name="content[key_meetings][{{ $i }}][reactions_notes]" value="{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}">
                                                                     @if($isReadonlyMeeting)
                                                                         <input type="hidden" name="content[key_meetings][{{ $i }}][date]" value="{{ old("content.key_meetings.$i.date", $meetingRow['date'] ?? '') }}">
                                                                     @endif
@@ -295,6 +295,27 @@
                                                                         <option value="Done" {{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') === 'Done' ? 'selected' : '' }}>Done</option>
                                                                         <option value="Not done" {{ old("content.key_meetings.$i.status", $meetingRow['status'] ?? '') === 'Not done' ? 'selected' : '' }}>Not done</option>
                                                                     </select>
+                                                                </td>
+                                                                <td>
+                                                                    @php $selectedLocation = old("content.key_meetings.$i.location", $meetingRow['location'] ?? ''); @endphp
+                                                                    @if($isReadonlyMeeting)
+                                                                        <input type="hidden" name="content[key_meetings][{{ $i }}][location]" value="{{ $selectedLocation }}">
+                                                                    @endif
+                                                                    <select class="form-select" @unless($isReadonlyMeeting) name="content[key_meetings][{{ $i }}][location]" @endunless @if($isReadonlyMeeting) disabled @endif>
+                                                                        <option value="">-- Select --</option>
+                                                                        @foreach(['Office', 'Field', 'Virtual', 'On site'] as $loc)
+                                                                            <option value="{{ $loc }}" {{ $selectedLocation === $loc ? 'selected' : '' }}>{{ $loc }}</option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                </td>
+                                                                <td>
+                                                                    @if($isReadonlyMeeting)
+                                                                        <input type="hidden" name="content[key_meetings][{{ $i }}][reactions_notes]" value="{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}">
+                                                                    @endif
+                                                                    <textarea class="form-control" rows="4"
+                                                                        @unless($isReadonlyMeeting) name="content[key_meetings][{{ $i }}][reactions_notes]" @endunless
+                                                                        placeholder="Notes"
+                                                                        @if($isReadonlyMeeting) disabled @endif>{{ old("content.key_meetings.$i.reactions_notes", $meetingRow['reactions_notes'] ?? '') }}</textarea>
                                                                 </td>
                                                                 <td class="text-center align-middle">
                                                                     @if(!$isReadonlyMeeting)
