@@ -54,7 +54,9 @@
                     </div>
                 </div>
 
-                @if ($showStaffNominationModal ?? false)
+                @if ($showApprovalGateModal ?? false)
+                    @include('approvals.gate-modal')
+                @elseif ($showStaffNominationModal ?? false)
                     @include('appreciation.nomination-modal')
                 @endif
             @else

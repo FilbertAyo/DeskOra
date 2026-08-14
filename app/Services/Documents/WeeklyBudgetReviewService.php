@@ -4,8 +4,11 @@ namespace App\Services\Documents;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WorkPeriod;
 use App\Services\WorkPeriodService;
+use App\Support\WeeklyBudgetApprovalFlow;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -99,9 +102,133 @@ class WeeklyBudgetReviewService
         return $counts;
     }
 
+    public function actionableItemCountFor(User $user): int
+    {
+        return array_sum($this->actionableStageCountsFor($user));
+    }
+
+    /**
+     * Pending budget line items this user can act on, oldest week first.
+     *
+     * @return Collection<int, WeeklyPlanBudgetItem>
+     */
+    public function actionableItemsFor(User $user, int $limit = 25): Collection
+    {
+        if (! Schema::hasTable('weekly_plan_budget_items') || ! Schema::hasTable('weekly_plans')) {
+            return collect();
+        }
+
+        return $this->actionableItemsQuery($user)
+            ->with(['weeklyPlan.period', 'weeklyPlan.user.department', 'review'])
+            ->limit(max(1, $limit))
+            ->get();
+    }
+
+    public function actionableItemsQuery(User $user): Builder
+    {
+        $query = WeeklyPlanBudgetItem::query()
+            ->select('weekly_plan_budget_items.*')
+            ->join('weekly_plans', 'weekly_plan_budget_items.weekly_plan_id', '=', 'weekly_plans.id')
+            ->join('work_periods', 'weekly_plans.period_id', '=', 'work_periods.id')
+            ->whereNull('weekly_plans.deleted_at')
+            ->where('weekly_plans.state', Document::STATE_SUBMITTED)
+            ->where(function (Builder $stageQuery) use ($user) {
+                $hasClause = false;
+
+                if ($user->can('review weekly budgets')) {
+                    $hasClause = true;
+                    $stageQuery->where(function (Builder $reviewQuery) {
+                        $reviewQuery
+                            ->whereDoesntHave('review')
+                            ->orWhereHas('review', function (Builder $review) {
+                                $review
+                                    ->where('approval_stage', Document::BUDGET_REVIEW_STAGE_PENDING)
+                                    ->where(function (Builder $decision) {
+                                        $decision
+                                            ->whereNull('decision')
+                                            ->orWhere('decision', '!=', Document::BUDGET_REVIEW_REJECTED);
+                                    });
+                            });
+                    });
+                }
+
+                if ($user->can('approve weekly budgets')) {
+                    $method = $hasClause ? 'orWhereHas' : 'whereHas';
+                    $hasClause = true;
+                    $stageQuery->{$method}('review', function (Builder $review) {
+                        $review
+                            ->where('approval_stage', Document::BUDGET_REVIEW_STAGE_REVIEWED)
+                            ->where('decision', '!=', Document::BUDGET_REVIEW_REJECTED);
+                    });
+                }
+
+                if ($user->can('authorize weekly budgets')) {
+                    $method = $hasClause ? 'orWhereHas' : 'whereHas';
+                    $hasClause = true;
+                    $stageQuery->{$method}('review', function (Builder $review) {
+                        $review
+                            ->where('approval_stage', Document::BUDGET_REVIEW_STAGE_APPROVED)
+                            ->where('decision', '!=', Document::BUDGET_REVIEW_REJECTED);
+                    });
+                }
+
+                if (! $hasClause) {
+                    $stageQuery->whereRaw('1 = 0');
+                }
+            })
+            ->orderBy('work_periods.year')
+            ->orderBy('work_periods.week_number')
+            ->orderBy('weekly_plan_budget_items.sort_order')
+            ->orderBy('weekly_plan_budget_items.id');
+
+        return $query;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function presentActionableItem(WeeklyPlanBudgetItem $item, User $user): array
+    {
+        $plan = $item->weeklyPlan;
+        $period = $plan?->period;
+        $review = $item->review;
+        $approvalStage = $review?->approval_stage ?? Document::BUDGET_REVIEW_STAGE_PENDING;
+        $decision = $review?->decision ?? Document::BUDGET_REVIEW_PENDING;
+        $amountNumeric = (float) ($item->amount_numeric ?? 0);
+
+        $payload = [
+            'id' => (string) $item->id,
+            'document_id' => (string) $item->weekly_plan_id,
+            'budget_uid' => (string) $item->budget_uid,
+            'item' => (string) $item->item,
+            'description_purpose' => (string) ($item->description_purpose ?? ''),
+            'amount' => number_format($amountNumeric, 2),
+            'amount_numeric' => $amountNumeric,
+            'decision' => $decision,
+            'approval_stage' => $approvalStage,
+            'provided_amount' => $review?->provided_amount,
+            'review_provided_amount' => $review?->review_provided_amount,
+            'approve_provided_amount' => $review?->approve_provided_amount,
+            'owner_name' => $plan?->user?->name,
+            'department_name' => $plan?->user?->department?->name,
+            'period_label' => $period
+                ? sprintf('Week %s · %s', $period->week_number, $period->year)
+                : 'Unknown week',
+            'process_url' => route('documents.process-weekly-budget-review', $item->weekly_plan_id),
+        ];
+
+        return array_merge($payload, WeeklyBudgetApprovalFlow::itemViewContext($payload, $user));
+    }
+
+    public function isAllPendingWeeksView(Request $request): bool
+    {
+        return $request->input('status') === Document::BUDGET_REVIEW_PENDING
+            && ! $request->filled('period_id');
+    }
+
     public function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
     {
-        if ($request->filled('period_id')) {
+        if ($request->has('period_id') || $this->isAllPendingWeeksView($request)) {
             return null;
         }
 
@@ -135,6 +262,14 @@ class WeeklyBudgetReviewService
             $query->forPeriod($request->string('period_id')->toString());
         } elseif ($defaultPeriod) {
             $query->forPeriod($defaultPeriod->id);
+        }
+
+        if ($this->isAllPendingWeeksView($request) || ($request->has('period_id') && ! $request->filled('period_id'))) {
+            $query->join('work_periods', 'documents.period_id', '=', 'work_periods.id')
+                ->orderBy('work_periods.year')
+                ->orderBy('work_periods.week_number')
+                ->orderBy('documents.created_at')
+                ->select('documents.*');
         }
 
         if ($request->filled('year')) {
@@ -171,8 +306,8 @@ class WeeklyBudgetReviewService
             ? (string) $request->string('period_id')
             : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
 
-        $periodLabel = 'Selected Week';
-        $periodDateRange = 'Selected Work Period';
+        $periodLabel = $resolvedPeriodId ? 'Selected Week' : 'All Weeks';
+        $periodDateRange = $resolvedPeriodId ? 'Selected Work Period' : 'All work periods';
         if ($resolvedPeriodId) {
             $period = WorkPeriod::query()->find($resolvedPeriodId);
             if ($period) {

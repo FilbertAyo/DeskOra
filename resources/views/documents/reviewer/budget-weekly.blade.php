@@ -107,6 +107,7 @@
                         </div>
                         <div class="col-md-3">
                             <select name="period_id" class="form-control" onchange="document.getElementById('budgetFilterForm').submit();">
+                                <option value="" {{ empty($activePeriodId) ? 'selected' : '' }}>All Weeks</option>
                                 @foreach($periodOptions as $periodOption)
                                     <option value="{{ $periodOption->id }}" {{ ($activePeriodId ?? request('period_id')) == $periodOption->id ? 'selected' : '' }}>
                                         Week {{ $periodOption->week_number }} &bull; {{ $periodOption->year }}
@@ -134,6 +135,12 @@
                             <a href="{{ route('documents.weekly-budget-review') }}" class="btn btn-outline-secondary w-100">Clear</a>
                         </div>
                     </form>
+                    @if(! empty($showingAllPendingWeeks))
+                        <div class="alert alert-warning border py-2 mt-2 mb-0">
+                            Showing all pending weekly budgets across weeks, oldest first.
+                            Finish older items before the current week piles up again.
+                        </div>
+                    @endif
                     <div class="d-flex flex-wrap gap-2 mt-2">
                         @can('process weekly budgets')
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#midWeekBudgetEntryModal">

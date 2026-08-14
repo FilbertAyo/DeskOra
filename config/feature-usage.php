@@ -30,6 +30,8 @@ return [
         'ai-assist.status',
         'commands.index',
         'analytics.events.store',
+        'approval-gate.snapshot',
+        'approval-gate.remind-later',
         'feature-usage.index',
         'login',
         'logout',

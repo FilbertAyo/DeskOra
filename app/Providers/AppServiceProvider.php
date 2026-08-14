@@ -63,6 +63,8 @@ class AppServiceProvider extends ServiceProvider
             $newAnonymousFeedbackCount = 0;
             $showStaffNominationModal = false;
             $staffNominationPeriod = null;
+            $approvalGateSnapshot = \App\Data\PendingApprovalGateSnapshot::idle();
+            $showApprovalGateModal = false;
 
             if (Auth::check() && Schema::hasTable('requests')) {
                 /** @var \App\Models\User $user */
@@ -118,6 +120,19 @@ class AppServiceProvider extends ServiceProvider
                 }
             }
 
+            if (Auth::check() && request()->hasSession() && ($user = Auth::user()) && ($user->status ?? '') === 'active') {
+                $gate = app(\App\Services\PendingApprovalGate::class);
+                if ($gate->userIsResponsible($user)) {
+                    $onWorkRoute = $gate->isOnWorkRoute(request()->route()?->getName());
+                    $approvalGateSnapshot = $gate->snapshotFor(
+                        $user,
+                        request()->session(),
+                        ! $onWorkRoute
+                    );
+                    $showApprovalGateModal = $approvalGateSnapshot->showModal && ! $onWorkRoute;
+                }
+            }
+
             $view->with([
                 'approvalsReviewCount' => $approvalsReviewCount,
                 'approvalsApproveCount' => $approvalsApproveCount,
@@ -128,6 +143,8 @@ class AppServiceProvider extends ServiceProvider
                 'newAnonymousFeedbackCount' => $newAnonymousFeedbackCount,
                 'showStaffNominationModal' => $showStaffNominationModal,
                 'staffNominationPeriod' => $staffNominationPeriod,
+                'approvalGateSnapshot' => $approvalGateSnapshot,
+                'showApprovalGateModal' => $showApprovalGateModal,
             ]);
         });
         // Slot views do not inherit layout composer data; omit layouts.app (reminder toast is dashboard-only).

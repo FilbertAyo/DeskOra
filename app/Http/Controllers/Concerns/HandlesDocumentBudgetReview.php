@@ -9,17 +9,11 @@ use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
-use App\Services\MonthlyReportYearPlanActivities;
+use App\Services\PendingApprovalGate;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
@@ -44,11 +38,23 @@ trait HandlesDocumentBudgetReview
             abort(403, 'Unauthorized access.');
         }
 
+        $gateState = app(PendingApprovalGate::class)->queueState($user, $request->session());
+        if ($gateState['has_pending'] && $gateState['budget_remaining'] > 0
+            && ! $request->has('status')
+            && ! $request->filled('period_id')) {
+            return redirect()->route('documents.weekly-budget-review', ['status' => 'pending']);
+        }
+
         $defaultPeriod = $this->resolveWeeklyBudgetReviewDefaultPeriod($request);
         $statusFilter = $request->input('status');
         $query = $this->buildWeeklyBudgetReviewQuery($request, $defaultPeriod, $statusFilter);
 
-        $documents = $query->latest()->paginate(100)->withQueryString();
+        if (! $this->weeklyBudgetReviewService->isAllPendingWeeksView($request)
+            && ! ($request->has('period_id') && ! $request->filled('period_id'))) {
+            $query->latest();
+        }
+
+        $documents = $query->paginate(100)->withQueryString();
         $documents->setCollection(
             $documents->getCollection()->filter(fn (Document $document) => $document->hasBudgetItems())->values()
         );
@@ -108,6 +114,8 @@ trait HandlesDocumentBudgetReview
             'activePeriodId' => $activePeriodId,
             'approvalFlowSteps' => \App\Support\WeeklyBudgetApprovalFlow::steps(),
             'userApprovalActions' => \App\Support\WeeklyBudgetApprovalFlow::userActionSummary($user),
+            'showingAllPendingWeeks' => $this->weeklyBudgetReviewService->isAllPendingWeeksView($request)
+                || ($request->has('period_id') && ! $request->filled('period_id')),
         ]);
     }
 
@@ -192,9 +200,7 @@ trait HandlesDocumentBudgetReview
         }
 
         if ($document->type !== Document::TYPE_WEEKLY_PLAN || ! $document->hasBudgetItems()) {
-            return redirect()
-                ->back()
-                ->with('error', 'Only weekly plans with budget rows can be processed.');
+            return $this->respondToBudgetReview($request, 'error', 'Only weekly plans with budget rows can be processed.');
         }
 
         $validated = $request->validate([
@@ -220,9 +226,7 @@ trait HandlesDocumentBudgetReview
             $uidExists = collect($document->budgetItems())
                 ->contains(fn ($item) => is_array($item) && ($item['budget_uid'] ?? null) === $budgetUid);
             if (! $uidExists) {
-                return redirect()
-                    ->back()
-                    ->with('error', 'Budget item not found in this plan.');
+                return $this->respondToBudgetReview($request, 'error', 'Budget item not found in this plan.');
             }
 
             $existingReviews = is_array($document->budget_review_items) ? $document->budget_review_items : [];
@@ -235,9 +239,11 @@ trait HandlesDocumentBudgetReview
                     }
                     $actionStage = $this->resolveBudgetApprovalActionStage($currentStage, $user);
                     if (! $actionStage) {
-                        return redirect()
-                            ->back()
-                            ->with('error', 'You are not allowed to process this item at its current approval stage.');
+                        return $this->respondToBudgetReview(
+                            $request,
+                            'error',
+                            'You are not allowed to process this item at its current approval stage.'
+                        );
                     }
 
                     $newStage = $this->stageAfterAction($actionStage, $decision);
@@ -277,9 +283,11 @@ trait HandlesDocumentBudgetReview
             if (! $found) {
                 $actionStage = $this->resolveBudgetApprovalActionStage(Document::BUDGET_REVIEW_STAGE_PENDING, $user);
                 if (! $actionStage) {
-                    return redirect()
-                        ->back()
-                        ->with('error', 'You are not allowed to process this item at its current approval stage.');
+                    return $this->respondToBudgetReview(
+                        $request,
+                        'error',
+                        'You are not allowed to process this item at its current approval stage.'
+                    );
                 }
                 $newStage = $this->stageAfterAction($actionStage, $decision);
                 $stageAmounts = [
@@ -326,9 +334,11 @@ trait HandlesDocumentBudgetReview
 
             $this->notifyWeeklyBudgetStageAdvance($document, $user, $newStage, $budgetUid, $note);
 
-            return redirect()
-                ->back()
-                ->with('success', 'Budget item "'.$budgetUid.'" has been reviewed.');
+            return $this->respondToBudgetReview(
+                $request,
+                'success',
+                'Budget item "'.$budgetUid.'" has been reviewed.'
+            );
         }
 
         $budgetItem = WeeklyPlanBudgetItem::query()
@@ -336,9 +346,7 @@ trait HandlesDocumentBudgetReview
             ->where('budget_uid', $budgetUid)
             ->first();
         if (! $budgetItem) {
-            return redirect()
-                ->back()
-                ->with('error', 'Budget item not found in this plan.');
+            return $this->respondToBudgetReview($request, 'error', 'Budget item not found in this plan.');
         }
 
         $existingReview = WeeklyPlanBudgetReview::query()
@@ -347,9 +355,11 @@ trait HandlesDocumentBudgetReview
         $currentStage = $existingReview?->approval_stage ?? Document::BUDGET_REVIEW_STAGE_PENDING;
         $actionStage = $this->resolveBudgetApprovalActionStage((string) $currentStage, $user);
         if (! $actionStage) {
-            return redirect()
-                ->back()
-                ->with('error', 'You are not allowed to process this item at its current approval stage.');
+            return $this->respondToBudgetReview(
+                $request,
+                'error',
+                'You are not allowed to process this item at its current approval stage.'
+            );
         }
         $newStage = $this->stageAfterAction($actionStage, $decision);
 
@@ -412,9 +422,26 @@ trait HandlesDocumentBudgetReview
 
         $stageLabel = ucfirst($actionStage);
 
-        return redirect()
-            ->back()
-            ->with('success', 'Budget item "'.$budgetUid.'" has passed '.$stageLabel.' stage.');
+        return $this->respondToBudgetReview(
+            $request,
+            'success',
+            'Budget item "'.$budgetUid.'" has passed '.$stageLabel.' stage.',
+            (string) $budgetItem->id
+        );
+    }
+
+    private function respondToBudgetReview(Request $request, string $type, string $message, ?string $itemId = null)
+    {
+        $success = $type === 'success';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => $success,
+                'message' => $message,
+            ], $success ? 200 : 422);
+        }
+
+        return redirect()->back()->with($type, $message);
     }
 
     private function notifyWeeklyBudgetStageAdvance(

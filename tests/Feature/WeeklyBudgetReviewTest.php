@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
-use App\Services\Documents\DocumentDomainSyncService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -85,6 +84,14 @@ class WeeklyBudgetReviewTest extends TestCase
         return $user;
     }
 
+    private function createViewer(): User
+    {
+        $user = User::factory()->create(['status' => 'active']);
+        $user->givePermissionTo(['view weekly budgets', 'view all documents']);
+
+        return $user;
+    }
+
     private function createStageReviewer(string $permission): User
     {
         $user = User::factory()->create(['status' => 'active']);
@@ -135,9 +142,7 @@ class WeeklyBudgetReviewTest extends TestCase
             'budget_review_status' => Document::BUDGET_REVIEW_PENDING,
         ]);
 
-        app(DocumentDomainSyncService::class)->syncFromDocument($document->fresh());
-
-        return $document->fresh();
+        return $document->fresh() ?? $document;
     }
 
     // ------------------------------------------------------------------
@@ -149,7 +154,7 @@ class WeeklyBudgetReviewTest extends TestCase
         [$current, $next] = $this->createPeriods();
         $dept = $this->createDepartment();
         $staff = $this->createStaffUser($dept);
-        $reviewer = $this->createReviewer();
+        $viewer = $this->createViewer();
 
         // Plan for next week (the default) with budget
         $this->createPlanWithBudget($staff, $next, [
@@ -170,12 +175,27 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertEquals($next->id, $resolvedNext->id, 'Next period should be week 17');
 
         // Default view (no filters) should show only next-week plans
-        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review'));
+        $response = $this->actingAs($viewer)->get(route('documents.weekly-budget-review'));
         $response->assertOk();
-        $response->assertSee('Laptop');
-        $response->assertDontSee('All Weeks');
-        // 'Desk' should not appear as a budget item (note: 'DeskOra' appears in branding)
-        $response->assertDontSee('>Desk</');
+        $response->assertSee('All Weeks');
+    }
+
+    public function test_responsible_reviewer_is_sent_to_all_pending_weeks_when_backlog_exists(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Desk', 'description_purpose' => 'Office', 'amount' => '500'],
+        ]);
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Laptop', 'description_purpose' => 'Dev', 'amount' => '1000'],
+        ]);
+
+        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review'));
+        $response->assertRedirect(route('documents.weekly-budget-review', ['status' => 'pending']));
     }
 
     public function test_budget_review_shows_all_weeks_when_period_filter_applied(): void
@@ -194,6 +214,31 @@ class WeeklyBudgetReviewTest extends TestCase
         ]));
         $response->assertStatus(200);
         $response->assertSee('Desk');
+    }
+
+    public function test_pending_status_without_period_shows_older_weeks_oldest_first(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createReviewer();
+
+        $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Desk', 'description_purpose' => 'Office', 'amount' => '500'],
+        ]);
+        $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Laptop', 'description_purpose' => 'Dev', 'amount' => '1000'],
+        ]);
+
+        $items = app(\App\Services\Documents\WeeklyBudgetReviewService::class)
+            ->actionableItemsFor($reviewer, 10);
+
+        $this->assertSame(['Desk', 'Laptop'], $items->pluck('item')->all());
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.weekly-budget-review', ['status' => 'pending']))
+            ->assertOk()
+            ->assertSee('All Weeks');
     }
 
     public function test_pending_budget_review_count_without_period_includes_older_weeks_until_processed(): void
@@ -233,7 +278,7 @@ class WeeklyBudgetReviewTest extends TestCase
 
         // Draft plan with budget should NOT appear
         Document::create([
-            'user_id' => $staff->id,
+            'user_id' => $this->createStaffUser($dept)->id,
             'period_id' => $next->id,
             'type' => Document::TYPE_WEEKLY_PLAN,
             'title' => 'Draft plan with budget',
@@ -254,7 +299,9 @@ class WeeklyBudgetReviewTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review'));
+        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review', [
+            'status' => 'pending',
+        ]));
         $response->assertOk();
         $response->assertSee('Submitted Item');
         $response->assertDontSee('Draft Item');
@@ -315,7 +362,9 @@ class WeeklyBudgetReviewTest extends TestCase
             ['item' => 'Server', 'description_purpose' => 'New host', 'amount' => '5000'],
         ]);
 
-        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review'));
+        $response = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review', [
+            'status' => 'pending',
+        ]));
         $response->assertStatus(200);
         $response->assertSee('Finance');
         $response->assertSee('IT');

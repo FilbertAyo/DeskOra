@@ -148,7 +148,7 @@
                         </li>
                         @if($canWeeklyBudgetReview)
                             <li class="{{ Request::routeIs('documents.weekly-budget-review') ? 'active' : '' }}">
-                                <a href="{{ route('documents.weekly-budget-review') }}" class="pc-link">
+                                <a href="{{ route('documents.weekly-budget-review', $reviewActivitiesPendingBudgetCount > 0 ? ['status' => 'pending'] : []) }}" class="pc-link">
                                     <span class="pc-mtext">Weekly Budget</span>
                                     @if($reviewActivitiesPendingBudgetCount > 0)
                                         <span class="badge bg-light-warning border border-warning ms-2">{{ $reviewActivitiesPendingBudgetCount }}</span>

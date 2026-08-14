@@ -21,6 +21,7 @@ use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficialLetterController;
+use App\Http\Controllers\PendingApprovalGateController;
 use App\Http\Controllers\PettyController;
 use App\Http\Controllers\PortalAiAssistantController;
 use App\Http\Controllers\ProfileController;
@@ -67,6 +68,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile/settings', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/picture/update', [ProfileController::class, 'updateProfile'])->name('profile.image');
+
+    Route::get('/approval-gate', [PendingApprovalGateController::class, 'snapshot'])
+        ->name('approval-gate.snapshot');
+    Route::post('/approval-gate/remind-later', [PendingApprovalGateController::class, 'remindLater'])
+        ->name('approval-gate.remind-later');
 
     Route::post('/ai-assistant/ask', [PortalAiAssistantController::class, 'ask'])
         ->middleware('throttle:20,1')
