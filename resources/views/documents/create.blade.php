@@ -160,6 +160,7 @@
             const relatedPlanMainTarget = formData.relatedPlanMainTarget;
             const canProcessWeeklyBudgets = formData.canProcessWeeklyBudgets;
             const currentUserId = formData.currentUserId;
+            const defaultPlannerStaffIds = currentUserId ? [currentUserId] : [];
 
             // Session monitoring for long-lived weekly forms.
             // Prevents confusing "session expired" errors by warning/locking before timeout.
@@ -471,7 +472,7 @@
                             </select>
                         </td>
                         <td>
-                            ${buildStaffCheckboxFieldHtml(`content[planned_activities][${activityIndex}][team_member_ids][]`)}
+                            ${buildStaffCheckboxFieldHtml(`content[planned_activities][${activityIndex}][team_member_ids][]`, defaultPlannerStaffIds)}
                         </td>
                         <td><textarea class="form-control" rows="5" name="content[planned_activities][${activityIndex}][notes_inclusion]" placeholder="Notes"></textarea></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-activity-row">&times;</button></td>
@@ -503,7 +504,7 @@
                         <td><input type="date" class="form-control" name="content[key_meetings][${meetingIndex}][date]"></td>
                         <td><input type="hidden" name="content[key_meetings][${meetingIndex}][meeting_uid]" value=""><input class="form-control" name="content[key_meetings][${meetingIndex}][meeting]" placeholder="Meeting / engagement"></td>
                         <td>
-                            ${buildStaffCheckboxFieldHtml(`content[key_meetings][${meetingIndex}][participant_user_ids][]`)}
+                            ${buildStaffCheckboxFieldHtml(`content[key_meetings][${meetingIndex}][participant_user_ids][]`, defaultPlannerStaffIds)}
                         </td>
                         <td>
                             <select class="form-select" name="content[key_meetings][${meetingIndex}][location]">
@@ -706,7 +707,7 @@
                         meeting_uid: '',
                         date: '',
                         meeting: '',
-                        participant_user_ids: [],
+                        participant_user_ids: defaultPlannerStaffIds,
                         status: '',
                         location: '',
                         reactions_notes: '',
@@ -886,7 +887,7 @@
                                     meeting_uid: '',
                                     date: '',
                                     meeting: '',
-                                    participant_user_ids: [],
+                                    participant_user_ids: defaultPlannerStaffIds,
                                     status: '',
                                     location: '',
                                     reactions_notes: '',

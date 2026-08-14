@@ -97,9 +97,10 @@
                     </thead>
                     <tbody id="plannedActivitiesBody">
                         @php
+                            $defaultPlannerStaffIds = array_values(array_filter([(string) (auth()->id() ?? '')]));
                             $dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                             $defaultActivityRows = !empty($carriedActivities ?? []) ? $carriedActivities : [
-                                ['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => [], 'notes_inclusion' => ''],
+                                ['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => $defaultPlannerStaffIds, 'notes_inclusion' => ''],
                             ];
                             $activityRows = old('content.planned_activities', $defaultActivityRows);
                             if (!is_array($activityRows) || empty($activityRows)) {
@@ -195,11 +196,12 @@
                     </thead>
                     <tbody id="keyMeetingsBody">
                         @php
+                            $defaultPlannerStaffIds = $defaultPlannerStaffIds ?? array_values(array_filter([(string) (auth()->id() ?? '')]));
                             $meetingRows = old('content.key_meetings', [
-                                ['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => ''],
+                                ['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => $defaultPlannerStaffIds, 'location' => '', 'reactions_notes' => ''],
                             ]);
                             if (!is_array($meetingRows) || empty($meetingRows)) {
-                                $meetingRows = [['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '']];
+                                $meetingRows = [['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => $defaultPlannerStaffIds, 'location' => '', 'reactions_notes' => '']];
                             }
                         @endphp
                         @foreach($meetingRows as $i => $meetingRow)
@@ -258,6 +260,8 @@
         </div>
     </div>
 </div>
+
+@include('documents.partials.weekly-assigned-meetings-card')
 
 <div class="col-12 mb-3">
     <div class="card border">

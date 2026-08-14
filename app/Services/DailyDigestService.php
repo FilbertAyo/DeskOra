@@ -80,7 +80,7 @@ class DailyDigestService
             'budget_total' => $budgetTotal,
             'logged_today' => $loggedToday,
             'dashboard_url' => route('dashboard'),
-            'work_log_url' => route('weekly-work-logs.index'),
+            'work_log_url' => route('dashboard'),
         ];
     }
 

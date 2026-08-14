@@ -10,7 +10,6 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
 
 class WeeklyWorkLogController extends Controller
 {
@@ -18,73 +17,11 @@ class WeeklyWorkLogController extends Controller
         private readonly WeeklyWorkLogActionBridgeService $actionBridge,
     ) {}
 
-    public function index(Request $request): View
+    public function index(): RedirectResponse
     {
         $this->authorize('viewAny', WeeklyWorkLog::class);
 
-        /** @var User $user */
-        $user = Auth::user();
-        $currentPeriod = WorkPeriod::getCurrent();
-        $periodId = $request->string('period_id')->toString() ?: ($currentPeriod?->id);
-        $period = $periodId ? WorkPeriod::query()->find($periodId) : $currentPeriod;
-
-        $canViewTeam = $user->can('approve documents');
-        $viewUserId = (string) $user->id;
-        if ($canViewTeam && $request->filled('user_id')) {
-            $viewUserId = $request->string('user_id')->toString();
-        }
-
-        $logs = collect();
-        $days = collect();
-        if ($period) {
-            $logs = WeeklyWorkLog::query()
-                ->where('user_id', $viewUserId)
-                ->where('period_id', $period->id)
-                ->orderBy('log_date')
-                ->get()
-                ->keyBy(fn (WeeklyWorkLog $log) => $log->log_date->toDateString());
-
-            $start = Carbon::parse($period->week_start_date)->startOfDay();
-            $end = Carbon::parse($period->week_end_date)->startOfDay();
-            for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
-                $key = $day->toDateString();
-                $days->push([
-                    'date' => $day->copy(),
-                    'key' => $key,
-                    'log' => $logs->get($key),
-                    'is_today' => $key === now()->toDateString(),
-                ]);
-            }
-        }
-
-        $periods = WorkPeriod::query()
-            ->orderByDesc('year')
-            ->orderByDesc('week_number')
-            ->limit(40)
-            ->get();
-
-        $teamUsers = $canViewTeam
-            ? User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name'])
-            : collect();
-
-        $todayLog = $currentPeriod
-            ? WeeklyWorkLog::query()
-                ->where('user_id', $user->id)
-                ->where('period_id', $currentPeriod->id)
-                ->whereDate('log_date', now()->toDateString())
-                ->first()
-            : null;
-
-        return view('weekly-work-logs.index', compact(
-            'period',
-            'periods',
-            'currentPeriod',
-            'days',
-            'todayLog',
-            'canViewTeam',
-            'teamUsers',
-            'viewUserId',
-        ));
+        return redirect()->route('dashboard');
     }
 
     public function store(Request $request): RedirectResponse
@@ -170,12 +107,12 @@ class WeeklyWorkLogController extends Controller
             $this->actionBridge->createActionFromBlocker($weeklyWorkLog, Auth::user());
         } catch (\RuntimeException $e) {
             return redirect()
-                ->route('weekly-work-logs.index', ['period_id' => $weeklyWorkLog->period_id])
+                ->route('dashboard')
                 ->with('error', $e->getMessage());
         }
 
         return redirect()
-            ->route('weekly-work-logs.index', ['period_id' => $weeklyWorkLog->period_id])
+            ->route('dashboard')
             ->with('success', 'Action item created from your blocker.');
     }
 }

@@ -1,7 +1,6 @@
-const CACHE_NAME = 'deskora-shell-v1';
+const CACHE_NAME = 'deskora-shell-v2';
 const SHELL_URLS = [
   '/dashboard',
-  '/weekly-work-logs',
   '/manifest.webmanifest',
   '/assets/images/logo-icon.png',
 ];
@@ -32,7 +31,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Network-first for app pages; cache fallback for offline shell.
-  if (request.mode === 'navigate' || url.pathname.startsWith('/weekly-work-logs') || url.pathname === '/dashboard') {
+  if (request.mode === 'navigate' || url.pathname === '/dashboard') {
     event.respondWith(
       fetch(request)
         .then((response) => {

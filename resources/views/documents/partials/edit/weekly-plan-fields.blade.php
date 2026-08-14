@@ -108,6 +108,7 @@
                                                     </thead>
                                                     <tbody id="plannedActivitiesBody">
                                                         @php
+                                                            $defaultPlannerStaffIds = array_values(array_filter([(string) (auth()->id() ?? '')]));
                                                             $dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                                                             $activityRows = old('content.planned_activities', $plannedActivities ?? []);
                                                             if (!is_array($activityRows)) {
@@ -115,7 +116,7 @@
                                                             }
 
                                                             if (empty($activityRows)) {
-                                                                $activityRows = [['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => [], 'notes_inclusion' => '']];
+                                                                $activityRows = [['day' => 'Monday', 'activity' => '', 'location' => '', 'team_member_ids' => $defaultPlannerStaffIds, 'notes_inclusion' => '']];
                                                             }
                                                         @endphp
                                                         @foreach($activityRows as $i => $activityRow)
@@ -213,39 +214,14 @@
                                                     </thead>
                                                     <tbody id="keyMeetingsBody">
                                                         @php
+                                                            $defaultPlannerStaffIds = $defaultPlannerStaffIds ?? array_values(array_filter([(string) (auth()->id() ?? '')]));
                                                             $meetingRows = old('content.key_meetings', $keyMeetings ?? []);
                                                             if (!is_array($meetingRows)) {
                                                                 $meetingRows = [];
                                                             }
-                                                            $incomingRows = is_array($incomingMeetings ?? null) ? $incomingMeetings : [];
-                                                            $meetingKeys = [];
-                                                            foreach ($meetingRows as $existingMeetingRow) {
-                                                                if (!is_array($existingMeetingRow)) {
-                                                                    continue;
-                                                                }
-                                                                $participantIds = is_array($existingMeetingRow['participant_user_ids'] ?? null) ? $existingMeetingRow['participant_user_ids'] : [];
-                                                                $participantIds = array_values(array_unique(array_filter(array_map('strval', $participantIds))));
-                                                                sort($participantIds);
-                                                                $meetingKey = mb_strtolower(trim((string) ($existingMeetingRow['date'] ?? '')).'|'.trim((string) ($existingMeetingRow['meeting'] ?? '')).'|'.trim((string) ($existingMeetingRow['location'] ?? '')).'|'.implode(',', $participantIds));
-                                                                $meetingKeys[$meetingKey] = true;
-                                                            }
-                                                            foreach ($incomingRows as $incomingRow) {
-                                                                if (!is_array($incomingRow)) {
-                                                                    continue;
-                                                                }
-                                                                $incomingParticipantIds = is_array($incomingRow['participant_user_ids'] ?? null) ? $incomingRow['participant_user_ids'] : [];
-                                                                $incomingParticipantIds = array_values(array_unique(array_filter(array_map('strval', $incomingParticipantIds))));
-                                                                sort($incomingParticipantIds);
-                                                                $meetingKey = mb_strtolower(trim((string) ($incomingRow['date'] ?? '')).'|'.trim((string) ($incomingRow['meeting'] ?? '')).'|'.trim((string) ($incomingRow['location'] ?? '')).'|'.implode(',', $incomingParticipantIds));
-                                                                if (isset($meetingKeys[$meetingKey])) {
-                                                                    continue;
-                                                                }
-                                                                $meetingRows[] = $incomingRow;
-                                                                $meetingKeys[$meetingKey] = true;
-                                                            }
 
                                                             if (empty($meetingRows)) {
-                                                                $meetingRows = [['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => [], 'location' => '', 'reactions_notes' => '']];
+                                                                $meetingRows = [['meeting_uid' => '', 'date' => '', 'meeting' => '', 'participant_user_ids' => $defaultPlannerStaffIds, 'location' => '', 'reactions_notes' => '']];
                                                             }
                                                         @endphp
                                                         @foreach($meetingRows as $i => $meetingRow)
@@ -264,9 +240,6 @@
                                                                         name="content[key_meetings][{{ $i }}][meeting]"
                                                                         value="{{ old("content.key_meetings.$i.meeting", $row['meeting'] ?? '') }}"
                                                                         placeholder="e.g., MIT Engagement ...">
-                                                                    @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
-                                                                        <small class="badge bg-light-info border border-info text-info mt-1">From another participant plan</small>
-                                                                    @endif
                                                                 </td>
                                                                 <td>
                                                                     @php
@@ -307,6 +280,8 @@
                                         </div>
                                     </div>
                                 </div>
+
+                            @include('documents.partials.weekly-assigned-meetings-card', ['assignedToUser' => $document->user])
 
                                 <div class="col-12 mb-3">
                                     <div class="card border">

@@ -266,13 +266,22 @@ trait HandlesDocumentCrud
             return $redirect;
         }
 
+        $teamUsers = $this->teamUsersForSelection();
+        $shareableUsers = $this->shareableDepartmentUsersFor($user);
+        $assignedWeeklyActivities = collect();
+        $incomingMeetings = [];
+        if ($selectedType === Document::TYPE_WEEKLY_PLAN && $defaultPeriodId) {
+            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) $user->id, (string) $defaultPeriodId);
+            $incomingMeetings = $this->incomingMeetingsForUserAndPeriod(
+                (string) $defaultPeriodId,
+                [(string) $user->id]
+            );
+        }
+
         // If type is provided in query string, pre-select it
         if ($selectedType && isset($availableTypes[$selectedType])) {
             // Validate that user can create this type
             if (Document::canUserCreateType($user, $selectedType)) {
-                $teamUsers = $this->teamUsersForSelection();
-                $shareableUsers = $this->shareableDepartmentUsersFor($user);
-
                 return view('documents.create', compact(
                     'availableTypes',
                     'selectedType',
@@ -290,16 +299,11 @@ trait HandlesDocumentCrud
                     'monthlyDefaultMonth',
                     'monthlyDefaultYear',
                     'monthlyYearChoices',
-                    'monthlyHasSubDepartments'
+                    'monthlyHasSubDepartments',
+                    'assignedWeeklyActivities',
+                    'incomingMeetings'
                 ));
             }
-        }
-
-        $teamUsers = $this->teamUsersForSelection();
-        $shareableUsers = $this->shareableDepartmentUsersFor($user);
-        $assignedWeeklyActivities = collect();
-        if ($selectedType === Document::TYPE_WEEKLY_PLAN && $defaultPeriodId) {
-            $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) $user->id, (string) $defaultPeriodId);
         }
 
         return view('documents.create', compact(
@@ -319,7 +323,8 @@ trait HandlesDocumentCrud
             'monthlyDefaultYear',
             'monthlyYearChoices',
             'monthlyHasSubDepartments',
-            'assignedWeeklyActivities'
+            'assignedWeeklyActivities',
+            'incomingMeetings'
         ));
     }
 
@@ -947,6 +952,16 @@ trait HandlesDocumentCrud
 
         $teamUsers = $this->teamUsersForSelection();
 
+        $reportMeetingRows = [];
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->period_id) {
+            $existingMeetingRows = is_array($document->content) ? ($document->content['key_meetings'] ?? []) : [];
+            $reportMeetingRows = $this->weeklyReportMeetingRowsForUserPeriod(
+                (string) $document->period_id,
+                (string) $document->user_id,
+                is_array($existingMeetingRows) ? $existingMeetingRows : []
+            );
+        }
+
         $weeklyReportWizardProgress = null;
         if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->isDraft()) {
             /** @var \App\Models\User $viewer */
@@ -954,7 +969,7 @@ trait HandlesDocumentCrud
             $weeklyReportWizardProgress = $this->actionLogProgressService->buildForUser($viewer);
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers', 'weeklyReportWizardProgress'));
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers', 'weeklyReportWizardProgress', 'reportMeetingRows'));
     }
 
     /**
@@ -989,10 +1004,20 @@ trait HandlesDocumentCrud
             $filename = 'weekly_plan_'.$weekLabel.'_'.$document->id.'.pdf';
         } else {
             $teamUsers = $this->teamUsersForSelection();
+            $reportMeetingRows = [];
+            if ($document->period_id) {
+                $existingMeetingRows = is_array($document->content) ? ($document->content['key_meetings'] ?? []) : [];
+                $reportMeetingRows = $this->weeklyReportMeetingRowsForUserPeriod(
+                    (string) $document->period_id,
+                    (string) $document->user_id,
+                    is_array($existingMeetingRows) ? $existingMeetingRows : []
+                );
+            }
 
             $pdf = Pdf::loadView('documents.pdf.weekly-report-pdf', compact(
                 'document',
                 'teamUsers',
+                'reportMeetingRows',
             ));
 
             $filename = 'weekly_report_'.$weekLabel.'_'.$document->id.'.pdf';

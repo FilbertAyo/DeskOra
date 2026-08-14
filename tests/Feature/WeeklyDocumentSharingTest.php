@@ -720,6 +720,155 @@ class WeeklyDocumentSharingTest extends TestCase
         ]);
     }
 
+    public function test_planned_meeting_appears_as_assigned_on_selected_staff_plan(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'main_target' => 'Owner target',
+            'content' => [
+                'key_meetings' => [
+                    [
+                        'date' => '2025-04-08',
+                        'meeting' => 'Joint field engagement',
+                        'location' => 'Field',
+                        'participant_user_ids' => [$owner->id, $member->id],
+                        'reactions_notes' => 'Bring reports',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $incomingRows = $this->invokeDocumentControllerMethod(
+            'incomingMeetingsForUserAndPeriod',
+            [(string) $nextPeriod->id, [(string) $member->id]]
+        );
+
+        $this->assertTrue(collect($incomingRows)->contains(
+            fn ($row) => is_array($row) && ($row['meeting'] ?? '') === 'Joint field engagement'
+        ));
+
+        $this->actingAs($member)
+            ->view('documents.partials.weekly-assigned-meetings-card', [
+                'incomingMeetings' => $incomingRows,
+                'errors' => new \Illuminate\Support\ViewErrorBag,
+            ])
+            ->assertSeeText('Assigned Meetings')
+            ->assertSeeText('Joint field engagement')
+            ->assertSeeText($owner->name);
+    }
+
+    public function test_planned_meeting_appears_as_assigned_on_selected_staff_report(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department, ['create weekly report']);
+
+        Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Owner plan',
+            'main_target' => 'Owner target',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'key_meetings' => [
+                    [
+                        'meeting_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'date' => '2025-04-02',
+                        'meeting' => 'Planned coordination meeting',
+                        'location' => 'Office',
+                        'participant_user_ids' => [$owner->id, $member->id],
+                        'reactions_notes' => '',
+                    ],
+                ],
+            ],
+        ]);
+
+        $reportMeetingRows = $this->invokeDocumentControllerMethod(
+            'weeklyReportMeetingRowsForUserPeriod',
+            [(string) $currentPeriod->id, (string) $member->id]
+        );
+
+        $assignedRow = collect($reportMeetingRows)->first(
+            fn ($row) => is_array($row) && ($row['meeting'] ?? '') === 'Planned coordination meeting'
+        );
+
+        $this->assertIsArray($assignedRow);
+        $this->assertTrue((bool) ($assignedRow['is_readonly_for_current_user'] ?? false));
+        $this->assertSame('assigned_plan', $assignedRow['source_type'] ?? null);
+    }
+
+    public function test_report_meeting_appears_as_assigned_on_selected_staff_report(): void
+    {
+        [$currentPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly report']);
+        $member = $this->createUserInDepartment($department, ['create weekly report']);
+
+        Document::create([
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'title' => 'Owner report',
+            'state' => Document::STATE_DRAFT,
+            'content' => [
+                'key_meetings' => [
+                    [
+                        'meeting_uid' => (string) \Illuminate\Support\Str::ulid(),
+                        'date' => '2025-04-02',
+                        'meeting' => 'Shared partners meeting',
+                        'location' => 'Office',
+                        'status' => 'Done',
+                        'participant_user_ids' => [$owner->id, $member->id],
+                        'reactions_notes' => 'Follow up Friday',
+                    ],
+                ],
+            ],
+        ]);
+
+        $reportMeetingRows = $this->invokeDocumentControllerMethod(
+            'weeklyReportMeetingRowsForUserPeriod',
+            [(string) $currentPeriod->id, (string) $member->id]
+        );
+
+        $assignedRow = collect($reportMeetingRows)->first(
+            fn ($row) => is_array($row) && ($row['meeting'] ?? '') === 'Shared partners meeting'
+        );
+
+        $this->assertIsArray($assignedRow);
+        $this->assertTrue((bool) ($assignedRow['is_readonly_for_current_user'] ?? false));
+        $this->assertSame('assigned_report', $assignedRow['source_type'] ?? null);
+    }
+
+    public function test_weekly_plan_create_preselects_the_planning_staff_on_activities_and_meetings(): void
+    {
+        $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $this->actingAs($owner);
+        \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
+
+        $html = view('documents.partials.create.weekly-plan-fields', [
+            'teamUsers' => collect([$owner]),
+            'shareableUsers' => collect(),
+            'carriedActivities' => [],
+            'incomingMeetings' => [],
+            'assignedWeeklyActivities' => collect(),
+        ])->render();
+
+        $this->assertStringContainsString('name="content[planned_activities][0][team_member_ids][]"', $html);
+        $this->assertStringContainsString('value="'.$owner->id.'"', $html);
+        $this->assertStringContainsString('name="content[key_meetings][0][participant_user_ids][]"', $html);
+    }
+
     public function test_weekly_report_edit_prefills_target_accomplished_dropdown_for_zero_value(): void
     {
         [$currentPeriod] = $this->createCurrentAndNextPeriods();
@@ -785,6 +934,18 @@ class WeeklyDocumentSharingTest extends TestCase
         }
 
         return $user;
+    }
+
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    private function invokeDocumentControllerMethod(string $method, array $arguments): mixed
+    {
+        $controller = app(\App\Http\Controllers\DocumentController::class);
+        $reflection = new \ReflectionMethod($controller, $method);
+        $reflection->setAccessible(true);
+
+        return $reflection->invoke($controller, ...$arguments);
     }
 
     protected function tearDown(): void

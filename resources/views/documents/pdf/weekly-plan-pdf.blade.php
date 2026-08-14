@@ -89,7 +89,6 @@
         $teamUserNames = \App\Models\User::whereIn('id', $plannedTeamIds)->pluck('name', 'id')->toArray();
 
         $meetingParticipantIds = collect($keyMeetings)
-            ->merge($incomingMeetingsList)
             ->filter(fn ($row) => is_array($row) && !empty($row['participant_user_ids']) && is_array($row['participant_user_ids']))
             ->flatMap(fn ($row) => $row['participant_user_ids'])
             ->filter()
@@ -200,7 +199,6 @@
         $hasPlannedActivities = $groupedActivities->contains(fn ($rows) => !empty($rows));
 
         $normalizedMeetings = collect($keyMeetings ?: [])
-            ->merge($incomingMeetingsList)
             ->map(function ($row) {
                 if (! is_array($row)) {
                     return null;
@@ -216,7 +214,6 @@
                     'participant_user_ids' => $participantIds,
                     'location' => trim((string) ($row['location'] ?? '')),
                     'reactions_notes' => trim((string) ($row['reactions_notes'] ?? '')),
-                    'incoming_source_plan_id' => trim((string) ($row['incoming_source_plan_id'] ?? '')),
                 ];
             })
             ->filter()
@@ -279,6 +276,16 @@
             return trim((string) ($payload['activity'] ?? '')) !== '';
         })->values();
         $hasAssignedActivities = $assignedRows->isNotEmpty();
+        $assignedMeetingRows = collect($incomingMeetingsList ?? [])->filter(function ($row) {
+            if (! is_array($row)) {
+                return false;
+            }
+
+            return trim((string) ($row['meeting'] ?? '')) !== ''
+                || trim((string) ($row['date'] ?? '')) !== ''
+                || trim((string) ($row['location'] ?? '')) !== '';
+        })->values();
+        $hasAssignedMeetings = $assignedMeetingRows->isNotEmpty();
 
         $period = $document->period;
         $staffName = $document->user?->name ?? '';
@@ -437,12 +444,59 @@
                             <td>{{ $row['location'] ?? '' }}</td>
                             <td>
                                 {{ $row['reactions_notes'] ?? '' }}
-                                @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
-                                    (From another participant plan)
-                                @endif
                             </td>
                         </tr>
                     @endif
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if($hasAssignedMeetings)
+        @php
+            $pdfAssignedMeetingParticipantIds = $assignedMeetingRows
+                ->flatMap(fn ($row) => is_array($row['participant_user_ids'] ?? null) ? $row['participant_user_ids'] : [])
+                ->map(fn ($id) => (string) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            $pdfAssignedMeetingUserNames = $pdfAssignedMeetingParticipantIds === []
+                ? []
+                : array_merge(
+                    $meetingUserNames,
+                    \App\Models\User::query()->whereIn('id', $pdfAssignedMeetingParticipantIds)->pluck('name', 'id')->toArray()
+                );
+        @endphp
+        <div class="section-title">Assigned Meetings</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 14%;">Date</th>
+                    <th>Meeting</th>
+                    <th style="width: 20%;">Participants</th>
+                    <th style="width: 16%;">Location</th>
+                    <th>From</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($assignedMeetingRows as $meetingRow)
+                    @php
+                        $meetingRow = is_array($meetingRow) ? $meetingRow : [];
+                        $participantIds = is_array($meetingRow['participant_user_ids'] ?? null) ? $meetingRow['participant_user_ids'] : [];
+                        $participantNames = collect($participantIds)
+                            ->map(fn ($id) => $pdfAssignedMeetingUserNames[(string) $id] ?? null)
+                            ->filter()
+                            ->values()
+                            ->all();
+                    @endphp
+                    <tr>
+                        <td>{{ $meetingRow['date'] ?? '-' }}</td>
+                        <td>{{ $meetingRow['meeting'] ?? '-' }}</td>
+                        <td>{{ $participantNames !== [] ? implode(', ', $participantNames) : '-' }}</td>
+                        <td>{{ $meetingRow['location'] ?? '-' }}</td>
+                        <td>{{ $meetingRow['incoming_source_user_name'] ?? '-' }}</td>
+                    </tr>
                 @endforeach
             </tbody>
         </table>

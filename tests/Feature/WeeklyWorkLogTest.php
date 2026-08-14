@@ -29,6 +29,7 @@ class WeeklyWorkLogTest extends TestCase
         ]);
 
         $this->actingAs($user)
+            ->from(route('dashboard'))
             ->post(route('weekly-work-logs.store'), [
                 'period_id' => $period->id,
                 'log_date' => now()->toDateString(),
@@ -36,7 +37,7 @@ class WeeklyWorkLogTest extends TestCase
                 'blocker' => 'Vehicle delay',
                 'next' => 'Write report',
             ])
-            ->assertRedirect(route('weekly-work-logs.index', ['period_id' => $period->id]));
+            ->assertRedirect(route('dashboard'));
 
         $this->assertDatabaseHas('weekly_work_logs', [
             'user_id' => $user->id,
@@ -46,7 +47,7 @@ class WeeklyWorkLogTest extends TestCase
         ]);
     }
 
-    public function test_index_is_reachable_for_active_user(): void
+    public function test_index_redirects_to_dashboard(): void
     {
         $user = User::factory()->create(['status' => 'active']);
         WorkPeriod::factory()->create([
@@ -57,8 +58,7 @@ class WeeklyWorkLogTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('weekly-work-logs.index'))
-            ->assertOk()
-            ->assertSee('Personal Work Log');
+            ->assertRedirect(route('dashboard'));
     }
 
     public function test_user_cannot_update_another_users_log(): void

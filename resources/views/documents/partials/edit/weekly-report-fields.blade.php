@@ -224,7 +224,7 @@
                                                         @php
                                                             $resolvedReportMeetingRows = old('content.key_meetings', $reportMeetingRows ?? $reportMeetings ?? []);
                                                             if (!is_array($resolvedReportMeetingRows) || empty($resolvedReportMeetingRows)) {
-                                                                $resolvedReportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => [], 'status' => '', 'location' => '', 'reactions_notes' => '', 'source_type' => 'report_manual', 'source_plan_id' => '', 'source_owner_user_id' => (string) auth()->id(), 'is_readonly_for_current_user' => false]];
+                                                                $resolvedReportMeetingRows = [['date' => '', 'meeting' => '', 'participant_user_ids' => array_values(array_filter([(string) (auth()->id() ?? '')])), 'status' => '', 'location' => '', 'reactions_notes' => '', 'source_type' => 'report_manual', 'source_plan_id' => '', 'source_owner_user_id' => (string) auth()->id(), 'is_readonly_for_current_user' => false]];
                                                             }
                                                         @endphp
                                                         @foreach($resolvedReportMeetingRows as $i => $meetingRow)
@@ -267,6 +267,15 @@
                                                                     @php
                                                                         $selectedParticipantIds = old("content.key_meetings.$i.participant_user_ids", $meetingRow['participant_user_ids'] ?? []);
                                                                         if (!is_array($selectedParticipantIds)) $selectedParticipantIds = [];
+                                                                        if (
+                                                                            old('content.key_meetings') === null
+                                                                            && ! $isReadonlyMeeting
+                                                                            && $selectedParticipantIds === []
+                                                                            && trim((string) ($meetingRow['meeting'] ?? '')) === ''
+                                                                            && trim((string) ($meetingRow['date'] ?? '')) === ''
+                                                                        ) {
+                                                                            $selectedParticipantIds = array_values(array_filter([(string) (auth()->id() ?? '')]));
+                                                                        }
                                                                     @endphp
                                                                     <x-staff-checkbox-select
                                                                         name="content[key_meetings][{{ $i }}][participant_user_ids][]"

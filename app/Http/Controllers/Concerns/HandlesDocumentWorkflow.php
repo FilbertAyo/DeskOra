@@ -61,7 +61,17 @@ trait HandlesDocumentWorkflow
 
         $teamUsers = $this->teamUsersForSelection();
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers'));
+        $reportMeetingRows = [];
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->period_id) {
+            $existingMeetingRows = is_array($document->content) ? ($document->content['key_meetings'] ?? []) : [];
+            $reportMeetingRows = $this->weeklyReportMeetingRowsForUserPeriod(
+                (string) $document->period_id,
+                (string) $document->user_id,
+                is_array($existingMeetingRows) ? $existingMeetingRows : []
+            );
+        }
+
+        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers', 'reportMeetingRows'));
     }
 
     /**

@@ -23,7 +23,6 @@
                                         ->pluck('name', 'id')
                                         ->toArray();
                                     $meetingParticipantIds = collect($keyMeetings)
-                                        ->merge($incomingMeetings)
                                         ->filter(fn($row) => is_array($row) && !empty($row['participant_user_ids']) && is_array($row['participant_user_ids']))
                                         ->flatMap(fn($row) => $row['participant_user_ids'])
                                         ->filter()
@@ -131,7 +130,6 @@
                                         );
 
                                     $normalizedMeetings = collect($keyMeetings ?: [])
-                                        ->merge($incomingMeetings)
                                         ->map(function ($row) {
                                             if (! is_array($row)) {
                                                 return null;
@@ -147,7 +145,6 @@
                                                 'participant_user_ids' => $participantIds,
                                                 'location' => trim((string) ($row['location'] ?? '')),
                                                 'reactions_notes' => trim((string) ($row['reactions_notes'] ?? '')),
-                                                'incoming_source_plan_id' => trim((string) ($row['incoming_source_plan_id'] ?? '')),
                                             ];
                                         })
                                         ->filter()
@@ -340,9 +337,6 @@
                                                                         <td>{{ $row['location'] ?? '' }}</td>
                                                                         <td>
                                                                             {{ $row['reactions_notes'] ?? '' }}
-                                                                            @if(trim((string) ($row['incoming_source_plan_id'] ?? '')) !== '')
-                                                                                <div><small class="badge bg-light-info border border-info text-info mt-1">From another participant plan</small></div>
-                                                                            @endif
                                                                         </td>
                                                                     </tr>
                                                                 @endif
@@ -356,6 +350,10 @@
                                                 </table>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        @include('documents.partials.weekly-assigned-meetings-card', ['assignedToUser' => $document->user, 'embedded' => true])
                                     </div>
 
                                     <div class="card shadow-none border mb-0">

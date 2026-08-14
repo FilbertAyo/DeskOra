@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WeeklyPlanBudgetReview;
+use App\Models\WeeklyPlanMeeting;
+use App\Models\WeeklyReportMeeting;
 use App\Models\WorkPeriod;
 use App\Services\ActionLogProgressService;
 use App\Services\Documents\DocumentListingService;
@@ -1235,8 +1237,8 @@ class DocumentController extends Controller
     }
 
     /**
-     * Collect meeting rows from peer weekly plans in same period where this
-     * plan owner was selected as a participant.
+     * Collect meeting rows from peer weekly plans in the same period where this
+     * plan owner (or shared collaborator) was selected as a participant.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -1246,47 +1248,193 @@ class DocumentController extends Controller
             return [];
         }
 
-        $ownerUserId = (string) $document->user_id;
-        $peerPlans = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('period_id', $document->period_id)
-            ->where('id', '!=', $document->id)
-            ->select(['id', 'user_id', 'content'])
+        $document->loadMissing('sharedUsers:id');
+
+        return $this->incomingMeetingsForUserAndPeriod(
+            (string) $document->period_id,
+            $document->allEditableUserIds(),
+            (string) $document->id
+        );
+    }
+
+    /**
+     * Meetings from other staff plans in this period where the given users were selected.
+     *
+     * @param  array<int, string>  $assigneeUserIds
+     * @return array<int, array<string, mixed>>
+     */
+    protected function incomingMeetingsForUserAndPeriod(string $periodId, array $assigneeUserIds, ?string $excludePlanId = null): array
+    {
+        $periodId = trim($periodId);
+        $assigneeIds = collect($assigneeUserIds)
+            ->map(static fn ($id) => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($periodId === '' || $assigneeIds === []) {
+            return [];
+        }
+
+        $meetings = WeeklyPlanMeeting::query()
+            ->with([
+                'participants:id,name',
+                'weeklyPlan:id,user_id,period_id',
+                'weeklyPlan.user:id,name',
+            ])
+            ->whereHas('weeklyPlan', function ($query) use ($periodId, $assigneeIds, $excludePlanId) {
+                $query->where('period_id', $periodId)
+                    ->whereNotIn('user_id', $assigneeIds);
+                if ($excludePlanId) {
+                    $query->where('id', '!=', $excludePlanId);
+                }
+            })
+            ->whereHas('participants', function ($query) use ($assigneeIds) {
+                $query->whereIn('users.id', $assigneeIds);
+            })
+            ->orderBy('date')
+            ->orderBy('sort_order')
             ->get();
 
         $incomingRows = [];
-        foreach ($peerPlans as $peerPlan) {
-            $peerContent = is_array($peerPlan->content) ? $peerPlan->content : [];
-            $meetingRows = is_array($peerContent['key_meetings'] ?? null) ? $peerContent['key_meetings'] : [];
-            foreach ($meetingRows as $meetingRow) {
-                if (! is_array($meetingRow)) {
-                    continue;
-                }
-
-                $participantIds = is_array($meetingRow['participant_user_ids'] ?? null)
-                    ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $meetingRow['participant_user_ids'])))
-                    : [];
-                if (! in_array($ownerUserId, $participantIds, true)) {
-                    continue;
-                }
-
-                $uid = trim((string) ($meetingRow['meeting_uid'] ?? ''));
-                if ($uid === '') {
-                    $meetingRow['meeting_uid'] = (string) Str::ulid();
-                }
-                $meetingRow['incoming_source_plan_id'] = (string) $peerPlan->id;
-                $meetingRow['incoming_source_user_id'] = (string) $peerPlan->user_id;
-                $incomingRows[] = $meetingRow;
+        $seen = [];
+        foreach ($meetings as $meeting) {
+            $participantIds = $meeting->participants
+                ->pluck('id')
+                ->map(static fn ($id) => (string) $id)
+                ->values()
+                ->all();
+            $mapped = $this->mapWeeklyPlanMeetingToIncomingRow($meeting, $participantIds);
+            if ($mapped === null) {
+                continue;
             }
+
+            $rowKey = $this->incomingMeetingRowKey($mapped);
+            if (isset($seen[$rowKey])) {
+                continue;
+            }
+            $seen[$rowKey] = true;
+            $incomingRows[] = $mapped;
         }
 
         return $incomingRows;
     }
 
     /**
+     * @param  array<int, string>  $participantIds
+     * @return array<string, mixed>|null
+     */
+    protected function mapWeeklyPlanMeetingToIncomingRow(WeeklyPlanMeeting $meeting, array $participantIds): ?array
+    {
+        $date = $this->formatMeetingDateField($meeting->date);
+        $title = trim((string) ($meeting->meeting ?? ''));
+        $location = trim((string) ($meeting->location ?? ''));
+        $notes = trim((string) ($meeting->reactions_notes ?? ''));
+        if ($date === '' && $title === '' && $location === '' && $notes === '') {
+            return null;
+        }
+
+        $uid = trim((string) ($meeting->meeting_uid ?? ''));
+        if ($uid === '') {
+            $uid = (string) Str::ulid();
+        }
+
+        $sourcePlan = $meeting->weeklyPlan;
+
+        return [
+            'meeting_uid' => $uid,
+            'date' => $date,
+            'meeting' => $title,
+            'participant_user_ids' => array_values($participantIds),
+            'location' => $location,
+            'reactions_notes' => $notes,
+            'incoming_source_plan_id' => $sourcePlan ? (string) $sourcePlan->id : (string) $meeting->weekly_plan_id,
+            'incoming_source_user_id' => $sourcePlan ? (string) $sourcePlan->user_id : '',
+            'incoming_source_user_name' => trim((string) ($sourcePlan?->user?->name ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    protected function incomingMeetingRowKey(array $row): string
+    {
+        $uid = trim((string) ($row['meeting_uid'] ?? ''));
+        if ($uid !== '') {
+            return 'uid:'.$uid;
+        }
+
+        $participantIds = is_array($row['participant_user_ids'] ?? null)
+            ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $row['participant_user_ids'])))
+            : [];
+        sort($participantIds);
+
+        return mb_strtolower(implode('|', [
+            trim((string) ($row['date'] ?? '')),
+            trim((string) ($row['meeting'] ?? '')),
+            trim((string) ($row['location'] ?? '')),
+            implode(',', $participantIds),
+        ]));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function weeklyPlanMeetingToReportRow(WeeklyPlanMeeting $meeting): array
+    {
+        return [
+            'meeting_uid' => (string) ($meeting->meeting_uid ?? ''),
+            'date' => $this->formatMeetingDateField($meeting->date),
+            'meeting' => trim((string) ($meeting->meeting ?? '')),
+            'participant_user_ids' => $meeting->participants
+                ->pluck('id')
+                ->map(static fn ($id) => (string) $id)
+                ->values()
+                ->all(),
+            'status' => trim((string) ($meeting->status ?? '')),
+            'location' => trim((string) ($meeting->location ?? '')),
+            'reactions_notes' => trim((string) ($meeting->reactions_notes ?? '')),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function weeklyReportMeetingToRow(WeeklyReportMeeting $meeting): array
+    {
+        return [
+            'meeting_uid' => (string) ($meeting->meeting_uid ?? ''),
+            'date' => $this->formatMeetingDateField($meeting->date),
+            'meeting' => trim((string) ($meeting->meeting ?? '')),
+            'participant_user_ids' => $meeting->participants
+                ->pluck('id')
+                ->map(static fn ($id) => (string) $id)
+                ->values()
+                ->all(),
+            'status' => trim((string) ($meeting->status ?? '')),
+            'location' => trim((string) ($meeting->location ?? '')),
+            'reactions_notes' => trim((string) ($meeting->reactions_notes ?? '')),
+        ];
+    }
+
+    protected function isAssignedMeetingSourceType(string $sourceType): bool
+    {
+        return in_array(trim($sourceType), ['assigned_plan', 'assigned_report'], true);
+    }
+
+    protected function isReadonlyAssignedMeetingForUser(string $sourceType, string $sourceOwnerUserId, string $actingUserId): bool
+    {
+        return $this->isAssignedMeetingSourceType($sourceType)
+            && trim($sourceOwnerUserId) !== ''
+            && trim($sourceOwnerUserId) !== trim($actingUserId);
+    }
+
+    /**
      * Build weekly report meeting rows for a viewer in a period:
      * - own planned meetings (editable)
      * - assigned meetings from peer plans (view-only)
+     * - assigned meetings from peer reports (view-only)
      * - unmatched draft report rows (editable)
      *
      * @param  array<int, mixed>  $existingReportRows
@@ -1354,42 +1502,73 @@ class DocumentController extends Controller
             }
         }
 
-        $peerPlans = Document::query()
-            ->where('type', Document::TYPE_WEEKLY_PLAN)
-            ->where('period_id', $periodId)
-            ->where('user_id', '!=', $viewerUserId)
-            ->select(['id', 'user_id', 'content'])
+        $peerPlanMeetings = WeeklyPlanMeeting::query()
+            ->with(['participants:id', 'weeklyPlan:id,user_id,period_id'])
+            ->whereHas('weeklyPlan', function ($query) use ($periodId, $viewerUserId) {
+                $query->where('period_id', $periodId)
+                    ->where('user_id', '!=', $viewerUserId);
+            })
+            ->whereHas('participants', function ($query) use ($viewerUserId) {
+                $query->where('users.id', $viewerUserId);
+            })
+            ->orderBy('date')
+            ->orderBy('sort_order')
             ->get();
 
-        foreach ($peerPlans as $peerPlan) {
-            $peerContent = is_array($peerPlan->content) ? $peerPlan->content : [];
-            $peerMeetings = is_array($peerContent['key_meetings'] ?? null)
-                ? $peerContent['key_meetings']
-                : [];
-            foreach ($peerMeetings as $peerMeetingRow) {
-                if (! is_array($peerMeetingRow)) {
-                    continue;
-                }
-                $participantIds = is_array($peerMeetingRow['participant_user_ids'] ?? null)
-                    ? array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $peerMeetingRow['participant_user_ids'])))
-                    : [];
-                if (! in_array($viewerUserId, $participantIds, true)) {
-                    continue;
-                }
-                $normalizedAssignedRow = $this->normalizeWeeklyReportMeetingRow(
-                    $peerMeetingRow,
-                    'assigned_plan',
-                    (string) $peerPlan->id,
-                    (string) $peerPlan->user_id,
-                    true
-                );
-                $rowKey = $this->weeklyReportMeetingRowKey($normalizedAssignedRow);
-                if (isset($seen[$rowKey])) {
-                    continue;
-                }
-                $seen[$rowKey] = true;
-                $rows[] = $normalizedAssignedRow;
+        foreach ($peerPlanMeetings as $peerPlanMeeting) {
+            $peerPlan = $peerPlanMeeting->weeklyPlan;
+            if (! $peerPlan) {
+                continue;
             }
+            $normalizedAssignedRow = $this->normalizeWeeklyReportMeetingRow(
+                $this->weeklyPlanMeetingToReportRow($peerPlanMeeting),
+                'assigned_plan',
+                (string) $peerPlan->id,
+                (string) $peerPlan->user_id,
+                true
+            );
+            $rowKey = $this->weeklyReportMeetingRowKey($normalizedAssignedRow);
+            if (isset($seen[$rowKey])) {
+                continue;
+            }
+            $seen[$rowKey] = true;
+            $rows[] = $normalizedAssignedRow;
+        }
+
+        $peerReportMeetings = WeeklyReportMeeting::query()
+            ->with(['participants:id', 'weeklyReport:id,user_id,period_id'])
+            ->whereHas('weeklyReport', function ($query) use ($periodId, $viewerUserId) {
+                $query->where('period_id', $periodId)
+                    ->where('user_id', '!=', $viewerUserId);
+            })
+            ->whereHas('participants', function ($query) use ($viewerUserId) {
+                $query->where('users.id', $viewerUserId);
+            })
+            ->orderBy('date')
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($peerReportMeetings as $peerReportMeeting) {
+            if ($this->isAssignedMeetingSourceType((string) ($peerReportMeeting->source_type ?? ''))) {
+                continue;
+            }
+            $peerReport = $peerReportMeeting->weeklyReport;
+            if (! $peerReport) {
+                continue;
+            }
+            $normalizedAssignedRow = $this->normalizeWeeklyReportMeetingRow(
+                $this->weeklyReportMeetingToRow($peerReportMeeting),
+                'assigned_report',
+                null,
+                (string) $peerReport->user_id,
+                true
+            );
+            $rowKey = $this->weeklyReportMeetingRowKey($normalizedAssignedRow);
+            if (isset($seen[$rowKey])) {
+                continue;
+            }
+            $seen[$rowKey] = true;
+            $rows[] = $normalizedAssignedRow;
         }
 
         foreach ($existingByKey as $existingKey => $existingRow) {
@@ -1398,7 +1577,7 @@ class DocumentController extends Controller
             }
             $sourceType = trim((string) ($existingRow['source_type'] ?? ''));
             $sourceOwnerUserId = trim((string) ($existingRow['source_owner_user_id'] ?? ''));
-            if ($sourceType === 'assigned_plan' && $sourceOwnerUserId !== '' && $sourceOwnerUserId !== $viewerUserId) {
+            if ($this->isReadonlyAssignedMeetingForUser($sourceType, $sourceOwnerUserId, $viewerUserId)) {
                 continue;
             }
             $existingRow['is_readonly_for_current_user'] = false;
@@ -1526,7 +1705,7 @@ class DocumentController extends Controller
 
             $submittedSourceType = trim((string) ($inputRow['source_type'] ?? ''));
             $submittedOwnerUserId = trim((string) ($inputRow['source_owner_user_id'] ?? ''));
-            if ($submittedSourceType === 'assigned_plan' && $submittedOwnerUserId !== '' && $submittedOwnerUserId !== (string) $actingUser->id) {
+            if ($this->isReadonlyAssignedMeetingForUser($submittedSourceType, $submittedOwnerUserId, (string) $actingUser->id)) {
                 continue;
             }
 
