@@ -92,6 +92,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // Official letters permissions
             'manage official letters',
+            'authorize official letter downloads',
 
         ];
 

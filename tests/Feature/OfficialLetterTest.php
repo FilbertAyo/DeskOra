@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\OfficialLetter;
 use App\Models\OfficialLetterSequence;
 use App\Models\User;
+use App\Notifications\OfficialLetterDownloadDecisionNotification;
+use App\Notifications\OfficialLetterDownloadRequestedNotification;
 use App\Notifications\OfficialLetterSharedNotification;
 use App\Services\OfficialLetterReferenceService;
 use Carbon\Carbon;
@@ -268,6 +270,7 @@ class OfficialLetterTest extends TestCase
         /** @var User $manager */
         $manager = User::factory()->create(['status' => 'active']);
         $manager->givePermissionTo('manage official letters');
+        $manager->givePermissionTo('authorize official letter downloads');
 
         $this->actingAs($manager)
             ->post(route('official-letters.store'), $this->validPayload())
@@ -288,6 +291,7 @@ class OfficialLetterTest extends TestCase
         /** @var User $manager */
         $manager = User::factory()->create(['status' => 'active']);
         $manager->givePermissionTo('manage official letters');
+        $manager->givePermissionTo('authorize official letter downloads');
 
         $this->actingAs($manager)
             ->post(route('official-letters.store'), $this->validPayload([
@@ -437,6 +441,240 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($colleague)
             ->get(route('official-letters.edit', $letter))
             ->assertForbidden();
+    }
+
+    public function test_staff_cannot_download_letter_without_authorization(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        $letter = $this->createLetterAs($manager);
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.show', $letter))
+            ->assertOk()
+            ->assertSee('Request download authorization');
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.download', $letter))
+            ->assertForbidden();
+    }
+
+    public function test_download_request_notifies_authorizers_and_appears_on_their_panel(): void
+    {
+        Notification::fake();
+
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active', 'name' => 'Letter Writer']);
+        $manager->givePermissionTo('manage official letters');
+
+        /** @var User $authorizer */
+        $authorizer = User::factory()->create(['status' => 'active', 'name' => 'Letter Authorizer']);
+        $authorizer->givePermissionTo('authorize official letter downloads');
+
+        $letter = $this->createLetterAs($manager);
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter), [
+                'request_note' => 'Needed for partner meeting',
+            ])
+            ->assertRedirect(route('official-letters.show', $letter));
+
+        Notification::assertSentTo($authorizer, OfficialLetterDownloadRequestedNotification::class);
+        Notification::assertNotSentTo($manager, OfficialLetterDownloadRequestedNotification::class);
+
+        $this->actingAs($authorizer)
+            ->get(route('official-letters.index'))
+            ->assertOk()
+            ->assertDontSee($letter->reference_number);
+
+        $this->actingAs($authorizer)
+            ->get(route('official-letters.index', ['tab' => 'authorizations']))
+            ->assertOk()
+            ->assertSee($letter->reference_number)
+            ->assertSee('Download authorizations')
+            ->assertSee('Letter Writer');
+
+        $this->actingAs($authorizer)
+            ->get(route('official-letters.show', $letter))
+            ->assertOk()
+            ->assertSee('You were asked to authorize download')
+            ->assertSee('Authorize download')
+            ->assertSee('Reference is made to your letter', false);
+    }
+
+    public function test_authorize_unlocks_download_for_owner_and_shared_users(): void
+    {
+        Notification::fake();
+
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        /** @var User $sharee */
+        $sharee = User::factory()->create(['status' => 'active']);
+        $sharee->assignRole('staff');
+
+        /** @var User $authorizer */
+        $authorizer = User::factory()->create(['status' => 'active']);
+        $authorizer->givePermissionTo('authorize official letter downloads');
+
+        $letter = $this->createLetterAs($manager);
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.share', $letter), [
+                'shared_user_ids' => [$sharee->id],
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($sharee)
+            ->get(route('official-letters.download', $letter))
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter))
+            ->assertRedirect();
+
+        $this->actingAs($authorizer)
+            ->post(route('official-letters.authorize-download', $letter))
+            ->assertRedirect(route('official-letters.show', $letter));
+
+        Notification::assertSentTo($manager, OfficialLetterDownloadDecisionNotification::class);
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.download', $letter))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->actingAs($sharee)
+            ->get(route('official-letters.download', $letter))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_reject_blocks_download_and_allows_a_new_request(): void
+    {
+        Notification::fake();
+
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        /** @var User $authorizer */
+        $authorizer = User::factory()->create(['status' => 'active']);
+        $authorizer->givePermissionTo('authorize official letter downloads');
+
+        $letter = $this->createLetterAs($manager);
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter))
+            ->assertRedirect();
+
+        $this->actingAs($authorizer)
+            ->post(route('official-letters.reject-download', $letter), [
+                'decision_note' => 'Please revise the recipient first.',
+            ])
+            ->assertRedirect(route('official-letters.show', $letter));
+
+        Notification::assertSentTo($manager, OfficialLetterDownloadDecisionNotification::class);
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.download', $letter))
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.show', $letter))
+            ->assertOk()
+            ->assertSee('Download rejected');
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter))
+            ->assertRedirect(route('official-letters.show', $letter));
+
+        $this->assertSame(2, $letter->downloadRequests()->count());
+        $this->assertTrue($letter->fresh()->hasPendingDownloadRequest());
+    }
+
+    public function test_edit_after_authorize_still_allows_download(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        /** @var User $authorizer */
+        $authorizer = User::factory()->create(['status' => 'active']);
+        $authorizer->givePermissionTo('authorize official letter downloads');
+
+        $letter = $this->createLetterAs($manager, [
+            'subject' => 'ORIGINAL SUBJECT',
+        ]);
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter))
+            ->assertRedirect();
+
+        $this->actingAs($authorizer)
+            ->post(route('official-letters.authorize-download', $letter))
+            ->assertRedirect();
+
+        $this->actingAs($manager)
+            ->put(route('official-letters.update', $letter), $this->validPayload([
+                'subject' => 'UPDATED SUBJECT AFTER AUTHORIZATION',
+            ]))
+            ->assertRedirect();
+
+        $letter->refresh();
+        $this->assertSame('UPDATED SUBJECT AFTER AUTHORIZATION', $letter->subject);
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.download', $letter))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_user_with_authorize_permission_can_download_own_letter_without_requesting(): void
+    {
+        /** @var User $authorizer */
+        $authorizer = User::factory()->create(['status' => 'active']);
+        $authorizer->givePermissionTo('manage official letters');
+        $authorizer->givePermissionTo('authorize official letter downloads');
+
+        $letter = $this->createLetterAs($authorizer);
+
+        $this->actingAs($authorizer)
+            ->get(route('official-letters.download', $letter))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_pending_request_cannot_be_submitted_twice(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        $letter = $this->createLetterAs($manager);
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter))
+            ->assertRedirect();
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.request-download', $letter))
+            ->assertForbidden();
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function createLetterAs(User $manager, array $overrides = []): OfficialLetter
+    {
+        $this->actingAs($manager)
+            ->post(route('official-letters.store'), $this->validPayload($overrides))
+            ->assertRedirect();
+
+        return OfficialLetter::query()->latest('created_at')->firstOrFail();
     }
 
     /**

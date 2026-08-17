@@ -14,7 +14,8 @@ class OfficialLetterPolicy
 
     public function view(User $user, OfficialLetter $officialLetter): bool
     {
-        return $officialLetter->userHasFullAccess($user);
+        return $officialLetter->userHasFullAccess($user)
+            || $officialLetter->userCanReviewDownloadRequest($user);
     }
 
     public function verify(User $user, OfficialLetter $officialLetter): bool
@@ -24,7 +25,7 @@ class OfficialLetterPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('manage official letters');
+        return $user->can(OfficialLetter::PERMISSION_MANAGE);
     }
 
     public function update(User $user, OfficialLetter $officialLetter): bool
@@ -44,6 +45,30 @@ class OfficialLetterPolicy
 
     public function download(User $user, OfficialLetter $officialLetter): bool
     {
-        return $officialLetter->userHasFullAccess($user);
+        if ($officialLetter->userCanAuthorizeDownloads($user)) {
+            return $officialLetter->userHasFullAccess($user)
+                || $officialLetter->hasDownloadRequest();
+        }
+
+        return $officialLetter->userHasFullAccess($user)
+            && $officialLetter->isDownloadAuthorized();
+    }
+
+    public function requestDownload(User $user, OfficialLetter $officialLetter): bool
+    {
+        return $officialLetter->userHasFullAccess($user)
+            && ! $officialLetter->isDownloadAuthorized()
+            && ! $officialLetter->hasPendingDownloadRequest();
+    }
+
+    public function authorizeDownload(User $user, OfficialLetter $officialLetter): bool
+    {
+        return $officialLetter->userCanAuthorizeDownloads($user)
+            && $officialLetter->hasPendingDownloadRequest();
+    }
+
+    public function rejectDownload(User $user, OfficialLetter $officialLetter): bool
+    {
+        return $this->authorizeDownload($user, $officialLetter);
     }
 }

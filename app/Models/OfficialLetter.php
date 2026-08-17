@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -18,6 +20,10 @@ class OfficialLetter extends Model
     public const SIGNATURE_MODE_DIGITAL = 'digital';
 
     public const SIGNATURE_MODE_MANUAL = 'manual';
+
+    public const PERMISSION_MANAGE = 'manage official letters';
+
+    public const PERMISSION_AUTHORIZE_DOWNLOADS = 'authorize official letter downloads';
 
     protected $fillable = [
         'department_code',
@@ -89,6 +95,16 @@ class OfficialLetter extends Model
             ->withTimestamps();
     }
 
+    public function downloadRequests(): HasMany
+    {
+        return $this->hasMany(OfficialLetterDownloadRequest::class);
+    }
+
+    public function latestDownloadRequest(): HasOne
+    {
+        return $this->hasOne(OfficialLetterDownloadRequest::class)->latestOfMany();
+    }
+
     public function isSharedWith(User $user): bool
     {
         return $this->sharedUsers()
@@ -106,6 +122,60 @@ class OfficialLetter extends Model
         return $this->isOwnedBy($user) || $this->isSharedWith($user);
     }
 
+    public function isDownloadAuthorized(): bool
+    {
+        if ($this->relationLoaded('latestDownloadRequest')) {
+            return $this->latestDownloadRequest?->status === OfficialLetterDownloadRequest::STATUS_AUTHORIZED;
+        }
+
+        return $this->downloadRequests()
+            ->where('status', OfficialLetterDownloadRequest::STATUS_AUTHORIZED)
+            ->exists();
+    }
+
+    public function hasPendingDownloadRequest(): bool
+    {
+        if ($this->relationLoaded('latestDownloadRequest')) {
+            return $this->latestDownloadRequest?->status === OfficialLetterDownloadRequest::STATUS_PENDING;
+        }
+
+        return $this->downloadRequests()
+            ->where('status', OfficialLetterDownloadRequest::STATUS_PENDING)
+            ->exists();
+    }
+
+    public function hasDownloadRequest(): bool
+    {
+        if ($this->relationLoaded('latestDownloadRequest')) {
+            return $this->latestDownloadRequest !== null;
+        }
+
+        if ($this->relationLoaded('downloadRequests')) {
+            return $this->downloadRequests->isNotEmpty();
+        }
+
+        return $this->downloadRequests()->exists();
+    }
+
+    public function downloadAuthorizationStatus(): ?string
+    {
+        $latest = $this->relationLoaded('latestDownloadRequest')
+            ? $this->latestDownloadRequest
+            : $this->latestDownloadRequest()->first();
+
+        return $latest?->status;
+    }
+
+    public function userCanAuthorizeDownloads(User $user): bool
+    {
+        return $user->can(self::PERMISSION_AUTHORIZE_DOWNLOADS);
+    }
+
+    public function userCanReviewDownloadRequest(User $user): bool
+    {
+        return $this->userCanAuthorizeDownloads($user) && $this->hasDownloadRequest();
+    }
+
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         // Only the creator and explicitly shared users can list/see full letter content.
@@ -116,6 +186,11 @@ class OfficialLetter extends Model
                     $shared->where('users.id', $user->id);
                 });
         });
+    }
+
+    public function scopeWithDownloadRequests(Builder $query): Builder
+    {
+        return $query->whereHas('downloadRequests');
     }
 
     public function departmentLabel(): string

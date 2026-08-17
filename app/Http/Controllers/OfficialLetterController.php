@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\OfficialLetter;
+use App\Models\OfficialLetterDownloadRequest;
 use App\Models\User;
+use App\Services\OfficialLetterDownloadAuthorizationService;
 use App\Services\OfficialLetterReferenceService;
 use App\Services\SystemSettingService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -17,6 +19,7 @@ class OfficialLetterController extends Controller
 {
     public function __construct(
         private readonly OfficialLetterReferenceService $referenceService,
+        private readonly OfficialLetterDownloadAuthorizationService $downloadAuthorizationService,
     ) {}
 
     public function index(Request $request)
@@ -25,13 +28,30 @@ class OfficialLetterController extends Controller
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $canManage = $user->can('manage official letters');
+        $canManage = $user->can(OfficialLetter::PERMISSION_MANAGE);
+        $canAuthorizeDownloads = $user->can(OfficialLetter::PERMISSION_AUTHORIZE_DOWNLOADS);
+        $tab = $canAuthorizeDownloads && $request->input('tab') === 'authorizations'
+            ? 'authorizations'
+            : 'mine';
 
         $query = OfficialLetter::query()
-            ->visibleTo($user)
-            ->with(['creator', 'signatory', 'sharedUsers:id,name'])
-            ->orderByDesc('letter_date')
-            ->orderByDesc('created_at');
+            ->with([
+                'creator',
+                'signatory',
+                'sharedUsers:id,name',
+                'latestDownloadRequest.requester:id,name',
+            ]);
+
+        if ($tab === 'authorizations') {
+            $query->withDownloadRequests()
+                ->orderByRaw($this->pendingDownloadRequestSortSql())
+                ->orderByDesc('letter_date')
+                ->orderByDesc('created_at');
+        } else {
+            $query->visibleTo($user)
+                ->orderByDesc('letter_date')
+                ->orderByDesc('created_at');
+        }
 
         if ($request->filled('department_code')) {
             $query->where('department_code', strtoupper((string) $request->input('department_code')));
@@ -47,19 +67,36 @@ class OfficialLetterController extends Controller
 
         $letters = $query->paginate(15)->withQueryString();
         $departments = config('official-letters.departments', []);
-        $years = OfficialLetter::query()
-            ->visibleTo($user)
+        $yearsQuery = OfficialLetter::query();
+        if ($tab === 'authorizations') {
+            $yearsQuery->withDownloadRequests();
+        } else {
+            $yearsQuery->visibleTo($user);
+        }
+        $years = $yearsQuery
             ->orderByDesc('letter_date')
             ->pluck('letter_date')
             ->map(fn ($date) => Carbon::parse($date)->year)
             ->unique()
             ->values();
 
+        $pendingAuthorizationCount = 0;
+        if ($canAuthorizeDownloads) {
+            $pendingAuthorizationCount = OfficialLetter::query()
+                ->whereHas('downloadRequests', function ($pending) {
+                    $pending->where('status', OfficialLetterDownloadRequest::STATUS_PENDING);
+                })
+                ->count();
+        }
+
         return view('official-letters.index', compact(
             'letters',
             'departments',
             'years',
             'canManage',
+            'canAuthorizeDownloads',
+            'tab',
+            'pendingAuthorizationCount',
             'user',
         ));
     }
@@ -108,18 +145,29 @@ class OfficialLetterController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (! $officialLetter->userHasFullAccess($user)) {
+        if (! $user->can('view', $officialLetter)) {
             return redirect()->route('official-letters.verify', $officialLetter);
         }
 
         $this->authorize('view', $officialLetter);
 
-        $officialLetter->load(['creator', 'signatory', 'sharedUsers:id,name']);
+        $officialLetter->load([
+            'creator',
+            'signatory',
+            'sharedUsers:id,name',
+            'latestDownloadRequest.requester:id,name',
+            'latestDownloadRequest.decider:id,name',
+        ]);
         $shareableUsers = $this->shareableUsersFor($user, $officialLetter);
         $canShare = $user->can('share', $officialLetter);
         $canUpdate = $user->can('update', $officialLetter);
         $canDelete = $user->can('delete', $officialLetter);
+        $canDownload = $user->can('download', $officialLetter);
+        $canRequestDownload = $user->can('requestDownload', $officialLetter);
+        $canAuthorizeDownload = $user->can('authorizeDownload', $officialLetter);
         $isSharedWithMe = ! $officialLetter->isOwnedBy($user) && $officialLetter->isSharedWith($user);
+        $isAuthorizerReview = $officialLetter->userCanReviewDownloadRequest($user)
+            && ! $officialLetter->userHasFullAccess($user);
 
         return view('official-letters.show', [
             'letter' => $officialLetter,
@@ -127,7 +175,11 @@ class OfficialLetterController extends Controller
             'canShare' => $canShare,
             'canUpdate' => $canUpdate,
             'canDelete' => $canDelete,
+            'canDownload' => $canDownload,
+            'canRequestDownload' => $canRequestDownload,
+            'canAuthorizeDownload' => $canAuthorizeDownload,
             'isSharedWithMe' => $isSharedWithMe,
+            'isAuthorizerReview' => $isAuthorizerReview,
         ]);
     }
 
@@ -138,7 +190,7 @@ class OfficialLetterController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if ($officialLetter->userHasFullAccess($user)) {
+        if ($user->can('view', $officialLetter)) {
             return redirect()->route('official-letters.show', $officialLetter);
         }
 
@@ -249,6 +301,69 @@ class OfficialLetterController extends Controller
             ->with('success', 'Official letter deleted.');
     }
 
+    public function requestDownload(Request $request, OfficialLetter $officialLetter)
+    {
+        $this->authorize('requestDownload', $officialLetter);
+
+        $validated = $request->validate([
+            'request_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $this->downloadAuthorizationService->requestDownload(
+            $officialLetter,
+            $user,
+            $this->optionalNote($validated['request_note'] ?? null),
+        );
+
+        return redirect()
+            ->route('official-letters.show', $officialLetter)
+            ->with('success', 'Download authorization requested. You will be notified when it is reviewed.');
+    }
+
+    public function authorizeDownload(Request $request, OfficialLetter $officialLetter)
+    {
+        $this->authorize('authorizeDownload', $officialLetter);
+
+        $validated = $request->validate([
+            'decision_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $this->downloadAuthorizationService->authorize(
+            $officialLetter,
+            $user,
+            $this->optionalNote($validated['decision_note'] ?? null),
+        );
+
+        return redirect()
+            ->route('official-letters.show', $officialLetter)
+            ->with('success', 'Download authorized. The requester has been notified.');
+    }
+
+    public function rejectDownload(Request $request, OfficialLetter $officialLetter)
+    {
+        $this->authorize('rejectDownload', $officialLetter);
+
+        $validated = $request->validate([
+            'decision_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $this->downloadAuthorizationService->reject(
+            $officialLetter,
+            $user,
+            $this->optionalNote($validated['decision_note'] ?? null),
+        );
+
+        return redirect()
+            ->route('official-letters.show', $officialLetter)
+            ->with('success', 'Download request rejected. The requester has been notified.');
+    }
+
     public function download(OfficialLetter $officialLetter)
     {
         $this->authorize('download', $officialLetter);
@@ -315,6 +430,24 @@ class OfficialLetterController extends Controller
         }
 
         return $response;
+    }
+
+    private function optionalNote(?string $note): ?string
+    {
+        $trimmed = trim((string) $note);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function pendingDownloadRequestSortSql(): string
+    {
+        return "(
+            select case when status = 'pending' then 0 else 1 end
+            from official_letter_download_requests
+            where official_letter_id = official_letters.id
+            order by created_at desc, id desc
+            limit 1
+        )";
     }
 
     /**

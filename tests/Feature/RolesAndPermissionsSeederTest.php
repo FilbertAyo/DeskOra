@@ -43,5 +43,7 @@ class RolesAndPermissionsSeederTest extends TestCase
         $this->assertTrue($staffRole->hasPermissionTo('manage official letters'));
         $this->assertTrue($staffRole->hasPermissionTo('create weekly plan'));
         $this->assertTrue($staffRole->hasPermissionTo('create weekly report'));
+        $this->assertTrue(\Spatie\Permission\Models\Permission::query()->where('name', 'authorize official letter downloads')->exists());
+        $this->assertFalse($staffRole->hasPermissionTo('authorize official letter downloads'));
     }
 }

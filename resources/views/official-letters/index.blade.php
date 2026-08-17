@@ -36,6 +36,26 @@
         </div>
     @endif
 
+    @if($canAuthorizeDownloads)
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link {{ $tab === 'mine' ? 'active' : '' }}"
+                   href="{{ route('official-letters.index', array_filter(['department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}">
+                    My Letters
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $tab === 'authorizations' ? 'active' : '' }}"
+                   href="{{ route('official-letters.index', array_filter(['tab' => 'authorizations', 'department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}">
+                    Download authorizations
+                    @if($pendingAuthorizationCount > 0)
+                        <span class="badge bg-warning text-dark ms-1">{{ $pendingAuthorizationCount }}</span>
+                    @endif
+                </a>
+            </li>
+        </ul>
+    @endif
+
     <div class="row">
         <div class="col-md-12">
             <div class="card tbl-card mb-2">
@@ -43,11 +63,15 @@
                     <div class="row align-items-center">
                         <div class="col-md-4 mb-2 mb-md-0">
                             <h5 class="mb-0">
-                                <i class="ti ti-mail me-2 text-primary"></i>My Official Letters
+                                <i class="ti ti-mail me-2 text-primary"></i>
+                                {{ $tab === 'authorizations' ? 'Download authorizations' : 'My Official Letters' }}
                             </h5>
                         </div>
                         <div class="col-md-8">
                             <form method="GET" action="{{ route('official-letters.index') }}" class="row g-2" id="filterForm">
+                                @if($tab === 'authorizations')
+                                    <input type="hidden" name="tab" value="authorizations">
+                                @endif
                                 <div class="col-md-4">
                                     <select name="department_code" class="form-control" onchange="document.getElementById('filterForm').submit();">
                                         <option value="">All Departments</option>
@@ -94,7 +118,10 @@
                                         <th style="width: 100px;">Dept</th>
                                         <th style="width: 120px;">Letter Date</th>
                                         <th style="width: 160px;">Created By</th>
-                                        <th class="text-center" style="width: 140px;">Actions</th>
+                                        @if($tab === 'authorizations')
+                                            <th style="width: 160px;">Requested By</th>
+                                        @endif
+                                        <th class="text-center" style="width: 180px;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -105,6 +132,7 @@
                                                 fn ($shared) => (string) $shared->id === (string) $user->id
                                             );
                                             $canEditLetter = $isOwned || $isSharedWithMe;
+                                            $canAuthorizeThis = $user->can('authorizeDownload', $letter);
                                         @endphp
                                         <tr>
                                             <td class="text-center">{{ ($letters->currentPage() - 1) * $letters->perPage() + $loop->iteration }}</td>
@@ -113,6 +141,7 @@
                                                 @if($isSharedWithMe)
                                                     <span class="badge bg-light-info border border-info ms-1">Shared</span>
                                                 @endif
+                                                @include('official-letters.partials.download-status-badge', ['letter' => $letter, 'class' => 'ms-1'])
                                             </td>
                                             <td>{{ \Illuminate\Support\Str::limit($letter->subject, 60) }}</td>
                                             <td>{{ $letter->department_code }}</td>
@@ -123,13 +152,32 @@
                                                     <span>{{ $letter->created_at->format('M d, Y') }}</span>
                                                 </small>
                                             </td>
+                                            @if($tab === 'authorizations')
+                                                <td>
+                                                    <small>
+                                                        {{ $letter->latestDownloadRequest?->requester?->name ?? 'N/A' }}
+                                                    </small>
+                                                </td>
+                                            @endif
                                             <td class="text-center">
                                                 <a href="{{ route('official-letters.show', $letter) }}" class="btn btn-sm btn-light" title="View">
                                                     <i class="ti ti-eye"></i>
                                                 </a>
-                                                <a href="{{ route('official-letters.download', $letter) }}" class="btn btn-sm btn-danger" title="Download PDF">
-                                                    <i class="ti ti-download"></i>
-                                                </a>
+                                                @include('official-letters.partials.download-button', ['letter' => $letter, 'user' => $user, 'compact' => true])
+                                                @if($canAuthorizeThis)
+                                                    <form method="POST" action="{{ route('official-letters.authorize-download', $letter) }}" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-success" title="Authorize download">
+                                                            <i class="ti ti-check"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form method="POST" action="{{ route('official-letters.reject-download', $letter) }}" class="d-inline" onsubmit="return confirm('Reject this download request?');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject download">
+                                                            <i class="ti ti-x"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                                 @if($canEditLetter)
                                                     <a href="{{ route('official-letters.edit', $letter) }}" class="btn btn-sm btn-light" title="Edit">
                                                         <i class="ti ti-pencil"></i>
@@ -147,8 +195,10 @@
                     @else
                         <div class="text-center py-5">
                             <i class="ti ti-mail-off" style="font-size: 3rem; opacity: 0.3;"></i>
-                            <p class="text-muted mb-3 mt-3">No official letters found</p>
-                            @if($canManage)
+                            <p class="text-muted mb-3 mt-3">
+                                {{ $tab === 'authorizations' ? 'No download authorization requests yet' : 'No official letters found' }}
+                            </p>
+                            @if($canManage && $tab !== 'authorizations')
                                 <a href="{{ route('official-letters.create') }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-plus me-1"></i> Create your first letter
                                 </a>
@@ -159,4 +209,6 @@
             </div>
         </div>
     </div>
+
+    @include('official-letters.partials.download-modals')
 </x-app-layout>

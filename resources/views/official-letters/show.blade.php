@@ -13,16 +13,14 @@
                             </ul>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
-                            <a href="{{ route('official-letters.download', $letter) }}" class="btn btn-sm btn-danger">
-                                <i class="ti ti-download me-1"></i> Download PDF
-                            </a>
+                            @include('official-letters.partials.download-button', ['letter' => $letter, 'user' => auth()->user(), 'compact' => false])
                             @if($canUpdate)
                                 <a href="{{ route('official-letters.edit', $letter) }}" class="btn btn-sm btn-light">
                                     <i class="ti ti-pencil me-1"></i> Edit
                                 </a>
                             @endif
-                       
-                            <a href="{{ route('official-letters.index') }}" class="btn btn-sm btn-light">
+
+                            <a href="{{ route('official-letters.index', $isAuthorizerReview ? ['tab' => 'authorizations'] : []) }}" class="btn btn-sm btn-light">
                                 <i class="ti ti-arrow-left me-1"></i> Back
                             </a>
                         </div>
@@ -39,9 +37,29 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-triangle me-2"></i>{{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-triangle me-2"></i>{{ $errors->first() }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     @if($isSharedWithMe)
         <div class="alert alert-info">
             <i class="ti ti-share me-1"></i> This letter was shared with you. You can view and edit it.
+        </div>
+    @endif
+
+    @if($isAuthorizerReview)
+        <div class="alert alert-info">
+            <i class="ti ti-shield-check me-1"></i> You were asked to authorize download of this letter.
         </div>
     @endif
 
@@ -50,7 +68,10 @@
             <div class="card shadow-none border mb-3">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="ti ti-file-text me-2"></i>Letter Content</h5>
-                    <code>{{ $letter->reference_number }}</code>
+                    <div class="d-flex align-items-center gap-2">
+                        <code>{{ $letter->reference_number }}</code>
+                        @include('official-letters.partials.download-status-badge', ['letter' => $letter])
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -106,6 +127,8 @@
                     </div>
                 </div>
             </div>
+
+            @include('official-letters.partials.authorize-actions', ['letter' => $letter, 'canAuthorizeDownload' => $canAuthorizeDownload])
 
             @if($canShare)
                 <div class="card shadow-none border mb-3">
@@ -165,9 +188,27 @@
                                 {{ $letter->sharedUsers->pluck('name')->join(', ') }}
                             @endif
                         </dd>
+                        <dt class="small text-muted">Download</dt>
+                        <dd>
+                            @include('official-letters.partials.download-status-badge', ['letter' => $letter])
+                            @if(! $letter->downloadAuthorizationStatus())
+                                <span class="text-muted">Authorization required</span>
+                            @endif
+                            @if($letter->latestDownloadRequest?->requester)
+                                <div class="small text-muted mt-1">
+                                    Requested by {{ $letter->latestDownloadRequest->requester->name }}
+                                    @if($letter->latestDownloadRequest->decider)
+                                        · {{ $letter->latestDownloadRequest->isAuthorized() ? 'Authorized' : 'Rejected' }}
+                                        by {{ $letter->latestDownloadRequest->decider->name }}
+                                    @endif
+                                </div>
+                            @endif
+                        </dd>
                     </dl>
                 </div>
             </div>
         </div>
     </div>
+
+    @include('official-letters.partials.download-modals')
 </x-app-layout>

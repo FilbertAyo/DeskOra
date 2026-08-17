@@ -201,6 +201,9 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:manage official letters')
             ->name('store');
         Route::get('/{officialLetter}/download', [OfficialLetterController::class, 'download'])->name('download');
+        Route::post('/{officialLetter}/request-download', [OfficialLetterController::class, 'requestDownload'])->name('request-download');
+        Route::post('/{officialLetter}/authorize-download', [OfficialLetterController::class, 'authorizeDownload'])->name('authorize-download');
+        Route::post('/{officialLetter}/reject-download', [OfficialLetterController::class, 'rejectDownload'])->name('reject-download');
         Route::get('/{officialLetter}/verify', [OfficialLetterController::class, 'verify'])->name('verify');
         Route::get('/{officialLetter}/edit', [OfficialLetterController::class, 'edit'])->name('edit');
         Route::put('/{officialLetter}', [OfficialLetterController::class, 'update'])->name('update');
