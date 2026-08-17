@@ -24,10 +24,10 @@
     min-width: 0;
 }
 
-.dashboard-slot--action { order: 1; }
-.dashboard-slot--stats { order: 2; }
-.dashboard-slot--performance { order: 3; }
-.dashboard-slot--work-log { order: 4; }
+.dashboard-slot--stats { order: 1; }
+.dashboard-slot--performance { order: 2; }
+.dashboard-slot--work-log { order: 3; }
+.dashboard-slot--action { order: 4; }
 .dashboard-slot--scorecard { order: 5; }
 .dashboard-slot--alerts { order: 6; }
 .dashboard-slot--activities { order: 7; }
