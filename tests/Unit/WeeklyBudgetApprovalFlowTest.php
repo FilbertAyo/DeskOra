@@ -75,4 +75,29 @@ class WeeklyBudgetApprovalFlowTest extends TestCase
             WeeklyBudgetApprovalFlow::resolveNextActionStage(Document::BUDGET_REVIEW_STAGE_PENDING, $approver)
         );
     }
+
+    public function test_queue_visibility_matches_each_role_stage(): void
+    {
+        $reviewer = $this->userWithPermissions(['review weekly budgets']);
+        $approver = $this->userWithPermissions(['approve weekly budgets']);
+        $authorizer = $this->userWithPermissions(['authorize weekly budgets']);
+
+        $pending = ['decision' => Document::BUDGET_REVIEW_PENDING, 'approval_stage' => Document::BUDGET_REVIEW_STAGE_PENDING];
+        $reviewed = ['decision' => Document::BUDGET_REVIEW_APPROVED, 'approval_stage' => Document::BUDGET_REVIEW_STAGE_REVIEWED];
+        $approved = ['decision' => Document::BUDGET_REVIEW_APPROVED, 'approval_stage' => Document::BUDGET_REVIEW_STAGE_APPROVED];
+        $authorized = ['decision' => Document::BUDGET_REVIEW_APPROVED, 'approval_stage' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED];
+
+        $this->assertTrue(WeeklyBudgetApprovalFlow::itemIsInUserQueue($pending, $reviewer));
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($reviewed, $reviewer));
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($approved, $reviewer));
+
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($pending, $approver));
+        $this->assertTrue(WeeklyBudgetApprovalFlow::itemIsInUserQueue($reviewed, $approver));
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($approved, $approver));
+
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($pending, $authorizer));
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($reviewed, $authorizer));
+        $this->assertTrue(WeeklyBudgetApprovalFlow::itemIsInUserQueue($approved, $authorizer));
+        $this->assertFalse(WeeklyBudgetApprovalFlow::itemIsInUserQueue($authorized, $authorizer));
+    }
 }

@@ -60,11 +60,8 @@ trait HandlesDocumentBudgetReview
         );
 
         // Build grouped data: department -> staff -> budget items
-        $grouped = $this->groupBudgetDocumentsByDepartment($documents->getCollection());
-
-        // Stats from current result set
-        $statsDocuments = $documents->getCollection();
-        $aggregateStats = $this->computeBudgetStats($statsDocuments);
+        $grouped = $this->groupBudgetDocumentsByDepartment($documents->getCollection(), $user);
+        $aggregateStats = $this->weeklyBudgetReviewService->computeBudgetStatsFromGrouped($grouped);
 
         $usersWithBudgets = User::query()
             ->whereHas('documents', function ($documentsQuery) {

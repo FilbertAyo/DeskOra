@@ -275,6 +275,63 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertSame(['Week 17 laptop'], collect($week17Items)->pluck('item')->all());
     }
 
+    public function test_each_role_only_sees_budget_items_in_their_queue(): void
+    {
+        [, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+        $reviewer = $this->createStageReviewer('review weekly budgets');
+        $approver = $this->createStageReviewer('approve weekly budgets');
+        $authorizer = $this->createStageReviewer('authorize weekly budgets');
+
+        $plan = $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Stage queue item', 'description_purpose' => 'Check visibility', 'amount' => '100'],
+        ]);
+        $uid = $plan->budgetItems()[0]['budget_uid'];
+        $plan->setRelation('user', $staff->loadMissing('department'));
+        $plan->setRelation('period', $next);
+
+        $service = app(\App\Services\Documents\WeeklyBudgetReviewService::class);
+        $itemNames = function (User $actor) use ($service, &$plan): array {
+            $grouped = $service->groupBudgetDocumentsByDepartment(collect([$plan]), $actor);
+
+            return collect($grouped)
+                ->flatMap(fn ($period) => collect($period['departments'] ?? []))
+                ->flatMap(fn ($dept) => collect($dept['staff'] ?? []))
+                ->flatMap(fn ($staff) => collect($staff['items'] ?? []))
+                ->pluck('item')
+                ->all();
+        };
+
+        $this->assertSame(['Stage queue item'], $itemNames($reviewer));
+        $this->assertSame([], $itemNames($approver));
+        $this->assertSame([], $itemNames($authorizer));
+
+        $this->actingAs($reviewer)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect();
+        $plan = $plan->fresh() ?? $plan;
+        $plan->setRelation('user', $staff->loadMissing('department'));
+        $plan->setRelation('period', $next);
+
+        $this->assertSame([], $itemNames($reviewer));
+        $this->assertSame(['Stage queue item'], $itemNames($approver));
+        $this->assertSame([], $itemNames($authorizer));
+
+        $this->actingAs($approver)->post(
+            route('documents.process-weekly-budget-review', $plan->id),
+            ['budget_uid' => $uid, 'decision' => 'approved', 'provided_amount' => 100]
+        )->assertRedirect();
+        $plan = $plan->fresh() ?? $plan;
+        $plan->setRelation('user', $staff->loadMissing('department'));
+        $plan->setRelation('period', $next);
+
+        $this->assertSame([], $itemNames($reviewer));
+        $this->assertSame([], $itemNames($approver));
+        $this->assertSame(['Stage queue item'], $itemNames($authorizer));
+    }
+
     public function test_pending_budget_review_count_without_period_includes_older_weeks_until_processed(): void
     {
         [$current, $next] = $this->createPeriods();

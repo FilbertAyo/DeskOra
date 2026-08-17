@@ -372,7 +372,9 @@ class WeeklyBudgetReviewService
     /**
      * Group budget documents by work period -> department -> staff.
      * Staff from different weeks stay in separate sections.
+     * Processors only see items in their review / approve / authorize queue.
      *
+     * @param  User|null  $viewer
      * @return array<string, array{
      *     period: \App\Models\WorkPeriod|null,
      *     period_id: string,
@@ -389,7 +391,7 @@ class WeeklyBudgetReviewService
      *     }>
      * }>
      */
-    public function groupBudgetDocumentsByDepartment(Collection $documents): array
+    public function groupBudgetDocumentsByDepartment(Collection $documents, ?User $viewer = null): array
     {
         $grouped = [];
         $actorIds = [];
@@ -401,44 +403,9 @@ class WeeklyBudgetReviewService
                 ? sprintf('Week %s • %s', $period->week_number, $period->year)
                 : 'Unknown week';
 
-            if (! isset($grouped[$periodId])) {
-                $grouped[$periodId] = [
-                    'period' => $period,
-                    'period_id' => $periodId,
-                    'period_label' => $periodLabel,
-                    'period_range' => $period?->date_range,
-                    'sort_year' => (int) ($period?->year ?? 9999),
-                    'sort_week' => (int) ($period?->week_number ?? 9999),
-                    'requested_total' => 0.0,
-                    'provided_total' => 0.0,
-                    'departments' => [],
-                ];
-            }
-
             $departmentName = $document->user?->department?->name ?? 'No Department';
             $departmentId = (string) ($document->user?->department_id ?? 'none');
-
-            if (! isset($grouped[$periodId]['departments'][$departmentId])) {
-                $grouped[$periodId]['departments'][$departmentId] = [
-                    'department_name' => $departmentName,
-                    'department_id' => $departmentId,
-                    'requested_total' => 0.0,
-                    'provided_total' => 0.0,
-                    'staff' => [],
-                ];
-            }
-
-            $userId = (string) $document->user_id;
-            if (! isset($grouped[$periodId]['departments'][$departmentId]['staff'][$userId])) {
-                $grouped[$periodId]['departments'][$departmentId]['staff'][$userId] = [
-                    'user' => $document->user,
-                    'document' => $document,
-                    'items' => [],
-                    'requested_total' => 0.0,
-                    'provided_total' => 0.0,
-                    'summary' => $document->budgetReviewSummary(),
-                ];
-            }
+            $staffUserId = (string) $document->user_id;
 
             $budgetItems = $document->budgetItems();
             $reviewsByUid = $document->budgetReviewItemsByUid();
@@ -450,13 +417,7 @@ class WeeklyBudgetReviewService
                 $providedAmount = (float) ($review['provided_amount'] ?? 0);
                 $approvalStage = $review['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING;
 
-                foreach (['review_stage_by', 'approve_stage_by', 'authorize_stage_by'] as $actorKey) {
-                    if (! empty($review[$actorKey])) {
-                        $actorIds[] = (string) $review[$actorKey];
-                    }
-                }
-
-                $grouped[$periodId]['departments'][$departmentId]['staff'][$userId]['items'][] = [
+                $row = [
                     'budget_uid' => $uid,
                     'item' => $item['item'],
                     'description_purpose' => $item['description_purpose'],
@@ -479,14 +440,72 @@ class WeeklyBudgetReviewService
                     'document_id' => $document->id,
                 ];
 
-                $grouped[$periodId]['departments'][$departmentId]['staff'][$userId]['requested_total'] += $amountNumeric;
+                if ($viewer && ! WeeklyBudgetApprovalFlow::itemIsInUserQueue($row, $viewer)) {
+                    continue;
+                }
+
+                if (! isset($grouped[$periodId])) {
+                    $grouped[$periodId] = [
+                        'period' => $period,
+                        'period_id' => $periodId,
+                        'period_label' => $periodLabel,
+                        'period_range' => $period?->date_range,
+                        'sort_year' => (int) ($period?->year ?? 9999),
+                        'sort_week' => (int) ($period?->week_number ?? 9999),
+                        'requested_total' => 0.0,
+                        'provided_total' => 0.0,
+                        'departments' => [],
+                    ];
+                }
+
+                if (! isset($grouped[$periodId]['departments'][$departmentId])) {
+                    $grouped[$periodId]['departments'][$departmentId] = [
+                        'department_name' => $departmentName,
+                        'department_id' => $departmentId,
+                        'requested_total' => 0.0,
+                        'provided_total' => 0.0,
+                        'staff' => [],
+                    ];
+                }
+
+                if (! isset($grouped[$periodId]['departments'][$departmentId]['staff'][$staffUserId])) {
+                    $grouped[$periodId]['departments'][$departmentId]['staff'][$staffUserId] = [
+                        'user' => $document->user,
+                        'document' => $document,
+                        'items' => [],
+                        'requested_total' => 0.0,
+                        'provided_total' => 0.0,
+                        'summary' => [
+                            'pending' => 0,
+                            'approved' => 0,
+                            'rejected' => 0,
+                        ],
+                    ];
+                }
+
+                foreach (['review_stage_by', 'approve_stage_by', 'authorize_stage_by'] as $actorKey) {
+                    if (! empty($review[$actorKey])) {
+                        $actorIds[] = (string) $review[$actorKey];
+                    }
+                }
+
+                $staff = &$grouped[$periodId]['departments'][$departmentId]['staff'][$staffUserId];
+                $staff['items'][] = $row;
+                $staff['requested_total'] += $amountNumeric;
                 $grouped[$periodId]['departments'][$departmentId]['requested_total'] += $amountNumeric;
                 $grouped[$periodId]['requested_total'] += $amountNumeric;
                 if ($approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED) {
-                    $grouped[$periodId]['departments'][$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
+                    $staff['provided_total'] += $providedAmount;
                     $grouped[$periodId]['departments'][$departmentId]['provided_total'] += $providedAmount;
                     $grouped[$periodId]['provided_total'] += $providedAmount;
+                    $staff['summary']['approved']++;
+                } elseif (($row['decision'] ?? '') === Document::BUDGET_REVIEW_REJECTED
+                    || $approvalStage === Document::BUDGET_REVIEW_STAGE_REJECTED) {
+                    $staff['summary']['rejected']++;
+                } else {
+                    $staff['summary']['pending']++;
                 }
+                unset($staff);
             }
         }
 
@@ -554,6 +573,46 @@ class WeeklyBudgetReviewService
 
         return [
             'total' => $documents->count(),
+            'total_items' => $totalItems,
+            'pending' => $pendingItems,
+            'approved' => $approvedItems,
+            'rejected' => $rejectedItems,
+            'requested_total' => $requestedTotal,
+            'provided_total' => $providedTotal,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $grouped
+     * @return array<string, int|float>
+     */
+    public function computeBudgetStatsFromGrouped(array $grouped): array
+    {
+        $totalItems = 0;
+        $pendingItems = 0;
+        $approvedItems = 0;
+        $rejectedItems = 0;
+        $requestedTotal = 0.0;
+        $providedTotal = 0.0;
+        $staffCount = 0;
+
+        foreach ($grouped as $periodGroup) {
+            $requestedTotal += (float) ($periodGroup['requested_total'] ?? 0);
+            $providedTotal += (float) ($periodGroup['provided_total'] ?? 0);
+            foreach ($periodGroup['departments'] ?? [] as $department) {
+                foreach ($department['staff'] ?? [] as $staffData) {
+                    $staffCount++;
+                    $summary = $staffData['summary'] ?? [];
+                    $pendingItems += (int) ($summary['pending'] ?? 0);
+                    $approvedItems += (int) ($summary['approved'] ?? 0);
+                    $rejectedItems += (int) ($summary['rejected'] ?? 0);
+                    $totalItems += count($staffData['items'] ?? []);
+                }
+            }
+        }
+
+        return [
+            'total' => $staffCount,
             'total_items' => $totalItems,
             'pending' => $pendingItems,
             'approved' => $approvedItems,

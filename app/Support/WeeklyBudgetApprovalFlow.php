@@ -143,6 +143,34 @@ class WeeklyBudgetApprovalFlow
         return implode(' · ', $roles);
     }
 
+    public static function itemIsInUserQueue(array $item, User $user): bool
+    {
+        if (! $user->canAny([
+            'review weekly budgets',
+            'approve weekly budgets',
+            'authorize weekly budgets',
+        ])) {
+            return true;
+        }
+
+        $isRejected = ($item['decision'] ?? '') === Document::BUDGET_REVIEW_REJECTED
+            || ($item['approval_stage'] ?? '') === Document::BUDGET_REVIEW_STAGE_REJECTED;
+        $approvalStage = $item['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING;
+        $isFinalApproved = ($item['decision'] ?? '') === Document::BUDGET_REVIEW_APPROVED
+            && $approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
+
+        if ($isRejected || $isFinalApproved) {
+            return false;
+        }
+
+        return match ($approvalStage) {
+            Document::BUDGET_REVIEW_STAGE_PENDING => $user->can('review weekly budgets'),
+            Document::BUDGET_REVIEW_STAGE_REVIEWED => $user->can('approve weekly budgets'),
+            Document::BUDGET_REVIEW_STAGE_APPROVED => $user->can('authorize weekly budgets'),
+            default => false,
+        };
+    }
+
     public static function isDirectAuthorization(?string $nextStage, string $approvalStage): bool
     {
         return $nextStage === self::STAGE_AUTHORIZE

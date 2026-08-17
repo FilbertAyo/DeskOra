@@ -246,9 +246,9 @@ class DocumentController extends Controller
      *
      * @return array<string, array{department_name: string, department_id: string|null, requested_total: float, provided_total: float, staff: array}>
      */
-    protected function groupBudgetDocumentsByDepartment(\Illuminate\Support\Collection $documents): array
+    protected function groupBudgetDocumentsByDepartment(\Illuminate\Support\Collection $documents, ?User $viewer = null): array
     {
-        return $this->weeklyBudgetReviewService->groupBudgetDocumentsByDepartment($documents);
+        return $this->weeklyBudgetReviewService->groupBudgetDocumentsByDepartment($documents, $viewer);
     }
 
     /**
