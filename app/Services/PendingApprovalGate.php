@@ -91,7 +91,7 @@ class PendingApprovalGate
             );
         }
 
-        $budgetRemaining = $this->weeklyBudgetReviewService->actionableItemCountFor($user);
+        $budgetRemaining = $this->weeklyBudgetReviewService->reminderItemCountFor($user);
         $hasPending = $requisitionCount > 0 || $budgetRemaining > 0;
         $snoozed = $this->isSnoozed($session);
         $primaryQueue = $requisitionCount > 0

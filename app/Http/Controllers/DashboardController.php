@@ -305,49 +305,20 @@ class DashboardController extends Controller
             ];
         }
 
+        $recentPeriodIds = $this->workPeriodService->latestReminderPeriodIds(2);
+
         $sharedWithMeCount = Document::query()
             ->whereRaw('BINARY type IN (BINARY ?, BINARY ?)', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
             ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
             ->whereRaw('BINARY user_id <> BINARY ?', [(string) $user->id])
+            ->when(
+                $recentPeriodIds === [],
+                fn ($query) => $query->whereRaw('1 = 0'),
+                fn ($query) => $query->whereIn('period_id', $recentPeriodIds)
+            )
             ->count();
 
-        $collaborationEvents = DB::table('document_share_events as dse')
-            ->leftJoin('weekly_plans as wp', 'wp.id', '=', 'dse.weekly_plan_id')
-            ->leftJoin('weekly_reports as wr', 'wr.id', '=', 'dse.weekly_report_id')
-            ->leftJoin('users as actor', 'actor.id', '=', 'dse.actor_user_id')
-            ->where('dse.target_user_id', $user->id)
-            ->where(function ($query) {
-                $query->whereNotNull('dse.weekly_plan_id')
-                    ->orWhereNotNull('dse.weekly_report_id');
-            })
-            ->orderByDesc('dse.created_at')
-            ->limit(5)
-            ->get([
-                'dse.event_type',
-                'dse.created_at',
-                DB::raw('COALESCE(wp.id, wr.id) as document_id'),
-                DB::raw("CASE WHEN dse.weekly_plan_id IS NOT NULL THEN 'weekly_plan' WHEN dse.weekly_report_id IS NOT NULL THEN 'weekly_report' END as document_type"),
-                DB::raw('COALESCE(wp.title, wr.title) as document_title'),
-                'actor.name as actor_name',
-            ])
-            ->map(function ($event) {
-                $typeLabel = $event->document_type === Document::TYPE_WEEKLY_PLAN ? 'Weekly Plan' : 'Weekly Report';
-                $verb = $event->event_type === Document::SHARE_EVENT_REMOVED ? 'removed you from' : 'shared';
-                $actor = $event->actor_name ?: 'A teammate';
-                $title = $event->document_title ?: $typeLabel;
-
-                $isRemoved = $event->event_type === Document::SHARE_EVENT_REMOVED;
-
-                return [
-                    'document_id' => $event->document_id,
-                    'message' => "{$actor} {$verb} {$typeLabel}: {$title}",
-                    'event_type' => $event->event_type,
-                    'badge_label' => $isRemoved ? 'Removed' : 'Shared',
-                    'badge_class' => $isRemoved ? 'bg-light-secondary border border-secondary' : 'bg-light-success border border-success',
-                    'created_at' => Carbon::parse($event->created_at),
-                ];
-            })
-            ->values();
+        $collaborationEvents = $this->recentCollaborationEventsFor($user, $recentPeriodIds);
 
         $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
         $teamUsers = User::query()
@@ -526,6 +497,62 @@ class DashboardController extends Controller
         }
 
         return $actions;
+    }
+
+    /**
+     * @param  list<string>  $periodIds
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function recentCollaborationEventsFor(User $user, array $periodIds)
+    {
+        return DB::table('document_share_events as dse')
+            ->leftJoin('weekly_plans as wp', 'wp.id', '=', 'dse.weekly_plan_id')
+            ->leftJoin('weekly_reports as wr', 'wr.id', '=', 'dse.weekly_report_id')
+            ->leftJoin('users as actor', 'actor.id', '=', 'dse.actor_user_id')
+            ->where('dse.target_user_id', $user->id)
+            ->where(function ($query) {
+                $query->whereNotNull('dse.weekly_plan_id')
+                    ->orWhereNotNull('dse.weekly_report_id');
+            })
+            ->when(
+                $periodIds === [],
+                fn ($query) => $query->whereRaw('1 = 0'),
+                function ($query) use ($periodIds) {
+                    $query->where(function ($periodQuery) use ($periodIds) {
+                        $periodQuery
+                            ->whereIn('wp.period_id', $periodIds)
+                            ->orWhereIn('wr.period_id', $periodIds);
+                    });
+                }
+            )
+            ->orderByDesc('dse.created_at')
+            ->limit(5)
+            ->get([
+                'dse.event_type',
+                'dse.created_at',
+                DB::raw('COALESCE(wp.id, wr.id) as document_id'),
+                DB::raw("CASE WHEN dse.weekly_plan_id IS NOT NULL THEN 'weekly_plan' WHEN dse.weekly_report_id IS NOT NULL THEN 'weekly_report' END as document_type"),
+                DB::raw('COALESCE(wp.title, wr.title) as document_title'),
+                'actor.name as actor_name',
+            ])
+            ->map(function ($event) {
+                $typeLabel = $event->document_type === Document::TYPE_WEEKLY_PLAN ? 'Weekly Plan' : 'Weekly Report';
+                $verb = $event->event_type === Document::SHARE_EVENT_REMOVED ? 'removed you from' : 'shared';
+                $actor = $event->actor_name ?: 'A teammate';
+                $title = $event->document_title ?: $typeLabel;
+
+                $isRemoved = $event->event_type === Document::SHARE_EVENT_REMOVED;
+
+                return [
+                    'document_id' => $event->document_id,
+                    'message' => "{$actor} {$verb} {$typeLabel}: {$title}",
+                    'event_type' => $event->event_type,
+                    'badge_label' => $isRemoved ? 'Removed' : 'Shared',
+                    'badge_class' => $isRemoved ? 'bg-light-secondary border border-secondary' : 'bg-light-success border border-success',
+                    'created_at' => Carbon::parse($event->created_at),
+                ];
+            })
+            ->values();
     }
 
     private function withEffectiveWeeklyReportCollaborators($documents, User $viewer)

@@ -11,6 +11,7 @@ use App\Services\WeeklyActivityAssignmentService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class WeeklyDocumentSharingTest extends TestCase
@@ -314,6 +315,70 @@ class WeeklyDocumentSharingTest extends TestCase
             ->exists();
 
         $this->assertTrue($pendingForDashboard);
+    }
+
+    public function test_dashboard_shared_activities_hide_plans_from_past_work_periods(): void
+    {
+        [$currentPeriod, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $olderPeriod = WorkPeriod::create([
+            'year' => 2025,
+            'week_number' => 13,
+            'week_start_date' => '2025-03-24',
+            'week_end_date' => '2025-03-30',
+            'plan_deadline' => '2025-03-28',
+            'report_deadline' => '2025-03-29',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+        $member = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $oldPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $olderPeriod->id,
+            'user_id' => $owner->id,
+            'main_target' => 'Old target',
+            'title' => 'Old Shared Plan From March',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $recentPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $currentPeriod->id,
+            'user_id' => $owner->id,
+            'main_target' => 'Recent target',
+            'title' => 'Recent Shared Plan For This Week',
+            'state' => Document::STATE_DRAFT,
+        ]);
+        $nextPlan = Document::create([
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'user_id' => $owner->id,
+            'main_target' => 'Next target',
+            'title' => 'Next Week Shared Plan',
+            'state' => Document::STATE_DRAFT,
+        ]);
+
+        foreach ([$oldPlan, $recentPlan, $nextPlan] as $plan) {
+            $plan->sharedUsers()->sync([$member->id]);
+            DB::table('document_share_events')->insert([
+                'weekly_plan_id' => $plan->id,
+                'weekly_report_id' => null,
+                'actor_user_id' => $owner->id,
+                'target_user_id' => $member->id,
+                'event_type' => Document::SHARE_EVENT_ADDED,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $periodIds = app(\App\Services\WorkPeriodService::class)->latestReminderPeriodIds(2);
+        $events = $this->invokeDashboardControllerMethod('recentCollaborationEventsFor', [$member, $periodIds]);
+        $messages = collect($events)->pluck('message')->implode("\n");
+
+        $this->assertStringContainsString('Recent Shared Plan For This Week', $messages);
+        $this->assertStringContainsString('Next Week Shared Plan', $messages);
+        $this->assertStringNotContainsString('Old Shared Plan From March', $messages);
     }
 
     public function test_plan_collaborator_scope_does_not_include_unrelated_weekly_reports_from_same_period(): void
@@ -942,6 +1007,18 @@ class WeeklyDocumentSharingTest extends TestCase
     private function invokeDocumentControllerMethod(string $method, array $arguments): mixed
     {
         $controller = app(\App\Http\Controllers\DocumentController::class);
+        $reflection = new \ReflectionMethod($controller, $method);
+        $reflection->setAccessible(true);
+
+        return $reflection->invoke($controller, ...$arguments);
+    }
+
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    private function invokeDashboardControllerMethod(string $method, array $arguments): mixed
+    {
+        $controller = app(\App\Http\Controllers\DashboardController::class);
         $reflection = new \ReflectionMethod($controller, $method);
         $reflection->setAccessible(true);
 

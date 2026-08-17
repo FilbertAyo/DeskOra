@@ -215,6 +215,40 @@ class PendingApprovalGateTest extends TestCase
             ->assertJsonPath('budget_remaining', 1);
     }
 
+    public function test_weekly_budget_popup_ignores_older_work_periods(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $older = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 15,
+            'week_start_date' => '2026-04-06',
+            'week_end_date' => '2026-04-12',
+            'plan_deadline' => '2026-04-10',
+            'report_deadline' => '2026-04-11',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $department = $this->createDepartment();
+        $staff = User::factory()->create(['department_id' => $department->id, 'status' => 'active']);
+        $reviewer = $this->userWithPermissions(['review weekly budgets', 'view weekly budgets']);
+        $this->createPlanWithBudget($staff, $older, 'Ancient toner');
+
+        $this->actingAs($reviewer)
+            ->getJson(route('approval-gate.snapshot'))
+            ->assertOk()
+            ->assertJsonPath('show_modal', false)
+            ->assertJsonPath('budget_remaining', 0);
+
+        $this->createPlanWithBudget($staff, $current, 'Current paper');
+        $this->createPlanWithBudget($staff, $next, 'Next pens');
+
+        $this->actingAs($reviewer)
+            ->getJson(route('approval-gate.snapshot'))
+            ->assertOk()
+            ->assertJsonPath('show_modal', true)
+            ->assertJsonPath('budget_remaining', 2);
+    }
+
     public function test_weekly_budget_popup_does_not_block_other_work(): void
     {
         [$current] = $this->createPeriods();

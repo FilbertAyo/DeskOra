@@ -108,6 +108,28 @@ class WeeklyBudgetReviewService
     }
 
     /**
+     * Pending budget items in the current and next work periods only.
+     */
+    public function reminderItemCountFor(User $user): int
+    {
+        $periodIds = $this->workPeriodService->latestReminderPeriodIds(
+            max(1, (int) config('approval_gate.budget_reminder_period_count', 2))
+        );
+
+        if ($periodIds === []) {
+            return 0;
+        }
+
+        if (! Schema::hasTable('weekly_plan_budget_items') || ! Schema::hasTable('weekly_plans')) {
+            return 0;
+        }
+
+        return (int) $this->actionableItemsQuery($user)
+            ->whereIn('weekly_plans.period_id', $periodIds)
+            ->count();
+    }
+
+    /**
      * Pending budget line items this user can act on, oldest week first.
      *
      * @return Collection<int, WeeklyPlanBudgetItem>

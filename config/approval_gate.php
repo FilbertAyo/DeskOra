@@ -13,6 +13,12 @@ return [
     */
     'session_snooze_key' => 'approval_gate.snoozed',
 
+    /*
+    | Reminder modal only counts weekly budgets in the current and next work
+    | periods (the two latest weeks staff are working in). Requisitions are unchanged.
+    */
+    'budget_reminder_period_count' => 2,
+
     'work_routes' => [
         'petty.list',
         'petty.details',

@@ -126,6 +126,35 @@ class WorkPeriodService
     }
 
     /**
+     * Current week and next week — the two latest periods staff are working in.
+     *
+     * @return list<string>
+     */
+    public function latestReminderPeriodIds(int $limit = 2): array
+    {
+        $ids = [];
+        $current = $this->getCurrentPeriod();
+        $next = $current?->getNextPeriod();
+
+        foreach ([$current, $next] as $period) {
+            if ($period === null) {
+                continue;
+            }
+
+            $id = (string) $period->id;
+            if (! in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+
+            if (count($ids) >= $limit) {
+                break;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Badge/text/deadline dates for UI: plan targets next week; report targets current week.
      *
      * @return array<string, mixed>|null

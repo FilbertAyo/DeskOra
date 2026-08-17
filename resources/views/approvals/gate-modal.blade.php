@@ -55,7 +55,7 @@
                         <div>
                             <div class="fw-semibold">Weekly budgets</div>
                             <small class="text-muted">
-                                {{ $gate->budgetRemaining }} item{{ $gate->budgetRemaining === 1 ? '' : 's' }} waiting. Oldest weeks first.
+                                {{ $gate->budgetRemaining }} item{{ $gate->budgetRemaining === 1 ? '' : 's' }} waiting in the latest two work periods.
                             </small>
                         </div>
                         @if($gate->budgetActionUrl)
