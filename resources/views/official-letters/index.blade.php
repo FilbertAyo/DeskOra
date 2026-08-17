@@ -1,54 +1,4 @@
 <x-app-layout>
-    <style>
-        .ol-tabs {
-            display: inline-flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-            padding: 0.3rem;
-            background: #f1f5f9;
-            border-radius: 999px;
-        }
-        .ol-tabs__item {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.4rem 0.9rem;
-            border-radius: 999px;
-            color: #475569;
-            font-weight: 600;
-            font-size: 0.875rem;
-            text-decoration: none;
-            line-height: 1.2;
-        }
-        .ol-tabs__item:hover {
-            color: #0f172a;
-            background: rgba(255,255,255,0.7);
-        }
-        .ol-tabs__item.is-active {
-            background: #fff;
-            color: #0f172a;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-        }
-        .ol-tabs__count {
-            min-width: 1.35rem;
-            height: 1.35rem;
-            padding: 0 0.35rem;
-            border-radius: 999px;
-            background: #dc3545;
-            color: #fff;
-            font-size: 0.75rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .ol-subtabs .btn {
-            border-radius: 999px;
-        }
-        .ol-row-pending {
-            background: #fffbeb;
-        }
-    </style>
-
     <div class="page-header">
         <div class="page-block">
             <div class="row align-items-center">
@@ -106,21 +56,23 @@
                     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
                         <div>
                             @if($canAuthorizeDownloads)
-                                <div class="ol-tabs" role="tablist">
-                                    <a class="ol-tabs__item {{ $tab === 'mine' ? 'is-active' : '' }}"
-                                       href="{{ route('official-letters.index', array_filter(['department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}">
-                                        <i class="ti ti-mail"></i>
-                                        My Letters
-                                    </a>
-                                    <a class="ol-tabs__item {{ $tab === 'authorizations' ? 'is-active' : '' }}"
-                                       href="{{ route('official-letters.index', array_filter(['tab' => 'authorizations', 'department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}">
-                                        <i class="ti ti-shield-check"></i>
-                                        Download authorizations
-                                        @if($pendingAuthorizationCount > 0)
-                                            <span class="ol-tabs__count">{{ $pendingAuthorizationCount }}</span>
-                                        @endif
-                                    </a>
-                                </div>
+                                <ul class="nav nav-tabs border-0 mb-0">
+                                    <li class="nav-item">
+                                        <a class="nav-link {{ $tab === 'mine' ? 'active' : '' }}"
+                                           href="{{ route('official-letters.index', array_filter(['department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}">
+                                            My Letters
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {{ $tab === 'authorizations' ? 'active' : '' }}"
+                                           href="{{ route('official-letters.index', array_filter(['tab' => 'authorizations', 'department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}">
+                                            Download authorizations
+                                            @if($pendingAuthorizationCount > 0)
+                                                <span class="badge bg-danger ms-1">{{ $pendingAuthorizationCount }}</span>
+                                            @endif
+                                        </a>
+                                    </li>
+                                </ul>
                             @else
                                 <h5 class="mb-0">
                                     <i class="ti ti-mail me-2 text-primary"></i>My Official Letters
@@ -130,7 +82,6 @@
                         <form method="GET" action="{{ route('official-letters.index') }}" class="row g-2 flex-grow-1" id="filterForm" style="max-width: 42rem;">
                             @if($tab === 'authorizations')
                                 <input type="hidden" name="tab" value="authorizations">
-                                <input type="hidden" name="auth_status" value="{{ $authStatus }}">
                             @endif
                             <div class="col-md-4">
                                 <select name="department_code" class="form-control" onchange="document.getElementById('filterForm').submit();">
@@ -164,21 +115,6 @@
                             </div>
                         </form>
                     </div>
-                    @if($tab === 'authorizations')
-                        <div class="ol-subtabs d-flex flex-wrap gap-2 mt-3">
-                            <a href="{{ route('official-letters.index', array_filter(['tab' => 'authorizations', 'auth_status' => 'pending', 'department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}"
-                               class="btn btn-sm {{ $authStatus === 'pending' ? 'btn-warning' : 'btn-outline-secondary' }}">
-                                Needs action
-                                @if($pendingAuthorizationCount > 0)
-                                    <span class="badge bg-dark ms-1">{{ $pendingAuthorizationCount }}</span>
-                                @endif
-                            </a>
-                            <a href="{{ route('official-letters.index', array_filter(['tab' => 'authorizations', 'auth_status' => 'all', 'department_code' => request('department_code'), 'year' => request('year'), 'month' => request('month')])) }}"
-                               class="btn btn-sm {{ $authStatus === 'all' ? 'btn-secondary' : 'btn-outline-secondary' }}">
-                                All requests
-                            </a>
-                        </div>
-                    @endif
                 </div>
                 <div class="card-body">
                     @if($letters->count() > 0)
@@ -207,9 +143,8 @@
                                             );
                                             $canEditLetter = $isOwned || $isSharedWithMe;
                                             $canAuthorizeThis = $user->can('authorizeDownload', $letter);
-                                            $isPendingAuth = $letter->hasPendingDownloadRequest();
                                         @endphp
-                                        <tr class="{{ $isPendingAuth ? 'ol-row-pending' : '' }}">
+                                        <tr>
                                             <td class="text-center">{{ ($letters->currentPage() - 1) * $letters->perPage() + $loop->iteration }}</td>
                                             <td>
                                                 <code class="small">{{ $letter->reference_number }}</code>
@@ -271,9 +206,7 @@
                         <div class="text-center py-5">
                             <i class="ti ti-mail-off" style="font-size: 3rem; opacity: 0.3;"></i>
                             <p class="text-muted mb-3 mt-3">
-                                @if($tab === 'authorizations' && $authStatus === 'pending')
-                                    No letters waiting for authorization
-                                @elseif($tab === 'authorizations')
+                                @if($tab === 'authorizations')
                                     No download authorization requests yet
                                 @else
                                     No official letters found

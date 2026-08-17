@@ -32,7 +32,6 @@ class OfficialLetterController extends Controller
         $tab = $canAuthorizeDownloads && $request->input('tab') === 'authorizations'
             ? 'authorizations'
             : 'mine';
-        $authStatus = $request->input('auth_status', 'pending') === 'all' ? 'all' : 'pending';
 
         $query = OfficialLetter::query()
             ->with([
@@ -43,11 +42,8 @@ class OfficialLetterController extends Controller
             ]);
 
         if ($tab === 'authorizations') {
-            $query->withDownloadRequests();
-            if ($authStatus === 'pending') {
-                $query->pendingDownloadAuthorization();
-            }
-            $query->orderByRaw($this->pendingDownloadRequestSortSql())
+            $query->withDownloadRequests()
+                ->orderByRaw($this->pendingDownloadRequestSortSql())
                 ->orderByDesc('letter_date')
                 ->orderByDesc('created_at');
         } else {
@@ -94,7 +90,6 @@ class OfficialLetterController extends Controller
             'canManage',
             'canAuthorizeDownloads',
             'tab',
-            'authStatus',
             'pendingAuthorizationCount',
             'user',
         ));
