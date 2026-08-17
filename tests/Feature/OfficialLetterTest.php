@@ -499,9 +499,16 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($authorizer)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('You were asked to authorize download')
-            ->assertSee('Authorize download')
+            ->assertSee('Download authorization needed')
+            ->assertSee('Authorize')
             ->assertSee('Reference is made to your letter', false);
+
+        $method = new \ReflectionMethod(\App\Http\Controllers\DashboardController::class, 'approvalActionsFor');
+        $method->setAccessible(true);
+        $approvalActions = $method->invoke(app(\App\Http\Controllers\DashboardController::class), $authorizer);
+
+        $this->assertContains('Authorize letter downloads', array_column($approvalActions, 'label'));
+        $this->assertSame(1, $approvalActions[0]['count']);
     }
 
     public function test_authorize_unlocks_download_for_owner_and_shared_users(): void
@@ -586,7 +593,7 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($manager)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('Download rejected');
+            ->assertSee('Rejected');
 
         $this->actingAs($manager)
             ->post(route('official-letters.request-download', $letter))

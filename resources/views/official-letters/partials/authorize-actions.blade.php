@@ -1,31 +1,31 @@
 @if($canAuthorizeDownload)
-    <div class="card shadow-none border mb-3">
-        <div class="card-header bg-white border-bottom">
-            <h5 class="mb-0"><i class="ti ti-shield-check me-2"></i>Download authorization</h5>
-        </div>
-        <div class="card-body">
-            <p class="text-muted small mb-3">
+    <div class="alert alert-warning border-warning d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+        <div>
+            <div class="fw-semibold mb-1">
+                <i class="ti ti-shield-check me-1"></i>Download authorization needed
+            </div>
+            <div class="small mb-0">
                 {{ $letter->latestDownloadRequest?->requester?->name ?? 'A staff member' }}
                 requested permission to download this letter
                 @if($letter->latestDownloadRequest?->created_at)
                     on {{ $letter->latestDownloadRequest->created_at->format('d M Y H:i') }}
                 @endif
                 .
-            </p>
-            @if(filled($letter->latestDownloadRequest?->request_note))
-                <p class="mb-3"><strong>Request note:</strong> {{ $letter->latestDownloadRequest->request_note }}</p>
-            @endif
-            <div class="d-flex flex-wrap gap-2">
-                <form method="POST" action="{{ route('official-letters.authorize-download', $letter) }}">
-                    @csrf
-                    <button type="submit" class="btn btn-success btn-sm">
-                        <i class="ti ti-check me-1"></i> Authorize download
-                    </button>
-                </form>
-                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#letterDownloadRejectModal">
-                    <i class="ti ti-x me-1"></i> Reject
-                </button>
+                @if(filled($letter->latestDownloadRequest?->request_note))
+                    <span class="d-block mt-1"><strong>Note:</strong> {{ $letter->latestDownloadRequest->request_note }}</span>
+                @endif
             </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+            <form method="POST" action="{{ route('official-letters.authorize-download', $letter) }}">
+                @csrf
+                <button type="submit" class="btn btn-success btn-sm">
+                    <i class="ti ti-check me-1"></i> Authorize
+                </button>
+            </form>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#letterDownloadRejectModal">
+                <i class="ti ti-x me-1"></i> Reject
+            </button>
         </div>
     </div>
 

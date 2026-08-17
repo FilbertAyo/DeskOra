@@ -45,6 +45,10 @@
 
         @include('dashboard.partials.plan-coverage-alert')
 
+        <div class="dashboard-slot dashboard-slot--action mb-3">
+            @include('dashboard.partials.action-needed')
+        </div>
+
         <div class="dashboard-body">
             <div class="dashboard-col dashboard-col--main">
                 <div class="dashboard-slot dashboard-slot--stats">
@@ -72,10 +76,6 @@
             </div>
 
             <div class="dashboard-col dashboard-col--side">
-                <div class="dashboard-slot dashboard-slot--action">
-                    @include('dashboard.partials.action-needed')
-                </div>
-
                 <div class="dashboard-slot dashboard-slot--scorecard">
                     @include('dashboard.partials.scorecard')
                 </div>

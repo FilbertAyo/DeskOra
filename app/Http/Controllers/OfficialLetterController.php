@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\OfficialLetter;
-use App\Models\OfficialLetterDownloadRequest;
 use App\Models\User;
 use App\Services\OfficialLetterDownloadAuthorizationService;
 use App\Services\OfficialLetterReferenceService;
@@ -33,6 +32,7 @@ class OfficialLetterController extends Controller
         $tab = $canAuthorizeDownloads && $request->input('tab') === 'authorizations'
             ? 'authorizations'
             : 'mine';
+        $authStatus = $request->input('auth_status', 'pending') === 'all' ? 'all' : 'pending';
 
         $query = OfficialLetter::query()
             ->with([
@@ -43,8 +43,11 @@ class OfficialLetterController extends Controller
             ]);
 
         if ($tab === 'authorizations') {
-            $query->withDownloadRequests()
-                ->orderByRaw($this->pendingDownloadRequestSortSql())
+            $query->withDownloadRequests();
+            if ($authStatus === 'pending') {
+                $query->pendingDownloadAuthorization();
+            }
+            $query->orderByRaw($this->pendingDownloadRequestSortSql())
                 ->orderByDesc('letter_date')
                 ->orderByDesc('created_at');
         } else {
@@ -80,14 +83,9 @@ class OfficialLetterController extends Controller
             ->unique()
             ->values();
 
-        $pendingAuthorizationCount = 0;
-        if ($canAuthorizeDownloads) {
-            $pendingAuthorizationCount = OfficialLetter::query()
-                ->whereHas('downloadRequests', function ($pending) {
-                    $pending->where('status', OfficialLetterDownloadRequest::STATUS_PENDING);
-                })
-                ->count();
-        }
+        $pendingAuthorizationCount = $canAuthorizeDownloads
+            ? OfficialLetter::pendingDownloadAuthorizationCount()
+            : 0;
 
         return view('official-letters.index', compact(
             'letters',
@@ -96,6 +94,7 @@ class OfficialLetterController extends Controller
             'canManage',
             'canAuthorizeDownloads',
             'tab',
+            'authStatus',
             'pendingAuthorizationCount',
             'user',
         ));

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Document;
+use App\Models\OfficialLetter;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
 use App\Models\WeeklyWorkLog;
@@ -457,6 +458,17 @@ class DashboardController extends Controller
     private function approvalActionsFor(User $user): array
     {
         $actions = [];
+
+        if ($user->can(OfficialLetter::PERMISSION_AUTHORIZE_DOWNLOADS)) {
+            $letterCount = OfficialLetter::pendingDownloadAuthorizationCount();
+            if ($letterCount > 0) {
+                $actions[] = [
+                    'label' => 'Authorize letter downloads',
+                    'count' => $letterCount,
+                    'url' => route('official-letters.index', ['tab' => 'authorizations']),
+                ];
+            }
+        }
 
         foreach ([
             ['review', 'petty', 'Review petty cash', ['Petty Cash', 'Reimbursement']],

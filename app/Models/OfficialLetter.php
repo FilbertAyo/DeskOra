@@ -193,6 +193,18 @@ class OfficialLetter extends Model
         return $query->whereHas('downloadRequests');
     }
 
+    public function scopePendingDownloadAuthorization(Builder $query): Builder
+    {
+        return $query->whereHas('downloadRequests', function (Builder $requests) {
+            $requests->where('status', OfficialLetterDownloadRequest::STATUS_PENDING);
+        });
+    }
+
+    public static function pendingDownloadAuthorizationCount(): int
+    {
+        return static::query()->pendingDownloadAuthorization()->count();
+    }
+
     public function departmentLabel(): string
     {
         $departments = config('official-letters.departments', []);

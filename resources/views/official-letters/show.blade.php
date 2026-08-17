@@ -13,6 +13,17 @@
                             </ul>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
+                            @if($canAuthorizeDownload)
+                                <form method="POST" action="{{ route('official-letters.authorize-download', $letter) }}">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="ti ti-check me-1"></i> Authorize
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#letterDownloadRejectModal">
+                                    <i class="ti ti-x me-1"></i> Reject
+                                </button>
+                            @endif
                             @include('official-letters.partials.download-button', ['letter' => $letter, 'user' => auth()->user(), 'compact' => false])
                             @if($canUpdate)
                                 <a href="{{ route('official-letters.edit', $letter) }}" class="btn btn-sm btn-light">
@@ -57,11 +68,13 @@
         </div>
     @endif
 
-    @if($isAuthorizerReview)
+    @if($isAuthorizerReview && ! $canAuthorizeDownload)
         <div class="alert alert-info">
             <i class="ti ti-shield-check me-1"></i> You were asked to authorize download of this letter.
         </div>
     @endif
+
+    @include('official-letters.partials.authorize-actions', ['letter' => $letter, 'canAuthorizeDownload' => $canAuthorizeDownload])
 
     <div class="row">
         <div class="col-lg-8">
@@ -127,8 +140,6 @@
                     </div>
                 </div>
             </div>
-
-            @include('official-letters.partials.authorize-actions', ['letter' => $letter, 'canAuthorizeDownload' => $canAuthorizeDownload])
 
             @if($canShare)
                 <div class="card shadow-none border mb-3">

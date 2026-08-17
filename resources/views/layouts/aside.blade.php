@@ -188,6 +188,14 @@
                     <a href="{{ route('official-letters.index') }}" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-mail"></i></span>
                         <span class="pc-mtext">Official Letters</span>
+                        @if(Auth::user()->can(\App\Models\OfficialLetter::PERMISSION_AUTHORIZE_DOWNLOADS))
+                            @php
+                                $officialLetterPendingCount = \App\Models\OfficialLetter::pendingDownloadAuthorizationCount();
+                            @endphp
+                            @if($officialLetterPendingCount > 0)
+                                <span class="badge bg-light-danger border border-danger ms-2">{{ $officialLetterPendingCount }}</span>
+                            @endif
+                        @endif
                     </a>
                 </li>
                 <li class="pc-item {{ $isAllDocumentsNav ? 'active' : '' }}">

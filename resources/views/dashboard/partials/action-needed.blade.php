@@ -9,6 +9,7 @@
         'Authorize petty cash' => ['icon' => 'ti-shield-check', 'tone' => 'danger', 'cta' => 'Authorize'],
         'Authorize requisitions' => ['icon' => 'ti-certificate', 'tone' => 'danger', 'cta' => 'Authorize'],
         'Authorize weekly budgets' => ['icon' => 'ti-shield-check', 'tone' => 'danger', 'cta' => 'Authorize'],
+        'Authorize letter downloads' => ['icon' => 'ti-mail', 'tone' => 'danger', 'cta' => 'Authorize'],
     ];
     $hasWeeklyActions = $showWeeklyToast && $wr && (
         ($wr->plan && $wr->plan->showCta) || ($wr->report && $wr->report->showCta)
