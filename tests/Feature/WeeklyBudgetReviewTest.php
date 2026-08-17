@@ -241,6 +241,40 @@ class WeeklyBudgetReviewTest extends TestCase
             ->assertSee('All Weeks');
     }
 
+    public function test_pending_view_keeps_each_staff_budget_under_its_own_work_period(): void
+    {
+        [$current, $next] = $this->createPeriods();
+        $dept = $this->createDepartment();
+        $staff = $this->createStaffUser($dept);
+
+        $week16Plan = $this->createPlanWithBudget($staff, $current, [
+            ['item' => 'Week 16 desk', 'description_purpose' => 'Office', 'amount' => '500'],
+        ]);
+        $week17Plan = $this->createPlanWithBudget($staff, $next, [
+            ['item' => 'Week 17 laptop', 'description_purpose' => 'Dev', 'amount' => '1000'],
+        ]);
+
+        $week16Plan->setRelation('user', $staff->loadMissing('department'));
+        $week16Plan->setRelation('period', $current);
+        $week17Plan->setRelation('user', $staff->loadMissing('department'));
+        $week17Plan->setRelation('period', $next);
+
+        $grouped = app(\App\Services\Documents\WeeklyBudgetReviewService::class)
+            ->groupBudgetDocumentsByDepartment(collect([$week16Plan, $week17Plan]));
+
+        $this->assertCount(2, $grouped);
+        $this->assertSame(
+            [16, 17],
+            collect($grouped)->map(fn ($periodGroup) => $periodGroup['period']?->week_number)->values()->all()
+        );
+
+        $week16Items = collect($grouped)->first()['departments'][(string) $dept->id]['staff'][(string) $staff->id]['items'];
+        $week17Items = collect($grouped)->last()['departments'][(string) $dept->id]['staff'][(string) $staff->id]['items'];
+
+        $this->assertSame(['Week 16 desk'], collect($week16Items)->pluck('item')->all());
+        $this->assertSame(['Week 17 laptop'], collect($week17Items)->pluck('item')->all());
+    }
+
     public function test_pending_budget_review_count_without_period_includes_older_weeks_until_processed(): void
     {
         [$current, $next] = $this->createPeriods();

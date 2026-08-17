@@ -159,93 +159,102 @@
         </div>
         <div class="card-body">
             @if(count($grouped) > 0)
-                @foreach($grouped as $departmentId => $dept)
-                    {{-- Department header --}}
-                    <div class="card border mb-4">
-                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                @foreach($grouped as $periodGroup)
+                    <div class="mb-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <h6 class="mb-0">
-                                <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
+                                <i class="ti ti-calendar-week me-1"></i>{{ $periodGroup['period_label'] }}
+                                @if(! empty($periodGroup['period_range']))
+                                    <small class="text-muted fw-normal">• {{ $periodGroup['period_range'] }}</small>
+                                @endif
                             </h6>
-                            <div class="text-end">
-                                <span class="badge bg-light-light border border text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
-                                <span class="badge bg-light-light border border text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
+                            <div>
+                                <span class="badge bg-light-light border border text-dark me-2">Requested: {{ number_format($periodGroup['requested_total'], 2) }}</span>
+                                <span class="badge bg-light-light border border text-dark">Provided: {{ number_format($periodGroup['provided_total'], 2) }}</span>
                             </div>
                         </div>
-                        <div class="card-body p-0">
-                            @foreach($dept['staff'] as $userId => $staffData)
-                                @php
-                                    $staffUser = $staffData['user'];
-                                    $staffDocument = $staffData['document'];
-                                    $staffItems = $staffData['items'];
-                                    $staffSummary = $staffData['summary'];
-                                @endphp
-                                {{-- Staff sub-header --}}
-                                <div class="border-bottom px-3 py-2 bg-white d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ $staffUser?->name ?? 'Unknown' }}</strong>
-                                        @if($staffDocument->period)
-                                            <small class="text-muted ms-2">
-                                                Week {{ $staffDocument->period->week_number }} &bull; {{ $staffDocument->period->date_range }}
-                                            </small>
-                                        @endif
-                                        <a href="{{ route('documents.show', $staffDocument->id) }}" class="btn btn-sm btn-outline-secondary ms-2" title="View plan">
-                                            <i class="ti ti-eye"></i>
-                                        </a>
-                                    </div>
+
+                        @foreach($periodGroup['departments'] as $dept)
+                            {{-- Department header --}}
+                            <div class="card border mb-3">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="ti ti-building me-1"></i>{{ $dept['department_name'] }}
+                                    </h6>
                                     <div class="text-end">
-                
-                                        @if($staffSummary['pending'] > 0)
-                                            <span class="badge bg-light-warning border border-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
-                                        @endif
-                                        @if($staffSummary['approved'] > 0)
-                                            <span class="badge bg-light-success border border-success">{{ $staffSummary['approved'] }} approved</span>
-                                        @endif
-                                        @if($staffSummary['rejected'] > 0)
-                                            <span class="badge bg-light-danger border border-danger">{{ $staffSummary['rejected'] }} rejected</span>
-                                        @endif
+                                        <span class="badge bg-light-light border border text-dark me-2">Requested: {{ number_format($dept['requested_total'], 2) }}</span>
+                                        <span class="badge bg-light-light border border text-dark">Provided: {{ number_format($dept['provided_total'], 2) }}</span>
                                     </div>
                                 </div>
+                                <div class="card-body p-0">
+                                    @foreach($dept['staff'] as $staffData)
+                                        @php
+                                            $staffUser = $staffData['user'];
+                                            $staffDocument = $staffData['document'];
+                                            $staffItems = $staffData['items'];
+                                            $staffSummary = $staffData['summary'];
+                                        @endphp
+                                        {{-- Staff sub-header --}}
+                                        <div class="border-bottom px-3 py-2 bg-white d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ $staffUser?->name ?? 'Unknown' }}</strong>
+                                                <a href="{{ route('documents.show', $staffDocument->id) }}" class="btn btn-sm btn-outline-secondary ms-2" title="View plan">
+                                                    <i class="ti ti-eye"></i>
+                                                </a>
+                                            </div>
+                                            <div class="text-end">
+                                                @if($staffSummary['pending'] > 0)
+                                                    <span class="badge bg-light-warning border border-warning text-dark">{{ $staffSummary['pending'] }} pending</span>
+                                                @endif
+                                                @if($staffSummary['approved'] > 0)
+                                                    <span class="badge bg-light-success border border-success">{{ $staffSummary['approved'] }} approved</span>
+                                                @endif
+                                                @if($staffSummary['rejected'] > 0)
+                                                    <span class="badge bg-light-danger border border-danger">{{ $staffSummary['rejected'] }} rejected</span>
+                                                @endif
+                                            </div>
+                                        </div>
 
-                                {{-- Item rows --}}
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered mb-0">
-                                        <thead class="thead-secondary">
-                                            <tr>
-                                                <th style="width: 50px;" class="text-center">#</th>
-                                                <th>Item</th>
-                                                <th>Description / Purpose</th>
-                                                <th class="text-end" style="width: 140px;">Requested</th>
-                                                <th class="text-end" style="width: 140px;">Provided</th>
-                                                <th style="width: 120px;">Status</th>
-                                                <th class="text-center" style="width: 120px;">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($staffItems as $idx => $item)
-                                                @include('documents.partials.reviewer.budget-item-row', [
-                                                    'item' => $item,
-                                                    'rowNumber' => $idx + 1,
-                                                ])
-                                            @endforeach
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="3" class="text-end">Staff Total</td>
-                                                <td class="text-end">{{ number_format($staffData['requested_total'], 2) }}</td>
-                                                <td class="text-end">{{ number_format($staffData['provided_total'], 2) }}</td>
-                                                <td colspan="2"></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                                        {{-- Item rows --}}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered mb-0">
+                                                <thead class="thead-secondary">
+                                                    <tr>
+                                                        <th style="width: 50px;" class="text-center">#</th>
+                                                        <th>Item</th>
+                                                        <th>Description / Purpose</th>
+                                                        <th class="text-end" style="width: 140px;">Requested</th>
+                                                        <th class="text-end" style="width: 140px;">Provided</th>
+                                                        <th style="width: 120px;">Status</th>
+                                                        <th class="text-center" style="width: 120px;">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($staffItems as $idx => $item)
+                                                        @include('documents.partials.reviewer.budget-item-row', [
+                                                            'item' => $item,
+                                                            'rowNumber' => $idx + 1,
+                                                        ])
+                                                    @endforeach
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr class="fw-bold">
+                                                        <td colspan="3" class="text-end">Staff Total</td>
+                                                        <td class="text-end">{{ number_format($staffData['requested_total'], 2) }}</td>
+                                                        <td class="text-end">{{ number_format($staffData['provided_total'], 2) }}</td>
+                                                        <td colspan="2"></td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+
+                                        @foreach($staffItems as $item)
+                                            @include('documents.partials.reviewer.budget-item-modal', ['item' => $item])
+                                        @endforeach
+                                    @endforeach
                                 </div>
-
-                                @foreach($staffItems as $item)
-                                    @include('documents.partials.reviewer.budget-item-modal', ['item' => $item])
-                                @endforeach
-
-                            @endforeach
-                        </div>
-                     
+                            </div>
+                        @endforeach
                     </div>
                 @endforeach
 

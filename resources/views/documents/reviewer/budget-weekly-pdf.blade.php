@@ -45,34 +45,46 @@
     <h2 class="mb-8">Weekly Budget Review</h2>
     <p class="mb-16">Work Period: {{ $workPeriodRange }}</p>
 
-    @forelse($grouped as $dept)
+    @forelse($grouped as $periodGroup)
         @php
-            $departmentHasApprovedItems = collect($dept['staff'])->contains(function ($staffData) {
-                return collect($staffData['items'])->contains(function ($item) {
-                    return ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
+            $periodHasApprovedItems = collect($periodGroup['departments'])->contains(function ($dept) {
+                return collect($dept['staff'])->contains(function ($staffData) {
+                    return collect($staffData['items'])->contains(function ($item) {
+                        return ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
+                    });
                 });
             });
         @endphp
-        @if(!$departmentHasApprovedItems)
+        @if(! $periodHasApprovedItems)
             @continue
         @endif
 
-        <div class="section-title">{{ $dept['department_name'] }}</div>
+        <div class="section-title">{{ $periodGroup['period_label'] }}@if(! empty($periodGroup['period_range'])) — {{ $periodGroup['period_range'] }}@endif</div>
 
-        @foreach($dept['staff'] as $staffData)
+        @foreach($periodGroup['departments'] as $dept)
             @php
-                $approvedItems = collect($staffData['items'])->filter(function ($item) {
-                    return ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
-                })->values();
+                $departmentHasApprovedItems = collect($dept['staff'])->contains(function ($staffData) {
+                    return collect($staffData['items'])->contains(function ($item) {
+                        return ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
+                    });
+                });
             @endphp
-            @if($approvedItems->isEmpty())
+            @if(!$departmentHasApprovedItems)
                 @continue
             @endif
-            <p class="mb-8"><strong>{{ $staffData['user']?->name ?? 'Unknown' }}</strong>
-                @if($staffData['document']->period)
-                    - Week {{ $staffData['document']->period->week_number }} ({{ $staffData['document']->period->year }})
+
+            <div class="section-title">{{ $dept['department_name'] }}</div>
+
+            @foreach($dept['staff'] as $staffData)
+                @php
+                    $approvedItems = collect($staffData['items'])->filter(function ($item) {
+                        return ($item['decision'] ?? 'pending') === \App\Models\Document::BUDGET_REVIEW_APPROVED;
+                    })->values();
+                @endphp
+                @if($approvedItems->isEmpty())
+                    @continue
                 @endif
-            </p>
+                <p class="mb-8"><strong>{{ $staffData['user']?->name ?? 'Unknown' }}</strong></p>
 
             <table class="mb-12">
                 <thead>
@@ -103,6 +115,7 @@
                     </tr>
                 </tfoot>
             </table>
+            @endforeach
         @endforeach
     @empty
         <p>No weekly budget records found for selected filters.</p>

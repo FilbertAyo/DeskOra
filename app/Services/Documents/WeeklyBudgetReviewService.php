@@ -370,9 +370,24 @@ class WeeklyBudgetReviewService
     }
 
     /**
-     * Group budget documents by department -> staff -> budget items for the review UI.
+     * Group budget documents by work period -> department -> staff.
+     * Staff from different weeks stay in separate sections.
      *
-     * @return array<string, array{department_name: string, department_id: string|null, requested_total: float, provided_total: float, staff: array}>
+     * @return array<string, array{
+     *     period: \App\Models\WorkPeriod|null,
+     *     period_id: string,
+     *     period_label: string,
+     *     period_range: string|null,
+     *     requested_total: float,
+     *     provided_total: float,
+     *     departments: array<string, array{
+     *         department_name: string,
+     *         department_id: string,
+     *         requested_total: float,
+     *         provided_total: float,
+     *         staff: array<string, array<string, mixed>>
+     *     }>
+     * }>
      */
     public function groupBudgetDocumentsByDepartment(Collection $documents): array
     {
@@ -380,11 +395,31 @@ class WeeklyBudgetReviewService
         $actorIds = [];
 
         foreach ($documents as $document) {
+            $period = $document->period;
+            $periodId = (string) ($document->period_id ?? 'none');
+            $periodLabel = $period
+                ? sprintf('Week %s • %s', $period->week_number, $period->year)
+                : 'Unknown week';
+
+            if (! isset($grouped[$periodId])) {
+                $grouped[$periodId] = [
+                    'period' => $period,
+                    'period_id' => $periodId,
+                    'period_label' => $periodLabel,
+                    'period_range' => $period?->date_range,
+                    'sort_year' => (int) ($period?->year ?? 9999),
+                    'sort_week' => (int) ($period?->week_number ?? 9999),
+                    'requested_total' => 0.0,
+                    'provided_total' => 0.0,
+                    'departments' => [],
+                ];
+            }
+
             $departmentName = $document->user?->department?->name ?? 'No Department';
             $departmentId = (string) ($document->user?->department_id ?? 'none');
 
-            if (! isset($grouped[$departmentId])) {
-                $grouped[$departmentId] = [
+            if (! isset($grouped[$periodId]['departments'][$departmentId])) {
+                $grouped[$periodId]['departments'][$departmentId] = [
                     'department_name' => $departmentName,
                     'department_id' => $departmentId,
                     'requested_total' => 0.0,
@@ -394,8 +429,8 @@ class WeeklyBudgetReviewService
             }
 
             $userId = (string) $document->user_id;
-            if (! isset($grouped[$departmentId]['staff'][$userId])) {
-                $grouped[$departmentId]['staff'][$userId] = [
+            if (! isset($grouped[$periodId]['departments'][$departmentId]['staff'][$userId])) {
+                $grouped[$periodId]['departments'][$departmentId]['staff'][$userId] = [
                     'user' => $document->user,
                     'document' => $document,
                     'items' => [],
@@ -421,7 +456,7 @@ class WeeklyBudgetReviewService
                     }
                 }
 
-                $grouped[$departmentId]['staff'][$userId]['items'][] = [
+                $grouped[$periodId]['departments'][$departmentId]['staff'][$userId]['items'][] = [
                     'budget_uid' => $uid,
                     'item' => $item['item'],
                     'description_purpose' => $item['description_purpose'],
@@ -444,12 +479,14 @@ class WeeklyBudgetReviewService
                     'document_id' => $document->id,
                 ];
 
-                $grouped[$departmentId]['staff'][$userId]['requested_total'] += $amountNumeric;
+                $grouped[$periodId]['departments'][$departmentId]['staff'][$userId]['requested_total'] += $amountNumeric;
+                $grouped[$periodId]['departments'][$departmentId]['requested_total'] += $amountNumeric;
+                $grouped[$periodId]['requested_total'] += $amountNumeric;
                 if ($approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED) {
-                    $grouped[$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
-                    $grouped[$departmentId]['provided_total'] += $providedAmount;
+                    $grouped[$periodId]['departments'][$departmentId]['staff'][$userId]['provided_total'] += $providedAmount;
+                    $grouped[$periodId]['departments'][$departmentId]['provided_total'] += $providedAmount;
+                    $grouped[$periodId]['provided_total'] += $providedAmount;
                 }
-                $grouped[$departmentId]['requested_total'] += $amountNumeric;
             }
         }
 
@@ -457,20 +494,36 @@ class WeeklyBudgetReviewService
             ->whereIn('id', array_values(array_unique($actorIds)))
             ->pluck('name', 'id');
 
-        foreach ($grouped as &$department) {
-            foreach ($department['staff'] as &$staffData) {
-                foreach ($staffData['items'] as &$item) {
-                    $item['review_stage_by_name'] = $actorNames[(string) ($item['review_stage_by'] ?? '')] ?? null;
-                    $item['approve_stage_by_name'] = $actorNames[(string) ($item['approve_stage_by'] ?? '')] ?? null;
-                    $item['authorize_stage_by_name'] = $actorNames[(string) ($item['authorize_stage_by'] ?? '')] ?? null;
+        foreach ($grouped as &$periodGroup) {
+            foreach ($periodGroup['departments'] as &$department) {
+                foreach ($department['staff'] as &$staffData) {
+                    foreach ($staffData['items'] as &$item) {
+                        $item['review_stage_by_name'] = $actorNames[(string) ($item['review_stage_by'] ?? '')] ?? null;
+                        $item['approve_stage_by_name'] = $actorNames[(string) ($item['approve_stage_by'] ?? '')] ?? null;
+                        $item['authorize_stage_by_name'] = $actorNames[(string) ($item['authorize_stage_by'] ?? '')] ?? null;
+                    }
+                    unset($item);
                 }
-                unset($item);
-            }
-            unset($staffData);
-        }
-        unset($department);
+                unset($staffData);
 
-        uasort($grouped, fn ($a, $b) => strcasecmp($a['department_name'], $b['department_name']));
+                uasort(
+                    $department['staff'],
+                    fn ($a, $b) => strcasecmp((string) ($a['user']?->name ?? ''), (string) ($b['user']?->name ?? ''))
+                );
+            }
+            unset($department);
+
+            uasort(
+                $periodGroup['departments'],
+                fn ($a, $b) => strcasecmp($a['department_name'], $b['department_name'])
+            );
+        }
+        unset($periodGroup);
+
+        uasort(
+            $grouped,
+            fn ($a, $b) => [$a['sort_year'], $a['sort_week']] <=> [$b['sort_year'], $b['sort_week']]
+        );
 
         return $grouped;
     }
