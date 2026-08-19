@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\InventoryCategory;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class InventoryCategoryController extends Controller
+{
+    public function index()
+    {
+        $categories = InventoryCategory::query()
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
+
+        return view('inventory.categories.index', compact('categories'));
+    }
+
+    public function store(Request $request)
+    {
+        $categoryId = $request->filled('category_id') ? $request->input('category_id') : null;
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('inventory_categories', 'name')->ignore($categoryId),
+            ],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+        ]);
+
+        if ($categoryId) {
+            $category = InventoryCategory::query()->findOrFail($categoryId);
+            $category->update($validated);
+
+            return redirect()->route('inventory.categories.index')->with('success', 'Category updated successfully.');
+        }
+
+        InventoryCategory::query()->create($validated);
+
+        return redirect()->route('inventory.categories.index')->with('success', 'Category created successfully.');
+    }
+
+    public function update(Request $request, InventoryCategory $category)
+    {
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('inventory_categories', 'name')->ignore($category->id),
+            ],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+        ]);
+
+        $category->update($validated);
+
+        return redirect()->route('inventory.categories.index')->with('success', 'Category updated successfully.');
+    }
+
+    public function destroy(InventoryCategory $category)
+    {
+        $category->delete();
+
+        return redirect()->route('inventory.categories.index')->with('success', 'Category deleted successfully.');
+    }
+}

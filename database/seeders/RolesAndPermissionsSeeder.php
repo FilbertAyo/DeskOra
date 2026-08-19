@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
+/**
+ * Additive roles/permissions seeder used by deploy.sh.
+ *
+ * Safe on production: creates missing permissions and roles, merges baseline
+ * permissions onto known roles, and never deletes users, documents, or inventory
+ * records. Extra permissions already on a role are kept. Inventory roles are
+ * created empty of users — attach them in Settings → Users.
+ */
 class RolesAndPermissionsSeeder extends Seeder
 {
     /**
@@ -96,8 +104,20 @@ class RolesAndPermissionsSeeder extends Seeder
 
         ];
 
+        $inventoryPermissions = [
+            'view inventory',
+            'manage inventory settings',
+            'manage inventory assets',
+            'manage inventory stock',
+            'manage inventory receipts',
+            'manage inventory transfers',
+            'manage inventory borrowing',
+            'manage inventory maintenance',
+            'approve inventory requests',
+        ];
+
         // Combine all permissions
-        $allPermissions = array_merge($existingPermissions, $documentPermissions);
+        $allPermissions = array_merge($existingPermissions, $documentPermissions, $inventoryPermissions);
 
         // Create all permissions
         foreach ($allPermissions as $permission) {
@@ -119,6 +139,12 @@ class RolesAndPermissionsSeeder extends Seeder
         $pettycashReviewerRole = Role::firstOrCreate(['name' => 'pettycash_reviewer']);
         $pettycashApproverRole = Role::firstOrCreate(['name' => 'pettycash_approver']);
         $pettycashAuthorizerRole = Role::firstOrCreate(['name' => 'pettycash_authorizer']);
+        $inventoryViewerRole = Role::firstOrCreate(['name' => 'inventory_viewer']);
+        $inventoryOfficerRole = Role::firstOrCreate(['name' => 'inventory_officer']);
+        $inventoryApproverRole = Role::firstOrCreate(['name' => 'inventory_approver']);
+        $inventoryAdminRole = Role::firstOrCreate(['name' => 'inventory_admin']);
+        $inventoryStoreClerkRole = Role::firstOrCreate(['name' => 'inventory_store_clerk']);
+        $inventoryAssetOfficerRole = Role::firstOrCreate(['name' => 'inventory_asset_officer']);
 
         $budgetReviewerPermissions = [
             'view weekly budgets',
@@ -164,6 +190,34 @@ class RolesAndPermissionsSeeder extends Seeder
         $pettycashAuthorizerPermissions = [
             'authorize pettycash',
         ];
+        $inventoryViewerPermissions = [
+            'view inventory',
+        ];
+        $inventoryOfficerPermissions = [
+            'view inventory',
+            'manage inventory assets',
+            'manage inventory stock',
+            'manage inventory receipts',
+            'manage inventory transfers',
+            'manage inventory borrowing',
+            'manage inventory maintenance',
+        ];
+        $inventoryApproverPermissions = [
+            'view inventory',
+            'approve inventory requests',
+        ];
+        $inventoryStoreClerkPermissions = [
+            'view inventory',
+            'manage inventory stock',
+            'manage inventory receipts',
+            'manage inventory borrowing',
+        ];
+        $inventoryAssetOfficerPermissions = [
+            'view inventory',
+            'manage inventory assets',
+            'manage inventory transfers',
+            'manage inventory maintenance',
+        ];
 
         // Superadmin always mirrors the full permission catalog.
         $superadminRole->syncPermissions($allPermissions);
@@ -182,6 +236,12 @@ class RolesAndPermissionsSeeder extends Seeder
         $this->ensureRolePermissions($pettycashReviewerRole, $pettycashReviewerPermissions);
         $this->ensureRolePermissions($pettycashApproverRole, $pettycashApproverPermissions);
         $this->ensureRolePermissions($pettycashAuthorizerRole, $pettycashAuthorizerPermissions);
+        $this->ensureRolePermissions($inventoryViewerRole, $inventoryViewerPermissions);
+        $this->ensureRolePermissions($inventoryOfficerRole, $inventoryOfficerPermissions);
+        $this->ensureRolePermissions($inventoryApproverRole, $inventoryApproverPermissions);
+        $this->ensureRolePermissions($inventoryAdminRole, $inventoryPermissions);
+        $this->ensureRolePermissions($inventoryStoreClerkRole, $inventoryStoreClerkPermissions);
+        $this->ensureRolePermissions($inventoryAssetOfficerRole, $inventoryAssetOfficerPermissions);
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.

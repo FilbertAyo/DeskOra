@@ -56,7 +56,8 @@ rm -rf "$SCRIPT_DIR/storage/framework/views/"* || true
 if grep -qE '^APP_ENV=production' .env 2>/dev/null; then
   echo "==> Production environment detected."
   echo "    Deploy uses forward-only migrations (migrate --force)."
-  echo "    Destructive commands such as migrate:fresh and db:wipe are never run here."
+  echo "    Destructive commands such as migrate:fresh, migrate:refresh, migrate:reset,"
+  echo "    db:wipe, and full db:seed (DatabaseSeeder / UsersSeeder) are never run here."
 fi
 
 echo "==> Running database migrations (forward-only)..."
@@ -72,7 +73,11 @@ if [ "$RUN_DOMAIN_BACKFILL" = "1" ]; then
   "$PHP_BIN" artisan documents:verify-domain-parity --sample=25
 fi
 
-echo "==> Running database seeders..."
+echo "==> Running RolesAndPermissionsSeeder (additive only)..."
+echo "    Creates missing permissions and roles, including Inventory roles."
+echo "    Merges baseline permissions onto known roles; keeps extra permissions already assigned."
+echo "    Does not delete users, documents, or inventory records."
+echo "    Does not assign Inventory roles to existing users — attach those in Settings → Users."
 "$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder --force --no-interaction
 
 

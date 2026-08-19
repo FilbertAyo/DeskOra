@@ -10,6 +10,8 @@
         'Authorize requisitions' => ['icon' => 'ti-certificate', 'tone' => 'danger', 'cta' => 'Authorize'],
         'Authorize weekly budgets' => ['icon' => 'ti-shield-check', 'tone' => 'danger', 'cta' => 'Authorize'],
         'Authorize letter downloads' => ['icon' => 'ti-mail', 'tone' => 'danger', 'cta' => 'Authorize'],
+        'Review inventory borrows' => ['icon' => 'ti-hand-grab', 'tone' => 'warning', 'cta' => 'Review'],
+        'Review inventory disposals' => ['icon' => 'ti-trash', 'tone' => 'danger', 'cta' => 'Review'],
     ];
     $hasWeeklyActions = $showWeeklyToast && $wr && (
         ($wr->plan && $wr->plan->showCta) || ($wr->report && $wr->report->showCta)

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Document;
+use App\Models\InventoryBorrowRequest;
+use App\Models\InventoryDisposalRequest;
 use App\Models\OfficialLetter;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
@@ -506,6 +508,26 @@ class DashboardController extends Controller
                 'count' => $count,
                 'url' => route('documents.weekly-budget-review', ['status' => 'pending']),
             ];
+        }
+
+        if ($user->can('approve inventory requests')) {
+            $borrowCount = InventoryBorrowRequest::pendingReviewCount();
+            if ($borrowCount > 0) {
+                $actions[] = [
+                    'label' => 'Review inventory borrows',
+                    'count' => $borrowCount,
+                    'url' => route('inventory.borrowing.index', ['tab' => 'pending']),
+                ];
+            }
+
+            $disposalCount = InventoryDisposalRequest::pendingReviewCount();
+            if ($disposalCount > 0) {
+                $actions[] = [
+                    'label' => 'Review inventory disposals',
+                    'count' => $disposalCount,
+                    'url' => route('inventory.disposal.index', ['tab' => 'pending']),
+                ];
+            }
         }
 
         return $actions;

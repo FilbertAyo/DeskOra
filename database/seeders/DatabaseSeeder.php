@@ -13,6 +13,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'Full DatabaseSeeder must not run in production. It includes UsersSeeder, which deletes users. Use RolesAndPermissionsSeeder only (as deploy.sh does).'
+            );
+        }
+
         $this->call([
             RolesAndPermissionsSeeder::class,
             UsersSeeder::class,

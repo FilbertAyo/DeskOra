@@ -16,6 +16,20 @@ use App\Http\Controllers\DocumentWorkflowController;
 use App\Http\Controllers\ExecutivePulseController;
 use App\Http\Controllers\FeatureUsageController;
 use App\Http\Controllers\FeatureUsageEventController;
+use App\Http\Controllers\InventoryAssetController;
+use App\Http\Controllers\InventoryBorrowRequestController;
+use App\Http\Controllers\InventoryCategoryController;
+use App\Http\Controllers\InventoryDashboardController;
+use App\Http\Controllers\InventoryDisposalRequestController;
+use App\Http\Controllers\InventoryDonorController;
+use App\Http\Controllers\InventoryLocationController;
+use App\Http\Controllers\InventoryMaintenanceController;
+use App\Http\Controllers\InventoryProjectController;
+use App\Http\Controllers\InventoryReceiptController;
+use App\Http\Controllers\InventoryReportController;
+use App\Http\Controllers\InventoryStockItemController;
+use App\Http\Controllers\InventorySupplierController;
+use App\Http\Controllers\InventoryVerificationController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\MeetingMinuteController;
@@ -210,6 +224,148 @@ Route::middleware('auth')->group(function () {
         Route::post('/{officialLetter}/share', [OfficialLetterController::class, 'share'])->name('share');
         Route::delete('/{officialLetter}', [OfficialLetterController::class, 'destroy'])->name('destroy');
         Route::get('/{officialLetter}', [OfficialLetterController::class, 'show'])->name('show');
+    });
+
+    Route::prefix('inventory')->name('inventory.')->middleware('permission:view inventory')->group(function () {
+        Route::get('/', [InventoryDashboardController::class, 'index'])->name('index');
+
+        Route::middleware('permission:manage inventory settings')->group(function () {
+            Route::get('/categories', [InventoryCategoryController::class, 'index'])->name('categories.index');
+            Route::post('/categories', [InventoryCategoryController::class, 'store'])->name('categories.store');
+            Route::put('/categories/{category}', [InventoryCategoryController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{category}', [InventoryCategoryController::class, 'destroy'])->name('categories.destroy');
+
+            Route::get('/locations', [InventoryLocationController::class, 'index'])->name('locations.index');
+            Route::post('/locations', [InventoryLocationController::class, 'store'])->name('locations.store');
+            Route::put('/locations/{location}', [InventoryLocationController::class, 'update'])->name('locations.update');
+            Route::delete('/locations/{location}', [InventoryLocationController::class, 'destroy'])->name('locations.destroy');
+
+            Route::get('/suppliers', [InventorySupplierController::class, 'index'])->name('suppliers.index');
+            Route::post('/suppliers', [InventorySupplierController::class, 'store'])->name('suppliers.store');
+            Route::put('/suppliers/{supplier}', [InventorySupplierController::class, 'update'])->name('suppliers.update');
+            Route::delete('/suppliers/{supplier}', [InventorySupplierController::class, 'destroy'])->name('suppliers.destroy');
+
+            Route::get('/donors', [InventoryDonorController::class, 'index'])->name('donors.index');
+            Route::post('/donors', [InventoryDonorController::class, 'store'])->name('donors.store');
+            Route::put('/donors/{donor}', [InventoryDonorController::class, 'update'])->name('donors.update');
+            Route::delete('/donors/{donor}', [InventoryDonorController::class, 'destroy'])->name('donors.destroy');
+
+            Route::get('/projects', [InventoryProjectController::class, 'index'])->name('projects.index');
+            Route::post('/projects', [InventoryProjectController::class, 'store'])->name('projects.store');
+            Route::put('/projects/{project}', [InventoryProjectController::class, 'update'])->name('projects.update');
+            Route::delete('/projects/{project}', [InventoryProjectController::class, 'destroy'])->name('projects.destroy');
+        });
+
+        Route::middleware('permission:manage inventory assets|view inventory')->group(function () {
+            Route::get('/assets', [InventoryAssetController::class, 'index'])->name('assets.index');
+            Route::get('/assets/labels', [InventoryAssetController::class, 'labels'])->name('assets.labels');
+            Route::get('/q/{assetCode}', [InventoryAssetController::class, 'scan'])->name('scan');
+        });
+
+        Route::middleware('permission:manage inventory assets')->group(function () {
+            Route::get('/assets/create', [InventoryAssetController::class, 'create'])->name('assets.create');
+            Route::post('/assets', [InventoryAssetController::class, 'store'])->name('assets.store');
+            Route::get('/assets/{asset}/edit', [InventoryAssetController::class, 'edit'])->name('assets.edit');
+            Route::put('/assets/{asset}', [InventoryAssetController::class, 'update'])->name('assets.update');
+            Route::get('/assets/{asset}/assign', [InventoryAssetController::class, 'assignForm'])->name('assets.assign.form');
+            Route::post('/assets/{asset}/assign', [InventoryAssetController::class, 'assign'])->name('assets.assign');
+        });
+
+        Route::middleware('permission:manage inventory transfers')->group(function () {
+            Route::get('/assets/{asset}/transfer', [InventoryAssetController::class, 'transferForm'])->name('assets.transfer.form');
+            Route::post('/assets/{asset}/transfer', [InventoryAssetController::class, 'transfer'])->name('assets.transfer');
+        });
+
+        Route::middleware('permission:manage inventory assets|view inventory')->group(function () {
+            Route::get('/assets/{asset}', [InventoryAssetController::class, 'show'])->name('assets.show');
+        });
+
+        Route::middleware('permission:manage inventory stock|view inventory')->group(function () {
+            Route::get('/stock-items', [InventoryStockItemController::class, 'index'])->name('stock-items.index');
+        });
+
+        Route::middleware('permission:manage inventory stock')->group(function () {
+            Route::get('/stock-items/create', [InventoryStockItemController::class, 'create'])->name('stock-items.create');
+            Route::post('/stock-items', [InventoryStockItemController::class, 'store'])->name('stock-items.store');
+            Route::get('/stock-items/{stockItem}/edit', [InventoryStockItemController::class, 'edit'])->name('stock-items.edit');
+            Route::put('/stock-items/{stockItem}', [InventoryStockItemController::class, 'update'])->name('stock-items.update');
+            Route::post('/stock-items/{stockItem}/issue', [InventoryStockItemController::class, 'issue'])->name('stock-items.issue');
+            Route::post('/stock-items/{stockItem}/adjust', [InventoryStockItemController::class, 'adjust'])->name('stock-items.adjust');
+        });
+
+        Route::middleware('permission:manage inventory receipts')->group(function () {
+            Route::get('/receipts/create', [InventoryReceiptController::class, 'create'])->name('receipts.create');
+            Route::post('/receipts', [InventoryReceiptController::class, 'store'])->name('receipts.store');
+            Route::get('/receipts/{receipt}/add-items', [InventoryReceiptController::class, 'addItems'])->name('receipts.add-items');
+            Route::post('/receipts/{receipt}/add-items', [InventoryReceiptController::class, 'storeItems'])->name('receipts.store-items');
+        });
+
+        Route::middleware('permission:manage inventory receipts|view inventory')->group(function () {
+            Route::get('/receipts', [InventoryReceiptController::class, 'index'])->name('receipts.index');
+            Route::get('/receipts/{receipt}', [InventoryReceiptController::class, 'show'])->name('receipts.show');
+        });
+
+        Route::middleware('permission:manage inventory borrowing')->group(function () {
+            Route::get('/borrowing/create', [InventoryBorrowRequestController::class, 'create'])->name('borrowing.create');
+            Route::post('/borrowing', [InventoryBorrowRequestController::class, 'store'])->name('borrowing.store');
+            Route::post('/borrowing/{borrowRequest}/issue', [InventoryBorrowRequestController::class, 'issue'])->name('borrowing.issue');
+            Route::post('/borrowing/{borrowRequest}/return', [InventoryBorrowRequestController::class, 'returnItem'])->name('borrowing.return');
+        });
+
+        Route::middleware('permission:approve inventory requests')->group(function () {
+            Route::post('/borrowing/{borrowRequest}/approve', [InventoryBorrowRequestController::class, 'approve'])->name('borrowing.approve');
+            Route::post('/borrowing/{borrowRequest}/reject', [InventoryBorrowRequestController::class, 'reject'])->name('borrowing.reject');
+        });
+
+        Route::middleware('permission:manage inventory borrowing|view inventory|approve inventory requests')->group(function () {
+            Route::get('/borrowing', [InventoryBorrowRequestController::class, 'index'])->name('borrowing.index');
+            Route::get('/borrowing/{borrowRequest}', [InventoryBorrowRequestController::class, 'show'])->name('borrowing.show');
+        });
+
+        Route::middleware('permission:manage inventory maintenance')->group(function () {
+            Route::get('/maintenance/create', [InventoryMaintenanceController::class, 'create'])->name('maintenance.create');
+            Route::post('/maintenance', [InventoryMaintenanceController::class, 'store'])->name('maintenance.store');
+            Route::get('/maintenance/{maintenance}/complete', [InventoryMaintenanceController::class, 'completeForm'])->name('maintenance.complete.form');
+            Route::post('/maintenance/{maintenance}/complete', [InventoryMaintenanceController::class, 'complete'])->name('maintenance.complete');
+        });
+
+        Route::middleware('permission:manage inventory maintenance|view inventory')->group(function () {
+            Route::get('/maintenance', [InventoryMaintenanceController::class, 'index'])->name('maintenance.index');
+            Route::get('/maintenance/{maintenance}', [InventoryMaintenanceController::class, 'show'])->name('maintenance.show');
+        });
+
+        Route::middleware('permission:manage inventory assets')->group(function () {
+            Route::get('/disposal/create', [InventoryDisposalRequestController::class, 'create'])->name('disposal.create');
+            Route::post('/disposal', [InventoryDisposalRequestController::class, 'store'])->name('disposal.store');
+        });
+
+        Route::middleware('permission:approve inventory requests')->group(function () {
+            Route::post('/disposal/{disposal}/approve', [InventoryDisposalRequestController::class, 'approve'])->name('disposal.approve');
+            Route::post('/disposal/{disposal}/reject', [InventoryDisposalRequestController::class, 'reject'])->name('disposal.reject');
+        });
+
+        Route::middleware('permission:manage inventory assets|view inventory|approve inventory requests')->group(function () {
+            Route::get('/disposal', [InventoryDisposalRequestController::class, 'index'])->name('disposal.index');
+            Route::get('/disposal/{disposal}', [InventoryDisposalRequestController::class, 'show'])->name('disposal.show');
+        });
+
+        Route::middleware('permission:manage inventory assets')->group(function () {
+            Route::get('/verification/create', [InventoryVerificationController::class, 'create'])->name('verification.create');
+            Route::post('/verification', [InventoryVerificationController::class, 'store'])->name('verification.store');
+            Route::put('/verification/{verification}/results', [InventoryVerificationController::class, 'updateResults'])->name('verification.results');
+            Route::post('/verification/{verification}/complete', [InventoryVerificationController::class, 'complete'])->name('verification.complete');
+        });
+
+        Route::middleware('permission:manage inventory assets|view inventory')->group(function () {
+            Route::get('/verification', [InventoryVerificationController::class, 'index'])->name('verification.index');
+            Route::get('/verification/{verification}', [InventoryVerificationController::class, 'show'])->name('verification.show');
+        });
+
+        Route::middleware('permission:view inventory')->group(function () {
+            Route::get('/reports', [InventoryReportController::class, 'index'])->name('reports.index');
+            Route::get('/reports/export/assets', [InventoryReportController::class, 'exportAssets'])->name('reports.export.assets');
+            Route::get('/reports/export/stock', [InventoryReportController::class, 'exportStock'])->name('reports.export.stock');
+        });
     });
 
     Route::middleware('permission:manage year plans')->prefix('year-plans')->name('year-plan.')->group(function () {

@@ -16,6 +16,12 @@ class UsersSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'UsersSeeder must not run in production. It deletes users, departments, and role assignments.'
+            );
+        }
+
         $tableNames = config('permission.table_names');
         $columnNames = config('permission.column_names');
 

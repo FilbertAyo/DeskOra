@@ -116,12 +116,7 @@
                         </a>
                     </li>
 
-                    <li class="pc-item {{ Request::routeIs('weekly-matrix.*') ? 'active' : '' }}">
-                        <a href="{{ route('weekly-matrix.index') }}" class="pc-link">
-                            <span class="pc-micon"><i class="ti ti-layout-grid"></i></span>
-                            <span class="pc-mtext">Weekly Matrix</span>
-                        </a>
-                    </li>
+                  
 
                 <!-- Weekly Plans & Reports -->
                 <li class="pc-item pc-caption">
@@ -129,13 +124,18 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*', 'weekly-matrix.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Activities</span>
                         <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                     </a>
                     <ul class="pc-submenu">
+                    <li class="{{ Request::routeIs('weekly-matrix.*') ? 'active' : '' }}">
+                        <a href="{{ route('weekly-matrix.index') }}" class="pc-link">
+                            <span class="pc-mtext">Weekly Matrix</span>
+                        </a>
+                    </li>
                         <li class="{{ Request::routeIs('documents.weekly-plans') ? 'active' : '' }}">
                             <a href="{{ route('documents.weekly-plans') }}" class="pc-link">
                                 <span class="pc-mtext">Weekly Plans</span>
@@ -204,6 +204,116 @@
                         <span class="pc-mtext">All Documents</span>
                     </a>
                 </li>
+
+                @can('view inventory')
+                    @php
+                        $inventoryOpsOpen = Request::routeIs('inventory.borrowing.*', 'inventory.maintenance.*', 'inventory.disposal.*', 'inventory.verification.*');
+                        $inventorySetupOpen = Request::routeIs('inventory.categories.*', 'inventory.locations.*', 'inventory.suppliers.*', 'inventory.donors.*', 'inventory.projects.*');
+                        $inventoryOverdueCount = \App\Models\InventoryBorrowRequest::overdueCount();
+                        $inventoryPendingBorrowCount = \App\Models\InventoryBorrowRequest::pendingReviewCount();
+                        $inventoryRepairCount = \App\Models\InventoryMaintenanceRecord::openCount();
+                        $inventoryDisposalPending = \App\Models\InventoryDisposalRequest::pendingReviewCount();
+                        $inventoryOpenVerification = \App\Models\InventoryVerificationSession::openCount();
+                        $inventoryOpsAttention = $inventoryOverdueCount + $inventoryPendingBorrowCount + $inventoryRepairCount + $inventoryDisposalPending + $inventoryOpenVerification;
+                    @endphp
+                    <li class="pc-item pc-hasmenu {{ Request::routeIs('inventory.*') ? 'active pc-trigger' : '' }}">
+                        <a href="javascript:void(0);" class="pc-link">
+                            <span class="pc-micon"><i class="ti ti-package"></i></span>
+                            <span class="pc-mtext">Inventory</span>
+                            @if($inventoryOpsAttention > 0)
+                                <span class="badge bg-secondary ms-2">{{ $inventoryOpsAttention }}</span>
+                            @endif
+                            <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
+                        </a>
+                        <ul class="pc-submenu">
+                            <li class="{{ Request::routeIs('inventory.index') ? 'active' : '' }}">
+                                <a href="{{ route('inventory.index') }}" class="pc-link">
+                                    <span class="pc-mtext">Overview</span>
+                                </a>
+                            </li>
+                            <li class="{{ Request::routeIs('inventory.assets.*') ? 'active' : '' }}">
+                                <a href="{{ route('inventory.assets.index') }}" class="pc-link">
+                                    <span class="pc-mtext">Assets</span>
+                                </a>
+                            </li>
+                            <li class="{{ Request::routeIs('inventory.stock-items.*') ? 'active' : '' }}">
+                                <a href="{{ route('inventory.stock-items.index') }}" class="pc-link">
+                                    <span class="pc-mtext">Stock</span>
+                                </a>
+                            </li>
+                            @canany(['manage inventory receipts', 'view inventory'])
+                                <li class="{{ Request::routeIs('inventory.receipts.*') ? 'active' : '' }}">
+                                    <a href="{{ route('inventory.receipts.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Receipts</span>
+                                    </a>
+                                </li>
+                            @endcanany
+                            <li class="pc-item pc-hasmenu {{ $inventoryOpsOpen ? 'active pc-trigger' : '' }}">
+                                <a href="javascript:void(0);" class="pc-link">
+                                    <span class="pc-mtext">Operations</span>
+                                    @if($inventoryOpsAttention > 0)
+                                        <span class="badge bg-secondary ms-2">{{ $inventoryOpsAttention }}</span>
+                                    @endif
+                                    <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
+                                </a>
+                                <ul class="pc-submenu">
+                                    <li class="{{ Request::routeIs('inventory.borrowing.*') ? 'active' : '' }}">
+                                        <a href="{{ route('inventory.borrowing.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Borrowing</span>
+                                        </a>
+                                    </li>
+                                    @canany(['manage inventory maintenance', 'view inventory'])
+                                        <li class="{{ Request::routeIs('inventory.maintenance.*') ? 'active' : '' }}">
+                                            <a href="{{ route('inventory.maintenance.index') }}" class="pc-link">
+                                                <span class="pc-mtext">Maintenance</span>
+                                            </a>
+                                        </li>
+                                    @endcanany
+                                    <li class="{{ Request::routeIs('inventory.disposal.*') ? 'active' : '' }}">
+                                        <a href="{{ route('inventory.disposal.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Disposal</span>
+                                        </a>
+                                    </li>
+                                    <li class="{{ Request::routeIs('inventory.verification.*') ? 'active' : '' }}">
+                                        <a href="{{ route('inventory.verification.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Verification</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li class="{{ Request::routeIs('inventory.reports.*') ? 'active' : '' }}">
+                                <a href="{{ route('inventory.reports.index') }}" class="pc-link">
+                                    <span class="pc-mtext">Reports</span>
+                                </a>
+                            </li>
+                            @can('manage inventory settings')
+                                <li class="pc-item pc-hasmenu {{ $inventorySetupOpen ? 'active pc-trigger' : '' }}">
+                                    <a href="javascript:void(0);" class="pc-link">
+                                        <span class="pc-mtext">Setup</span>
+                                        <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
+                                    </a>
+                                    <ul class="pc-submenu">
+                                        <li class="{{ Request::routeIs('inventory.categories.*') ? 'active' : '' }}">
+                                            <a href="{{ route('inventory.categories.index') }}" class="pc-link"><span class="pc-mtext">Categories</span></a>
+                                        </li>
+                                        <li class="{{ Request::routeIs('inventory.locations.*') ? 'active' : '' }}">
+                                            <a href="{{ route('inventory.locations.index') }}" class="pc-link"><span class="pc-mtext">Locations</span></a>
+                                        </li>
+                                        <li class="{{ Request::routeIs('inventory.suppliers.*') ? 'active' : '' }}">
+                                            <a href="{{ route('inventory.suppliers.index') }}" class="pc-link"><span class="pc-mtext">Suppliers</span></a>
+                                        </li>
+                                        <li class="{{ Request::routeIs('inventory.donors.*') ? 'active' : '' }}">
+                                            <a href="{{ route('inventory.donors.index') }}" class="pc-link"><span class="pc-mtext">Donors</span></a>
+                                        </li>
+                                        <li class="{{ Request::routeIs('inventory.projects.*') ? 'active' : '' }}">
+                                            <a href="{{ route('inventory.projects.index') }}" class="pc-link"><span class="pc-mtext">Projects</span></a>
+                                        </li>
+                                    </ul>
+                                </li>
+                            @endcan
+                        </ul>
+                    </li>
+                @endcan
 
                 <!-- Finance & Accounting -->
                 <li class="pc-item pc-caption">
