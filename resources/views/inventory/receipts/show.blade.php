@@ -64,6 +64,7 @@
                                     <th>Name</th>
                                     <th class="text-center">Qty</th>
                                     <th>Category</th>
+                                    <th>Project</th>
                                     <th>Result</th>
                                 </tr>
                             </thead>
@@ -78,11 +79,12 @@
                                         <td>{{ $line->name }}</td>
                                         <td class="text-center">{{ $line->quantity }}</td>
                                         <td>{{ $line->category?->name ?? '—' }}</td>
+                                        <td>{{ $line->project?->name ?? '—' }}</td>
                                         <td>
                                             @if($line->item_type === 'stock' && $line->stockItem)
                                                 <a href="{{ route('inventory.stock-items.index') }}">{{ $line->stockItem->name }}</a>
                                             @else
-                                                {{ $line->serial_number ?: '—' }}
+                                                Asset
                                             @endif
                                         </td>
                                     </tr>

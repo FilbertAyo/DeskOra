@@ -29,9 +29,14 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-4 asset-only">
-                <label class="form-label small">Serial (if qty is 1)</label>
-                <input type="text" class="form-control form-control-sm" name="lines[__INDEX__][serial_number]">
+            <div class="col-md-4">
+                <label class="form-label small">Project <span class="text-muted">(optional)</span></label>
+                <select class="form-control form-control-sm" name="lines[__INDEX__][project_id]">
+                    <option value="">-- Select project --</option>
+                    @foreach($projects as $project)
+                        <option value="{{ $project->id }}">{{ $project->name }}</option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-4 asset-only">
                 <label class="form-label small">Condition</label>

@@ -20,6 +20,7 @@ class InventoryReceiptLine extends Model
         'name',
         'quantity',
         'category_id',
+        'project_id',
         'stock_item_id',
         'serial_number',
         'unit',
@@ -46,6 +47,11 @@ class InventoryReceiptLine extends Model
     public function category()
     {
         return $this->belongsTo(InventoryCategory::class, 'category_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(InventoryProject::class, 'project_id');
     }
 
     public function stockItem()

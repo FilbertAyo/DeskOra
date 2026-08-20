@@ -84,7 +84,7 @@ class InventoryReceiptController extends Controller
         $this->authorize('view', $receipt);
         $receipt->load([
             'supplier', 'donor', 'project', 'location', 'receivedByUser',
-            'lines.category', 'lines.stockItem',
+            'lines.category', 'lines.project', 'lines.stockItem',
             'assets',
         ]);
 
@@ -188,6 +188,7 @@ class InventoryReceiptController extends Controller
             'lines.*.name' => ['required', 'string', 'max:255'],
             'lines.*.quantity' => ['required', 'integer', 'min:1'],
             'lines.*.category_id' => ['nullable', 'string', 'short_id', 'exists:inventory_categories,id'],
+            'lines.*.project_id' => ['nullable', 'string', 'short_id', 'exists:inventory_projects,id'],
             'lines.*.stock_item_id' => ['nullable', 'string', 'short_id', 'exists:inventory_stock_items,id'],
             'lines.*.serial_number' => ['nullable', 'string', 'max:255'],
             'lines.*.unit' => ['nullable', 'string', 'max:50'],
@@ -205,7 +206,7 @@ class InventoryReceiptController extends Controller
     private function normalizeLines(array $lines): array
     {
         foreach ($lines as $index => $line) {
-            foreach (['category_id', 'stock_item_id', 'serial_number', 'unit', 'minimum_level', 'unit_value', 'condition', 'notes'] as $field) {
+            foreach (['category_id', 'project_id', 'stock_item_id', 'serial_number', 'unit', 'minimum_level', 'unit_value', 'condition', 'notes'] as $field) {
                 if (($line[$field] ?? '') === '') {
                     $lines[$index][$field] = null;
                 }
