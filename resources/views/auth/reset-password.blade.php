@@ -1,12 +1,10 @@
 <x-guest-layout>
     <div class="card auth-card">
         <div class="card-body">
-            <div class="mb-4">
-                <h3 class="mb-1"><b>Reset Your Password</b></h3>
-                <p class="text-muted mb-0">
-                    Enter your email, a new password, and confirm it to complete the reset.
-                </p>
-            </div>
+            <h1 class="auth-form-heading">Reset Your Password</h1>
+            <p class="auth-form-subheading">
+                Enter your email, a new password, and confirm it to complete the reset.
+            </p>
 
             <form method="POST" action="{{ route('password.store') }}">
                 @csrf

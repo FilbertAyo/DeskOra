@@ -1,12 +1,10 @@
 <x-guest-layout>
     <div class="card auth-card">
         <div class="card-body">
-            <div class="mb-4">
-                <h3 class="mb-1"><b>Verify Email</b></h3>
-                <p class="text-muted mb-0">
-                    Thanks for signing up! Before getting started, verify your email address by clicking the link we sent you. If you didn't receive it, we can send another.
-                </p>
-            </div>
+            <h1 class="auth-form-heading">Verify Email</h1>
+            <p class="auth-form-subheading">
+                Thanks for signing up! Before getting started, verify your email address by clicking the link we sent you. If you didn't receive it, we can send another.
+            </p>
 
             @if (session('status') == 'verification-link-sent')
                 <div class="alert alert-success small mb-4">

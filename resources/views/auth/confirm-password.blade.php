@@ -1,12 +1,10 @@
 <x-guest-layout>
     <div class="card auth-card">
         <div class="card-body">
-            <div class="mb-4">
-                <h3 class="mb-1"><b>Confirm Password</b></h3>
-                <p class="text-muted mb-0">
-                    This is a secure area. Please confirm your password before continuing.
-                </p>
-            </div>
+            <h1 class="auth-form-heading">Confirm Password</h1>
+            <p class="auth-form-subheading">
+                This is a secure area. Please confirm your password before continuing.
+            </p>
 
             <form method="POST" action="{{ route('password.confirm') }}">
                 @csrf

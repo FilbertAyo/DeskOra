@@ -1,12 +1,10 @@
 <x-guest-layout>
     <div class="card auth-card">
         <div class="card-body">
-            <div class="mb-4">
-                <h3 class="mb-1"><b>Verify Sign In</b></h3>
-                <p class="text-muted mb-0">
-                    Enter the 4-digit code sent to {{ $maskedEmail }}.
-                </p>
-            </div>
+            <h1 class="auth-form-heading">Verify Sign In</h1>
+            <p class="auth-form-subheading">
+                Enter the 4-digit code sent to {{ $maskedEmail }}.
+            </p>
 
             <x-auth-session-status class="mb-4" :status="session('status')" />
 

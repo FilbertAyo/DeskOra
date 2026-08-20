@@ -1,12 +1,10 @@
 <x-guest-layout>
     <div class="card auth-card">
         <div class="card-body">
-            <div class="mb-4">
-                <h3 class="mb-1"><b>Forgot Password</b></h3>
-                <p class="text-muted mb-0">
-                    Enter your email address and we'll send you a link to reset your password.
-                </p>
-            </div>
+            <h1 class="auth-form-heading">Forgot Password</h1>
+            <p class="auth-form-subheading">
+                Enter your email address and we'll send you a link to reset your password.
+            </p>
 
             <x-auth-session-status class="mb-4" :status="session('status')" />
 
