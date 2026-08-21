@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ActionLogController extends Controller
@@ -151,7 +152,9 @@ class ActionLogController extends Controller
         }
 
         $notes = trim((string) ($validated['notes_progress'] ?? ''));
-        if ($notes === '') {
+        if ($validated['progress'] === self::PROGRESS_NOT_STARTED) {
+            $notes = '';
+        } elseif ($notes === '') {
             $notes = 'Moved on Kanban board.';
         }
 
@@ -611,9 +614,18 @@ class ActionLogController extends Controller
         $validated = $request->validate([
             'task_uid' => ['required', 'string', 'max:80'],
             'progress' => ['required', 'string', 'in:'.implode(',', array_merge(self::STAFF_PROGRESS_OPTIONS, [self::QUICK_UPDATE_REASSIGN]))],
-            'notes_progress' => ['required', 'string', 'max:4000'],
+            'notes_progress' => [
+                Rule::requiredIf(fn () => ActionLogTaskSupport::progressRequiresNotes((string) $request->input('progress', ''))),
+                'nullable',
+                'string',
+                'max:4000',
+            ],
             'reassign_user_id' => ['nullable', 'string', 'short_id', 'exists:users,id'],
         ]);
+
+        if ($validated['progress'] === self::PROGRESS_NOT_STARTED) {
+            $validated['notes_progress'] = '';
+        }
 
         $isReassign = $validated['progress'] === self::QUICK_UPDATE_REASSIGN;
         if ($isReassign) {
@@ -671,7 +683,16 @@ class ActionLogController extends Controller
                 $before = $task;
                 $task['progress'] = $validated['progress'];
                 $task['notes_progress'] = $validated['notes_progress'];
-                $task = $this->appendTaskHistoryIfChanged($before, $task, $period, (string) $user->id);
+                $task = $this->applyCancelledTaskRules($task, false);
+                $forceNotStartedAck = $task['progress'] === self::PROGRESS_NOT_STARTED
+                    && ! ActionLogTaskSupport::hasRealUpdateInPeriod($before, (string) $period->id);
+                $task = $this->appendTaskHistoryIfChanged(
+                    $before,
+                    $task,
+                    $period,
+                    (string) $user->id,
+                    $forceNotStartedAck
+                );
             }
 
             $found = true;
@@ -892,7 +913,7 @@ class ActionLogController extends Controller
         return $initialized;
     }
 
-    private function appendTaskHistoryIfChanged(?array $existingTask, array $newTask, WorkPeriod $period, string $actorUserId): array
+    private function appendTaskHistoryIfChanged(?array $existingTask, array $newTask, WorkPeriod $period, string $actorUserId, bool $force = false): array
     {
         $history = [];
         if (is_array($existingTask['history'] ?? null)) {
@@ -912,7 +933,8 @@ class ActionLogController extends Controller
         $changed = $isNewTask
             || $oldProgress !== $newProgress
             || $oldNotes !== $newNotes
-            || $oldReason !== $newReason;
+            || $oldReason !== $newReason
+            || $force;
 
         if ($changed) {
             $history[] = [
@@ -1040,6 +1062,9 @@ class ActionLogController extends Controller
 
         $task['progress'] = $progress;
         $task['status_reason'] = null;
+        if ($progress === self::PROGRESS_NOT_STARTED) {
+            $task['notes_progress'] = '';
+        }
 
         return $task;
     }

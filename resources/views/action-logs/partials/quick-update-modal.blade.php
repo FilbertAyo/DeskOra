@@ -46,9 +46,9 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="mb-0">
+                    <div class="mb-0 d-none js-quick-notes-field">
                         <label for="{{ $formId }}Notes" class="form-label js-quick-notes-label">Progress notes <span class="text-danger">*</span></label>
-                        <textarea class="form-control js-quick-task-notes" name="notes_progress" id="{{ $formId }}Notes" rows="4" maxlength="4000" required placeholder="What did you do this week? Any blockers or context?"></textarea>
+                        <textarea class="form-control js-quick-task-notes" name="notes_progress" id="{{ $formId }}Notes" rows="4" maxlength="4000" placeholder="What did you do this week? Any blockers or context?"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -66,12 +66,16 @@
     @push('scripts')
         <script>
             (function () {
-                function toggleReassignField(form) {
+                function toggleProgressDependentFields(form) {
                     const progressEl = form.querySelector('.js-quick-task-progress');
                     const reassignField = form.querySelector('.js-quick-reassign-field');
                     const reassignUserEl = form.querySelector('.js-quick-reassign-user');
+                    const notesField = form.querySelector('.js-quick-notes-field');
                     const notesLabel = form.querySelector('.js-quick-notes-label');
-                    const isReassign = progressEl && progressEl.value === 'Reassign';
+                    const notesEl = form.querySelector('.js-quick-task-notes');
+                    const progress = progressEl ? progressEl.value : '';
+                    const isReassign = progress === 'Reassign';
+                    const isNotStarted = progress === 'Not Started';
 
                     if (reassignField) {
                         reassignField.classList.toggle('d-none', !isReassign);
@@ -80,6 +84,21 @@
                         reassignUserEl.required = isReassign;
                         if (!isReassign) {
                             reassignUserEl.value = '';
+                        }
+                    }
+                    if (notesField) {
+                        notesField.classList.toggle('d-none', isNotStarted);
+                    }
+                    if (notesEl) {
+                        notesEl.required = !isNotStarted;
+                        if (isNotStarted) {
+                            if (notesEl.dataset.stashedNotes === undefined) {
+                                notesEl.dataset.stashedNotes = notesEl.value;
+                            }
+                            notesEl.value = '';
+                        } else if (notesEl.value === '' && notesEl.dataset.stashedNotes !== undefined) {
+                            notesEl.value = notesEl.dataset.stashedNotes;
+                            delete notesEl.dataset.stashedNotes;
                         }
                     }
                     if (notesLabel) {
@@ -128,10 +147,11 @@
                                 progressEl.value = btn.getAttribute('data-progress') || 'Not Started';
                             }
                             if (notesEl) {
+                                delete notesEl.dataset.stashedNotes;
                                 notesEl.value = btn.getAttribute('data-notes') || '';
                             }
 
-                            toggleReassignField(form);
+                            toggleProgressDependentFields(form);
 
                             if (modalEl) {
                                 bootstrapApi.Modal.getOrCreateInstance(modalEl).show();
@@ -141,15 +161,20 @@
 
                     if (progressEl) {
                         progressEl.addEventListener('change', function () {
-                            toggleReassignField(form);
+                            toggleProgressDependentFields(form);
                         });
                     }
 
                     form.addEventListener('submit', function (e) {
                         const isReassign = progressEl && progressEl.value === 'Reassign';
+                        const isNotStarted = progressEl && progressEl.value === 'Not Started';
                         const reassignUserEl = form.querySelector('.js-quick-reassign-user');
 
-                        if (notesEl && !notesEl.value.trim()) {
+                        if (isNotStarted && notesEl) {
+                            notesEl.value = '';
+                        }
+
+                        if (!isNotStarted && notesEl && !notesEl.value.trim()) {
                             e.preventDefault();
                             notesEl.focus();
                             return;

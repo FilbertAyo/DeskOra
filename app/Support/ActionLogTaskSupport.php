@@ -108,4 +108,31 @@ class ActionLogTaskSupport
 
         return $fromProgress !== '' && $toProgress !== '' && $fromProgress !== $toProgress;
     }
+
+    public static function progressRequiresNotes(string $progress): bool
+    {
+        return trim($progress) !== self::PROGRESS_NOT_STARTED;
+    }
+
+    /**
+     * @param  array<string, mixed>  $task
+     */
+    public static function hasRealUpdateInPeriod(array $task, string $periodId): bool
+    {
+        $history = is_array($task['history'] ?? null) ? $task['history'] : [];
+        foreach ($history as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            if (trim((string) ($entry['period_id'] ?? '')) !== $periodId) {
+                continue;
+            }
+
+            if (self::isRealHistoryEntry($entry)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

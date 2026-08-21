@@ -28,7 +28,7 @@
                         <input type="date" class="form-control" id="actionLogModalCompilationDate">
                     </div>
                 </div>
-                <div class="mb-0">
+                <div class="mb-0 d-none action-log-modal-notes-field">
                     <label for="actionLogModalNotes" class="form-label action-log-modal-notes-label">Notes / progress update</label>
                     <textarea class="form-control action-log-textarea-md" id="actionLogModalNotes" rows="4" placeholder="Weekly updates, blockers, or context"></textarea>
                 </div>

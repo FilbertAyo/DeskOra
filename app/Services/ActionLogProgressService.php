@@ -131,7 +131,7 @@ class ActionLogProgressService
 
                 $hasRealUpdateThisPeriod = $currentPeriod
                     && (string) $document->period_id === (string) $currentPeriod->id
-                    && $this->taskHasRealUpdateInPeriod($task, (string) $currentPeriod->id);
+                    && ActionLogTaskSupport::hasRealUpdateInPeriod($task, (string) $currentPeriod->id);
                 $carriedFromLabel = null;
                 if ($taskUid !== '' && $currentPeriod && (string) $document->period_id === (string) $currentPeriod->id) {
                     $carriedFromLabel = $this->findLatestPriorPeriodLabelForTask($taskUid, $selectedByPeriod, $currentPeriod);
@@ -266,27 +266,5 @@ class ActionLogProgressService
         }
 
         return $label;
-    }
-
-    /**
-     * @param  array<string, mixed>  $task
-     */
-    private function taskHasRealUpdateInPeriod(array $task, string $periodId): bool
-    {
-        $history = is_array($task['history'] ?? null) ? $task['history'] : [];
-        foreach ($history as $entry) {
-            if (! is_array($entry)) {
-                continue;
-            }
-            if (trim((string) ($entry['period_id'] ?? '')) !== $periodId) {
-                continue;
-            }
-
-            if (ActionLogTaskSupport::isRealHistoryEntry($entry)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

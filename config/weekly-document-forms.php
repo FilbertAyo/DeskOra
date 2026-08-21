@@ -145,7 +145,7 @@ return [
                 'fields' => [
                     ['label' => 'Progress status', 'required_on_submit' => false, 'options' => ['Not Started', 'In Progress', 'Done', 'Cancelled', 'Reassign']],
                     ['label' => 'Reassign to', 'required_on_submit' => false, 'notes' => 'Shown when progress is Reassign.'],
-                    ['label' => 'Progress notes / Reason for reassignment', 'required_on_submit' => false],
+                    ['label' => 'Progress notes / Reason for reassignment', 'required_on_submit' => false, 'notes' => 'Hidden when progress is Not Started. Required for other statuses and for reassignment.'],
                 ],
                 'notes' => 'Appears when the user has active action log tasks. Updated via a quick-update modal, not the main report form.',
             ],

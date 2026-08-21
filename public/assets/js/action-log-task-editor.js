@@ -184,13 +184,31 @@
             function toggleReassignMode() {
                 const progressEl = document.getElementById('actionLogModalProgress');
                 const notesLabel = document.querySelector('#actionLogTaskModal .action-log-modal-notes-label');
-                const isReassign = progressEl && progressEl.value === REASSIGN_OPTION;
+                const notesField = document.querySelector('#actionLogTaskModal .action-log-modal-notes-field');
+                const notesEl = document.getElementById('actionLogModalNotes');
+                const progress = progressEl ? progressEl.value : '';
+                const isReassign = progress === REASSIGN_OPTION;
+                const isNotStarted = progress === 'Not Started';
 
                 if (modalResponsible) {
                     modalResponsible.classList.toggle('border', isReassign);
                     modalResponsible.classList.toggle('border-warning', isReassign);
                     modalResponsible.classList.toggle('rounded', isReassign);
                     modalResponsible.classList.toggle('p-2', isReassign);
+                }
+                if (notesField) {
+                    notesField.classList.toggle('d-none', isNotStarted);
+                }
+                if (notesEl) {
+                    if (isNotStarted) {
+                        if (notesEl.dataset.stashedNotes === undefined) {
+                            notesEl.dataset.stashedNotes = notesEl.value;
+                        }
+                        notesEl.value = '';
+                    } else if (notesEl.value === '' && notesEl.dataset.stashedNotes !== undefined) {
+                        notesEl.value = notesEl.dataset.stashedNotes;
+                        delete notesEl.dataset.stashedNotes;
+                    }
                 }
                 if (notesLabel) {
                     notesLabel.innerHTML = isReassign
@@ -237,23 +255,30 @@
                 document.getElementById('actionLogModalTask').value = '';
                 document.getElementById('actionLogModalDueDate').value = '';
                 document.getElementById('actionLogModalCompilationDate').value = '';
-                document.getElementById('actionLogModalNotes').value = '';
+                const notesEl = document.getElementById('actionLogModalNotes');
+                if (notesEl) {
+                    delete notesEl.dataset.stashedNotes;
+                    notesEl.value = '';
+                }
                 fillProgressSelect('Not Started', false);
                 cloneUserOptionsIntoModal([]);
                 editingPreviousResponsibleIds = [];
             }
 
             function readModal() {
+                const progress = document.getElementById('actionLogModalProgress').value;
                 return {
                     task_uid: document.getElementById('actionLogModalTaskUid').value || genUid(),
                     task: document.getElementById('actionLogModalTask').value,
                     responsible_user_ids: window.StaffCheckboxSelect
                         ? window.StaffCheckboxSelect.readSelected(modalResponsible)
                         : [],
-                    progress: document.getElementById('actionLogModalProgress').value,
+                    progress: progress,
                     due_date: document.getElementById('actionLogModalDueDate').value,
                     compilation_date: document.getElementById('actionLogModalCompilationDate').value,
-                    notes_progress: document.getElementById('actionLogModalNotes').value,
+                    notes_progress: progress === 'Not Started'
+                        ? ''
+                        : document.getElementById('actionLogModalNotes').value,
                 };
             }
 
@@ -262,7 +287,11 @@
                 document.getElementById('actionLogModalTask').value = task.task || '';
                 document.getElementById('actionLogModalDueDate').value = task.due_date || '';
                 document.getElementById('actionLogModalCompilationDate').value = task.compilation_date || '';
-                document.getElementById('actionLogModalNotes').value = task.notes_progress || '';
+                const notesEl = document.getElementById('actionLogModalNotes');
+                if (notesEl) {
+                    delete notesEl.dataset.stashedNotes;
+                    notesEl.value = task.notes_progress || '';
+                }
                 fillProgressSelect(task.progress || 'Not Started', true);
                 cloneUserOptionsIntoModal(task.responsible_user_ids || []);
                 editingPreviousResponsibleIds = Array.isArray(task.responsible_user_ids)

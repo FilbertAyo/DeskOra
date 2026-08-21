@@ -463,6 +463,83 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $response->assertSessionHasErrors('notes_progress');
     }
 
+    public function test_quick_update_not_started_does_not_require_progress_notes(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
+
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $staff = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'Not Started'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'Not Started',
+            'notes_progress' => '',
+        ]);
+
+        $response->assertSessionHas('success');
+        $document->refresh();
+        $task = $document->content['tasks'][0] ?? [];
+        $history = is_array($task['history'] ?? null) ? $task['history'] : [];
+        $latest = end($history);
+
+        $this->assertSame('Not Started', $task['progress'] ?? null);
+        $this->assertSame('', $task['notes_progress'] ?? null);
+        $this->assertSame('update', $latest['source'] ?? null);
+        $this->assertSame('', trim((string) ($latest['notes_progress'] ?? '')));
+        $this->assertFalse(app(\App\Services\ActionLogProgressService::class)->hasPendingUpdates($staff));
+    }
+
+    public function test_quick_update_not_started_clears_existing_progress_notes(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
+
+        $manager = User::factory()->create();
+        $manager->givePermissionTo('create action logs');
+        $staff = User::factory()->create();
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 14 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('task_a', 'Assigned task', [$staff->id], 'In Progress', null, null, 'Started last week'),
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($staff)->put(route('action-logs.quick-update', $document), [
+            'task_uid' => 'task_a',
+            'progress' => 'Not Started',
+            'notes_progress' => 'This should be ignored',
+        ]);
+
+        $response->assertSessionHas('success');
+        $document->refresh();
+        $task = $document->content['tasks'][0] ?? [];
+
+        $this->assertSame('Not Started', $task['progress'] ?? null);
+        $this->assertSame('', $task['notes_progress'] ?? null);
+    }
+
     public function test_assigned_staff_cannot_access_edit_page(): void
     {
         /** @var User $manager */
