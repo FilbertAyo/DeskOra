@@ -189,6 +189,7 @@
                                                         <span class="badge bg-light-danger border border-danger mt-1">Returned
                                                         </span>
                                                     @endif
+                                                    @include('documents.partials.edit-blocked-notice')
                                                 @else
                                                     <span class="badge bg-light-success border border-success">Submitted
                                                     </span>

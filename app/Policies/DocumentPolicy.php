@@ -4,6 +4,8 @@ namespace App\Policies;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Support\DocumentUpdateMessages;
+use Illuminate\Auth\Access\Response;
 
 class DocumentPolicy
 {
@@ -108,11 +110,11 @@ class DocumentPolicy
      * - Reviewers: Cannot update (read-only)
      * - Admin: Can update any draft document
      */
-    public function update(User $user, Document $document): bool
+    public function update(User $user, Document $document): bool|Response
     {
         if ($document->type === Document::TYPE_ACTION_LOG) {
             if (! $this->hasOpenPeriod($document)) {
-                return false;
+                return Response::deny(DocumentUpdateMessages::closedPeriodMessage($document));
             }
 
             if ($this->isActionLogManager($user)) {
@@ -122,21 +124,25 @@ class DocumentPolicy
 
             // Assigned staff can update their own rows only once the log is
             // submitted. Unsubmitted drafts remain manager-only.
-            return $document->isSubmitted() && $this->isUserAssignedToActionLog($user, $document);
+            if ($document->isSubmitted() && $this->isUserAssignedToActionLog($user, $document)) {
+                return true;
+            }
+
+            return Response::deny(DocumentUpdateMessages::genericDeniedMessage());
         }
 
         // Users who only have 'view all documents' permission cannot update (read-only)
         if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
-            return false;
+            return Response::deny(DocumentUpdateMessages::readOnlyAccessMessage());
         }
 
         // Only draft documents can be updated
         if (! $document->isDraft()) {
-            return false;
+            return Response::deny(DocumentUpdateMessages::alreadySubmittedMessage());
         }
 
         if (! $this->hasOpenPeriod($document)) {
-            return false;
+            return Response::deny(DocumentUpdateMessages::closedPeriodMessage($document));
         }
 
         if ($document->user_id === $user->id) {
@@ -151,7 +157,7 @@ class DocumentPolicy
             return true;
         }
 
-        return false;
+        return Response::deny(DocumentUpdateMessages::genericDeniedMessage());
     }
 
     /**
@@ -205,28 +211,36 @@ class DocumentPolicy
      * - Reviewers: Cannot submit (read-only)
      * - Admin: Can submit any draft document
      */
-    public function submit(User $user, Document $document): bool
+    public function submit(User $user, Document $document): bool|Response
     {
         if ($document->type === Document::TYPE_ACTION_LOG) {
             if (! $document->isDraft() || ! $this->hasOpenPeriod($document)) {
-                return false;
+                return Response::deny(
+                    ! $this->hasOpenPeriod($document)
+                        ? DocumentUpdateMessages::closedPeriodMessage($document)
+                        : DocumentUpdateMessages::alreadySubmittedMessage()
+                );
             }
 
-            return $this->isActionLogManager($user);
+            if ($this->isActionLogManager($user)) {
+                return true;
+            }
+
+            return Response::deny(DocumentUpdateMessages::genericDeniedMessage());
         }
 
         // Users who only have 'view all documents' permission cannot submit (read-only)
         if ($user->hasPermissionTo('view all documents') && ! $user->hasAnyPermission(['create weekly plan', 'create weekly report', 'create monthly report', 'create action logs', 'approve documents'])) {
-            return false;
+            return Response::deny(DocumentUpdateMessages::readOnlyAccessMessage());
         }
 
         // Only draft documents can be submitted
         if (! $document->isDraft()) {
-            return false;
+            return Response::deny(DocumentUpdateMessages::alreadySubmittedMessage());
         }
 
         if (! $this->hasOpenPeriod($document)) {
-            return false;
+            return Response::deny(DocumentUpdateMessages::closedPeriodMessage($document));
         }
 
         if ($document->user_id === $user->id) {
@@ -241,7 +255,7 @@ class DocumentPolicy
             return true;
         }
 
-        return false;
+        return Response::deny(DocumentUpdateMessages::genericDeniedMessage());
     }
 
     /**

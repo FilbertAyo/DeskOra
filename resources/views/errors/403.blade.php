@@ -1,7 +1,16 @@
 @php
+    use App\Support\DocumentUpdateMessages;
+
     $code = '403';
-    $title = 'Permission Denied';
-    $message = "It seems like you don't have access to perform this action.";
+    $defaultTitle = 'Permission Denied';
+    $defaultMessage = "It seems like you don't have access to perform this action.";
+    $exceptionMessage = isset($exception) ? trim((string) $exception->getMessage()) : '';
+    $message = ($exceptionMessage !== '' && $exceptionMessage !== 'This action is unauthorized.')
+        ? $exceptionMessage
+        : $defaultMessage;
+    $title = DocumentUpdateMessages::isClosedPeriodMessage($message)
+        ? 'Editing no longer available'
+        : $defaultTitle;
 @endphp
 
 @extends('errors.layout')

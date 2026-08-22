@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -1102,6 +1103,30 @@ class Document extends Model
         $user = auth()->user();
 
         return $user instanceof User && $user->can('update', $this);
+    }
+
+    /**
+     * Human-readable reason why the current user cannot edit this draft.
+     */
+    public function editBlockedReason(): ?string
+    {
+        if ($this->canBeEdited()) {
+            return null;
+        }
+
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        if (! $this->isDraft()) {
+            return \App\Support\DocumentUpdateMessages::alreadySubmittedMessage();
+        }
+
+        $response = Gate::forUser($user)->inspect('update', $this);
+        $message = trim((string) $response->message());
+
+        return $message !== '' ? $message : \App\Support\DocumentUpdateMessages::genericDeniedMessage();
     }
 
     /**

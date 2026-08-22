@@ -305,9 +305,15 @@ class WeeklyReportGracePeriodCreateTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('documents.edit', $report))
-            ->assertForbidden();
+            ->assertForbidden()
+            ->assertSee('Editing no longer available', false)
+            ->assertSee('work period is now closed', false);
 
         $this->assertFalse($user->can('update', $report));
         $this->assertFalse($report->canBeEdited());
+        $this->assertStringContainsString(
+            'Week 33 of 2026',
+            (string) $report->editBlockedReason()
+        );
     }
 }

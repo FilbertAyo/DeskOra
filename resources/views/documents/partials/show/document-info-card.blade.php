@@ -52,6 +52,7 @@
                             {{ $document->sharedUsers->pluck('name')->join(', ') }}
                         </div>
                     @endif
+                    @include('documents.partials.edit-blocked-notice')
                     <div class="btn-group mt-2 gap-1" role="group">
                         @if($document->canBeEdited())
                             <a href="{{ route('documents.edit', $document->id) }}" class="btn btn-primary btn-sm">
@@ -59,7 +60,7 @@
                             </a>
                         @endif
 
-                        @if($document->type === \App\Models\Document::TYPE_WEEKLY_REPORT && $document->state === 'draft' && ($weeklyReportWizardProgress ?? null))
+                        @if($document->type === \App\Models\Document::TYPE_WEEKLY_REPORT && $document->state === 'draft' && $document->canBeEdited() && ($weeklyReportWizardProgress ?? null))
                             @php
                                 $hasPendingWizardTasks = collect($weeklyReportWizardProgress['activeTasks'] ?? [])
                                     ->contains(fn ($task) => is_array($task) && ! empty($task['needs_update']));
