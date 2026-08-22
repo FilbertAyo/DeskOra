@@ -303,16 +303,14 @@ class DocumentPolicy
             return true;
         }
 
-        if (in_array($document->type, [
-            Document::TYPE_WEEKLY_PLAN,
-            Document::TYPE_WEEKLY_REPORT,
-            Document::TYPE_MONTHLY_REPORT,
-            Document::TYPE_ACTION_LOG,
-        ])) {
-            return $document->period->isOpen();
-        }
+        $period = $document->period;
 
-        return true;
+        return match ($document->type) {
+            Document::TYPE_WEEKLY_PLAN => $period->allowsWeeklyPlanEdits(),
+            Document::TYPE_WEEKLY_REPORT => $period->allowsWeeklyReportEdits(),
+            Document::TYPE_MONTHLY_REPORT, Document::TYPE_ACTION_LOG => $period->isOpen(),
+            default => true,
+        };
     }
 
     private function isActionLogManager(User $user): bool

@@ -335,6 +335,22 @@ class WorkPeriod extends Model
     }
 
     /**
+     * Whether staff may still edit or submit a weekly plan for this period.
+     */
+    public function allowsWeeklyPlanEdits(?Carbon $now = null): bool
+    {
+        return $this->isOpen() || $this->isPlanGracePeriodActive($now);
+    }
+
+    /**
+     * Whether staff may still edit or submit a weekly report for this period.
+     */
+    public function allowsWeeklyReportEdits(?Carbon $now = null): bool
+    {
+        return $this->isOpen() || $this->isReportGracePeriodActive($now);
+    }
+
+    /**
      * Check if plan deadline has passed
      */
     public function isPlanDeadlinePassed(): bool

@@ -119,11 +119,11 @@ class WeeklySubmissionReminderService
         }
 
         if ($document->type === Document::TYPE_WEEKLY_PLAN) {
-            return $period->isOpen() || $period->isPlanGracePeriodActive();
+            return $period->allowsWeeklyPlanEdits();
         }
 
         if ($document->type === Document::TYPE_WEEKLY_REPORT) {
-            return $period->isOpen() || $period->isReportGracePeriodActive();
+            return $period->allowsWeeklyReportEdits();
         }
 
         return $period->isOpen();

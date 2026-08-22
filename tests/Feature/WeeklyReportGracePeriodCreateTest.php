@@ -229,4 +229,85 @@ class WeeklyReportGracePeriodCreateTest extends TestCase
         $this->assertFalse($windows->gracePlanEntries($collaborator)->isNotEmpty());
         $this->assertFalse($windows->planSlotForPeriod($collaborator, $week30->fresh())->showAction());
     }
+
+    public function test_owner_can_edit_draft_weekly_report_during_report_grace_period(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 18, 10, 0, 0));
+
+        $week33 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 33,
+            'week_start_date' => '2026-08-10',
+            'week_end_date' => '2026-08-16',
+            'plan_deadline' => '2026-08-08',
+            'report_deadline' => '2026-08-20',
+            'status' => WorkPeriod::STATUS_CLOSED,
+        ]);
+
+        WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 34,
+            'week_start_date' => '2026-08-17',
+            'week_end_date' => '2026-08-23',
+            'plan_deadline' => '2026-08-15',
+            'report_deadline' => '2026-08-22',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
+
+        $this->assertTrue($week33->fresh()->isReportGracePeriodActive());
+        $this->assertFalse($week33->fresh()->isOpen());
+
+        $user = User::factory()->create(['status' => 'active']);
+        $user->givePermissionTo('create weekly report');
+
+        $report = Document::create([
+            'user_id' => $user->id,
+            'period_id' => $week33->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly Report - Week 33 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Saved as draft'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documents.edit', $report))
+            ->assertOk();
+
+        $this->assertTrue($user->can('update', $report));
+        $this->assertTrue($report->canBeEdited());
+    }
+
+    public function test_owner_cannot_edit_draft_weekly_report_after_closed_period_without_grace(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 25, 10, 0, 0));
+
+        $week33 = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 33,
+            'week_start_date' => '2026-08-10',
+            'week_end_date' => '2026-08-16',
+            'plan_deadline' => '2026-08-08',
+            'report_deadline' => '2026-08-16',
+            'status' => WorkPeriod::STATUS_CLOSED,
+        ]);
+
+        $user = User::factory()->create(['status' => 'active']);
+        $user->givePermissionTo('create weekly report');
+
+        $report = Document::create([
+            'user_id' => $user->id,
+            'period_id' => $week33->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly Report - Week 33 of 2026',
+            'state' => Document::STATE_DRAFT,
+            'content' => ['summary' => 'Saved as draft'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documents.edit', $report))
+            ->assertForbidden();
+
+        $this->assertFalse($user->can('update', $report));
+        $this->assertFalse($report->canBeEdited());
+    }
 }

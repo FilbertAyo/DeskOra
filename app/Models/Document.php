@@ -1091,11 +1091,17 @@ class Document extends Model
     }
 
     /**
-     * Check if document can be edited (only drafts can be edited)
+     * Check if document can be edited (draft + user may update per policy).
      */
     public function canBeEdited(): bool
     {
-        return $this->isDraft();
+        if (! $this->isDraft()) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can('update', $this);
     }
 
     /**
