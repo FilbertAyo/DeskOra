@@ -145,6 +145,15 @@
                                                 @can('transfer', $asset)
                                                     <a class="dropdown-item" href="{{ route('inventory.assets.transfer.form', $asset) }}"><i class="ti ti-arrows-exchange me-2"></i> Transfer</a>
                                                 @endcan
+                                                @can('delete', $asset)
+                                                    <form method="POST" action="{{ route('inventory.assets.destroy', $asset) }}" class="d-inline" onsubmit="return confirm('Delete asset {{ $asset->asset_code }} ({{ $asset->name }})? This cannot be undone.');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="ti ti-trash me-2"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                @endcan
                                             </x-table-action-dropdown>
                                         </td>
                                     </tr>
@@ -162,7 +171,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="mt-3">{{ $assets->links() }}</div>
+                    <div class="mt-3">{{ $assets->links('pagination::bootstrap-5') }}</div>
                 </div>
             </div>
         </div>

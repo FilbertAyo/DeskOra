@@ -240,6 +240,41 @@ class InventoryWorkflowTest extends TestCase
         $this->assertSame(1, $receipt->fresh()->lines()->count());
     }
 
+    public function test_manager_can_delete_mistaken_asset(): void
+    {
+        $user = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $asset = $this->makeAsset();
+
+        $this->actingAs($user)
+            ->delete(route('inventory.assets.destroy', $asset))
+            ->assertRedirect(route('inventory.assets.index'));
+
+        $this->assertDatabaseMissing('inventory_assets', ['id' => $asset->id]);
+    }
+
+    public function test_asset_with_disposal_history_cannot_be_deleted(): void
+    {
+        $user = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $asset = $this->makeAsset();
+
+        InventoryDisposalRequest::query()->create([
+            'request_number' => 'WH-DSP-2026-0001',
+            'asset_id' => $asset->id,
+            'reason' => 'End of life',
+            'method' => InventoryDisposalRequest::METHOD_DESTROYED,
+            'status' => InventoryDisposalRequest::STATUS_REQUESTED,
+            'requested_by_user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('inventory.assets.index'))
+            ->delete(route('inventory.assets.destroy', $asset))
+            ->assertRedirect(route('inventory.assets.index'))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('inventory_assets', ['id' => $asset->id]);
+    }
+
     /**
      * @param  list<string>  $permissions
      */

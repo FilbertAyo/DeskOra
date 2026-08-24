@@ -44,6 +44,15 @@
                                     </div>
                                 @endif
                             @endif
+                            @can('delete', $asset)
+                                <form method="POST" action="{{ route('inventory.assets.destroy', $asset) }}" class="d-inline" onsubmit="return confirm('Delete asset {{ $asset->asset_code }} ({{ $asset->name }})? This cannot be undone.');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="ti ti-trash me-1"></i> Delete
+                                    </button>
+                                </form>
+                            @endcan
                             <a href="{{ route('inventory.assets.index') }}" class="btn btn-sm btn-light"><i class="ti ti-arrow-left me-1"></i> Back</a>
                         </div>
                     </div>

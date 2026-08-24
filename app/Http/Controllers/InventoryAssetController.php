@@ -11,6 +11,7 @@ use App\Models\InventoryDonor;
 use App\Models\InventoryLocation;
 use App\Models\InventoryProject;
 use App\Models\InventorySupplier;
+use App\Models\InventoryVerificationResult;
 use App\Models\User;
 use App\Services\Inventory\InventoryAssetCodeGenerator;
 use App\Services\Inventory\InventoryQrCodeGenerator;
@@ -184,6 +185,30 @@ class InventoryAssetController extends Controller
         $asset->update($this->validatedAsset($request));
 
         return redirect()->route('inventory.assets.show', $asset)->with('success', 'Asset updated successfully.');
+    }
+
+    public function destroy(InventoryAsset $asset)
+    {
+        $this->authorize('delete', $asset);
+
+        if ($asset->disposalRequests()->exists()) {
+            return redirect()
+                ->back()
+                ->with('error', 'This asset has disposal history and cannot be deleted. Use disposal workflow instead.');
+        }
+
+        if (InventoryVerificationResult::query()->where('asset_id', $asset->id)->exists()) {
+            return redirect()
+                ->back()
+                ->with('error', 'This asset appears in a verification session and cannot be deleted.');
+        }
+
+        $assetCode = $asset->asset_code;
+        $asset->delete();
+
+        return redirect()
+            ->route('inventory.assets.index')
+            ->with('success', "Asset {$assetCode} deleted successfully.");
     }
 
     public function assignForm(InventoryAsset $asset)

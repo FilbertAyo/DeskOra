@@ -267,6 +267,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/assets', [InventoryAssetController::class, 'store'])->name('assets.store');
             Route::get('/assets/{asset}/edit', [InventoryAssetController::class, 'edit'])->name('assets.edit');
             Route::put('/assets/{asset}', [InventoryAssetController::class, 'update'])->name('assets.update');
+            Route::delete('/assets/{asset}', [InventoryAssetController::class, 'destroy'])->name('assets.destroy');
             Route::get('/assets/{asset}/assign', [InventoryAssetController::class, 'assignForm'])->name('assets.assign.form');
             Route::post('/assets/{asset}/assign', [InventoryAssetController::class, 'assign'])->name('assets.assign');
         });

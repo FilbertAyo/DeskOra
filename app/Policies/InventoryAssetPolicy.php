@@ -27,6 +27,11 @@ class InventoryAssetPolicy
         return $user->can('manage inventory assets') && ! $asset->isDisposed();
     }
 
+    public function delete(User $user, InventoryAsset $asset): bool
+    {
+        return $user->can('manage inventory assets');
+    }
+
     public function assign(User $user, InventoryAsset $asset): bool
     {
         return $user->can('manage inventory assets') && ! $asset->isDisposed();
