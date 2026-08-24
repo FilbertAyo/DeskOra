@@ -61,7 +61,16 @@
             </div>
             <div class="col-md-4 stock-only d-none">
                 <label class="form-label small">Unit</label>
-                <input type="text" class="form-control form-control-sm" name="lines[__INDEX__][unit]" placeholder="boxes, pcs">
+                <select class="form-control form-control-sm" name="lines[__INDEX__][unit]">
+                    <option value="pcs">pcs</option>
+                    <option value="boxes">boxes</option>
+                    <option value="packs">packs</option>
+                    <option value="kg">kg</option>
+                    <option value="liters">liters</option>
+                    <option value="sets">sets</option>
+                    <option value="rolls">rolls</option>
+                    <option value="cartons">cartons</option>
+                </select>
             </div>
             <div class="col-md-4 stock-only d-none">
                 <label class="form-label small">Minimum Level</label>
@@ -88,7 +97,7 @@
             const holder = document.createElement('div');
             holder.innerHTML = html.trim();
             const line = holder.firstElementChild;
-            linesWrap.appendChild(line);
+            linesWrap.prepend(line);
             line.querySelector('.line-type').addEventListener('change', () => toggleLineType(line));
             line.querySelector('.remove-line').addEventListener('click', () => {
                 if (linesWrap.children.length > 1) line.remove();
