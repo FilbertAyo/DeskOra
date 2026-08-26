@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             UsersSeeder::class,
             WorkPeriodSeeder::class,
             LocalAdminSeeder::class,
+            DemoUserSeeder::class,
         ]);
     }
 }

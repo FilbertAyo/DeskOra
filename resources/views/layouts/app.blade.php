@@ -29,7 +29,7 @@
    
 </head>
 
-<body data-pc-preset="preset-1" data-pc-direction="ltr" data-pc-theme="light">
+<body data-pc-preset="preset-1" data-pc-direction="ltr" data-pc-theme="light" @if(Auth::user()?->isDemoViewer()) data-demo-view-only="1" @endif>
     <!-- [ Pre-loader ] start -->
     <div class="loader-bg">
         <div class="loader-track">
@@ -49,6 +49,15 @@
                 <div class="container">
                     <div class="row justify-content-center">
                         <div class="col-12">
+                            @if(Auth::user()->isDemoViewer())
+                                <div class="alert alert-warning d-flex align-items-start mb-3" role="status">
+                                    <i class="ti ti-eye me-2 mt-1"></i>
+                                    <div>
+                                        <strong>Demo — view only.</strong>
+                                        You can open every screen and click any button. Submitting or saving changes is disabled.
+                                    </div>
+                                </div>
+                            @endif
                             {{ $slot }}
                         </div>
                     </div>
@@ -79,6 +88,10 @@
         @include('partials.deskora-go')
         @include('partials.ai-assist-actions')
         @include('partials.pwa')
+    @endif
+
+    @if(Auth::check() && Auth::user()->isDemoViewer())
+        @include('partials.demo-view-only')
     @endif
 
 

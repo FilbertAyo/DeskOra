@@ -281,7 +281,7 @@ class WeeklySubmissionWindowService
         return User::query()
             ->where('status', 'active')
             ->get()
-            ->filter(fn (User $user) => $user->hasPermissionTo($permission))
+            ->filter(fn (User $user) => ! $user->isDemoViewer() && $user->hasPermissionTo($permission))
             ->map(function (User $user) use ($period, $documentType) {
                 $slot = $documentType === Document::TYPE_WEEKLY_PLAN
                     ? $this->planSlotForPeriod($user, $period)

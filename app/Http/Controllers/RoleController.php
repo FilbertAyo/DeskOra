@@ -47,12 +47,18 @@ class RoleController extends Controller
     {
         $permissions = Permission::query()->orderBy('name')->get();
         $selectedPermissions = $role->permissions->pluck('name')->all();
+        $isSystemManaged = $this->isSystemManagedRole($role);
 
-        return view('settings.roles.edit', compact('role', 'permissions', 'selectedPermissions'));
+        return view('settings.roles.edit', compact('role', 'permissions', 'selectedPermissions', 'isSystemManaged'));
     }
 
     public function update(Request $request, Role $role)
     {
+        if ($this->isSystemManagedRole($role)) {
+            return redirect()->route('roles.index')
+                ->with('error', 'The demo viewer role is system-managed and cannot be changed.');
+        }
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -75,6 +81,11 @@ class RoleController extends Controller
 
     public function destroy(Role $role)
     {
+        if ($this->isSystemManagedRole($role)) {
+            return redirect()->route('roles.index')
+                ->with('error', 'The demo viewer role is system-managed and cannot be deleted.');
+        }
+
         if ($role->users()->exists()) {
             return redirect()->route('roles.index')->with('error', 'Cannot delete a role that is assigned to users.');
         }
@@ -82,5 +93,10 @@ class RoleController extends Controller
         $role->delete();
 
         return redirect()->route('roles.index')->with('success', 'Role deleted successfully.');
+    }
+
+    private function isSystemManagedRole(Role $role): bool
+    {
+        return $role->name === (string) config('demo.role', 'demo_viewer');
     }
 }

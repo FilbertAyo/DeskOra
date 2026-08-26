@@ -58,8 +58,9 @@
                                         <td class="text-center">
                                             <x-table-action-dropdown>
     <a class="dropdown-item" href="{{ route('roles.edit', $role) }}">
-    <i class="ti ti-edit me-2"></i> Edit
+    <i class="ti ti-edit me-2"></i> {{ $role->name === config('demo.role') ? 'View' : 'Edit' }}
     </a>
+    @if($role->name !== config('demo.role'))
     <form action="{{ route('roles.destroy', $role) }}" method="POST"
     onsubmit="return confirm('Delete this role?');">
     @csrf
@@ -68,6 +69,7 @@
     <i class="ti ti-trash me-2"></i> Delete
     </button>
     </form>
+    @endif
 </x-table-action-dropdown>
                                         </td>
                                     </tr>

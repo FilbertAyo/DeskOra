@@ -145,6 +145,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $inventoryAdminRole = Role::firstOrCreate(['name' => 'inventory_admin']);
         $inventoryStoreClerkRole = Role::firstOrCreate(['name' => 'inventory_store_clerk']);
         $inventoryAssetOfficerRole = Role::firstOrCreate(['name' => 'inventory_asset_officer']);
+        $demoViewerRole = Role::firstOrCreate(['name' => config('demo.role', 'demo_viewer')]);
 
         $budgetReviewerPermissions = [
             'view weekly budgets',
@@ -219,8 +220,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory maintenance',
         ];
 
-        // Superadmin always mirrors the full permission catalog.
+        // Superadmin and demo viewer always mirror the full permission catalog.
+        // Demo viewers get every permission so the UI stays fully visible; writes
+        // are blocked separately by EnsureDemoReadOnly middleware.
         $superadminRole->syncPermissions($allPermissions);
+        $demoViewerRole->syncPermissions($allPermissions);
 
         // Other roles keep admin-assigned extras (e.g. manage official letters on staff)
         // so deploy.sh reseeds do not wipe production customizations.

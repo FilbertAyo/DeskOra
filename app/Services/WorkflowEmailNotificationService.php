@@ -130,6 +130,7 @@ class WorkflowEmailNotificationService
     private function eligibleEmailRecipients(): Builder
     {
         return User::query()
+            ->withoutDemoViewers()
             ->where('status', 'active')
             ->whereNotNull('email')
             ->where('email', '!=', '')

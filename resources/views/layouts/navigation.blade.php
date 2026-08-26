@@ -68,6 +68,13 @@
                         <kbd class="small border rounded px-1 bg-white text-muted" style="font-size: 0.65rem;">⌘K</kbd>
                     </button>
                 </li>
+                @if(Auth::user()->isDemoViewer())
+                    <li class="pc-h-item d-none d-md-inline-flex align-items-center me-2">
+                        <span class="badge bg-light-warning border border-warning text-dark">
+                            <i class="ti ti-eye me-1"></i> View only
+                        </span>
+                    </li>
+                @endif
                 <li class="pc-h-item d-md-none">
                     <a href="#" class="pc-head-link me-0" data-deskora-go-open title="DeskOra Go">
                         <i class="ti ti-search"></i>

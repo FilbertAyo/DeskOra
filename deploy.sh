@@ -74,11 +74,15 @@ if [ "$RUN_DOMAIN_BACKFILL" = "1" ]; then
 fi
 
 echo "==> Running RolesAndPermissionsSeeder (additive only)..."
-echo "    Creates missing permissions and roles, including Inventory roles."
+echo "    Creates missing permissions and roles, including Inventory and demo_viewer roles."
 echo "    Merges baseline permissions onto known roles; keeps extra permissions already assigned."
 echo "    Does not delete users, documents, or inventory records."
 echo "    Does not assign Inventory roles to existing users — attach those in Settings → Users."
 "$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder --force --no-interaction
+
+echo "==> Running DemoUserSeeder (additive only)..."
+echo "    Creates or refreshes the view-only demo account when DEMO_VIEWER_ENABLED is true."
+"$PHP_BIN" artisan db:seed --class=DemoUserSeeder --force --no-interaction
 
 
 echo "==> Clearing framework caches (keeping application cache for AI summaries)..."

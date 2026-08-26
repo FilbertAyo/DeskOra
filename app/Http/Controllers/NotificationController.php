@@ -128,7 +128,7 @@ class NotificationController extends Controller
             ->where('id', $notificationId)
             ->firstOrFail();
 
-        if ($notification->read_at === null) {
+        if ($notification->read_at === null && ! $request->user()->isDemoViewer()) {
             $notification->markAsRead();
         }
 

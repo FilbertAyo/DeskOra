@@ -114,13 +114,14 @@ class AppServiceProvider extends ServiceProvider
 
                 if ($staffNominationPeriod
                     && ($user->status ?? '') === 'active'
+                    && ! $user->isDemoViewer()
                     && ! $service->hasResponded($staffNominationPeriod, $user)) {
                     $snoozed = session(\App\Http\Controllers\StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
                     $showStaffNominationModal = $snoozed !== $staffNominationPeriod->id;
                 }
             }
 
-            if (Auth::check() && request()->hasSession() && ($user = Auth::user()) && ($user->status ?? '') === 'active') {
+            if (Auth::check() && request()->hasSession() && ($user = Auth::user()) && ($user->status ?? '') === 'active' && ! $user->isDemoViewer()) {
                 $gate = app(\App\Services\PendingApprovalGate::class);
                 if ($gate->userIsResponsible($user)) {
                     $onWorkRoute = $gate->isOnWorkRoute(request()->route()?->getName());

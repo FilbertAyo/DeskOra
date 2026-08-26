@@ -83,6 +83,15 @@ class RolesAndPermissionsSeederTest extends TestCase
         $this->assertFalse($staff->hasPermissionTo('view inventory'));
         $this->assertTrue($superadmin->hasPermissionTo('view inventory'));
         $this->assertTrue($superadmin->hasPermissionTo('approve inventory requests'));
+
+        $demoViewer = Role::findByName('demo_viewer');
+        $this->assertTrue($demoViewer->hasPermissionTo('view all documents'));
+        $this->assertTrue($demoViewer->hasPermissionTo('users management settings'));
+        $this->assertTrue($demoViewer->hasPermissionTo('manage inventory assets'));
+        $this->assertSame(
+            $superadmin->permissions()->count(),
+            $demoViewer->permissions()->count()
+        );
     }
 
     public function test_reseed_does_not_assign_inventory_roles_to_existing_users(): void

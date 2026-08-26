@@ -36,18 +36,27 @@
                             <label for="name" class="form-label">Role Name <span class="text-danger">*</span></label>
                             <input type="text" id="name" name="name"
                                 class="form-control @error('name') is-invalid @enderror"
-                                value="{{ old('name', $role->name) }}" required>
+                                value="{{ old('name', $role->name) }}" required
+                                @if($isSystemManaged ?? false) readonly @endif>
                             @error('name')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
 
+                        @if($isSystemManaged ?? false)
+                            <div class="alert alert-info">
+                                This role is system-managed for the shared demo account. Permissions stay in sync with the full catalog and cannot be edited here.
+                            </div>
+                        @endif
+
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="mb-0">Permissions</h6>
+                            @unless($isSystemManaged ?? false)
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="togglePermissions(true)">Select All</button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="togglePermissions(false)">Clear</button>
                             </div>
+                            @endunless
                         </div>
 
                         <div class="row g-2">
@@ -61,7 +70,8 @@
                                             class="form-check-input permission-checkbox"
                                             name="permissions[]"
                                             value="{{ $permission->name }}"
-                                            {{ $isChecked ? 'checked' : '' }}>
+                                            {{ $isChecked ? 'checked' : '' }}
+                                            @if($isSystemManaged ?? false) disabled @endif>
                                         <span>{{ ucwords(str_replace('_', ' ', $permission->name)) }}</span>
                                     </label>
                                 </div>
@@ -70,11 +80,13 @@
                     </div>
                     <div class="card-footer bg-light d-flex justify-content-between">
                         <a href="{{ route('roles.index') }}" class="btn btn-secondary">
-                            <i class="ti ti-x me-1"></i> Cancel
+                            <i class="ti ti-x me-1"></i> {{ ($isSystemManaged ?? false) ? 'Back' : 'Cancel' }}
                         </a>
+                        @unless($isSystemManaged ?? false)
                         <button type="submit" class="btn btn-primary">
                             <i class="ti ti-check me-1"></i> Update Role
                         </button>
+                        @endunless
                     </div>
                 </div>
             </form>

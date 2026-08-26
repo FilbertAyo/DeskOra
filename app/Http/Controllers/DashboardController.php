@@ -42,7 +42,7 @@ class DashboardController extends Controller
     public function redirect()
     {
 
-        if (Schema::hasTable('requests')) {
+        if (Schema::hasTable('requests') && ! Auth::user()?->isDemoViewer()) {
             DB::table('requests')
                 ->where('status', 'resubmission')
                 ->where('updated_at', '<', now()->subDay())

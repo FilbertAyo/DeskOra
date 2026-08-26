@@ -86,6 +86,7 @@ class OfficialLetterDownloadAuthorizationService
     public function activeAuthorizers(): Collection
     {
         return User::query()
+            ->withoutDemoViewers()
             ->where('status', 'active')
             ->permission(OfficialLetter::PERMISSION_AUTHORIZE_DOWNLOADS)
             ->get();

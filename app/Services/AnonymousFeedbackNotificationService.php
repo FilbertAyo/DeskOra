@@ -57,6 +57,7 @@ class AnonymousFeedbackNotificationService
     private function permissionRecipients(string $permission): Collection
     {
         return User::query()
+            ->withoutDemoViewers()
             ->where('status', 'active')
             ->whereNotNull('email')
             ->where('email', '!=', '')

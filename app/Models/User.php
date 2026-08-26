@@ -128,8 +128,36 @@ class User extends Authenticatable
         return $this->status === 'active' && filled(trim((string) $this->email));
     }
 
+    public function isDemoViewer(): bool
+    {
+        $role = (string) config('demo.role', 'demo_viewer');
+
+        if ($role === '') {
+            return false;
+        }
+
+        return $this->getRoleNames()->contains($role);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<User>
+     */
+    public function scopeWithoutDemoViewers($query)
+    {
+        $role = (string) config('demo.role', 'demo_viewer');
+
+        return $query->whereDoesntHave('roles', function ($roles) use ($role) {
+            $roles->where('roles.name', $role);
+        });
+    }
+
     public function requiresLoginOtp(?int $hours = null): bool
     {
+        if ($this->isDemoViewer()) {
+            return false;
+        }
+
         $hours ??= (int) config('auth.login_otp_inactivity_hours', 120);
 
         return $this->last_login_at === null

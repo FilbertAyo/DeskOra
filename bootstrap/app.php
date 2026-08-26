@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAnonymousFeedbackToken;
+use App\Http\Middleware\EnsureDemoReadOnly;
 use App\Http\Middleware\PreventAuthResponseCache;
 use App\Http\Middleware\TrackFeatureUsage;
 use Illuminate\Foundation\Application;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->web(append: [
+            EnsureDemoReadOnly::class,
             TrackFeatureUsage::class,
         ]);
 

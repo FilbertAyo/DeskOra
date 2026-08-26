@@ -123,6 +123,7 @@ class RequisitionNotificationService
     private function recipientsForPermission(string $permission): Collection
     {
         return User::query()
+            ->withoutDemoViewers()
             ->where('status', 'active')
             ->permission($permission)
             ->get();
