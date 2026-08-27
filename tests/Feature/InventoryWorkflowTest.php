@@ -490,6 +490,33 @@ class InventoryWorkflowTest extends TestCase
             ->assertOk();
     }
 
+    public function test_locations_page_separates_sites_and_rooms(): void
+    {
+        $user = $this->inventoryUser(['manage inventory settings', 'view inventory']);
+        $hq = InventoryLocation::query()->create([
+            'name' => 'Adilisha HQ',
+            'status' => 'active',
+        ]);
+        InventoryLocation::query()->create([
+            'name' => 'Conference Suite',
+            'status' => 'active',
+            'parent_id' => $hq->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('inventory.locations.index'))
+            ->assertOk()
+            ->assertSee('Adilisha HQ')
+            ->assertDontSee('Conference Suite');
+
+        $this->actingAs($user)
+            ->get(route('inventory.locations.index', ['tab' => 'rooms']))
+            ->assertOk()
+            ->assertSee('Conference Suite')
+            ->assertSee('Adilisha HQ')
+            ->assertSee('New Room');
+    }
+
     /**
      * @param  list<string>  $permissions
      */

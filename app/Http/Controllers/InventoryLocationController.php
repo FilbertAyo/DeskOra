@@ -8,21 +8,28 @@ use Illuminate\Validation\Rule;
 
 class InventoryLocationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $locations = InventoryLocation::query()
-            ->with(['parent'])
+        $tab = $request->input('tab') === 'rooms' ? 'rooms' : 'locations';
+
+        $sites = InventoryLocation::query()
+            ->whereNull('parent_id')
             ->withCount(['children'])
-            ->orderByRaw("CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END")
             ->orderBy('name')
             ->get();
 
-        $parentLocations = InventoryLocation::query()
-            ->whereNull('parent_id')
+        $rooms = InventoryLocation::query()
+            ->whereNotNull('parent_id')
+            ->with(['parent'])
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get();
 
-        return view('inventory.locations.index', compact('locations', 'parentLocations'));
+        return view('inventory.locations.index', [
+            'tab' => $tab,
+            'sites' => $sites,
+            'rooms' => $rooms,
+            'parentLocations' => $sites,
+        ]);
     }
 
     public function store(Request $request)
@@ -54,12 +61,16 @@ class InventoryLocationController extends Controller
 
             $location->update($validated);
 
-            return redirect()->route('inventory.locations.index')->with('success', 'Location updated successfully.');
+            return redirect()
+                ->route('inventory.locations.index', ['tab' => $this->tabFor($validated['parent_id'] ?? null)])
+                ->with('success', filled($validated['parent_id'] ?? null) ? 'Room updated successfully.' : 'Location updated successfully.');
         }
 
         InventoryLocation::query()->create($validated);
 
-        return redirect()->route('inventory.locations.index')->with('success', 'Location created successfully.');
+        return redirect()
+            ->route('inventory.locations.index', ['tab' => $this->tabFor($validated['parent_id'] ?? null)])
+            ->with('success', filled($validated['parent_id'] ?? null) ? 'Room created successfully.' : 'Location created successfully.');
     }
 
     public function update(Request $request, InventoryLocation $location)
@@ -86,18 +97,30 @@ class InventoryLocationController extends Controller
 
         $location->update($validated);
 
-        return redirect()->route('inventory.locations.index')->with('success', 'Location updated successfully.');
+        return redirect()
+            ->route('inventory.locations.index', ['tab' => $this->tabFor($validated['parent_id'] ?? null)])
+            ->with('success', filled($validated['parent_id'] ?? null) ? 'Room updated successfully.' : 'Location updated successfully.');
     }
 
     public function destroy(InventoryLocation $location)
     {
         if ($location->children()->exists()) {
-            return redirect()->route('inventory.locations.index')->with('error', 'Location has sub-locations. Remove or reassign them first.');
+            return redirect()
+                ->route('inventory.locations.index', ['tab' => 'locations'])
+                ->with('error', 'This location has rooms. Remove or reassign them first.');
         }
 
+        $tab = $location->parent_id ? 'rooms' : 'locations';
         $location->delete();
 
-        return redirect()->route('inventory.locations.index')->with('success', 'Location deleted successfully.');
+        return redirect()
+            ->route('inventory.locations.index', ['tab' => $tab])
+            ->with('success', $tab === 'rooms' ? 'Room deleted successfully.' : 'Location deleted successfully.');
+    }
+
+    private function tabFor(?string $parentId): string
+    {
+        return filled($parentId) ? 'rooms' : 'locations';
     }
 
     private function createsCycle(InventoryLocation $location, ?string $parentId): bool
