@@ -1,0 +1,23 @@
+@keyframes inv-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes inv-row-flash {
+    0%, 35% { background-color: rgba(25, 135, 84, 0.16); }
+    100% { background-color: transparent; }
+}
+
+.inv-busy-icon {
+    display: inline-block;
+    animation: inv-spin 0.7s linear infinite;
+}
+
+button.is-inv-busy,
+input.is-inv-busy {
+    pointer-events: none;
+    opacity: 0.85;
+}
+
+tr.inv-just-updated > td {
+    animation: inv-row-flash 2.6s ease-out;
+}

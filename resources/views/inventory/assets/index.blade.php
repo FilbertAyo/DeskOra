@@ -130,7 +130,7 @@
                             </thead>
                             <tbody>
                                 @forelse($assets as $asset)
-                                    <tr>
+                                    <tr id="asset-{{ $asset->id }}" @class(['inv-just-updated' => session('highlight_id') == $asset->id])>
                                         <td class="fw-semibold">{{ $asset->asset_code }}</td>
                                         <td>{{ $asset->name }}</td>
                                         <td>{{ $asset->category?->name ?? '—' }}</td>
@@ -162,7 +162,8 @@
                                                     <form method="POST" action="{{ route('inventory.assets.destroy', $asset) }}" class="d-inline" onsubmit="return confirm('Delete asset {{ $asset->asset_code }} ({{ $asset->name }})? This cannot be undone.');">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" class="dropdown-item text-danger">
+                                                        <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                        <button type="submit" class="dropdown-item text-danger" data-busy-label="Deleting…">
                                                             <i class="ti ti-trash me-2"></i> Delete
                                                         </button>
                                                     </form>
@@ -192,45 +193,5 @@
 
     @include('inventory.partials.assign-modal')
     @include('inventory.partials.picker-scripts')
-    @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const modalEl = document.getElementById('assignAssetModal');
-            if (!modalEl) return;
-
-            const modal = new bootstrap.Modal(modalEl);
-            const form = document.getElementById('assignAssetForm');
-            const cascade = modalEl.querySelector('.js-ownership-cascade');
-
-            function openAssign(data) {
-                form.action = `/inventory/assets/${data.id}/assign`;
-                document.getElementById('assignAssetName').textContent = data.name || 'Asset';
-                document.getElementById('assignAssetCode').textContent = data.code ? `(${data.code})` : '';
-                if (cascade) {
-                    cascade.dataset.selectedDept = data.department || '';
-                    cascade.dataset.selectedUser = data.user || '';
-                    if (window.InventoryPickers) {
-                        window.InventoryPickers.rebind(modalEl);
-                    }
-                }
-                modal.show();
-            }
-
-            document.querySelectorAll('.assign-btn').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    openAssign(this.dataset);
-                });
-            });
-
-            @if(session('open_assign_modal'))
-                const firstAssign = document.querySelector('.assign-btn');
-                if (firstAssign) {
-                    openAssign(firstAssign.dataset);
-                } else {
-                    modal.show();
-                }
-            @endif
-        });
-    </script>
-    @endpush
+    @include('inventory.partials.assign-modal-scripts')
 </x-app-layout>

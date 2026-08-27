@@ -33,8 +33,9 @@
                     ])
                 </div>
                 <div class="modal-footer">
+                    <input type="hidden" name="return_url" value="{{ url()->full() }}">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save assignment</button>
+                    <button type="submit" class="btn btn-primary" data-busy-label="Saving…">Save assignment</button>
                 </div>
             </form>
         </div>

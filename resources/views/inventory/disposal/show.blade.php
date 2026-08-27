@@ -63,13 +63,13 @@
                                 @csrf
                                 <label class="form-label">Review notes</label>
                                 <textarea name="review_notes" rows="2" class="form-control mb-2"></textarea>
-                                <button type="submit" class="btn btn-primary btn-sm">Approve disposal</button>
+                                <button type="submit" class="btn btn-primary btn-sm" data-busy-label="Approving…">Approve disposal</button>
                             </form>
                             <form method="POST" action="{{ route('inventory.disposal.reject', $item) }}">
                                 @csrf
                                 <label class="form-label">Rejection reason <span class="text-danger">*</span></label>
                                 <textarea name="review_notes" rows="2" class="form-control mb-2" required></textarea>
-                                <button type="submit" class="btn btn-light btn-sm">Reject</button>
+                                <button type="submit" class="btn btn-light btn-sm" data-busy-label="Rejecting…">Reject</button>
                             </form>
                         @else
                             <p class="text-muted mb-0">Waiting for review. You cannot approve your own request.</p>

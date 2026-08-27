@@ -102,7 +102,7 @@
                             </thead>
                             <tbody>
                                 @forelse($stockItems as $item)
-                                    <tr>
+                                    <tr id="stock-{{ $item->id }}" @class(['inv-just-updated' => session('highlight_id') == $item->id])>
                                         <td class="fw-semibold">
                                             {{ $item->name }}
                                             @if($item->unit)<small class="text-muted">({{ $item->unit }})</small>@endif
@@ -167,6 +167,7 @@
             <div class="modal-content">
                 <form method="POST" id="issueForm">
                     @csrf
+                    <input type="hidden" name="return_url" value="{{ url()->full() }}">
                     <div class="modal-header">
                         <h5 class="modal-title">Issue Stock</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -194,7 +195,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Issue Stock</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Issuing…">Issue Stock</button>
                     </div>
                 </form>
             </div>
@@ -206,6 +207,7 @@
             <div class="modal-content">
                 <form method="POST" id="adjustForm">
                     @csrf
+                    <input type="hidden" name="return_url" value="{{ url()->full() }}">
                     <div class="modal-header">
                         <h5 class="modal-title">Adjust Stock</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -238,7 +240,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Adjustment</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Saving…">Save Adjustment</button>
                     </div>
                 </form>
             </div>

@@ -47,7 +47,7 @@
                             <label class="form-label">Problem description <span class="text-danger">*</span></label>
                             <textarea name="problem_description" rows="4" class="form-control" required>{{ old('problem_description') }}</textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Report Problem</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Saving…">Report Problem</button>
                     </form>
                 </div>
             </div>

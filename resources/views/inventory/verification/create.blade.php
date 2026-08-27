@@ -55,7 +55,7 @@
                             <label class="form-label">Notes</label>
                             <textarea name="notes" rows="3" class="form-control">{{ old('notes') }}</textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Start session</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Starting…">Start session</button>
                     </form>
                 </div>
             </div>

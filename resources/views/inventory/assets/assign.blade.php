@@ -47,6 +47,7 @@
 
                     <form method="POST" action="{{ route('inventory.assets.assign', $asset) }}">
                         @csrf
+                        <input type="hidden" name="return_url" value="{{ old('return_url', url()->previous()) }}">
                         <div class="mb-3">
                             <label class="form-label">Staff Member</label>
                             <select name="assigned_to_user_id" class="form-control">
@@ -70,7 +71,7 @@
                             <label class="form-label">Notes</label>
                             <textarea name="notes" rows="3" class="form-control" placeholder="Optional assignment notes">{{ old('notes') }}</textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Save Assignment</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Saving…">Save Assignment</button>
                     </form>
                 </div>
             </div>

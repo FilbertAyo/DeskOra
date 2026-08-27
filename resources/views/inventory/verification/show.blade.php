@@ -112,7 +112,7 @@
                 </div>
                 @if($session->isOpen() && $results->isNotEmpty())
                     <div class="d-flex gap-2 mt-3">
-                        <button type="submit" class="btn btn-primary btn-sm">Save results</button>
+                        <button type="submit" class="btn btn-primary btn-sm" data-busy-label="Saving…">Save results</button>
                     </div>
                 @endif
             </div>
@@ -123,7 +123,7 @@
         @can('complete', $session)
             <form method="POST" action="{{ route('inventory.verification.complete', $session) }}" class="mt-3" onsubmit="return confirm('Complete this session and apply missing / location / person / damaged updates?');">
                 @csrf
-                <button type="submit" class="btn btn-primary btn-sm">Complete session</button>
+                <button type="submit" class="btn btn-primary btn-sm" data-busy-label="Completing…">Complete session</button>
             </form>
         @endcan
     @endif

@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Inventory\InventoryAssetCodeGenerator;
 use App\Services\Inventory\InventoryQrCodeGenerator;
 use App\Support\InventoryHierarchy;
+use App\Support\InventoryReturnUrl;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -227,7 +228,7 @@ class InventoryAssetController extends Controller
         return redirect()->route('inventory.assets.show', $asset)->with('success', 'Asset updated successfully.');
     }
 
-    public function destroy(InventoryAsset $asset)
+    public function destroy(Request $request, InventoryAsset $asset)
     {
         $this->authorize('delete', $asset);
 
@@ -246,8 +247,7 @@ class InventoryAssetController extends Controller
         $assetCode = $asset->asset_code;
         $asset->delete();
 
-        return redirect()
-            ->route('inventory.assets.index')
+        return InventoryReturnUrl::redirect($request, route('inventory.assets.index'))
             ->with('success', "Asset {$assetCode} deleted successfully.");
     }
 
@@ -297,19 +297,28 @@ class InventoryAssetController extends Controller
             );
         });
 
-        return redirect()->route('inventory.assets.show', $asset)->with('success', 'Asset assigned successfully.');
+        return InventoryReturnUrl::redirect($request, route('inventory.assets.show', $asset))
+            ->with('success', 'Asset assigned successfully.')
+            ->with('highlight_id', $asset->id);
     }
 
-    public function transferForm(InventoryAsset $asset)
+    public function transferForm(Request $request, InventoryAsset $asset)
     {
         $this->authorize('transfer', $asset);
 
         $asset->load(['location.parent']);
 
+        $returnUrl = InventoryReturnUrl::sanitize($request->query('return_url'))
+            ?: InventoryReturnUrl::sanitize(url()->previous())
+            ?: route('inventory.assets.show', $asset);
+
         return view('inventory.assets.transfer', array_merge(
             compact('asset'),
             $this->formOptions(),
-            ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
+            [
+                'inventoryPickerData' => InventoryHierarchy::pickerPayload(),
+                'returnUrl' => $returnUrl,
+            ]
         ));
     }
 
@@ -351,7 +360,9 @@ class InventoryAssetController extends Controller
             ]);
         });
 
-        return redirect()->route('inventory.assets.show', $asset)->with('success', 'Asset transferred successfully.');
+        return InventoryReturnUrl::redirect($request, route('inventory.assets.show', $asset))
+            ->with('success', 'Asset transferred successfully.')
+            ->with('highlight_id', $asset->id);
     }
 
     public function scan(string $assetCode)

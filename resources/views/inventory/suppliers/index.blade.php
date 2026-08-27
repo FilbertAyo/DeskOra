@@ -172,7 +172,7 @@
 
                         <div class="d-flex justify-content-end gap-2 mt-3">
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="ti ti-x me-1"></i> Cancel</button>
-                            <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i> Save Supplier</button>
+                            <button type="submit" class="btn btn-primary" data-busy-label="Saving…"><i class="ti ti-device-floppy me-1"></i> Save Supplier</button>
                         </div>
                     </form>
                 </div>
@@ -195,7 +195,7 @@
                     <form id="deleteForm" method="POST" style="display: inline;">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-danger"><i class="ti ti-trash me-1"></i> Delete</button>
+                        <button type="submit" class="btn btn-danger" data-busy-label="Deleting…"><i class="ti ti-trash me-1"></i> Delete</button>
                     </form>
                 </div>
             </div>

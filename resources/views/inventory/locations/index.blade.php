@@ -298,7 +298,7 @@
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">
                                 <i class="ti ti-x me-1"></i> Cancel
                             </button>
-                            <button type="submit" class="btn btn-primary" id="saveBtn">
+                            <button type="submit" class="btn btn-primary" id="saveBtn" data-busy-label="Saving…">
                                 <i class="ti ti-device-floppy me-1"></i> Save
                             </button>
                         </div>
@@ -331,7 +331,7 @@
                     <form id="deleteForm" method="POST" style="display: inline;">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-danger" id="deleteSubmitBtn">
+                        <button type="submit" class="btn btn-danger" id="deleteSubmitBtn" data-busy-label="Deleting…">
                             <i class="ti ti-trash me-1"></i> Delete
                         </button>
                     </form>

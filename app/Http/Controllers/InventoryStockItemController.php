@@ -12,6 +12,7 @@ use App\Models\InventoryStockItem;
 use App\Models\InventorySupplier;
 use App\Models\User;
 use App\Support\InventoryHierarchy;
+use App\Support\InventoryReturnUrl;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -142,7 +143,9 @@ class InventoryStockItemController extends Controller
             ]);
         });
 
-        return redirect()->route('inventory.stock-items.index')->with('success', 'Stock issued successfully.');
+        return InventoryReturnUrl::redirect($request, route('inventory.stock-items.index'))
+            ->with('success', 'Stock issued successfully.')
+            ->with('highlight_id', $stockItem->id);
     }
 
     public function adjust(Request $request, InventoryStockItem $stockItem)
@@ -188,7 +191,9 @@ class InventoryStockItemController extends Controller
             ]);
         });
 
-        return redirect()->route('inventory.stock-items.index')->with('success', 'Stock adjusted successfully.');
+        return InventoryReturnUrl::redirect($request, route('inventory.stock-items.index'))
+            ->with('success', 'Stock adjusted successfully.')
+            ->with('highlight_id', $stockItem->id);
     }
 
     private function validatedStockItem(Request $request, ?InventoryStockItem $stockItem = null): array

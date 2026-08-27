@@ -52,7 +52,7 @@
                             <label class="form-label">Reason <span class="text-danger">*</span></label>
                             <textarea name="reason" rows="4" class="form-control" required>{{ old('reason') }}</textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Submit for review</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Submitting…">Submit for review</button>
                     </form>
                 </div>
             </div>

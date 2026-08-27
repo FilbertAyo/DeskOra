@@ -117,7 +117,7 @@
 
         <div class="d-flex justify-content-end gap-2">
             <a href="{{ route('inventory.receipts.show', $receipt) }}" class="btn btn-light">Cancel</a>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" data-busy-label="Saving…">
                 <i class="ti ti-device-floppy me-1"></i> Add Items
             </button>
         </div>

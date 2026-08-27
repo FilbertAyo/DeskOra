@@ -63,7 +63,7 @@
                                 <form method="POST" action="{{ route('inventory.assets.destroy', $asset) }}" class="d-inline" onsubmit="return confirm('Delete asset {{ $asset->asset_code }} ({{ $asset->name }})? This cannot be undone.');">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" data-busy-label="Deleting…">
                                         <i class="ti ti-trash me-1"></i> Delete
                                     </button>
                                 </form>
@@ -261,45 +261,7 @@
 
     @include('inventory.partials.assign-modal')
     @include('inventory.partials.picker-scripts')
-    @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const modalEl = document.getElementById('assignAssetModal');
-            if (!modalEl) return;
-            const modal = new bootstrap.Modal(modalEl);
-            const form = document.getElementById('assignAssetForm');
-            const cascade = modalEl.querySelector('.js-ownership-cascade');
-
-            function openAssign(data) {
-                form.action = `/inventory/assets/${data.id}/assign`;
-                document.getElementById('assignAssetName').textContent = data.name || 'Asset';
-                document.getElementById('assignAssetCode').textContent = data.code ? `(${data.code})` : '';
-                if (cascade) {
-                    cascade.dataset.selectedDept = data.department || '';
-                    cascade.dataset.selectedUser = data.user || '';
-                    if (window.InventoryPickers) {
-                        window.InventoryPickers.rebind(modalEl);
-                    }
-                }
-                modal.show();
-            }
-
-            document.querySelectorAll('.assign-btn').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    openAssign(this.dataset);
-                });
-            });
-
-            @if(session('open_assign_modal'))
-                const btn = document.querySelector('.assign-btn');
-                if (btn) {
-                    openAssign(btn.dataset);
-                } else {
-                    form.action = @json(route('inventory.assets.assign', $asset));
-                    modal.show();
-                }
-            @endif
-        });
-    </script>
-    @endpush
+    @include('inventory.partials.assign-modal-scripts', [
+        'assignFallbackUrl' => route('inventory.assets.assign', $asset),
+    ])
 </x-app-layout>

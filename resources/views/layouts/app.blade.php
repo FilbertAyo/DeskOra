@@ -25,6 +25,9 @@
 <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}" id="main-style-link" >
 <link rel="stylesheet" href="{{ asset('assets/css/style-preset.css') }}" >
 <link rel="stylesheet" href="{{ asset('assets/css/deskora-document-thead.css') }}" >
+@if(request()->routeIs('inventory.*'))
+<link rel="stylesheet" href="{{ asset('css/inventory-ui.css') }}">
+@endif
 
    
 </head>
@@ -118,8 +121,10 @@
   
   
   <script>font_change("Public-Sans");</script>
-  
-    
+
+    @if(request()->routeIs('inventory.*'))
+        <script src="{{ asset('js/inventory-ui.js') }}"></script>
+    @endif
 
     @stack('scripts')
 

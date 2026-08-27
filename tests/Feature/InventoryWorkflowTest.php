@@ -342,6 +342,68 @@ class InventoryWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_assign_returns_to_the_same_paginated_assets_list(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $department = Department::factory()->create(['name' => 'Finance']);
+        $asset = $this->makeAsset();
+        $listUrl = route('inventory.assets.index', ['page' => 4, 'search' => 'Laptop']);
+
+        $this->actingAs($officer)
+            ->from($listUrl)
+            ->post(route('inventory.assets.assign', $asset), [
+                'parent_department_id' => $department->id,
+                'assign_whole_department' => '1',
+                'return_url' => $listUrl,
+            ])
+            ->assertRedirect($listUrl)
+            ->assertSessionHas('success')
+            ->assertSessionHas('highlight_id', $asset->id);
+    }
+
+    public function test_assign_from_asset_view_stays_on_the_view_page(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $department = Department::factory()->create(['name' => 'Finance']);
+        $asset = $this->makeAsset();
+        $showUrl = route('inventory.assets.show', $asset);
+
+        $this->actingAs($officer)
+            ->from($showUrl)
+            ->post(route('inventory.assets.assign', $asset), [
+                'parent_department_id' => $department->id,
+                'assign_whole_department' => '1',
+                'return_url' => $showUrl,
+            ])
+            ->assertRedirect($showUrl);
+    }
+
+    public function test_stock_issue_returns_to_the_same_paginated_list(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory stock', 'view inventory']);
+        $department = Department::factory()->create(['name' => 'Finance']);
+        $stock = InventoryStockItem::query()->create([
+            'name' => 'A4 Paper',
+            'quantity_received' => 20,
+            'quantity_issued' => 0,
+            'quantity_remaining' => 20,
+            'minimum_level' => 2,
+            'status' => 'active',
+        ]);
+        $listUrl = route('inventory.stock-items.index', ['page' => 3]);
+
+        $this->actingAs($officer)
+            ->from($listUrl)
+            ->post(route('inventory.stock-items.issue', $stock), [
+                'quantity' => 1,
+                'parent_department_id' => $department->id,
+                'assign_whole_department' => '1',
+                'return_url' => $listUrl,
+            ])
+            ->assertRedirect($listUrl)
+            ->assertSessionHas('highlight_id', $stock->id);
+    }
+
     public function test_asset_can_be_placed_in_a_room_under_a_location(): void
     {
         $officer = $this->inventoryUser(['manage inventory assets', 'view inventory']);

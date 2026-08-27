@@ -73,5 +73,5 @@
 
 <div class="d-flex justify-content-end gap-2 mt-3">
     <a href="{{ route('inventory.stock-items.index') }}" class="btn btn-light">Cancel</a>
-    <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i> Save Stock Item</button>
+    <button type="submit" class="btn btn-primary" data-busy-label="Saving…"><i class="ti ti-device-floppy me-1"></i> Save Stock Item</button>
 </div>

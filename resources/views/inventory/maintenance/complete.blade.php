@@ -59,7 +59,7 @@
                             <label class="form-label">Notes</label>
                             <textarea name="repair_notes" rows="3" class="form-control">{{ old('repair_notes') }}</textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Save completion</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Saving…">Save completion</button>
                     </form>
                 </div>
             </div>

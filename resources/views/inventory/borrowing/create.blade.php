@@ -92,7 +92,7 @@
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
             <a href="{{ route('inventory.borrowing.index') }}" class="btn btn-light">Cancel</a>
-            <button type="submit" class="btn btn-primary">Submit Request</button>
+            <button type="submit" class="btn btn-primary" data-busy-label="Submitting…">Submit Request</button>
         </div>
     </form>
 

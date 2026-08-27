@@ -95,13 +95,13 @@
                                 @csrf
                                 <label class="form-label">Review notes</label>
                                 <textarea name="review_notes" rows="2" class="form-control mb-2"></textarea>
-                                <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                                <button type="submit" class="btn btn-primary btn-sm" data-busy-label="Approving…">Approve</button>
                             </form>
                             <form method="POST" action="{{ route('inventory.borrowing.reject', $item) }}">
                                 @csrf
                                 <label class="form-label">Rejection reason <span class="text-danger">*</span></label>
                                 <textarea name="review_notes" rows="2" class="form-control mb-2" required></textarea>
-                                <button type="submit" class="btn btn-light btn-sm">Reject</button>
+                                <button type="submit" class="btn btn-light btn-sm" data-busy-label="Rejecting…">Reject</button>
                             </form>
                         @else
                             <p class="text-muted mb-0">Waiting for review.</p>
@@ -111,7 +111,7 @@
                             <form method="POST" action="{{ route('inventory.borrowing.issue', $item) }}">
                                 @csrf
                                 <p class="text-muted small">Issue this item to the borrower. Asset status will change to Borrowed, or stock quantity will be deducted.</p>
-                                <button type="submit" class="btn btn-primary btn-sm">Issue Item</button>
+                                <button type="submit" class="btn btn-primary btn-sm" data-busy-label="Issuing…">Issue Item</button>
                             </form>
                         @else
                             <p class="text-muted mb-0">Approved. Waiting to be issued.</p>
@@ -140,7 +140,7 @@
                                     <textarea name="return_notes" rows="2" class="form-control"></textarea>
                                 </div>
                                 <p class="text-muted small">Damaged asset returns are sent to Under Repair. Missing sets status to Missing.</p>
-                                <button type="submit" class="btn btn-primary btn-sm">Record Return</button>
+                                <button type="submit" class="btn btn-primary btn-sm" data-busy-label="Saving…">Record Return</button>
                             </form>
                         @else
                             <p class="text-muted mb-0">Issued. Waiting for return.</p>

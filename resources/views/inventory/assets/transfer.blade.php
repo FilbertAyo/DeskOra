@@ -45,6 +45,7 @@
 
                     <form method="POST" action="{{ route('inventory.assets.transfer', $asset) }}">
                         @csrf
+                        <input type="hidden" name="return_url" value="{{ old('return_url', $returnUrl ?? url()->previous()) }}">
                         <div class="mb-3">
                             @include('inventory.partials.location-room-picker', [
                                 'fieldName' => 'to_location_id',
@@ -59,7 +60,7 @@
                             <textarea name="reason" rows="4" class="form-control" required placeholder="Why is this asset being moved?">{{ old('reason') }}</textarea>
                         </div>
                         <p class="text-muted small">Transfers do not require approval. A reason is required for the history record.</p>
-                        <button type="submit" class="btn btn-primary">Transfer Asset</button>
+                        <button type="submit" class="btn btn-primary" data-busy-label="Transferring…">Transfer Asset</button>
                     </form>
                 </div>
             </div>
