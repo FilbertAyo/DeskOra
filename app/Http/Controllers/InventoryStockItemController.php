@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\InventoryStockItemsExport;
 use App\Models\Department;
 use App\Models\InventoryCategory;
 use App\Models\InventoryLocation;
@@ -10,10 +11,13 @@ use App\Models\InventoryStockIssue;
 use App\Models\InventoryStockItem;
 use App\Models\InventorySupplier;
 use App\Models\User;
+use App\Support\InventoryHierarchy;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryStockItemController extends Controller
 {
@@ -21,22 +25,7 @@ class InventoryStockItemController extends Controller
     {
         $this->authorize('viewAny', InventoryStockItem::class);
 
-        $query = InventoryStockItem::query()
-            ->with(['category', 'location', 'supplier']);
-
-        if ($request->filled('search')) {
-            $search = $request->string('search')->toString();
-            $query->where('name', 'like', "%{$search}%");
-        }
-
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->input('category_id'));
-        }
-
-        if ($request->boolean('low_stock')) {
-            $query->whereColumn('quantity_remaining', '<=', 'minimum_level')
-                ->where('minimum_level', '>', 0);
-        }
+        $query = $this->filteredStockQuery($request);
 
         $stockItems = $query->orderBy('name')->paginate(20)->withQueryString();
         $lowStockCount = InventoryStockItem::query()
@@ -48,7 +37,10 @@ class InventoryStockItemController extends Controller
         return view('inventory.stock-items.index', array_merge(
             compact('stockItems', 'lowStockCount'),
             $this->formOptions(),
-            ['filters' => $request->only(['search', 'category_id', 'low_stock'])]
+            [
+                'filters' => $request->only(['search', 'category_id', 'location_id', 'low_stock']),
+                'inventoryPickerData' => InventoryHierarchy::pickerPayload(),
+            ]
         ));
     }
 
@@ -56,7 +48,10 @@ class InventoryStockItemController extends Controller
     {
         $this->authorize('create', InventoryStockItem::class);
 
-        return view('inventory.stock-items.create', $this->formOptions());
+        return view('inventory.stock-items.create', array_merge(
+            $this->formOptions(),
+            ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
+        ));
     }
 
     public function store(Request $request)
@@ -76,7 +71,11 @@ class InventoryStockItemController extends Controller
     {
         $this->authorize('update', $stockItem);
 
-        return view('inventory.stock-items.edit', array_merge(compact('stockItem'), $this->formOptions()));
+        return view('inventory.stock-items.edit', array_merge(
+            compact('stockItem'),
+            $this->formOptions(),
+            ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
+        ));
     }
 
     public function update(Request $request, InventoryStockItem $stockItem)
@@ -96,17 +95,23 @@ class InventoryStockItemController extends Controller
     public function issue(Request $request, InventoryStockItem $stockItem)
     {
         $this->authorize('issue', $stockItem);
+        $ownership = InventoryHierarchy::resolveOwnership($request, 'issued_to_user_id', 'issued_to_department_id');
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:1'],
             'issued_to_user_id' => ['nullable', 'string', 'short_id', 'exists:users,id'],
             'issued_to_department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
+            'parent_department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
+            'sub_department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
             'purpose' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $validated['issued_to_user_id'] = $ownership['user_id'];
+        $validated['issued_to_department_id'] = $ownership['department_id'];
+
         if (empty($validated['issued_to_user_id']) && empty($validated['issued_to_department_id'])) {
             return redirect()->back()->withErrors([
-                'issued_to_user_id' => 'Issue to a staff member or department.',
+                'parent_department_id' => 'Issue to a department, sub-department, or staff member.',
             ])->withInput();
         }
 
@@ -200,6 +205,8 @@ class InventoryStockItemController extends Controller
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 
+        $validated['location_id'] = InventoryHierarchy::resolveLocationId($request) ?: ($validated['location_id'] ?? null);
+
         foreach (['category_id', 'location_id', 'supplier_id'] as $field) {
             if (empty($validated[$field])) {
                 $validated[$field] = null;
@@ -209,14 +216,62 @@ class InventoryStockItemController extends Controller
         return $validated;
     }
 
+    public function export(Request $request, string $format)
+    {
+        $this->authorize('viewAny', InventoryStockItem::class);
+
+        $stockItems = $this->filteredStockQuery($request)
+            ->orderBy('name')
+            ->get();
+
+        $filename = 'inventory-stock-items-'.now()->format('Y-m-d');
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('inventory.exports.stock-pdf', [
+                'stockItems' => $stockItems,
+                'generatedAt' => now(),
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download($filename.'.pdf');
+        }
+
+        return Excel::download(new InventoryStockItemsExport($stockItems), $filename.'.xlsx');
+    }
+
+    private function filteredStockQuery(Request $request)
+    {
+        $query = InventoryStockItem::query()
+            ->with(['category', 'location.parent', 'supplier']);
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->input('category_id'));
+        }
+
+        if ($request->filled('location_id')) {
+            InventoryHierarchy::applyLocationFilter($query, $request->input('location_id'));
+        }
+
+        if ($request->boolean('low_stock')) {
+            $query->whereColumn('quantity_remaining', '<=', 'minimum_level')
+                ->where('minimum_level', '>', 0);
+        }
+
+        return $query;
+    }
+
     private function formOptions(): array
     {
         return [
             'categories' => InventoryCategory::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
-            'locations' => InventoryLocation::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'locations' => InventoryLocation::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'parent_id']),
             'suppliers' => InventorySupplier::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
-            'departments' => Department::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
-            'users' => User::query()->active()->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'parent_id']),
+            'users' => User::query()->active()->orderBy('name')->get(['id', 'name', 'department_id']),
             'adjustmentReasons' => InventoryStockAdjustment::reasonOptions(),
         ];
     }

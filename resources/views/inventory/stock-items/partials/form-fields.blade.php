@@ -31,14 +31,11 @@
                 <label class="form-label">Unit</label>
                 <input type="text" name="unit" class="form-control" value="{{ old('unit', $stockItemModel?->unit) }}" placeholder="e.g. boxes, pieces">
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Location</label>
-                <select name="location_id" class="form-control">
-                    <option value="">-- Select --</option>
-                    @foreach($locations as $location)
-                        <option value="{{ $location->id }}" @selected(old('location_id', $stockItemModel?->location_id) == $location->id)>{{ $location->name }}</option>
-                    @endforeach
-                </select>
+            <div class="col-md-8">
+                @include('inventory.partials.location-room-picker', [
+                    'fieldName' => 'location_id',
+                    'selectedLocationId' => old('location_id', $stockItemModel?->location_id),
+                ])
             </div>
             <div class="col-md-4">
                 <label class="form-label">Quantity Received <span class="text-danger">*</span></label>

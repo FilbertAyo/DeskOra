@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\InventoryAssetsExport;
 use App\Models\Department;
 use App\Models\InventoryAsset;
 use App\Models\InventoryAssetAssignment;
@@ -15,10 +16,13 @@ use App\Models\InventoryVerificationResult;
 use App\Models\User;
 use App\Services\Inventory\InventoryAssetCodeGenerator;
 use App\Services\Inventory\InventoryQrCodeGenerator;
+use App\Support\InventoryHierarchy;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryAssetController extends Controller
 {
@@ -40,6 +44,7 @@ class InventoryAssetController extends Controller
             $this->formOptions(),
             [
                 'filters' => $request->only(['search', 'category_id', 'location_id', 'department_id', 'responsible_user_id', 'status', 'condition']),
+                'inventoryPickerData' => InventoryHierarchy::pickerPayload(),
             ]
         ));
     }
@@ -48,7 +53,10 @@ class InventoryAssetController extends Controller
     {
         $this->authorize('create', InventoryAsset::class);
 
-        return view('inventory.assets.create', $this->formOptions());
+        return view('inventory.assets.create', array_merge(
+            $this->formOptions(),
+            ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
+        ));
     }
 
     public function store(Request $request)
@@ -58,7 +66,16 @@ class InventoryAssetController extends Controller
         $validated = $this->validatedAsset($request);
         $validated['asset_code'] = $this->assetCodeGenerator->generate();
 
-        InventoryAsset::query()->create($validated);
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        DB::transaction(function () use ($validated, $user) {
+            $asset = InventoryAsset::query()->create($validated);
+
+            if ($asset->department_id || $asset->responsible_user_id) {
+                $this->recordAssignment($asset, $user, $asset->responsible_user_id, $asset->department_id);
+            }
+        });
 
         return redirect()->route('inventory.assets.index')->with('success', 'Asset registered successfully.');
     }
@@ -68,10 +85,10 @@ class InventoryAssetController extends Controller
         $this->authorize('view', $asset);
 
         $asset->load([
-            'category', 'location', 'department', 'responsibleUser',
+            'category', 'location.parent', 'department.parent', 'responsibleUser',
             'donor', 'project', 'supplier', 'receipt.receivedByUser',
-            'assignments.assignedToUser', 'assignments.assignedToDepartment', 'assignments.assignedByUser',
-            'transfers.fromLocation', 'transfers.toLocation', 'transfers.transferredByUser',
+            'assignments.assignedToUser', 'assignments.assignedToDepartment.parent', 'assignments.assignedByUser',
+            'transfers.fromLocation.parent', 'transfers.toLocation.parent', 'transfers.transferredByUser',
             'borrowRequests.borrower', 'borrowRequests.requestedBy',
             'maintenanceRecords.reportedBy', 'maintenanceRecords.completedBy',
             'disposalRequests.requestedBy', 'disposalRequests.reviewedBy',
@@ -160,7 +177,7 @@ class InventoryAssetController extends Controller
             ->sortByDesc('at')
             ->values();
 
-        return view('inventory.assets.show', [
+        return view('inventory.assets.show', array_merge($this->formOptions(), [
             'asset' => $asset,
             'timeline' => $timeline,
             'statusOptions' => InventoryAsset::statusOptions(),
@@ -168,21 +185,44 @@ class InventoryAssetController extends Controller
             'sourceTypeOptions' => InventoryAsset::sourceTypeOptions(),
             'qrDataUri' => $this->qrCodeGenerator->pngDataUri($this->qrCodeGenerator->scanUrl($asset)),
             'scanUrl' => $this->qrCodeGenerator->scanUrl($asset),
-        ]);
+            'inventoryPickerData' => InventoryHierarchy::pickerPayload(),
+            'assignPrefillDepartmentId' => $asset->department_id,
+            'assignPrefillUserId' => $asset->responsible_user_id,
+        ]));
     }
 
     public function edit(InventoryAsset $asset)
     {
         $this->authorize('update', $asset);
 
-        return view('inventory.assets.edit', array_merge(compact('asset'), $this->formOptions()));
+        return view('inventory.assets.edit', array_merge(
+            compact('asset'),
+            $this->formOptions(),
+            ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
+        ));
     }
 
     public function update(Request $request, InventoryAsset $asset)
     {
         $this->authorize('update', $asset);
 
-        $asset->update($this->validatedAsset($request));
+        $previousDepartmentId = $asset->department_id;
+        $previousUserId = $asset->responsible_user_id;
+        $validated = $this->validatedAsset($request);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        DB::transaction(function () use ($asset, $validated, $user, $previousDepartmentId, $previousUserId) {
+            $asset->update($validated);
+
+            $departmentChanged = (string) $previousDepartmentId !== (string) $asset->department_id;
+            $userChanged = (string) $previousUserId !== (string) $asset->responsible_user_id;
+
+            if (($departmentChanged || $userChanged) && ($asset->department_id || $asset->responsible_user_id)) {
+                $this->recordAssignment($asset, $user, $asset->responsible_user_id, $asset->department_id);
+            }
+        });
 
         return redirect()->route('inventory.assets.show', $asset)->with('success', 'Asset updated successfully.');
     }
@@ -215,49 +255,46 @@ class InventoryAssetController extends Controller
     {
         $this->authorize('assign', $asset);
 
-        $asset->load(['location', 'department', 'responsibleUser']);
-
-        return view('inventory.assets.assign', array_merge(compact('asset'), $this->formOptions()));
+        return redirect()
+            ->route('inventory.assets.show', $asset)
+            ->with('open_assign_modal', true);
     }
 
     public function assign(Request $request, InventoryAsset $asset)
     {
         $this->authorize('assign', $asset);
 
+        $ownership = InventoryHierarchy::resolveOwnership($request, 'assigned_to_user_id', 'assigned_to_department_id');
+
         $validated = $request->validate([
             'assigned_to_user_id' => ['nullable', 'string', 'short_id', 'exists:users,id'],
             'assigned_to_department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
+            'parent_department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
+            'sub_department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        if (empty($validated['assigned_to_user_id']) && empty($validated['assigned_to_department_id'])) {
+        $assignedUserId = $ownership['user_id'];
+        $assignedDepartmentId = $ownership['department_id'];
+
+        if (empty($assignedUserId) && empty($assignedDepartmentId)) {
             return redirect()->back()->withErrors([
-                'assigned_to_user_id' => 'Assign to a staff member or department.',
-            ])->withInput();
+                'parent_department_id' => 'Assign to a department, sub-department, or staff member.',
+            ])->withInput()->with('open_assign_modal', true);
         }
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        DB::transaction(function () use ($asset, $validated, $user) {
-            $asset->assignments()
-                ->whereNull('ended_at')
-                ->update(['ended_at' => now()]);
-
-            InventoryAssetAssignment::query()->create([
-                'asset_id' => $asset->id,
-                'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
-                'assigned_to_department_id' => $validated['assigned_to_department_id'] ?? null,
-                'assigned_by_user_id' => $user->id,
-                'notes' => $validated['notes'] ?? null,
-                'assigned_at' => now(),
-            ]);
-
-            $asset->update([
-                'responsible_user_id' => $validated['assigned_to_user_id'] ?? null,
-                'department_id' => $validated['assigned_to_department_id'] ?? $asset->department_id,
-                'status' => InventoryAsset::STATUS_ASSIGNED,
-            ]);
+        DB::transaction(function () use ($asset, $assignedUserId, $assignedDepartmentId, $validated, $user) {
+            $this->recordAssignment(
+                $asset,
+                $user,
+                $assignedUserId,
+                $assignedDepartmentId,
+                $validated['notes'] ?? null,
+                InventoryAsset::STATUS_ASSIGNED,
+            );
         });
 
         return redirect()->route('inventory.assets.show', $asset)->with('success', 'Asset assigned successfully.');
@@ -267,19 +304,28 @@ class InventoryAssetController extends Controller
     {
         $this->authorize('transfer', $asset);
 
-        $asset->load(['location']);
+        $asset->load(['location.parent']);
 
-        return view('inventory.assets.transfer', array_merge(compact('asset'), $this->formOptions()));
+        return view('inventory.assets.transfer', array_merge(
+            compact('asset'),
+            $this->formOptions(),
+            ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
+        ));
     }
 
     public function transfer(Request $request, InventoryAsset $asset)
     {
         $this->authorize('transfer', $asset);
 
+        $toLocationId = InventoryHierarchy::resolveLocationId($request, 'to_location_id')
+            ?: $request->input('to_location_id');
+
         $validated = $request->validate([
             'to_location_id' => ['required', 'string', 'short_id', 'exists:inventory_locations,id'],
             'reason' => ['required', 'string', 'max:1000'],
         ]);
+
+        $validated['to_location_id'] = $toLocationId ?: $validated['to_location_id'];
 
         if ($validated['to_location_id'] === (string) $asset->location_id) {
             return redirect()->back()->withErrors([
@@ -311,7 +357,7 @@ class InventoryAssetController extends Controller
     public function scan(string $assetCode)
     {
         $asset = InventoryAsset::query()
-            ->with(['category', 'location', 'department', 'responsibleUser'])
+            ->with(['category', 'location.parent', 'department', 'responsibleUser'])
             ->where('asset_code', $assetCode)
             ->firstOrFail();
 
@@ -341,10 +387,34 @@ class InventoryAssetController extends Controller
         return view('inventory.assets.labels', compact('labels'));
     }
 
+    public function export(Request $request, string $format)
+    {
+        $this->authorize('viewAny', InventoryAsset::class);
+
+        $assets = $this->filteredAssetsQuery($request)
+            ->orderBy('asset_code')
+            ->get();
+
+        $filename = 'inventory-assets-'.now()->format('Y-m-d');
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('inventory.exports.assets-pdf', [
+                'assets' => $assets,
+                'statusOptions' => InventoryAsset::statusOptions(),
+                'conditionOptions' => InventoryAsset::conditionOptions(),
+                'generatedAt' => now(),
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download($filename.'.pdf');
+        }
+
+        return Excel::download(new InventoryAssetsExport($assets), $filename.'.xlsx');
+    }
+
     private function filteredAssetsQuery(Request $request)
     {
         $query = InventoryAsset::query()
-            ->with(['category', 'location', 'department', 'responsibleUser']);
+            ->with(['category', 'location.parent', 'department', 'responsibleUser']);
 
         if ($request->filled('search')) {
             $search = $request->string('search')->toString();
@@ -360,7 +430,7 @@ class InventoryAssetController extends Controller
         }
 
         if ($request->filled('location_id')) {
-            $query->where('location_id', $request->input('location_id'));
+            InventoryHierarchy::applyLocationFilter($query, $request->input('location_id'));
         }
 
         if ($request->filled('department_id')) {
@@ -405,6 +475,11 @@ class InventoryAssetController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $ownership = InventoryHierarchy::resolveOwnership($request, 'responsible_user_id', 'department_id');
+        $validated['location_id'] = InventoryHierarchy::resolveLocationId($request) ?: ($validated['location_id'] ?? null);
+        $validated['department_id'] = $ownership['department_id'];
+        $validated['responsible_user_id'] = $ownership['user_id'];
+
         foreach (['category_id', 'donor_id', 'project_id', 'supplier_id', 'location_id', 'department_id', 'responsible_user_id'] as $field) {
             if (empty($validated[$field])) {
                 $validated[$field] = null;
@@ -414,12 +489,45 @@ class InventoryAssetController extends Controller
         return $validated;
     }
 
+    private function recordAssignment(
+        InventoryAsset $asset,
+        User $actor,
+        ?string $userId,
+        ?string $departmentId,
+        ?string $notes = null,
+        ?string $status = null,
+    ): void {
+        $asset->assignments()
+            ->whereNull('ended_at')
+            ->update(['ended_at' => now()]);
+
+        InventoryAssetAssignment::query()->create([
+            'asset_id' => $asset->id,
+            'assigned_to_user_id' => $userId,
+            'assigned_to_department_id' => $departmentId,
+            'assigned_by_user_id' => $actor->id,
+            'notes' => $notes,
+            'assigned_at' => now(),
+        ]);
+
+        $updates = [
+            'responsible_user_id' => $userId,
+            'department_id' => $departmentId ?: $asset->department_id,
+        ];
+
+        if ($status) {
+            $updates['status'] = $status;
+        }
+
+        $asset->update($updates);
+    }
+
     private function formOptions(): array
     {
         return [
             'categories' => InventoryCategory::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'locations' => InventoryLocation::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'parent_id']),
-            'departments' => Department::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'parent_id']),
             'donors' => InventoryDonor::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'projects' => InventoryProject::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'suppliers' => InventorySupplier::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),

@@ -46,7 +46,7 @@
                     <p class="mb-2"><strong>Supplier:</strong> {{ $receipt->supplier?->name ?? '—' }}</p>
                     <p class="mb-2"><strong>Donor:</strong> {{ $receipt->donor?->name ?? '—' }}</p>
                     <p class="mb-2"><strong>Project:</strong> {{ $receipt->project?->name ?? '—' }}</p>
-                    <p class="mb-2"><strong>Location:</strong> {{ $receipt->location?->name ?? '—' }}</p>
+                    <p class="mb-2"><strong>Location:</strong> {{ $receipt->location?->pathLabel() ?? '—' }}</p>
                     <p class="mb-2"><strong>Received by:</strong> {{ $receipt->receivedByUser?->name ?? '—' }}</p>
                     <p class="mb-0"><strong>Notes:</strong> {{ $receipt->notes ?: '—' }}</p>
                 </div>

@@ -63,32 +63,20 @@
     </div>
     <div class="card-body">
         <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label">Location</label>
-                <select name="location_id" class="form-control @error('location_id') is-invalid @enderror">
-                    <option value="">-- Select --</option>
-                    @foreach($locations as $location)
-                        <option value="{{ $location->id }}" @selected(old('location_id', $assetModel?->location_id) == $location->id)>{{ $location->name }}</option>
-                    @endforeach
-                </select>
+            <div class="col-md-12">
+                @include('inventory.partials.location-room-picker', [
+                    'fieldName' => 'location_id',
+                    'selectedLocationId' => old('location_id', $assetModel?->location_id),
+                ])
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Department</label>
-                <select name="department_id" class="form-control @error('department_id') is-invalid @enderror">
-                    <option value="">-- Select --</option>
-                    @foreach($departments as $department)
-                        <option value="{{ $department->id }}" @selected(old('department_id', $assetModel?->department_id) == $department->id)>{{ $department->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Responsible Person</label>
-                <select name="responsible_user_id" class="form-control @error('responsible_user_id') is-invalid @enderror">
-                    <option value="">-- Select --</option>
-                    @foreach($users as $user)
-                        <option value="{{ $user->id }}" @selected(old('responsible_user_id', $assetModel?->responsible_user_id) == $user->id)>{{ $user->name }}</option>
-                    @endforeach
-                </select>
+            <div class="col-md-12">
+                @include('inventory.partials.ownership-cascade', [
+                    'departmentField' => 'department_id',
+                    'userField' => 'responsible_user_id',
+                    'selectedDepartmentId' => old('department_id', $assetModel?->department_id),
+                    'selectedUserId' => old('responsible_user_id', $assetModel?->responsible_user_id),
+                    'idPrefix' => 'asset_ownership',
+                ])
             </div>
         </div>
     </div>

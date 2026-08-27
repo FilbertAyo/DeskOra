@@ -35,13 +35,11 @@
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Location</label>
-                                <select name="location_id" class="form-control">
-                                    <option value="">All locations</option>
-                                    @foreach($locations as $location)
-                                        <option value="{{ $location->id }}" @selected(old('location_id') == $location->id)>{{ $location->name }}</option>
-                                    @endforeach
-                                </select>
+                                @include('inventory.partials.location-room-picker', [
+                                    'fieldName' => 'location_id',
+                                    'selectedLocationId' => old('location_id'),
+                                    'emptyLabel' => 'All locations',
+                                ])
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Department</label>
@@ -63,4 +61,5 @@
             </div>
         </div>
     </div>
+    @include('inventory.partials.picker-scripts')
 </x-app-layout>

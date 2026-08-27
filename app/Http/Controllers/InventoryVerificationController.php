@@ -10,6 +10,7 @@ use App\Models\InventoryVerificationSession;
 use App\Models\User;
 use App\Services\Inventory\InventoryNumberGenerator;
 use App\Services\Inventory\InventoryVerificationProcessor;
+use App\Support\InventoryHierarchy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +62,8 @@ class InventoryVerificationController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $validated['location_id'] = InventoryHierarchy::resolveLocationId($request) ?: ($validated['location_id'] ?? null);
+
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
@@ -82,7 +85,9 @@ class InventoryVerificationController extends Controller
 
             $assets = InventoryAsset::query()
                 ->where('status', '!=', InventoryAsset::STATUS_DISPOSED)
-                ->when($session->location_id, fn ($query) => $query->where('location_id', $session->location_id))
+                ->when($session->location_id, function ($query) use ($session) {
+                    InventoryHierarchy::applyLocationFilter($query, $session->location_id);
+                })
                 ->when($session->department_id, fn ($query) => $query->where('department_id', $session->department_id))
                 ->get(['id']);
 
@@ -107,9 +112,9 @@ class InventoryVerificationController extends Controller
         $this->authorize('view', $verification);
 
         $session = $verification;
-        $session->load(['location', 'department', 'startedBy', 'completedBy']);
+        $session->load(['location.parent', 'department', 'startedBy', 'completedBy']);
         $results = $session->results()
-            ->with(['asset.location', 'asset.responsibleUser', 'recordedLocation', 'recordedResponsibleUser'])
+            ->with(['asset.location.parent', 'asset.responsibleUser', 'recordedLocation.parent', 'recordedResponsibleUser'])
             ->get();
 
         return view('inventory.verification.show', array_merge($this->formOptions(), [
@@ -189,9 +194,10 @@ class InventoryVerificationController extends Controller
     private function formOptions(): array
     {
         return [
-            'locations' => InventoryLocation::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'locations' => InventoryLocation::query()->where('status', 'active')->with('parent')->orderBy('name')->get(['id', 'name', 'parent_id']),
             'departments' => Department::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'users' => User::query()->active()->orderBy('name')->get(['id', 'name']),
+            'inventoryPickerData' => InventoryHierarchy::pickerPayload(),
         ];
     }
 }

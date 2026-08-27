@@ -84,6 +84,61 @@ class User extends Authenticatable
         return $this->belongsToMany(Department::class, 'sub_department_user', 'user_id', 'sub_department_id');
     }
 
+    /**
+     * Department / sub-department ids this user actually belongs to.
+     * Unlike departmentScopeIds(), users without a unit get an empty list (not every department).
+     *
+     * @return list<string>
+     */
+    public function inventoryCustodyScopeIds(): array
+    {
+        $ids = [];
+
+        if ($this->department_id) {
+            $department = $this->relationLoaded('department') ? $this->department : $this->department()->first();
+            if ($department) {
+                $ids = array_merge($ids, $department->selfAndDescendantIds());
+            } else {
+                $ids[] = $this->department_id;
+            }
+        }
+
+        if (Schema::hasTable('sub_department_user')) {
+            $subDepartments = $this->relationLoaded('subDepartments')
+                ? $this->subDepartments
+                : $this->subDepartments()->get();
+
+            foreach ($subDepartments as $subDepartment) {
+                $ids = array_merge($ids, $subDepartment->selfAndDescendantIds());
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    public function hasInventoryCustodyOf(InventoryAsset $asset): bool
+    {
+        if ((string) $asset->responsible_user_id === (string) $this->id) {
+            return true;
+        }
+
+        $scopeIds = $this->inventoryCustodyScopeIds();
+
+        if ($scopeIds !== [] && $asset->department_id && in_array((string) $asset->department_id, $scopeIds, true)) {
+            return true;
+        }
+
+        return $asset->assignments()
+            ->whereNull('ended_at')
+            ->where(function ($query) use ($scopeIds) {
+                $query->where('assigned_to_user_id', $this->id);
+                if ($scopeIds !== []) {
+                    $query->orWhereIn('assigned_to_department_id', $scopeIds);
+                }
+            })
+            ->exists();
+    }
+
     public function departmentScopeIds(): array
     {
         if (Schema::hasTable('sub_department_user')) {

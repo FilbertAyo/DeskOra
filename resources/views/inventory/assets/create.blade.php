@@ -23,4 +23,5 @@
         @csrf
         @include('inventory.assets.partials.form-fields')
     </form>
+    @include('inventory.partials.picker-scripts')
 </x-app-layout>

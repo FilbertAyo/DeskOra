@@ -7,7 +7,10 @@ use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryDisposalRequest;
 use App\Models\InventoryMaintenanceRecord;
 use App\Models\InventoryReceipt;
+use App\Models\InventoryStockIssue;
 use App\Models\InventoryStockItem;
+use App\Models\InventoryLocation;
+use App\Models\Department;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -273,6 +276,218 @@ class InventoryWorkflowTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertDatabaseHas('inventory_assets', ['id' => $asset->id]);
+    }
+
+    public function test_assign_modal_saves_department_sub_department_or_user(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $department = Department::factory()->create(['name' => 'Finance']);
+        $subDepartment = Department::factory()->create([
+            'name' => 'Accounts',
+            'parent_id' => $department->id,
+        ]);
+        $staff = User::factory()->create([
+            'status' => 'active',
+            'department_id' => $department->id,
+        ]);
+        $staff->subDepartments()->attach($subDepartment->id);
+        $asset = $this->makeAsset();
+
+        $this->actingAs($officer)
+            ->post(route('inventory.assets.assign', $asset), [
+                'parent_department_id' => $department->id,
+                'assign_whole_department' => '1',
+            ])
+            ->assertRedirect(route('inventory.assets.show', $asset));
+
+        $this->assertDatabaseHas('inventory_assets', [
+            'id' => $asset->id,
+            'department_id' => $department->id,
+            'responsible_user_id' => null,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+
+        $this->actingAs($officer)
+            ->post(route('inventory.assets.assign', $asset), [
+                'parent_department_id' => $department->id,
+                'sub_department_id' => $subDepartment->id,
+                'assign_whole_sub_department' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('inventory_assets', [
+            'id' => $asset->id,
+            'department_id' => $subDepartment->id,
+            'responsible_user_id' => null,
+        ]);
+
+        $this->actingAs($officer)
+            ->post(route('inventory.assets.assign', $asset), [
+                'parent_department_id' => $department->id,
+                'sub_department_id' => $subDepartment->id,
+                'assigned_to_user_id' => $staff->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('inventory_assets', [
+            'id' => $asset->id,
+            'department_id' => $subDepartment->id,
+            'responsible_user_id' => $staff->id,
+        ]);
+        $this->assertDatabaseHas('inventory_asset_assignments', [
+            'asset_id' => $asset->id,
+            'assigned_to_user_id' => $staff->id,
+            'assigned_to_department_id' => $subDepartment->id,
+            'ended_at' => null,
+        ]);
+    }
+
+    public function test_asset_can_be_placed_in_a_room_under_a_location(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $hq = InventoryLocation::query()->create([
+            'name' => 'Adilisha HQ',
+            'status' => 'active',
+        ]);
+        $room = InventoryLocation::query()->create([
+            'name' => 'Board Room',
+            'status' => 'active',
+            'parent_id' => $hq->id,
+        ]);
+
+        $this->actingAs($officer)
+            ->post(route('inventory.assets.store'), [
+                'name' => 'Projector',
+                'source_type' => InventoryAsset::SOURCE_OTHER,
+                'condition' => InventoryAsset::CONDITION_GOOD,
+                'status' => InventoryAsset::STATUS_AVAILABLE,
+                'location_id' => $room->id,
+            ])
+            ->assertRedirect(route('inventory.assets.index'));
+
+        $asset = InventoryAsset::query()->where('name', 'Projector')->firstOrFail();
+        $this->assertSame($room->id, $asset->location_id);
+
+        $this->actingAs($officer)
+            ->get(route('inventory.assets.index', ['location_id' => $hq->id]))
+            ->assertOk()
+            ->assertSee('Projector')
+            ->assertSee('Adilisha HQ › Board Room');
+    }
+
+    public function test_staff_only_see_assets_and_stock_in_their_custody(): void
+    {
+        $department = Department::factory()->create(['name' => 'Programmes']);
+        $otherDepartment = Department::factory()->create(['name' => 'Finance Unit']);
+        $staff = User::factory()->create([
+            'status' => 'active',
+            'department_id' => $department->id,
+        ]);
+        $staff->givePermissionTo('view own inventory items');
+        $officer = $this->inventoryUser(['manage inventory assets', 'manage inventory stock', 'view inventory']);
+
+        $mine = $this->makeAsset([
+            'name' => 'My Laptop',
+            'responsible_user_id' => $staff->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+        $deptAsset = $this->makeAsset([
+            'name' => 'Department Camera',
+            'department_id' => $department->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+        $otherAsset = $this->makeAsset([
+            'name' => 'Other Printer',
+            'department_id' => $otherDepartment->id,
+            'responsible_user_id' => $officer->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+
+        $stock = InventoryStockItem::query()->create([
+            'name' => 'A4 Paper',
+            'quantity_received' => 20,
+            'quantity_issued' => 4,
+            'quantity_remaining' => 16,
+            'minimum_level' => 2,
+            'status' => 'active',
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 4,
+            'issued_to_user_id' => $staff->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 1,
+            'issued_to_department_id' => $otherDepartment->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+        ]);
+
+        $this->actingAs($staff)
+            ->get(route('inventory.assets.index'))
+            ->assertForbidden();
+
+        $this->actingAs($staff)
+            ->get(route('inventory.my-items.index'))
+            ->assertOk()
+            ->assertSee('My Laptop')
+            ->assertSee('Department Camera')
+            ->assertDontSee('Other Printer');
+
+        $this->actingAs($staff)
+            ->get(route('inventory.assets.show', $mine))
+            ->assertOk();
+
+        $this->actingAs($staff)
+            ->get(route('inventory.assets.show', $otherAsset))
+            ->assertForbidden();
+
+        $this->actingAs($staff)
+            ->get(route('inventory.my-items.index', ['tab' => 'stock']))
+            ->assertOk()
+            ->assertSee('A4 Paper');
+
+        $this->actingAs($staff)
+            ->get(route('inventory.my-items.export', ['type' => 'assets', 'format' => 'xlsx']))
+            ->assertOk();
+    }
+
+    public function test_assets_list_can_be_exported_as_excel_and_pdf(): void
+    {
+        $user = $this->inventoryUser(['view inventory']);
+        $this->makeAsset(['name' => 'Export Laptop']);
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.export', ['format' => 'xlsx']))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.export', ['format' => 'pdf']))
+            ->assertOk();
+    }
+
+    public function test_stock_list_can_be_exported(): void
+    {
+        $user = $this->inventoryUser(['view inventory', 'manage inventory stock']);
+        InventoryStockItem::query()->create([
+            'name' => 'Staples',
+            'quantity_received' => 10,
+            'quantity_issued' => 0,
+            'quantity_remaining' => 10,
+            'minimum_level' => 1,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('inventory.stock-items.export', ['format' => 'xlsx']))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('inventory.stock-items.export', ['format' => 'pdf']))
+            ->assertOk();
     }
 
     /**

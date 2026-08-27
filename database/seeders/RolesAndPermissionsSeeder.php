@@ -114,6 +114,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory borrowing',
             'manage inventory maintenance',
             'approve inventory requests',
+            'view own inventory items',
         ];
 
         // Combine all permissions
@@ -246,6 +247,10 @@ class RolesAndPermissionsSeeder extends Seeder
         $this->ensureRolePermissions($inventoryAdminRole, $inventoryPermissions);
         $this->ensureRolePermissions($inventoryStoreClerkRole, $inventoryStoreClerkPermissions);
         $this->ensureRolePermissions($inventoryAssetOfficerRole, $inventoryAssetOfficerPermissions);
+
+        Role::query()->each(function (Role $role) {
+            $this->ensureRolePermissions($role, ['view own inventory items']);
+        });
 
         // Keep existing direct permission assignments untouched for compatibility,
         // but role assignment should be preferred moving forward.

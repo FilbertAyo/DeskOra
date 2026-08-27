@@ -38,6 +38,25 @@ class InventoryLocation extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    public function isRoom(): bool
+    {
+        return $this->parent_id !== null;
+    }
+
+    public function pathLabel(): string
+    {
+        if ($this->parent) {
+            return $this->parent->name.' › '.$this->name;
+        }
+
+        return $this->name;
+    }
+
+    public function selfAndDescendantIds(): array
+    {
+        return array_merge([$this->id], $this->descendantIds());
+    }
+
     public function descendantIds(): array
     {
         $ids = [];

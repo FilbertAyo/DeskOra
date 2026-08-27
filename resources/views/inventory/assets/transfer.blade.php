@@ -40,19 +40,19 @@
                 </div>
                 <div class="card-body">
                     <p class="text-muted small mb-4">
-                        Current location: {{ $asset->location?->name ?? 'Not set' }}
+                        Current location: {{ $asset->location?->pathLabel() ?? 'Not set' }}
                     </p>
 
                     <form method="POST" action="{{ route('inventory.assets.transfer', $asset) }}">
                         @csrf
                         <div class="mb-3">
-                            <label class="form-label">To Location <span class="text-danger">*</span></label>
-                            <select name="to_location_id" class="form-control" required>
-                                <option value="">-- Select location --</option>
-                                @foreach($locations as $location)
-                                    <option value="{{ $location->id }}" @selected(old('to_location_id') == $location->id)>{{ $location->name }}</option>
-                                @endforeach
-                            </select>
+                            @include('inventory.partials.location-room-picker', [
+                                'fieldName' => 'to_location_id',
+                                'selectedLocationId' => old('to_location_id'),
+                                'required' => true,
+                                'emptyLabel' => '-- Select location --',
+                                'locationLabel' => 'To location',
+                            ])
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Reason <span class="text-danger">*</span></label>
@@ -65,4 +65,5 @@
             </div>
         </div>
     </div>
+    @include('inventory.partials.picker-scripts')
 </x-app-layout>

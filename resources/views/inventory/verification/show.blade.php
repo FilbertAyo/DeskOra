@@ -28,7 +28,7 @@
                 <div>
                     <div class="fw-semibold">{{ $session->name }}</div>
                     <div class="small text-muted">
-                        Scope: {{ $session->location?->name ?? $session->department?->name ?? 'All assets' }}
+                                        Scope: {{ $session->location?->pathLabel() ?? $session->department?->name ?? 'All assets' }}
                         · Started by {{ $session->startedBy?->name ?? '—' }}
                     </div>
                 </div>
@@ -63,7 +63,7 @@
                                         <div class="small text-muted">{{ $result->asset?->name }}</div>
                                     </td>
                                     <td class="small">
-                                        {{ $result->asset?->location?->name ?? '—' }}<br>
+                                        {{ $result->asset?->location?->pathLabel() ?? '—' }}<br>
                                         {{ $result->asset?->responsibleUser?->name ?? '—' }}
                                     </td>
                                     <td>
@@ -82,7 +82,7 @@
                                             <select name="results[{{ $result->id }}][recorded_location_id]" class="form-control form-control-sm mb-1">
                                                 <option value="">Location (if changed)</option>
                                                 @foreach($locations as $location)
-                                                    <option value="{{ $location->id }}" @selected(old("results.{$result->id}.recorded_location_id", $result->recorded_location_id) == $location->id)>{{ $location->name }}</option>
+                                                    <option value="{{ $location->id }}" @selected(old("results.{$result->id}.recorded_location_id", $result->recorded_location_id) == $location->id)>{{ $location->pathLabel() }}</option>
                                                 @endforeach
                                             </select>
                                             <select name="results[{{ $result->id }}][recorded_responsible_user_id]" class="form-control form-control-sm">
@@ -92,7 +92,7 @@
                                                 @endforeach
                                             </select>
                                         @else
-                                            <div class="small">{{ $result->recordedLocation?->name ?? '—' }}</div>
+                                            <div class="small">{{ $result->recordedLocation?->pathLabel() ?? '—' }}</div>
                                             <div class="small">{{ $result->recordedResponsibleUser?->name ?? '—' }}</div>
                                         @endif
                                     </td>

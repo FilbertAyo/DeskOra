@@ -205,7 +205,7 @@
                     </a>
                 </li>
 
-                @can('view inventory')
+                @canany(['view inventory', 'view own inventory items'])
                     @php
                         $inventoryOpsOpen = Request::routeIs('inventory.borrowing.*', 'inventory.maintenance.*', 'inventory.disposal.*', 'inventory.verification.*');
                         $inventorySetupOpen = Request::routeIs('inventory.categories.*', 'inventory.locations.*', 'inventory.suppliers.*', 'inventory.donors.*', 'inventory.projects.*');
@@ -220,12 +220,22 @@
                         <a href="javascript:void(0);" class="pc-link">
                             <span class="pc-micon"><i class="ti ti-package"></i></span>
                             <span class="pc-mtext">Inventory</span>
-                            @if($inventoryOpsAttention > 0)
-                                <span class="badge bg-secondary ms-2">{{ $inventoryOpsAttention }}</span>
-                            @endif
+                            @can('view inventory')
+                                @if($inventoryOpsAttention > 0)
+                                    <span class="badge bg-secondary ms-2">{{ $inventoryOpsAttention }}</span>
+                                @endif
+                            @endcan
                             <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
                         </a>
                         <ul class="pc-submenu">
+                            @can('view own inventory items')
+                                <li class="{{ Request::routeIs('inventory.my-items.*') ? 'active' : '' }}">
+                                    <a href="{{ route('inventory.my-items.index') }}" class="pc-link">
+                                        <span class="pc-mtext">My items</span>
+                                    </a>
+                                </li>
+                            @endcan
+                            @can('view inventory')
                             <li class="{{ Request::routeIs('inventory.index') ? 'active' : '' }}">
                                 <a href="{{ route('inventory.index') }}" class="pc-link">
                                     <span class="pc-mtext">Overview</span>
@@ -311,9 +321,10 @@
                                     </ul>
                                 </li>
                             @endcan
+                            @endcan
                         </ul>
                     </li>
-                @endcan
+                @endcanany
 
                 <!-- Finance & Accounting -->
                 <li class="pc-item pc-caption">

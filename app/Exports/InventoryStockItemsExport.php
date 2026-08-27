@@ -10,10 +10,16 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class InventoryStockItemsExport implements FromCollection, WithHeadings, WithMapping
 {
+    public function __construct(private ?Collection $rows = null) {}
+
     public function collection(): Collection
     {
+        if ($this->rows) {
+            return $this->rows;
+        }
+
         return InventoryStockItem::query()
-            ->with(['category', 'location', 'supplier'])
+            ->with(['category', 'location.parent', 'supplier'])
             ->orderBy('name')
             ->get();
     }
@@ -47,7 +53,7 @@ class InventoryStockItemsExport implements FromCollection, WithHeadings, WithMap
             $item->quantity_issued,
             $item->quantity_remaining,
             $item->minimum_level,
-            $item->location?->name,
+            $item->location?->pathLabel(),
             $item->supplier?->name,
             $item->status,
         ];

@@ -52,9 +52,9 @@
                                 <tr>
                                     <th class="text-center" style="width: 50px;">No.</th>
                                     <th>Name</th>
-                                    <th>Parent</th>
+                                    <th>Parent location</th>
                                     <th>Description</th>
-                                    <th class="text-center" style="width: 110px;">Children</th>
+                                    <th class="text-center" style="width: 110px;">Rooms</th>
                                     <th class="text-center" style="width: 120px;">Status</th>
                                     <th class="text-center" style="width: 180px;">Action</th>
                                 </tr>
@@ -68,7 +68,7 @@
                                             @if($location->parent)
                                                 <span class="text-muted">{{ $location->parent->name }}</span>
                                             @else
-                                                <span class="text-muted">Top-Level</span>
+                                                <span class="text-muted">Location</span>
                                             @endif
                                         </td>
                                         <td class="text-muted">{{ $location->description ?: '—' }}</td>
@@ -142,7 +142,7 @@
                                         class="form-control @error('name') is-invalid @enderror"
                                         name="name"
                                         id="locationName"
-                                        placeholder="Enter location name"
+                                        placeholder="Enter location or room name"
                                         value="{{ old('name') }}"
                                         required>
                                 </div>
@@ -177,19 +177,19 @@
                                     Create As <span class="text-danger">*</span>
                                 </label>
                                 <select id="locationType" class="form-control">
-                                    <option value="location">Top-Level Location</option>
-                                    <option value="sub_location">Sub-Location</option>
+                                    <option value="location">Location (branch / site)</option>
+                                    <option value="sub_location">Room</option>
                                 </select>
                             </div>
 
                             <div class="col-md-6 mb-3 d-none" id="parentLocationWrapper">
                                 <label for="parentLocation" class="form-label">
-                                    Parent Location <span class="text-danger">*</span>
+                                    Parent location <span class="text-danger">*</span>
                                 </label>
                                 <select name="parent_id"
                                     id="parentLocation"
                                     class="form-control @error('parent_id') is-invalid @enderror">
-                                    <option value="">-- Select Parent Location --</option>
+                                    <option value="">-- Select location --</option>
                                     @foreach($parentLocations as $parentLocation)
                                         <option value="{{ $parentLocation->id }}" {{ old('parent_id') == $parentLocation->id ? 'selected' : '' }}>
                                             {{ $parentLocation->name }}

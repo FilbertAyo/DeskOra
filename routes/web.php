@@ -24,6 +24,7 @@ use App\Http\Controllers\InventoryDisposalRequestController;
 use App\Http\Controllers\InventoryDonorController;
 use App\Http\Controllers\InventoryLocationController;
 use App\Http\Controllers\InventoryMaintenanceController;
+use App\Http\Controllers\InventoryMyItemsController;
 use App\Http\Controllers\InventoryProjectController;
 use App\Http\Controllers\InventoryReceiptController;
 use App\Http\Controllers\InventoryReportController;
@@ -226,6 +227,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/{officialLetter}', [OfficialLetterController::class, 'show'])->name('show');
     });
 
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::middleware('permission:view own inventory items')->group(function () {
+            Route::get('/my-items', [InventoryMyItemsController::class, 'index'])->name('my-items.index');
+            Route::get('/my-items/export/{type}/{format}', [InventoryMyItemsController::class, 'export'])
+                ->whereIn('type', ['assets', 'stock'])
+                ->whereIn('format', ['xlsx', 'pdf'])
+                ->name('my-items.export');
+        });
+    });
+
     Route::prefix('inventory')->name('inventory.')->middleware('permission:view inventory')->group(function () {
         Route::get('/', [InventoryDashboardController::class, 'index'])->name('index');
 
@@ -259,7 +270,9 @@ Route::middleware('auth')->group(function () {
         Route::middleware('permission:manage inventory assets|view inventory')->group(function () {
             Route::get('/assets', [InventoryAssetController::class, 'index'])->name('assets.index');
             Route::get('/assets/labels', [InventoryAssetController::class, 'labels'])->name('assets.labels');
-            Route::get('/q/{assetCode}', [InventoryAssetController::class, 'scan'])->name('scan');
+            Route::get('/assets/export/{format}', [InventoryAssetController::class, 'export'])
+                ->whereIn('format', ['xlsx', 'pdf'])
+                ->name('assets.export');
         });
 
         Route::middleware('permission:manage inventory assets')->group(function () {
@@ -277,12 +290,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/assets/{asset}/transfer', [InventoryAssetController::class, 'transfer'])->name('assets.transfer');
         });
 
-        Route::middleware('permission:manage inventory assets|view inventory')->group(function () {
-            Route::get('/assets/{asset}', [InventoryAssetController::class, 'show'])->name('assets.show');
-        });
-
         Route::middleware('permission:manage inventory stock|view inventory')->group(function () {
             Route::get('/stock-items', [InventoryStockItemController::class, 'index'])->name('stock-items.index');
+            Route::get('/stock-items/export/{format}', [InventoryStockItemController::class, 'export'])
+                ->whereIn('format', ['xlsx', 'pdf'])
+                ->name('stock-items.export');
         });
 
         Route::middleware('permission:manage inventory stock')->group(function () {
@@ -367,6 +379,11 @@ Route::middleware('auth')->group(function () {
             Route::get('/reports/export/assets', [InventoryReportController::class, 'exportAssets'])->name('reports.export.assets');
             Route::get('/reports/export/stock', [InventoryReportController::class, 'exportStock'])->name('reports.export.stock');
         });
+    });
+
+    Route::prefix('inventory')->name('inventory.')->middleware('permission:view inventory|view own inventory items')->group(function () {
+        Route::get('/q/{assetCode}', [InventoryAssetController::class, 'scan'])->name('scan');
+        Route::get('/assets/{asset}', [InventoryAssetController::class, 'show'])->name('assets.show');
     });
 
     Route::middleware('permission:manage year plans')->prefix('year-plans')->name('year-plan.')->group(function () {

@@ -89,7 +89,7 @@
                                                 ?? $receipt->project?->name
                                                 ?? '—' }}
                                         </td>
-                                        <td>{{ $receipt->location?->name ?? '—' }}</td>
+                                        <td>{{ $receipt->location?->pathLabel() ?? '—' }}</td>
                                         <td class="text-center">{{ $receipt->lines_count }}</td>
                                         <td>{{ $receipt->receivedByUser?->name ?? '—' }}</td>
                                         <td class="text-center">

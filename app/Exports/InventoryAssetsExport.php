@@ -10,10 +10,16 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class InventoryAssetsExport implements FromCollection, WithHeadings, WithMapping
 {
+    public function __construct(private ?Collection $rows = null) {}
+
     public function collection(): Collection
     {
+        if ($this->rows) {
+            return $this->rows;
+        }
+
         return InventoryAsset::query()
-            ->with(['category', 'location', 'department', 'responsibleUser', 'donor', 'project', 'supplier'])
+            ->with(['category', 'location.parent', 'department.parent', 'responsibleUser', 'donor', 'project', 'supplier'])
             ->orderBy('asset_code')
             ->get();
     }
@@ -51,8 +57,8 @@ class InventoryAssetsExport implements FromCollection, WithHeadings, WithMapping
             $asset->category?->name,
             InventoryAsset::statusOptions()[$asset->status] ?? $asset->status,
             InventoryAsset::conditionOptions()[$asset->condition] ?? $asset->condition,
-            $asset->location?->name,
-            $asset->department?->name,
+            $asset->location?->pathLabel(),
+            $asset->department?->pathLabel() ?? $asset->department?->name,
             $asset->responsibleUser?->name,
             InventoryAsset::sourceTypeOptions()[$asset->source_type] ?? $asset->source_type,
             $asset->donor?->name,

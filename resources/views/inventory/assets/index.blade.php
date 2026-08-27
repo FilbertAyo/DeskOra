@@ -12,12 +12,18 @@
                                 <li class="breadcrumb-item" aria-current="page">Assets</li>
                             </ul>
                         </div>
-                        <div class="col-auto d-flex align-items-center gap-2">
+                        <div class="col-auto d-flex align-items-center gap-2 flex-wrap">
                             @can('manage inventory assets')
                                 <a href="{{ route('inventory.assets.create') }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> Register Asset
                                 </a>
                             @endcan
+                            <a href="{{ route('inventory.assets.export', array_merge(['format' => 'xlsx'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="ti ti-file-spreadsheet me-1"></i> Excel
+                            </a>
+                            <a href="{{ route('inventory.assets.export', array_merge(['format' => 'pdf'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="ti ti-file-type-pdf me-1"></i> PDF
+                            </a>
                             <a href="{{ route('inventory.assets.labels', request()->query()) }}" class="btn btn-outline-secondary btn-sm">
                                 <i class="ti ti-qrcode me-1"></i> Print labels
                             </a>
@@ -48,13 +54,13 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small text-muted">Location</label>
-                                <select name="location_id" class="form-control form-control-sm">
-                                    <option value="">All</option>
-                                    @foreach($locations as $location)
-                                        <option value="{{ $location->id }}" @selected(($filters['location_id'] ?? '') == $location->id)>{{ $location->name }}</option>
-                                    @endforeach
-                                </select>
+                                @include('inventory.partials.location-room-picker', [
+                                    'fieldName' => 'location_id',
+                                    'selectedLocationId' => $filters['location_id'] ?? '',
+                                    'emptyLabel' => 'All',
+                                    'compact' => true,
+                                    'locationLabel' => 'Location',
+                                ])
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-muted">Department</label>
@@ -128,7 +134,7 @@
                                         <td class="fw-semibold">{{ $asset->asset_code }}</td>
                                         <td>{{ $asset->name }}</td>
                                         <td>{{ $asset->category?->name ?? '—' }}</td>
-                                        <td>{{ $asset->location?->name ?? '—' }}</td>
+                                        <td>{{ $asset->location?->pathLabel() ?? '—' }}</td>
                                         <td>{{ $asset->department?->name ?? '—' }}</td>
                                         <td>{{ $asset->responsibleUser?->name ?? '—' }}</td>
                                         <td class="text-center"><span class="badge bg-light-secondary">{{ $conditionOptions[$asset->condition] ?? ucfirst($asset->condition) }}</span></td>
@@ -140,10 +146,17 @@
                                                     <a class="dropdown-item" href="{{ route('inventory.assets.edit', $asset) }}"><i class="ti ti-edit me-2"></i> Edit</a>
                                                 @endcan
                                                 @can('assign', $asset)
-                                                    <a class="dropdown-item" href="{{ route('inventory.assets.assign.form', $asset) }}"><i class="ti ti-user-check me-2"></i> Assign</a>
+                                                    <button type="button" class="dropdown-item assign-btn"
+                                                        data-id="{{ $asset->id }}"
+                                                        data-name="{{ e($asset->name) }}"
+                                                        data-code="{{ e($asset->asset_code) }}"
+                                                        data-department="{{ $asset->department_id }}"
+                                                        data-user="{{ $asset->responsible_user_id }}">
+                                                        <i class="ti ti-user-check me-2"></i> Assign
+                                                    </button>
                                                 @endcan
                                                 @can('transfer', $asset)
-                                                    <a class="dropdown-item" href="{{ route('inventory.assets.transfer.form', $asset) }}"><i class="ti ti-arrows-exchange me-2"></i> Transfer</a>
+                                                    <a class="dropdown-item" href="{{ route('inventory.assets.transfer.form', $asset) }}"><i class="ti ti-arrows-left-right me-2"></i> Transfer</a>
                                                 @endcan
                                                 @can('delete', $asset)
                                                     <form method="POST" action="{{ route('inventory.assets.destroy', $asset) }}" class="d-inline" onsubmit="return confirm('Delete asset {{ $asset->asset_code }} ({{ $asset->name }})? This cannot be undone.');">
@@ -176,4 +189,48 @@
             </div>
         </div>
     </div>
+
+    @include('inventory.partials.assign-modal')
+    @include('inventory.partials.picker-scripts')
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalEl = document.getElementById('assignAssetModal');
+            if (!modalEl) return;
+
+            const modal = new bootstrap.Modal(modalEl);
+            const form = document.getElementById('assignAssetForm');
+            const cascade = modalEl.querySelector('.js-ownership-cascade');
+
+            function openAssign(data) {
+                form.action = `/inventory/assets/${data.id}/assign`;
+                document.getElementById('assignAssetName').textContent = data.name || 'Asset';
+                document.getElementById('assignAssetCode').textContent = data.code ? `(${data.code})` : '';
+                if (cascade) {
+                    cascade.dataset.selectedDept = data.department || '';
+                    cascade.dataset.selectedUser = data.user || '';
+                    if (window.InventoryPickers) {
+                        window.InventoryPickers.rebind(modalEl);
+                    }
+                }
+                modal.show();
+            }
+
+            document.querySelectorAll('.assign-btn').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    openAssign(this.dataset);
+                });
+            });
+
+            @if(session('open_assign_modal'))
+                const firstAssign = document.querySelector('.assign-btn');
+                if (firstAssign) {
+                    openAssign(firstAssign.dataset);
+                } else {
+                    modal.show();
+                }
+            @endif
+        });
+    </script>
+    @endpush
 </x-app-layout>

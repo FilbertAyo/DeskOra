@@ -8,7 +8,13 @@
                             <h5 class="m-b-10">{{ $asset->name }}</h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                                <li class="breadcrumb-item"><a href="{{ route('inventory.assets.index') }}">Assets</a></li>
+                                <li class="breadcrumb-item">
+                                    @can('viewAny', App\Models\InventoryAsset::class)
+                                        <a href="{{ route('inventory.assets.index') }}">Assets</a>
+                                    @else
+                                        <a href="{{ route('inventory.my-items.index') }}">My items</a>
+                                    @endcan
+                                </li>
                                 <li class="breadcrumb-item" aria-current="page">{{ $asset->asset_code }}</li>
                             </ul>
                         </div>
@@ -26,10 +32,19 @@
                                         <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">More</button>
                                         <ul class="dropdown-menu dropdown-menu-end">
                                             @can('assign', $asset)
-                                                <li><a class="dropdown-item" href="{{ route('inventory.assets.assign.form', $asset) }}"><i class="ti ti-user-check me-2"></i> Assign</a></li>
+                                                <li>
+                                                    <button type="button" class="dropdown-item assign-btn"
+                                                        data-id="{{ $asset->id }}"
+                                                        data-name="{{ e($asset->name) }}"
+                                                        data-code="{{ e($asset->asset_code) }}"
+                                                        data-department="{{ $asset->department_id }}"
+                                                        data-user="{{ $asset->responsible_user_id }}">
+                                                        <i class="ti ti-user-check me-2"></i> Assign
+                                                    </button>
+                                                </li>
                                             @endcan
                                             @can('transfer', $asset)
-                                                <li><a class="dropdown-item" href="{{ route('inventory.assets.transfer.form', $asset) }}"><i class="ti ti-arrows-exchange me-2"></i> Transfer</a></li>
+                                                <li><a class="dropdown-item" href="{{ route('inventory.assets.transfer.form', $asset) }}"><i class="ti ti-arrows-left-right me-2"></i> Transfer</a></li>
                                             @endcan
                                             @can('manage inventory borrowing')
                                                 <li><a class="dropdown-item" href="{{ route('inventory.borrowing.create', ['asset_id' => $asset->id]) }}"><i class="ti ti-hand-grab me-2"></i> Request borrow</a></li>
@@ -53,7 +68,11 @@
                                     </button>
                                 </form>
                             @endcan
-                            <a href="{{ route('inventory.assets.index') }}" class="btn btn-sm btn-light"><i class="ti ti-arrow-left me-1"></i> Back</a>
+                            @can('viewAny', App\Models\InventoryAsset::class)
+                                <a href="{{ route('inventory.assets.index') }}" class="btn btn-sm btn-light"><i class="ti ti-arrow-left me-1"></i> Back</a>
+                            @else
+                                <a href="{{ route('inventory.my-items.index') }}" class="btn btn-sm btn-light"><i class="ti ti-arrow-left me-1"></i> Back</a>
+                            @endcan
                         </div>
                     </div>
                 </div>
@@ -73,8 +92,8 @@
                     <p class="mb-2"><strong>Asset ID:</strong> {{ $asset->asset_code }}</p>
                     <p class="mb-2"><strong>Serial:</strong> {{ $asset->serial_number ?: '—' }}</p>
                     <p class="mb-2"><strong>Category:</strong> {{ $asset->category?->name ?? '—' }}</p>
-                    <p class="mb-2"><strong>Location:</strong> {{ $asset->location?->name ?? '—' }}</p>
-                    <p class="mb-2"><strong>Department:</strong> {{ $asset->department?->name ?? '—' }}</p>
+                    <p class="mb-2"><strong>Location:</strong> {{ $asset->location?->pathLabel() ?? '—' }}</p>
+                    <p class="mb-2"><strong>Department:</strong> {{ $asset->department?->pathLabel() ?? '—' }}</p>
                     <p class="mb-2"><strong>Responsible:</strong> {{ $asset->responsibleUser?->name ?? '—' }}</p>
                     <p class="mb-2">
                         <strong>Condition:</strong>
@@ -101,7 +120,9 @@
                 <div class="card-body text-center">
                     <img src="{{ $qrDataUri }}" alt="QR {{ $asset->asset_code }}" width="140" height="140">
                     <div class="small text-muted mt-2">Scan to open this asset</div>
-                    <a href="{{ route('inventory.assets.labels', ['search' => $asset->asset_code]) }}" class="btn btn-sm btn-outline-secondary mt-2">Print label</a>
+                    @can('viewAny', App\Models\InventoryAsset::class)
+                        <a href="{{ route('inventory.assets.labels', ['search' => $asset->asset_code]) }}" class="btn btn-sm btn-outline-secondary mt-2">Print label</a>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -129,10 +150,12 @@
                                 </div>
                                 <div class="small mt-2">
                                     Assigned to:
-                                    @if($row->assignedToUser)
+                                    @if($row->assignedToUser && $row->assignedToDepartment)
+                                        {{ $row->assignedToDepartment->pathLabel() ?? $row->assignedToDepartment->name }} → {{ $row->assignedToUser->name }}
+                                    @elseif($row->assignedToUser)
                                         {{ $row->assignedToUser->name }}
                                     @elseif($row->assignedToDepartment)
-                                        {{ $row->assignedToDepartment->name }} (department)
+                                        {{ $row->assignedToDepartment->pathLabel() ?? $row->assignedToDepartment->name }}
                                     @else
                                         —
                                     @endif
@@ -143,11 +166,11 @@
                             @elseif($entry['type'] === 'transfer')
                                 @php $row = $entry['record']; @endphp
                                 <div class="d-flex justify-content-between">
-                                    <strong><i class="ti ti-arrows-exchange me-1"></i> Transfer</strong>
+                                    <strong><i class="ti ti-arrows-left-right me-1"></i> Transfer</strong>
                                     <small class="text-muted">{{ $entry['at']->format('M d, Y h:i A') }}</small>
                                 </div>
                                 <div class="small mt-2">
-                                    From: {{ $row->fromLocation?->name ?? '—' }} → To: {{ $row->toLocation?->name ?? '—' }}<br>
+                                    From: {{ $row->fromLocation?->pathLabel() ?? '—' }} → To: {{ $row->toLocation?->pathLabel() ?? '—' }}<br>
                                     Reason: {{ $row->reason }}<br>
                                     By: {{ $row->transferredByUser?->name ?? '—' }}
                                 </div>
@@ -235,4 +258,48 @@
             </div>
         </div>
     </div>
+
+    @include('inventory.partials.assign-modal')
+    @include('inventory.partials.picker-scripts')
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalEl = document.getElementById('assignAssetModal');
+            if (!modalEl) return;
+            const modal = new bootstrap.Modal(modalEl);
+            const form = document.getElementById('assignAssetForm');
+            const cascade = modalEl.querySelector('.js-ownership-cascade');
+
+            function openAssign(data) {
+                form.action = `/inventory/assets/${data.id}/assign`;
+                document.getElementById('assignAssetName').textContent = data.name || 'Asset';
+                document.getElementById('assignAssetCode').textContent = data.code ? `(${data.code})` : '';
+                if (cascade) {
+                    cascade.dataset.selectedDept = data.department || '';
+                    cascade.dataset.selectedUser = data.user || '';
+                    if (window.InventoryPickers) {
+                        window.InventoryPickers.rebind(modalEl);
+                    }
+                }
+                modal.show();
+            }
+
+            document.querySelectorAll('.assign-btn').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    openAssign(this.dataset);
+                });
+            });
+
+            @if(session('open_assign_modal'))
+                const btn = document.querySelector('.assign-btn');
+                if (btn) {
+                    openAssign(btn.dataset);
+                } else {
+                    form.action = @json(route('inventory.assets.assign', $asset));
+                    modal.show();
+                }
+            @endif
+        });
+    </script>
+    @endpush
 </x-app-layout>

@@ -54,14 +54,11 @@
                         <input type="date" name="received_at" class="form-control" required
                             value="{{ old('received_at', now()->toDateString()) }}">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Location</label>
-                        <select name="location_id" class="form-control">
-                            <option value="">-- Select --</option>
-                            @foreach($locations as $location)
-                                <option value="{{ $location->id }}" @selected(old('location_id') == $location->id)>{{ $location->name }}</option>
-                            @endforeach
-                        </select>
+                    <div class="col-md-12">
+                        @include('inventory.partials.location-room-picker', [
+                            'fieldName' => 'location_id',
+                            'selectedLocationId' => old('location_id'),
+                        ])
                     </div>
                     <div class="col-md-4 source-field" data-sources="purchase">
                         <label class="form-label">Supplier <span class="text-danger supplier-required">*</span></label>
@@ -139,4 +136,5 @@
             toggleSourceFields();
         });
     </script>
+    @include('inventory.partials.picker-scripts')
 </x-app-layout>

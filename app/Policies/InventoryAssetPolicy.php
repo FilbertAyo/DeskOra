@@ -14,7 +14,11 @@ class InventoryAssetPolicy
 
     public function view(User $user, InventoryAsset $asset): bool
     {
-        return $this->viewAny($user);
+        if ($this->viewAny($user)) {
+            return true;
+        }
+
+        return $user->can('view own inventory items') && $user->hasInventoryCustodyOf($asset);
     }
 
     public function create(User $user): bool

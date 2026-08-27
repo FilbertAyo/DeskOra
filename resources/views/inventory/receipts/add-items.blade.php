@@ -49,7 +49,7 @@
                 </div>
                 <div class="col-md-4">
                     <p class="mb-1 small text-muted">Location</p>
-                    <p class="mb-0 fw-semibold">{{ $receipt->location?->name ?? '—' }}</p>
+                    <p class="mb-0 fw-semibold">{{ $receipt->location?->pathLabel() ?? '—' }}</p>
                 </div>
                 <div class="col-md-4">
                     <p class="mb-1 small text-muted">Linked to</p>

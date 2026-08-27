@@ -57,6 +57,15 @@ class Department extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    public function pathLabel(): string
+    {
+        if ($this->parent) {
+            return $this->parent->name.' › '.$this->name;
+        }
+
+        return $this->name;
+    }
+
     public function head()
     {
         return $this->belongsTo(User::class, 'head_user_id');

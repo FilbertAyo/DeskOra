@@ -24,7 +24,7 @@
             <p class="text-muted">{{ $asset->asset_code }}</p>
             <p class="mb-2"><strong>Status:</strong> {{ $statusOptions[$asset->status] ?? $asset->status }}</p>
             <p class="mb-2"><strong>Condition:</strong> {{ $conditionOptions[$asset->condition] ?? $asset->condition }}</p>
-            <p class="mb-2"><strong>Location:</strong> {{ $asset->location?->name ?? '—' }}</p>
+            <p class="mb-2"><strong>Location:</strong> {{ $asset->location?->pathLabel() ?? '—' }}</p>
             <p class="mb-2"><strong>Department:</strong> {{ $asset->department?->name ?? '—' }}</p>
             <p class="mb-0"><strong>Responsible:</strong> {{ $asset->responsibleUser?->name ?? '—' }}</p>
         </div>

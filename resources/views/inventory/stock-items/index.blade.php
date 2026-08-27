@@ -12,12 +12,18 @@
                                 <li class="breadcrumb-item" aria-current="page">Stock Items</li>
                             </ul>
                         </div>
-                        <div class="col-auto d-flex align-items-center gap-2">
+                        <div class="col-auto d-flex align-items-center gap-2 flex-wrap">
                             @can('manage inventory stock')
                                 <a href="{{ route('inventory.stock-items.create') }}" class="btn btn-primary btn-sm">
                                     <i class="ti ti-circle-plus me-1"></i> New Stock Item
                                 </a>
                             @endcan
+                            <a href="{{ route('inventory.stock-items.export', array_merge(['format' => 'xlsx'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="ti ti-file-spreadsheet me-1"></i> Excel
+                            </a>
+                            <a href="{{ route('inventory.stock-items.export', array_merge(['format' => 'pdf'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="ti ti-file-type-pdf me-1"></i> PDF
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -52,6 +58,14 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
+                                @include('inventory.partials.location-room-picker', [
+                                    'fieldName' => 'location_id',
+                                    'selectedLocationId' => $filters['location_id'] ?? '',
+                                    'emptyLabel' => 'All',
+                                    'compact' => true,
+                                ])
+                            </div>
+                            <div class="col-md-3">
                                 <div class="form-check mt-4">
                                     <input class="form-check-input" type="checkbox" name="low_stock" value="1" id="lowStockFilter" @checked($filters['low_stock'] ?? false)>
                                     <label class="form-check-label" for="lowStockFilter">Low stock only</label>
@@ -77,6 +91,7 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Category</th>
+                                    <th>Location</th>
                                     <th class="text-center">Received</th>
                                     <th class="text-center">Issued</th>
                                     <th class="text-center">Remaining</th>
@@ -96,6 +111,7 @@
                                             @endif
                                         </td>
                                         <td>{{ $item->category?->name ?? '—' }}</td>
+                                        <td>{{ $item->location?->pathLabel() ?? '—' }}</td>
                                         <td class="text-center">{{ $item->quantity_received }}</td>
                                         <td class="text-center">{{ $item->quantity_issued }}</td>
                                         <td class="text-center fw-bold">{{ $item->quantity_remaining }}</td>
@@ -127,7 +143,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center py-4">
+                                        <td colspan="9" class="text-center py-4">
                                             <p class="text-muted mb-2">No stock items found.</p>
                                             @can('manage inventory stock')
                                                 <a href="{{ route('inventory.receipts.create') }}" class="btn btn-sm btn-outline-primary me-1">Record a receipt</a>
@@ -147,7 +163,7 @@
 
     @can('manage inventory stock')
     <div class="modal fade" id="issueModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="POST" id="issueForm">
                     @csrf
@@ -161,25 +177,13 @@
                             <label class="form-label">Quantity <span class="text-danger">*</span></label>
                             <input type="number" min="1" name="quantity" class="form-control" required>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Issue To (Staff)</label>
-                            <select name="issued_to_user_id" class="form-control">
-                                <option value="">-- Select staff --</option>
-                                @foreach($users as $user)
-                                    <option value="{{ $user->id }}">{{ $user->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Issue To (Department)</label>
-                            <select name="issued_to_department_id" class="form-control">
-                                <option value="">-- Select department --</option>
-                                @foreach($departments as $department)
-                                    <option value="{{ $department->id }}">{{ $department->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
+                        @include('inventory.partials.ownership-cascade', [
+                            'departmentField' => 'issued_to_department_id',
+                            'userField' => 'issued_to_user_id',
+                            'required' => true,
+                            'idPrefix' => 'stock_issue',
+                        ])
+                        <div class="mt-3 mb-3">
                             <label class="form-label">Purpose</label>
                             <input type="text" name="purpose" class="form-control" placeholder="What is this stock for?">
                         </div>
@@ -253,6 +257,14 @@
                     issueForm.action = `/inventory/stock-items/${this.dataset.id}/issue`;
                     document.getElementById('issueItemName').textContent = this.dataset.name;
                     document.getElementById('issueRemaining').textContent = this.dataset.remaining;
+                    if (window.InventoryPickers) {
+                        const wrap = issueForm.querySelector('.js-ownership-cascade');
+                        if (wrap) {
+                            wrap.dataset.selectedDept = '';
+                            wrap.dataset.selectedUser = '';
+                            window.InventoryPickers.rebind(issueForm);
+                        }
+                    }
                     issueModal.show();
                 });
             });
@@ -268,4 +280,5 @@
         });
     </script>
     @endcan
+    @include('inventory.partials.picker-scripts')
 </x-app-layout>

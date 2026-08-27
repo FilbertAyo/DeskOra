@@ -11,6 +11,7 @@ use App\Models\InventoryReceiptLine;
 use App\Models\InventoryStockItem;
 use App\Models\InventorySupplier;
 use App\Services\Inventory\InventoryReceiptProcessor;
+use App\Support\InventoryHierarchy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,7 @@ class InventoryReceiptController extends Controller
     {
         $this->authorize('viewAny', InventoryReceipt::class);
         $query = InventoryReceipt::query()
-            ->with(['supplier', 'donor', 'project', 'location', 'receivedByUser'])
+            ->with(['supplier', 'donor', 'project', 'location.parent', 'receivedByUser'])
             ->withCount('lines');
 
         if ($request->filled('search')) {
@@ -83,7 +84,7 @@ class InventoryReceiptController extends Controller
     {
         $this->authorize('view', $receipt);
         $receipt->load([
-            'supplier', 'donor', 'project', 'location', 'receivedByUser',
+            'supplier', 'donor', 'project', 'location.parent', 'receivedByUser',
             'lines.category', 'lines.project', 'lines.stockItem',
             'assets',
         ]);
@@ -103,7 +104,7 @@ class InventoryReceiptController extends Controller
         }
 
         $receipt->load([
-            'supplier', 'donor', 'project', 'location',
+            'supplier', 'donor', 'project', 'location.parent',
             'lines.category', 'lines.stockItem',
         ]);
 
@@ -156,6 +157,7 @@ class InventoryReceiptController extends Controller
         ], $this->lineValidationRules()));
 
         $this->assertSourceLinks($validated);
+        $validated['location_id'] = InventoryHierarchy::resolveLocationId($request) ?: ($validated['location_id'] ?? null);
         $validated['lines'] = $this->normalizeLines($validated['lines']);
 
         foreach (['supplier_id', 'donor_id', 'project_id', 'location_id'] as $field) {
@@ -243,13 +245,14 @@ class InventoryReceiptController extends Controller
     {
         return [
             'categories' => InventoryCategory::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
-            'locations' => InventoryLocation::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'locations' => InventoryLocation::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'parent_id']),
             'suppliers' => InventorySupplier::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'donors' => InventoryDonor::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'projects' => InventoryProject::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'stockItems' => InventoryStockItem::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'unit']),
             'sourceTypeOptions' => InventoryReceipt::sourceTypeOptions(),
             'conditionOptions' => \App\Models\InventoryAsset::conditionOptions(),
+            'inventoryPickerData' => InventoryHierarchy::pickerPayload(),
         ];
     }
 }
