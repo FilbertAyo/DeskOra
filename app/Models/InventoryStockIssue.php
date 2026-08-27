@@ -48,4 +48,23 @@ class InventoryStockIssue extends Model
     {
         return $this->belongsTo(User::class, 'issued_by_user_id');
     }
+
+    /**
+     * Stock issued to this user personally, or to a whole department / sub-department they belong to.
+     */
+    public function scopeInUserCustody($query, User $user)
+    {
+        $scopeIds = $user->inventoryCustodyScopeIds();
+
+        return $query->where(function ($inner) use ($user, $scopeIds) {
+            $inner->where('issued_to_user_id', $user->id);
+
+            if ($scopeIds !== []) {
+                $inner->orWhere(function ($unit) use ($scopeIds) {
+                    $unit->whereIn('issued_to_department_id', $scopeIds)
+                        ->whereNull('issued_to_user_id');
+                });
+            }
+        });
+    }
 }

@@ -18,10 +18,10 @@
                                     <i class="ti ti-circle-plus me-1"></i> Register Asset
                                 </a>
                             @endcan
-                            <a href="{{ route('inventory.assets.export', array_merge(['format' => 'xlsx'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                            <a href="{{ route('inventory.assets.export', array_merge(['format' => 'xlsx'], request()->query())) }}" class="btn btn-danger btn-sm">
                                 <i class="ti ti-file-spreadsheet me-1"></i> Excel
                             </a>
-                            <a href="{{ route('inventory.assets.export', array_merge(['format' => 'pdf'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                            <a href="{{ route('inventory.assets.export', array_merge(['format' => 'pdf'], request()->query())) }}" class="btn btn-danger btn-sm">
                                 <i class="ti ti-file-type-pdf me-1"></i> PDF
                             </a>
                             <a href="{{ route('inventory.assets.labels', request()->query()) }}" class="btn btn-outline-secondary btn-sm">

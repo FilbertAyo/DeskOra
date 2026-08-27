@@ -18,10 +18,10 @@
                                     <i class="ti ti-circle-plus me-1"></i> New Stock Item
                                 </a>
                             @endcan
-                            <a href="{{ route('inventory.stock-items.export', array_merge(['format' => 'xlsx'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                            <a href="{{ route('inventory.stock-items.export', array_merge(['format' => 'xlsx'], request()->query())) }}" class="btn btn-danger btn-sm">
                                 <i class="ti ti-file-spreadsheet me-1"></i> Excel
                             </a>
-                            <a href="{{ route('inventory.stock-items.export', array_merge(['format' => 'pdf'], request()->query())) }}" class="btn btn-outline-secondary btn-sm">
+                            <a href="{{ route('inventory.stock-items.export', array_merge(['format' => 'pdf'], request()->query())) }}" class="btn btn-danger btn-sm">
                                 <i class="ti ti-file-type-pdf me-1"></i> PDF
                             </a>
                         </div>
@@ -117,7 +117,7 @@
                                         <td class="text-center fw-bold">{{ $item->quantity_remaining }}</td>
                                         <td class="text-center">{{ $item->minimum_level }}</td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-secondary">
+                                            <span class="badge {{ $item->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">
                                                 {{ ucfirst($item->status) }}
                                             </span>
                                         </td>

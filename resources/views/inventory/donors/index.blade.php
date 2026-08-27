@@ -73,7 +73,7 @@
                                             <span class="badge bg-light-secondary border border-secondary">{{ $donor->projects_count }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-secondary">
+                                            <span class="badge {{ $donor->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">
                                                 {{ ucfirst($donor->status) }}
                                             </span>
                                         </td>

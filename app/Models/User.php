@@ -85,7 +85,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Department / sub-department ids this user actually belongs to.
+     * Units this user belongs to, plus parent departments.
+     * Does not include sibling or child sub-departments they are not in.
      * Unlike departmentScopeIds(), users without a unit get an empty list (not every department).
      *
      * @return list<string>
@@ -97,9 +98,9 @@ class User extends Authenticatable
         if ($this->department_id) {
             $department = $this->relationLoaded('department') ? $this->department : $this->department()->first();
             if ($department) {
-                $ids = array_merge($ids, $department->selfAndDescendantIds());
+                $ids = array_merge($ids, $department->selfAndAncestorIds());
             } else {
-                $ids[] = $this->department_id;
+                $ids[] = (string) $this->department_id;
             }
         }
 
@@ -109,33 +110,18 @@ class User extends Authenticatable
                 : $this->subDepartments()->get();
 
             foreach ($subDepartments as $subDepartment) {
-                $ids = array_merge($ids, $subDepartment->selfAndDescendantIds());
+                $ids = array_merge($ids, $subDepartment->selfAndAncestorIds());
             }
         }
 
-        return array_values(array_unique($ids));
+        return array_values(array_unique(array_map('strval', $ids)));
     }
 
     public function hasInventoryCustodyOf(InventoryAsset $asset): bool
     {
-        if ((string) $asset->responsible_user_id === (string) $this->id) {
-            return true;
-        }
-
-        $scopeIds = $this->inventoryCustodyScopeIds();
-
-        if ($scopeIds !== [] && $asset->department_id && in_array((string) $asset->department_id, $scopeIds, true)) {
-            return true;
-        }
-
-        return $asset->assignments()
-            ->whereNull('ended_at')
-            ->where(function ($query) use ($scopeIds) {
-                $query->where('assigned_to_user_id', $this->id);
-                if ($scopeIds !== []) {
-                    $query->orWhereIn('assigned_to_department_id', $scopeIds);
-                }
-            })
+        return InventoryAsset::query()
+            ->whereKey($asset->id)
+            ->inUserCustody($this)
             ->exists();
     }
 

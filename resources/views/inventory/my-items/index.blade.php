@@ -13,17 +13,17 @@
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
                             @if($tab === 'stock')
-                                <a href="{{ route('inventory.my-items.export', ['type' => 'stock', 'format' => 'xlsx']) }}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ route('inventory.my-items.export', ['type' => 'stock', 'format' => 'xlsx']) }}" class="btn btn-danger btn-sm">
                                     <i class="ti ti-file-spreadsheet me-1"></i> Excel
                                 </a>
-                                <a href="{{ route('inventory.my-items.export', ['type' => 'stock', 'format' => 'pdf']) }}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ route('inventory.my-items.export', ['type' => 'stock', 'format' => 'pdf']) }}" class="btn btn-danger btn-sm">
                                     <i class="ti ti-file-type-pdf me-1"></i> PDF
                                 </a>
                             @else
-                                <a href="{{ route('inventory.my-items.export', ['type' => 'assets', 'format' => 'xlsx']) }}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ route('inventory.my-items.export', ['type' => 'assets', 'format' => 'xlsx']) }}" class="btn btn-danger btn-sm">
                                     <i class="ti ti-file-spreadsheet me-1"></i> Excel
                                 </a>
-                                <a href="{{ route('inventory.my-items.export', ['type' => 'assets', 'format' => 'pdf']) }}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ route('inventory.my-items.export', ['type' => 'assets', 'format' => 'pdf']) }}" class="btn btn-danger btn-sm">
                                     <i class="ti ti-file-type-pdf me-1"></i> PDF
                                 </a>
                             @endif
@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <p class="text-muted">Items assigned to you personally, or to your department / sub-department.</p>
+    <p class="text-muted">Items assigned to you personally, plus items assigned to your whole department or sub-department.</p>
 
     @include('inventory.partials.tabs', [
         'current' => $tab,

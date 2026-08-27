@@ -12,8 +12,8 @@
                             </ul>
                         </div>
                         <div class="d-flex gap-2">
-                            <a href="{{ route('inventory.reports.export.assets') }}" class="btn btn-sm btn-outline-primary">Export assets</a>
-                            <a href="{{ route('inventory.reports.export.stock') }}" class="btn btn-sm btn-outline-primary">Export stock</a>
+                            <a href="{{ route('inventory.reports.export.assets') }}" class="btn btn-sm btn-danger">Export assets</a>
+                            <a href="{{ route('inventory.reports.export.stock') }}" class="btn btn-sm btn-danger">Export stock</a>
                         </div>
                     </div>
                 </div>

@@ -100,4 +100,39 @@ class Department extends Model
     {
         return array_merge([$this->id], $this->descendantIds());
     }
+
+    /**
+     * Parent units above this department (not including self).
+     *
+     * @return list<string>
+     */
+    public function ancestorIds(): array
+    {
+        $ids = [];
+        $current = $this->parent_id
+            ? ($this->relationLoaded('parent') ? $this->parent : $this->parent()->first())
+            : null;
+        $guard = 0;
+
+        while ($current && $guard < 20) {
+            $ids[] = (string) $current->id;
+            $current = $current->parent_id
+                ? ($current->relationLoaded('parent') ? $current->parent : $current->parent()->first())
+                : null;
+            $guard++;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * This department plus parent units, so a sub-department member
+     * also matches items assigned to the whole parent department.
+     *
+     * @return list<string>
+     */
+    public function selfAndAncestorIds(): array
+    {
+        return array_merge([(string) $this->id], $this->ancestorIds());
+    }
 }

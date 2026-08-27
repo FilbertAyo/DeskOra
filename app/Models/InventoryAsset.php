@@ -155,6 +155,40 @@ class InventoryAsset extends Model
         return $this->hasMany(InventoryDisposalRequest::class, 'asset_id');
     }
 
+    /**
+     * Items assigned to this user personally, or to a whole department / sub-department they belong to.
+     * Does not include items assigned to another person in the same unit.
+     */
+    public function scopeInUserCustody($query, User $user)
+    {
+        $scopeIds = $user->inventoryCustodyScopeIds();
+
+        return $query->where(function ($inner) use ($user, $scopeIds) {
+            $inner->where('responsible_user_id', $user->id);
+
+            if ($scopeIds !== []) {
+                $inner->orWhere(function ($unit) use ($scopeIds) {
+                    $unit->whereIn('department_id', $scopeIds)
+                        ->whereNull('responsible_user_id');
+                });
+            }
+
+            $inner->orWhereHas('assignments', function ($assignments) use ($user, $scopeIds) {
+                $assignments->whereNull('ended_at')
+                    ->where(function ($assignment) use ($user, $scopeIds) {
+                        $assignment->where('assigned_to_user_id', $user->id);
+
+                        if ($scopeIds !== []) {
+                            $assignment->orWhere(function ($unitAssignment) use ($scopeIds) {
+                                $unitAssignment->whereNull('assigned_to_user_id')
+                                    ->whereIn('assigned_to_department_id', $scopeIds);
+                            });
+                        }
+                    });
+            });
+        });
+    }
+
     public function isDisposed(): bool
     {
         return $this->status === self::STATUS_DISPOSED;

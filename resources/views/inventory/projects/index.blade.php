@@ -70,7 +70,7 @@
                                         </td>
                                         <td class="text-muted">{{ $project->description ?: '—' }}</td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-secondary">
+                                            <span class="badge {{ $project->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">
                                                 {{ ucfirst($project->status) }}
                                             </span>
                                         </td>

@@ -88,40 +88,15 @@ class InventoryMyItemsController extends Controller
 
     private function custodyAssetsQuery($user)
     {
-        $scopeIds = $user->inventoryCustodyScopeIds();
-
         return InventoryAsset::query()
             ->with(['category', 'location.parent', 'department.parent', 'responsibleUser'])
-            ->where(function ($query) use ($user, $scopeIds) {
-                $query->where('responsible_user_id', $user->id);
-
-                if ($scopeIds !== []) {
-                    $query->orWhereIn('department_id', $scopeIds);
-                }
-
-                $query->orWhereHas('assignments', function ($assignments) use ($user, $scopeIds) {
-                    $assignments->whereNull('ended_at')
-                        ->where(function ($inner) use ($user, $scopeIds) {
-                            $inner->where('assigned_to_user_id', $user->id);
-                            if ($scopeIds !== []) {
-                                $inner->orWhereIn('assigned_to_department_id', $scopeIds);
-                            }
-                        });
-                });
-            });
+            ->inUserCustody($user);
     }
 
     private function custodyIssuesQuery($user)
     {
-        $scopeIds = $user->inventoryCustodyScopeIds();
-
         return InventoryStockIssue::query()
             ->with(['stockItem.location.parent', 'issuedToUser', 'issuedToDepartment.parent', 'issuedByUser'])
-            ->where(function ($query) use ($user, $scopeIds) {
-                $query->where('issued_to_user_id', $user->id);
-                if ($scopeIds !== []) {
-                    $query->orWhereIn('issued_to_department_id', $scopeIds);
-                }
-            });
+            ->inUserCustody($user);
     }
 }

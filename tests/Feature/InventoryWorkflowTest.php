@@ -455,6 +455,128 @@ class InventoryWorkflowTest extends TestCase
             ->assertOk();
     }
 
+    public function test_staff_see_whole_unit_assignments_for_their_department_and_sub_department_only(): void
+    {
+        $finance = Department::factory()->create(['name' => 'Finance']);
+        $accounts = Department::factory()->create([
+            'name' => 'Accounts',
+            'parent_id' => $finance->id,
+        ]);
+        $procurement = Department::factory()->create([
+            'name' => 'Procurement',
+            'parent_id' => $finance->id,
+        ]);
+        $colleague = User::factory()->create([
+            'status' => 'active',
+            'department_id' => $finance->id,
+        ]);
+        $colleague->subDepartments()->attach($accounts->id);
+        $staff = User::factory()->create([
+            'status' => 'active',
+            'department_id' => $finance->id,
+        ]);
+        $staff->subDepartments()->attach($accounts->id);
+        $staff->givePermissionTo('view own inventory items');
+        $officer = $this->inventoryUser(['manage inventory stock', 'view inventory']);
+
+        $this->makeAsset([
+            'name' => 'Staff Laptop',
+            'department_id' => $accounts->id,
+            'responsible_user_id' => $staff->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+        $this->makeAsset([
+            'name' => 'Finance Projector',
+            'department_id' => $finance->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+        $this->makeAsset([
+            'name' => 'Accounts Camera',
+            'department_id' => $accounts->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+        $this->makeAsset([
+            'name' => 'Procurement Printer',
+            'department_id' => $procurement->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+        $this->makeAsset([
+            'name' => 'Colleague Monitor',
+            'department_id' => $accounts->id,
+            'responsible_user_id' => $colleague->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+
+        $stock = InventoryStockItem::query()->create([
+            'name' => 'Shared Toner',
+            'quantity_received' => 20,
+            'quantity_issued' => 8,
+            'quantity_remaining' => 12,
+            'minimum_level' => 2,
+            'status' => 'active',
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 2,
+            'issued_to_department_id' => $finance->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+            'purpose' => 'Finance unit issue',
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 2,
+            'issued_to_department_id' => $accounts->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+            'purpose' => 'Accounts unit issue',
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 2,
+            'issued_to_department_id' => $procurement->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+            'purpose' => 'Procurement unit issue',
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 1,
+            'issued_to_user_id' => $colleague->id,
+            'issued_to_department_id' => $accounts->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+            'purpose' => 'Colleague personal issue',
+        ]);
+        InventoryStockIssue::query()->create([
+            'stock_item_id' => $stock->id,
+            'quantity' => 1,
+            'issued_to_user_id' => $staff->id,
+            'issued_to_department_id' => $accounts->id,
+            'issued_by_user_id' => $officer->id,
+            'issued_at' => now(),
+            'purpose' => 'Staff personal issue',
+        ]);
+
+        $this->actingAs($staff)
+            ->get(route('inventory.my-items.index'))
+            ->assertOk()
+            ->assertSee('Staff Laptop')
+            ->assertSee('Finance Projector')
+            ->assertSee('Accounts Camera')
+            ->assertDontSee('Procurement Printer')
+            ->assertDontSee('Colleague Monitor');
+
+        $this->actingAs($staff)
+            ->get(route('inventory.my-items.index', ['tab' => 'stock']))
+            ->assertOk()
+            ->assertSee('Finance unit issue')
+            ->assertSee('Accounts unit issue')
+            ->assertSee('Staff personal issue')
+            ->assertDontSee('Procurement unit issue')
+            ->assertDontSee('Colleague personal issue');
+    }
+
     public function test_assets_list_can_be_exported_as_excel_and_pdf(): void
     {
         $user = $this->inventoryUser(['view inventory']);

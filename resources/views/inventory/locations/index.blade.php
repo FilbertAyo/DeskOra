@@ -109,7 +109,7 @@
                                     <td>{{ $location->parent?->name ?? '—' }}</td>
                                     <td class="text-muted">{{ $location->description ?: '—' }}</td>
                                     <td class="text-center">
-                                        <span class="badge bg-light-secondary">{{ ucfirst($location->status) }}</span>
+                                        <span class="badge {{ $location->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">{{ ucfirst($location->status) }}</span>
                                     </td>
                                     <td class="text-center">
                                         <x-table-action-dropdown>
@@ -165,7 +165,7 @@
                                         </a>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-light-secondary">{{ ucfirst($location->status) }}</span>
+                                        <span class="badge {{ $location->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">{{ ucfirst($location->status) }}</span>
                                     </td>
                                     <td class="text-center">
                                         <x-table-action-dropdown>

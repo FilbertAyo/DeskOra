@@ -69,7 +69,7 @@
                                             </div>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-secondary">
+                                            <span class="badge {{ $supplier->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">
                                                 {{ ucfirst($supplier->status) }}
                                             </span>
                                         </td>

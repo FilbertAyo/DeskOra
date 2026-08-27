@@ -64,7 +64,7 @@
                                         <td class="fw-semibold">{{ $category->name }}</td>
                                         <td class="text-muted">{{ $category->description ?: '—' }}</td>
                                         <td class="text-center">
-                                            <span class="badge bg-light-secondary">
+                                            <span class="badge {{ $category->status === 'active' ? 'bg-light-success border border-success' : 'bg-light-secondary' }}">
                                                 {{ ucfirst($category->status) }}
                                             </span>
                                         </td>
