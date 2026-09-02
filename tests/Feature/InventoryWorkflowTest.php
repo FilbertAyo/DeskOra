@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\InventoryAssignmentReportMail;
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryDisposalRequest;
@@ -13,7 +14,9 @@ use App\Models\InventoryLocation;
 use App\Models\Department;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class InventoryWorkflowTest extends TestCase
@@ -651,6 +654,106 @@ class InventoryWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('inventory.assets.export', ['format' => 'pdf']))
             ->assertOk();
+    }
+
+    public function test_assets_export_can_filter_by_department_and_room(): void
+    {
+        $user = $this->inventoryUser(['view inventory']);
+        $department = Department::query()->create(['name' => 'Finance', 'status' => 'active']);
+        $hq = InventoryLocation::query()->create(['name' => 'HQ', 'status' => 'active']);
+        $room = InventoryLocation::query()->create([
+            'name' => 'Room A',
+            'status' => 'active',
+            'parent_id' => $hq->id,
+        ]);
+
+        $this->makeAsset(['name' => 'Finance Laptop', 'department_id' => $department->id]);
+        $this->makeAsset(['name' => 'Room Asset', 'location_id' => $room->id]);
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.export', [
+                'format' => 'xlsx',
+                'department_id' => $department->id,
+            ]))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.export', [
+                'format' => 'xlsx',
+                'location_id' => $room->id,
+            ]))
+            ->assertOk();
+    }
+
+    public function test_qr_labels_require_a_room_selection(): void
+    {
+        $user = $this->inventoryUser(['view inventory']);
+        $hq = InventoryLocation::query()->create(['name' => 'HQ', 'status' => 'active']);
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.labels'))
+            ->assertRedirect(route('inventory.assets.index'));
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.labels', ['location_id' => $hq->id]))
+            ->assertRedirect(route('inventory.assets.index'));
+    }
+
+    public function test_qr_labels_show_assets_for_selected_room(): void
+    {
+        $user = $this->inventoryUser(['view inventory']);
+        $hq = InventoryLocation::query()->create(['name' => 'HQ', 'status' => 'active']);
+        $room = InventoryLocation::query()->create([
+            'name' => 'Room A',
+            'status' => 'active',
+            'parent_id' => $hq->id,
+        ]);
+        $otherRoom = InventoryLocation::query()->create([
+            'name' => 'Room B',
+            'status' => 'active',
+            'parent_id' => $hq->id,
+        ]);
+
+        $this->makeAsset(['name' => 'Room A Laptop', 'location_id' => $room->id]);
+        $this->makeAsset(['name' => 'Room B Laptop', 'location_id' => $otherRoom->id]);
+
+        $this->actingAs($user)
+            ->get(route('inventory.assets.labels', ['location_id' => $room->id]))
+            ->assertOk()
+            ->assertSee('Room A Laptop')
+            ->assertSee('Room A')
+            ->assertDontSee('Room B Laptop');
+    }
+
+    public function test_admin_can_email_staff_assignment_report(): void
+    {
+        Mail::fake();
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $department = Department::query()->create(['name' => 'Finance', 'status' => 'active']);
+        $staff = User::factory()->create([
+            'status' => 'active',
+            'department_id' => $department->id,
+        ]);
+
+        $this->makeAsset([
+            'name' => 'Assigned Laptop',
+            'department_id' => $department->id,
+            'responsible_user_id' => $staff->id,
+            'status' => InventoryAsset::STATUS_ASSIGNED,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('inventory.reports.notify-assignments'), [
+                'user_id' => $staff->id,
+            ])
+            ->assertRedirect(route('inventory.reports.index'))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(InventoryAssignmentReportMail::class, function (InventoryAssignmentReportMail $mail) use ($staff) {
+            return $mail->hasTo($staff->email) && $mail->assets->count() === 1;
+        });
     }
 
     public function test_stock_list_can_be_exported(): void

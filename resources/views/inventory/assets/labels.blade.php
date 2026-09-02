@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Asset labels</title>
+    <title>QR labels — {{ $location->pathLabel() }}</title>
     <style>
         body { font-family: sans-serif; margin: 24px; }
         .toolbar { margin-bottom: 16px; }
@@ -19,9 +19,10 @@
 </head>
 <body>
     <div class="toolbar">
-        <button type="button" onclick="window.print()">Print</button>
+        <button type="button" onclick="window.print()">Print / Save as PDF</button>
         <a href="{{ route('inventory.assets.index') }}">Back to assets</a>
-        <span style="color:#666; font-size:12px; margin-left:8px;">Up to 200 labels from the current asset filter.</span>
+        <strong style="margin-left:8px;">{{ $location->pathLabel() }}</strong>
+        <span style="color:#666; font-size:12px; margin-left:8px;">{{ $labels->count() }} label{{ $labels->count() === 1 ? '' : 's' }} (max 200 per room).</span>
     </div>
     <div class="grid">
         @forelse($labels as $label)

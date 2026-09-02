@@ -379,6 +379,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/reports/export/assets', [InventoryReportController::class, 'exportAssets'])->name('reports.export.assets');
             Route::get('/reports/export/stock', [InventoryReportController::class, 'exportStock'])->name('reports.export.stock');
         });
+
+        Route::middleware('permission:manage inventory assets')->group(function () {
+            Route::post('/reports/notify-assignments', [InventoryReportController::class, 'notifyAssignments'])->name('reports.notify-assignments');
+        });
     });
 
     Route::prefix('inventory')->name('inventory.')->middleware('permission:view inventory|view own inventory items')->group(function () {

@@ -385,7 +385,27 @@ class InventoryAssetController extends Controller
     {
         $this->authorize('viewAny', InventoryAsset::class);
 
-        $assets = $this->filteredAssetsQuery($request)
+        $locationId = $request->input('location_id');
+
+        if (! filled($locationId)) {
+            return redirect()
+                ->route('inventory.assets.index')
+                ->with('open_qr_modal', true)
+                ->with('info', 'Select a room to generate QR labels.');
+        }
+
+        $location = InventoryLocation::query()->findOrFail($locationId);
+
+        if (! $location->isRoom()) {
+            return redirect()
+                ->route('inventory.assets.index')
+                ->with('open_qr_modal', true)
+                ->with('error', 'Please select a specific room for QR labels.');
+        }
+
+        $assets = InventoryAsset::query()
+            ->with(['category', 'location.parent'])
+            ->where('location_id', $location->id)
             ->orderBy('asset_code')
             ->limit(200)
             ->get();
@@ -395,7 +415,7 @@ class InventoryAssetController extends Controller
             'qr' => $this->qrCodeGenerator->pngDataUri($this->qrCodeGenerator->scanUrl($asset), 140),
         ]);
 
-        return view('inventory.assets.labels', compact('labels'));
+        return view('inventory.assets.labels', compact('labels', 'location'));
     }
 
     public function export(Request $request, string $format)
@@ -407,6 +427,20 @@ class InventoryAssetController extends Controller
             ->get();
 
         $filename = 'inventory-assets-'.now()->format('Y-m-d');
+
+        if ($request->filled('department_id')) {
+            $department = Department::query()->find($request->input('department_id'));
+            if ($department) {
+                $filename .= '-dept-'.str($department->name)->slug('-');
+            }
+        }
+
+        if ($request->filled('location_id')) {
+            $location = InventoryLocation::query()->find($request->input('location_id'));
+            if ($location) {
+                $filename .= '-loc-'.str($location->pathLabel())->slug('-');
+            }
+        }
 
         if ($format === 'pdf') {
             $pdf = Pdf::loadView('inventory.exports.assets-pdf', [
