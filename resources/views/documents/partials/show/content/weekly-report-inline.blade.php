@@ -126,7 +126,7 @@
                                                                     @endphp
                                                                     <tr>
                                                                         <td class="text-center">{{ $apNum }}</td>
-                                                                        <td>{{ $activityOutputDisplay }}</td>
+                                                                        <td style="white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;">{{ $activityOutputDisplay }}</td>
                                                                         <td>{{ $progressDisplay }}</td>
                                                                         <td>{{ $row['remarks_challenges'] ?? '' }}</td>
                                                                         <td>

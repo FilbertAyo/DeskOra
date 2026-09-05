@@ -143,10 +143,7 @@
             const achievementsBody = document.getElementById('achievementsBody');
             const addChallengeRowBtn = document.getElementById('addChallengeRowBtn');
             const challengesMitigationBody = document.getElementById('challengesMitigationBody');
-            const reportActivityOptionsSource = reportActivityProgressBody
-                ? reportActivityProgressBody.querySelector('select[name^="content[activity_progress]"][name$="[activity_output]"]')
-                : null;
-            window.__reportActivityOptionsHtml = reportActivityOptionsSource ? reportActivityOptionsSource.innerHTML : '<option value="">-- Select Activity --</option>';
+            let reportActivityIndex = reportActivityProgressBody ? reportActivityProgressBody.querySelectorAll('tr').length : 0;
 
             function buildStaffCheckboxFieldHtml(name, selectedIds, options) {
                 options = options || {};
@@ -176,19 +173,57 @@
                     cell.textContent = String(idx + 1);
                 });
             }
-            function syncOffPlanInputForSelect(selectEl) {
-                if (!selectEl) return;
-                const cell = selectEl.closest('td');
-                if (!cell) return;
-                const wrap = cell.querySelector('[data-off-plan-input-wrap="true"]');
-                const input = wrap ? wrap.querySelector('input[name$="[off_plan_activity]"]') : null;
-                const showOffPlan = selectEl.value === '__off_plan__';
-                if (!wrap || !input) return;
-                wrap.style.display = showOffPlan ? '' : 'none';
-                input.required = showOffPlan;
-                if (!showOffPlan) {
-                    input.value = '';
-                }
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function buildReportActivityRowHtml(row, idx) {
+                const activityOutput = (row.activity_output || '').trim();
+                const isLocked = activityOutput !== '' && activityOutput !== '__off_plan__';
+                const activityCell = isLocked
+                    ? `<div class="weekly-report-activity-locked">
+                            <div class="weekly-report-activity-text">${escapeHtml(activityOutput)}</div>
+                            <input type="hidden" name="content[activity_progress][${idx}][activity_output]" value="${escapeHtml(activityOutput)}">
+                        </div>`
+                    : `<div class="small text-muted mb-1">Not on weekly plan</div>
+                        <input type="hidden" name="content[activity_progress][${idx}][activity_output]" value="__off_plan__">
+                        <textarea class="form-control weekly-report-activity-text" rows="4" name="content[activity_progress][${idx}][off_plan_activity]" placeholder="Describe the activity">${escapeHtml(row.off_plan_activity || '')}</textarea>`;
+                const progress = row.progress || '';
+                const progressOptions = [
+                    ['Done', 'Done'],
+                    ['Done and carry', 'Done (recurring)'],
+                    ['Partially done', 'Carry to next week'],
+                    ['Not started', 'Not done'],
+                ];
+                const progressOptionsHtml = progressOptions.map(([value, label]) => (
+                    `<option value="${value}" ${progress === value ? 'selected' : ''}>${label}</option>`
+                )).join('');
+                const extraProgress = progress && !progressOptions.some(([value]) => value === progress)
+                    ? `<option value="${escapeHtml(progress)}" selected>${escapeHtml(progress)}</option>`
+                    : '';
+
+                return `
+                    <tr${isLocked ? ' data-activity-locked="1"' : ''}>
+                        <td class="text-center align-middle js-report-activity-row-no"></td>
+                        <td class="weekly-report-activity-col">${activityCell}</td>
+                        <td>
+                            <select class="form-select" name="content[activity_progress][${idx}][progress]">
+                                <option value="">-- Select --</option>
+                                ${progressOptionsHtml}
+                                ${extraProgress}
+                            </select>
+                        </td>
+                        <td><textarea class="form-control" rows="5" name="content[activity_progress][${idx}][remarks_challenges]" placeholder="Remarks/Challenges">${escapeHtml(row.remarks_challenges || '')}</textarea></td>
+                        <td><textarea class="form-control" rows="5" name="content[activity_progress][${idx}][next_step]" placeholder="Next step">${escapeHtml(row.next_step || '')}</textarea></td>
+                        <td class="text-center align-middle">${isLocked ? '' : '<button type="button" class="btn btn-sm btn-outline-danger remove-report-activity-row">&times;</button>'}</td>
+                    </tr>
+                `;
             }
 
             function toggleTargetExplanation() {
@@ -329,61 +364,33 @@
             }
 
             if (addReportActivityRowBtn && reportActivityProgressBody) {
-                let reportActivityIndex = reportActivityProgressBody.querySelectorAll('tr').length;
-
                 addReportActivityRowBtn.addEventListener('click', function() {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="text-center align-middle js-report-activity-row-no"></td>
-                        <td>
-                            <select class="form-select" name="content[activity_progress][${reportActivityIndex}][activity_output]" data-off-plan-select="true">
-                                ${window.__reportActivityOptionsHtml || '<option value="">-- Select Activity --</option>'}
-                            </select>
-                            <div class="mt-2" data-off-plan-input-wrap="true" style="display:none;">
-                                <input type="text" class="form-control" name="content[activity_progress][${reportActivityIndex}][off_plan_activity]" placeholder="Describe off-plan activity">
-                            </div>
-                        </td>
-                        <td>
-                            <select class="form-select" name="content[activity_progress][${reportActivityIndex}][progress]">
-                                <option value="">-- Select --</option>
-                                <option value="Done">Done</option>
-                                <option value="Done and carry">Done (recurring)</option>
-                                <option value="Partially done">Carry to next week</option>
-                                <option value="Not started">Not done</option>
-                            </select>
-                        </td>
-                        <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][remarks_challenges]" placeholder="Remarks/Challenges"></textarea></td>
-                        <td><textarea class="form-control" rows="5" name="content[activity_progress][${reportActivityIndex}][next_step]" placeholder="Next step"></textarea></td>
-                        <td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger remove-report-activity-row">&times;</button></td>
-                    `;
-                    if (reportActivityProgressBody.firstChild) {
-                        reportActivityProgressBody.insertBefore(row, reportActivityProgressBody.firstChild);
-                    } else {
-                        reportActivityProgressBody.appendChild(row);
-                    }
+                    reportActivityProgressBody.insertAdjacentHTML(
+                        'afterbegin',
+                        buildReportActivityRowHtml({
+                            activity_output: '__off_plan__',
+                            off_plan_activity: '',
+                            progress: '',
+                            remarks_challenges: '',
+                            next_step: '',
+                        }, reportActivityIndex)
+                    );
                     reportActivityIndex++;
                     updateReportActivityRowNumbers();
-                    syncOffPlanInputForSelect(row.querySelector('[data-off-plan-select="true"]'));
                 });
 
                 reportActivityProgressBody.addEventListener('click', function(event) {
                     const btn = event.target.closest('.remove-report-activity-row');
                     if (!btn) return;
+                    const row = btn.closest('tr');
+                    if (!row || row.getAttribute('data-activity-locked') === '1') return;
                     const rows = reportActivityProgressBody.querySelectorAll('tr');
                     if (rows.length <= 1) return;
-                    btn.closest('tr')?.remove();
+                    row.remove();
                     updateReportActivityRowNumbers();
                 });
 
                 updateReportActivityRowNumbers();
-                reportActivityProgressBody.querySelectorAll('[data-off-plan-select="true"]').forEach((selectEl) => {
-                    syncOffPlanInputForSelect(selectEl);
-                });
-                reportActivityProgressBody.addEventListener('change', function(event) {
-                    const selectEl = event.target.closest('[data-off-plan-select="true"]');
-                    if (!selectEl) return;
-                    syncOffPlanInputForSelect(selectEl);
-                });
             }
 
             if (addAchievementRowBtn && achievementsBody) {

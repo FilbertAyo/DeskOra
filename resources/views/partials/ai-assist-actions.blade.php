@@ -160,8 +160,8 @@
             if (!label) return;
 
             const row = rows.find((candidate) => {
-                const select = candidate.querySelector('[name*="[activity_output]"]');
-                return select && select.value === label;
+                const activityField = candidate.querySelector('[name*="[activity_output]"]');
+                return activityField && activityField.value === label;
             });
             if (!row) return;
 

@@ -94,7 +94,7 @@
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <h6 class="mb-0"><i class="ti ti-list me-2"></i>2. Weekly Activity Progress</h6>
                                                 <button type="button" class="btn btn-sm btn-outline-primary" id="addReportActivityRowBtn">
-                                                    <i class="ti ti-plus me-1"></i> Add Progress
+                                                    <i class="ti ti-plus me-1"></i> Add activity not on plan
                                                 </button>
                                             </div>
                                         </div>
@@ -104,7 +104,7 @@
                                                     <thead class="table-light">
                                                         <tr>
                                                             <th style="width: 60px;">No.</th>
-                                                            <th style="width: 320px;">Activity (from Weekly Plan)</th>
+                                                            <th class="weekly-report-activity-col">Activity (from Weekly Plan)</th>
                                                             <th style="width: 150px;">Progress</th>
                                                             <th>Remarks/Challenges</th>
                                                             <th>Next Step</th>
@@ -119,40 +119,20 @@
                                                             }
                                                         @endphp
                                                         @foreach($activityProgressRows as $i => $row)
-                                                            @php $row = is_array($row) ? $row : []; @endphp
-                                                            <tr>
+                                                            @php
+                                                                $row = is_array($row) ? $row : [];
+                                                                $selectedActivityOutput = old("content.activity_progress.$i.activity_output", $row['activity_output'] ?? '');
+                                                                $offPlanActivity = old("content.activity_progress.$i.off_plan_activity", $row['off_plan_activity'] ?? '');
+                                                                $isLockedPlanActivity = $selectedActivityOutput !== '' && $selectedActivityOutput !== '__off_plan__';
+                                                            @endphp
+                                                            <tr @if($isLockedPlanActivity) data-activity-locked="1" @endif>
                                                                 <td class="text-center align-middle js-report-activity-row-no">{{ $i+1 }}</td>
-                                                                <td>
-                                                                    @php $selectedActivityOutput = old("content.activity_progress.$i.activity_output", $row['activity_output'] ?? ''); @endphp
-                                                                    <select class="form-select"
-                                                                        name="content[activity_progress][{{ $i }}][activity_output]"
-                                                                        data-off-plan-select="true"
-                                                                    >
-                                                                        <option value="">-- Select Activity --</option>
-                                                                        @foreach($planActivities as $planActivity)
-                                                                            <option value="{{ $planActivity['label'] }}" {{ $selectedActivityOutput === $planActivity['label'] ? 'selected' : '' }}>
-                                                                                {{ $planActivity['label'] }}
-                                                                            </option>
-                                                                        @endforeach
-                                                                        <option value="__off_plan__" {{ $selectedActivityOutput === '__off_plan__' ? 'selected' : '' }}>Other (Not on Plan)</option>
-                                                                        @if($selectedActivityOutput !== '' && $selectedActivityOutput !== '__off_plan__' && !collect($planActivities)->contains(fn($a) => ($a['label'] ?? '') === $selectedActivityOutput))
-                                                                            <option value="{{ $selectedActivityOutput }}" selected>{{ $selectedActivityOutput }}</option>
-                            @endif
-                                                                    </select>
-                                                                    @php
-                                                                        $offPlanActivity = old("content.activity_progress.$i.off_plan_activity", $row['off_plan_activity'] ?? '');
-                                                                        $showOffPlanActivity = $selectedActivityOutput === '__off_plan__';
-                                                                    @endphp
-                                                                    <div class="mt-2" data-off-plan-input-wrap="true" @if(!$showOffPlanActivity) style="display:none;" @endif>
-                                                                        <input
-                                                                            type="text"
-                                                                            class="form-control"
-                                                                            name="content[activity_progress][{{ $i }}][off_plan_activity]"
-                                                                            value="{{ $offPlanActivity }}"
-                                                                            placeholder="Describe off-plan activity"
-                                                                            @if($showOffPlanActivity) required @endif
-                                                                        >
-                                                                    </div>
+                                                                <td class="weekly-report-activity-col">
+                                                                    @include('documents.partials.weekly-report-activity-cell', [
+                                                                        'activityIndex' => $i,
+                                                                        'selectedActivityOutput' => $selectedActivityOutput,
+                                                                        'offPlanActivity' => $offPlanActivity,
+                                                                    ])
                                                                 </td>
                                                                 <td>
                                                                     <select class="form-select"
@@ -186,7 +166,9 @@
                                                                         placeholder="Next step">{{ old("content.activity_progress.$i.next_step", $row['next_step'] ?? '') }}</textarea>
                                                                 </td>
                                                                 <td class="text-center align-middle">
-                                                                    <button type="button" class="btn btn-sm btn-outline-danger remove-report-activity-row">&times;</button>
+                                                                    @unless($isLockedPlanActivity)
+                                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-report-activity-row">&times;</button>
+                                                                    @endunless
                                                                 </td>
                                                             </tr>
                                                         @endforeach
