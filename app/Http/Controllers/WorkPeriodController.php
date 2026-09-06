@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WeeklyPlan;
+use App\Models\WeeklyReport;
 use App\Models\WorkPeriod;
 use App\Services\WeeklyGracePeriodNotificationDispatcher;
 use Carbon\Carbon;
@@ -360,13 +361,8 @@ class WorkPeriodController extends Controller
                 ->where('status', WorkPeriod::STATUS_CLOSED)
                 ->update(['status' => WorkPeriod::STATUS_OPEN]);
 
-            $weeklyPlanDocumentIds = Document::query()
+            $updatedWeeklyPlans = WeeklyPlan::query()
                 ->whereIn('period_id', $selectedPeriodIds)
-                ->where('type', Document::TYPE_WEEKLY_PLAN)
-                ->pluck('id');
-
-            $updatedWeeklyPlans = Document::query()
-                ->whereIn('id', $weeklyPlanDocumentIds)
                 ->update([
                     'state' => Document::STATE_DRAFT,
                     'review_rejection_reason' => null,
@@ -377,21 +373,8 @@ class WorkPeriodController extends Controller
                     'budget_review_note' => null,
                 ]);
 
-            WeeklyPlan::query()
-                ->whereIn('id', $weeklyPlanDocumentIds)
-                ->update([
-                    'state' => Document::STATE_DRAFT,
-                    'review_rejection_reason' => null,
-                    'budget_review_status' => null,
-                    'budget_reviewed_by' => null,
-                    'budget_reviewed_at' => null,
-                    'budget_provided_amount' => null,
-                    'budget_review_note' => null,
-                ]);
-
-            $updatedWeeklyReports = Document::query()
+            $updatedWeeklyReports = WeeklyReport::query()
                 ->whereIn('period_id', $selectedPeriodIds)
-                ->where('type', Document::TYPE_WEEKLY_REPORT)
                 ->update([
                     'state' => Document::STATE_DRAFT,
                     'review_rejection_reason' => null,

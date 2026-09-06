@@ -177,15 +177,13 @@ class DashboardController extends Controller
         $myMonthlyRequestsByKey = FinanceRequest::query()
             ->where('user_id', Auth::user()->id)
             ->whereDate('created_at', '>=', Carbon::now()->subMonths(5)->startOfMonth())
-            ->selectRaw('YEAR(created_at) as y, MONTH(created_at) as m, COUNT(*) as total')
-            ->groupBy('y', 'm')
-            ->get()
-            ->keyBy(fn ($row) => $row->y.'-'.$row->m);
+            ->get(['created_at'])
+            ->countBy(fn ($row) => $row->created_at->year.'-'.$row->created_at->month);
         for ($i = 5; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
             $myMonthLabels[] = $date->format('M Y');
             $key = $date->year.'-'.$date->month;
-            $myMonthlyRequests[] = (int) ($myMonthlyRequestsByKey->get($key)->total ?? 0);
+            $myMonthlyRequests[] = (int) ($myMonthlyRequestsByKey->get($key) ?? 0);
         }
 
         // My recent requests (last 10)
@@ -257,15 +255,9 @@ class DashboardController extends Controller
                 ->when(
                     $timelinePeriodIds === [],
                     fn ($query) => $query->whereRaw('1 = 0'),
-                    fn ($query) => $query->whereRaw(
-                        'BINARY period_id IN ('.implode(', ', array_fill(0, count($timelinePeriodIds), 'BINARY ?')).')',
-                        $timelinePeriodIds
-                    )
+                    fn ($query) => $query->whereIn('period_id', $timelinePeriodIds)
                 )
-                ->whereRaw(
-                    'BINARY type IN ('.implode(', ', array_fill(0, count($timelineDocumentTypes), 'BINARY ?')).')',
-                    $timelineDocumentTypes
-                )
+                ->whereIn('type', $timelineDocumentTypes)
                 ->get()
                 ->groupBy(fn ($doc) => $doc->period_id.'-'.$doc->type);
 
@@ -311,9 +303,9 @@ class DashboardController extends Controller
         $recentPeriodIds = $this->workPeriodService->latestReminderPeriodIds(2);
 
         $sharedWithMeCount = Document::query()
-            ->whereRaw('BINARY type IN (BINARY ?, BINARY ?)', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
+            ->whereIn('type', [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])
             ->forOwnerSharedOrPlanCollaboratorOnWeeklyReport($user->id)
-            ->whereRaw('BINARY user_id <> BINARY ?', [(string) $user->id])
+            ->where('user_id', '<>', (string) $user->id)
             ->when(
                 $recentPeriodIds === [],
                 fn ($query) => $query->whereRaw('1 = 0'),

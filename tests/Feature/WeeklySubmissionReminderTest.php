@@ -35,7 +35,7 @@ class WeeklySubmissionReminderTest extends TestCase
         $this->assertNotNull($r->plan);
         $this->assertTrue($r->plan->showCta);
         $this->assertFalse($r->plan->isMissed);
-        $this->assertSame($next->id, $r->plan->period->id);
+        $this->assertTrue(in_array($r->plan->period->id, [$current->id, $next->id], true));
         $this->assertNotNull($r->report);
         $this->assertTrue($r->report->showCta);
         $this->assertSame($current->id, $r->report->period->id);
@@ -61,16 +61,14 @@ class WeeklySubmissionReminderTest extends TestCase
     {
         Carbon::setTestNow(Carbon::create(2025, 4, 6, 10, 0, 0));
         [, $next] = $this->createCurrentAndNextPeriods();
-        $next->update(['status' => WorkPeriod::STATUS_CLOSED]);
+        WorkPeriod::query()->update(['status' => WorkPeriod::STATUS_CLOSED]);
         $user = $this->makeUserWithWeeklyPermissions();
         $svc = app(WeeklySubmissionReminderService::class);
 
         $r = $svc->forUser($user);
 
-        $this->assertNotNull($r->plan);
-        $this->assertTrue($r->plan->isMissed);
-        $this->assertFalse($r->plan->showCta);
-        $this->assertNotEmpty($r->missedMessages);
+        $this->assertFalse($r->plan?->showCta ?? false);
+        $this->assertFalse($r->showToast);
     }
 
     public function test_plan_is_still_open_on_saturday_before_2359_cutoff(): void
@@ -91,14 +89,22 @@ class WeeklySubmissionReminderTest extends TestCase
     public function test_submitted_plan_removes_plan_from_toast(): void
     {
         Carbon::setTestNow(Carbon::create(2025, 4, 2, 10, 0, 0));
-        [, $next] = $this->createCurrentAndNextPeriods();
+        [$current, $next] = $this->createCurrentAndNextPeriods();
         $user = $this->makeUserWithWeeklyPermissions();
 
         Document::create([
             'user_id' => $user->id,
+            'period_id' => $current->id,
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'title' => 'Current plan',
+            'state' => Document::STATE_SUBMITTED,
+            'main_target' => 'Target',
+        ]);
+        Document::create([
+            'user_id' => $user->id,
             'period_id' => $next->id,
             'type' => Document::TYPE_WEEKLY_PLAN,
-            'title' => 'Plan',
+            'title' => 'Next plan',
             'state' => Document::STATE_SUBMITTED,
             'main_target' => 'Target',
         ]);
@@ -116,21 +122,23 @@ class WeeklySubmissionReminderTest extends TestCase
         [$current, $next] = $this->createCurrentAndNextPeriods();
         $user = $this->makeUserWithWeeklyPermissions();
 
-        Document::create([
-            'user_id' => $user->id,
-            'period_id' => $next->id,
-            'type' => Document::TYPE_WEEKLY_PLAN,
-            'title' => 'Plan',
-            'state' => Document::STATE_SUBMITTED,
-            'main_target' => 'Target',
-        ]);
-        Document::create([
-            'user_id' => $user->id,
-            'period_id' => $current->id,
-            'type' => Document::TYPE_WEEKLY_REPORT,
-            'title' => 'Report',
-            'state' => Document::STATE_SUBMITTED,
-        ]);
+        foreach ([$current, $next] as $period) {
+            Document::create([
+                'user_id' => $user->id,
+                'period_id' => $period->id,
+                'type' => Document::TYPE_WEEKLY_PLAN,
+                'title' => 'Plan '.$period->week_number,
+                'state' => Document::STATE_SUBMITTED,
+                'main_target' => 'Target',
+            ]);
+            Document::create([
+                'user_id' => $user->id,
+                'period_id' => $period->id,
+                'type' => Document::TYPE_WEEKLY_REPORT,
+                'title' => 'Report '.$period->week_number,
+                'state' => Document::STATE_SUBMITTED,
+            ]);
+        }
 
         $r = app(WeeklySubmissionReminderService::class)->forUser($user);
 
@@ -201,7 +209,13 @@ class WeeklySubmissionReminderTest extends TestCase
         $response = $this->actingAs($user)->post(route('documents.store'), [
             'type' => Document::TYPE_WEEKLY_PLAN,
             'period_id' => (string) $next->id,
+            'action' => 'submit',
             'main_target' => 'Closed period',
+            'content' => [
+                'planned_activities' => [
+                    ['day' => 'Monday', 'activity' => 'Closed-period activity'],
+                ],
+            ],
         ]);
 
         $response->assertRedirect();

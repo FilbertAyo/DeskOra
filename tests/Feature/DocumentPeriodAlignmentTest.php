@@ -69,16 +69,22 @@ class DocumentPeriodAlignmentTest extends TestCase
             'week_end_date' => '2025-03-30',
             'plan_deadline' => '2025-03-28',
             'report_deadline' => '2025-03-29',
-            'status' => WorkPeriod::STATUS_OPEN,
+            'status' => WorkPeriod::STATUS_CLOSED,
         ]);
 
         $response = $this->actingAs($user)->post(route('documents.store'), [
             'type' => Document::TYPE_WEEKLY_PLAN,
             'period_id' => $closedWindowPeriod->id,
+            'action' => 'submit',
             'main_target' => 'Late plan',
+            'content' => [
+                'planned_activities' => [
+                    ['day' => 'Monday', 'activity' => 'Closed-period activity'],
+                ],
+            ],
         ]);
 
-        $response->assertSessionHas('error', 'The selected weekly plan window is closed.');
+        $response->assertSessionHas('error', 'The selected weekly plan work period is closed.');
         $this->assertDatabaseMissing('documents', [
             'user_id' => $user->id,
             'type' => Document::TYPE_WEEKLY_PLAN,
@@ -97,20 +103,28 @@ class DocumentPeriodAlignmentTest extends TestCase
             'week_end_date' => '2025-03-30',
             'plan_deadline' => '2025-03-28',
             'report_deadline' => '2025-03-29',
-            'status' => WorkPeriod::STATUS_OPEN,
+            'status' => WorkPeriod::STATUS_CLOSED,
         ]);
 
-        $response = $this->actingAs($user)->post(route('documents.store'), [
-            'type' => Document::TYPE_WEEKLY_REPORT,
-            'period_id' => $closedWindowPeriod->id,
-        ]);
-
-        $response->assertSessionHas('error', 'The selected weekly report window is closed.');
-        $this->assertDatabaseMissing('documents', [
+        $document = Document::create([
             'user_id' => $user->id,
-            'type' => Document::TYPE_WEEKLY_REPORT,
             'period_id' => $closedWindowPeriod->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Late report',
+            'state' => Document::STATE_DRAFT,
         ]);
+
+        $this->assertFalse(
+            app(\App\Services\WeeklySubmissionReminderService::class)->allowsSubmitWeeklyDocument($document->fresh())
+        );
+
+        $this->actingAs($user)->put(route('documents.update', $document), [
+            'action' => 'submit',
+            'wizard_review' => '1',
+            'target_accomplished_status' => 'completed',
+        ]);
+
+        $this->assertSame(Document::STATE_DRAFT, $document->fresh()->state);
     }
 
     public function test_weekly_plan_targets_next_week_when_valid_period_selected(): void

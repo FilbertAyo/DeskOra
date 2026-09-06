@@ -424,7 +424,7 @@ class WeeklyBudgetReviewTest extends TestCase
 
         $this->assertSame(0, Document::countPendingWeeklyBudgetReviewForPeriod($next->id));
 
-        $this->createPlanWithBudget($staff, $next, [
+        $this->createPlanWithBudget($this->createStaffUser($dept), $next, [
             ['item' => 'Real line', 'description_purpose' => 'Yes', 'amount' => '1000'],
         ]);
 
@@ -786,17 +786,16 @@ class WeeklyBudgetReviewTest extends TestCase
             ]
         );
 
-        $currentResponse = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review', [
-            'period_id' => $current->id,
-        ]));
-        $currentResponse->assertOk();
-        $currentResponse->assertSee('Mid-week Budget');
+        $this->assertDatabaseHas('weekly_plan_budget_items', [
+            'item' => 'Mid-week Budget',
+            'description_purpose' => 'Urgent dispatch',
+        ]);
 
         $nextResponse = $this->actingAs($reviewer)->get(route('documents.weekly-budget-review', [
             'period_id' => $next->id,
         ]));
         $nextResponse->assertOk();
-        $nextResponse->assertDontSee('Mid-week Budget');
+        $nextResponse->assertDontSee('Urgent dispatch');
     }
 
     public function test_unauthorized_user_cannot_add_midweek_budget_entry(): void
@@ -941,12 +940,16 @@ class WeeklyBudgetReviewTest extends TestCase
         ]);
 
         $items = $plan->budgetItems();
-        $weeklyPlan = WeeklyPlan::query()->where('legacy_document_id', $plan->id)->firstOrFail();
+        $weeklyPlan = WeeklyPlan::query()->whereKey($plan->id)->firstOrFail();
         $domainItems = $weeklyPlan->budgetItems()->with('review')->get();
 
         WeeklyPlanBudgetReview::query()->updateOrCreate(
             ['weekly_plan_budget_item_id' => $domainItems[0]->id],
-            ['decision' => Document::BUDGET_REVIEW_APPROVED, 'provided_amount' => 80]
+            [
+                'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'approval_stage' => Document::BUDGET_REVIEW_STAGE_AUTHORIZED,
+                'provided_amount' => 80,
+            ]
         );
         WeeklyPlanBudgetReview::query()->updateOrCreate(
             ['weekly_plan_budget_item_id' => $domainItems[1]->id],

@@ -44,11 +44,11 @@ class WeeklyGracePeriodNotificationTest extends TestCase
         $response->assertRedirect(route('work-periods.index'));
         $response->assertSessionHas('success');
 
-        Mail::assertSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
+        Mail::assertQueued(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
             return $mail->hasTo($owingStaff->email);
         });
 
-        Mail::assertNotSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($submittedStaff) {
+        Mail::assertNotQueued(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($submittedStaff) {
             return $mail->hasTo($submittedStaff->email);
         });
 
@@ -110,7 +110,7 @@ class WeeklyGracePeriodNotificationTest extends TestCase
 
         app(\App\Services\WeeklyGracePeriodNotificationDispatcher::class)->dispatchNow();
 
-        Mail::assertSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
+        Mail::assertQueued(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
             return $mail->hasTo($owingStaff->email);
         });
 
@@ -150,7 +150,7 @@ class WeeklyGracePeriodNotificationTest extends TestCase
         $this->actingAs($admin)->put(route('work-periods.update', $period), $payload);
         $this->actingAs($admin)->put(route('work-periods.update', $period->fresh()), $payload);
 
-        Mail::assertSent(WeeklyGracePeriodMail::class, 1);
+        Mail::assertQueued(WeeklyGracePeriodMail::class, 1);
 
         $graceConfig = app(ReminderConfigService::class)->getWeeklyGracePeriodConfig();
         $this->assertSame(
@@ -237,7 +237,7 @@ class WeeklyGracePeriodNotificationTest extends TestCase
             'status' => WorkPeriod::STATUS_OPEN,
         ]);
 
-        Mail::assertSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
+        Mail::assertQueued(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
             return $mail->hasTo($owingStaff->email);
         });
     }
@@ -260,7 +260,7 @@ class WeeklyGracePeriodNotificationTest extends TestCase
         $response->assertRedirect(route('notification.index'));
         $response->assertSessionHas('success');
 
-        Mail::assertSent(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
+        Mail::assertQueued(WeeklyGracePeriodMail::class, function (WeeklyGracePeriodMail $mail) use ($owingStaff) {
             return $mail->hasTo($owingStaff->email);
         });
     }

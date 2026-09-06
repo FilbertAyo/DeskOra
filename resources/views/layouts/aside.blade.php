@@ -17,7 +17,7 @@
                 </li>
 
                 @php
-                    $canReviewSubmissions = Auth::user()->hasPermissionTo('approve documents');
+                    $canReviewSubmissions = Auth::user()->can('approve documents');
                     $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');
                     $canSeeManagement = $canReviewSubmissions
                         || Auth::user()->can('manage anonymous feedback')

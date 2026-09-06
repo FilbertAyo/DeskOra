@@ -155,7 +155,7 @@ class WeeklyReminderAutomationTest extends TestCase
         $this->assertTrue($result['due']);
         $this->assertSame(1, $result['sent']);
 
-        Mail::assertSent(WeeklySubmissionReminderMail::class, 1);
+        Mail::assertQueued(WeeklySubmissionReminderMail::class, 1);
         $this->assertCount(1, $staff->notifications);
         $this->assertSame(Document::TYPE_WEEKLY_REPORT, $staff->notifications()->latest()->first()->data['activity_type']);
     }

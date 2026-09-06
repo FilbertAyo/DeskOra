@@ -60,8 +60,7 @@ class WorkflowEmailNotificationTest extends TestCase
             'content' => ['summary' => 'Draft summary'],
         ]);
 
-        $this->actingAs($owner)->post(route('documents.submit', $document))
-            ->assertRedirect();
+        $this->submitWeeklyReport($owner, $document);
 
         Notification::assertSentTo($approverEmail, WeeklyDocumentSubmittedNotification::class);
         Notification::assertSentTo($approverBoth, WeeklyDocumentSubmittedNotification::class);
@@ -254,8 +253,7 @@ class WorkflowEmailNotificationTest extends TestCase
             'content' => ['summary' => 'Draft summary'],
         ]);
 
-        $this->actingAs($owner)->post(route('documents.submit', $document))
-            ->assertRedirect();
+        $this->submitWeeklyReport($owner, $document);
 
         Notification::assertSentTo($ceo, WeeklyDocumentSubmittedNotification::class);
     }
@@ -333,12 +331,14 @@ class WorkflowEmailNotificationTest extends TestCase
         ]);
 
         $response->assertRedirect(route('work-periods.index'));
-        $this->assertDatabaseHas('work_periods', [
-            'year' => $nextWeekStart->isoWeekYear(),
-            'week_number' => $nextWeekStart->isoWeek(),
-            'week_start_date' => $nextWeekStart->format('Y-m-d'),
-            'status' => WorkPeriod::STATUS_OPEN,
-        ]);
+        $this->assertTrue(
+            WorkPeriod::query()
+                ->where('year', $nextWeekStart->isoWeekYear())
+                ->where('week_number', $nextWeekStart->isoWeek())
+                ->where('status', WorkPeriod::STATUS_OPEN)
+                ->whereDate('week_start_date', $nextWeekStart->toDateString())
+                ->exists()
+        );
 
         Notification::assertNothingSent();
     }
@@ -361,8 +361,7 @@ class WorkflowEmailNotificationTest extends TestCase
             'content' => ['summary' => 'Draft summary'],
         ]);
 
-        $this->actingAs($staff)->post(route('documents.submit', $document))
-            ->assertRedirect();
+        $this->submitWeeklyReport($staff, $document);
 
         Notification::assertSentTo($head, WeeklyDocumentDepartmentHeadNotification::class);
     }
@@ -516,5 +515,14 @@ class WorkflowEmailNotificationTest extends TestCase
         ]);
 
         return [$department, $head, $staff];
+    }
+
+    private function submitWeeklyReport(User $user, Document $document): void
+    {
+        $this->actingAs($user)->put(route('documents.update', $document), [
+            'action' => 'submit',
+            'wizard_review' => '1',
+            'target_accomplished_status' => 'completed',
+        ])->assertRedirect();
     }
 }

@@ -25,6 +25,6 @@ return new class extends Migration
             return;
         }
 
-        DB::statement('DROP VIEW IF EXISTS documents');
+        DocumentsUnionView::dropIfExists();
     }
 };

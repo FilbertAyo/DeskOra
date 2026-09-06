@@ -4,6 +4,7 @@ namespace App\Services\Documents;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WorkPeriod;
 use App\Services\WorkPeriodService;
@@ -22,23 +23,13 @@ class WeeklyBudgetReviewService
 
     public function countPendingForPeriod(?string $periodId = null): int
     {
-        if (! Schema::hasTable('documents')) {
+        if (! Schema::hasTable('weekly_plans') || ! Schema::hasTable('weekly_plan_budget_items')) {
             return 0;
         }
 
-        $query = Document::query()
-            ->select(['id', 'content', 'budget_review_status', 'type', 'state', 'period_id'])
-            ->weeklyPlans()
-            ->submitted()
-            ->where(function ($budgetQuery) {
-                $budgetQuery
-                    ->whereHas('weeklyPlanDomain.budgetItems')
-                    ->orWhere(function ($legacyQuery) {
-                        $legacyQuery
-                            ->whereNotNull('budget_review_status')
-                            ->orWhere('content', 'like', '%"budget"%');
-                    });
-            })
+        $query = WeeklyPlan::query()
+            ->with('budgetItems')
+            ->where('state', WeeklyPlan::STATE_SUBMITTED)
             ->where(function ($statusQuery) {
                 $statusQuery
                     ->whereNull('budget_review_status')
@@ -46,10 +37,18 @@ class WeeklyBudgetReviewService
             });
 
         if ($periodId !== null && $periodId !== '') {
-            $query->forPeriod($periodId);
+            $query->where('period_id', $periodId);
         }
 
-        return $query->get()->filter(fn (Document $document) => $document->hasBudgetItems())->count();
+        return $query->get()
+            ->filter(function (WeeklyPlan $plan): bool {
+                return $plan->budgetItems->contains(function (WeeklyPlanBudgetItem $item): bool {
+                    return trim((string) $item->item) !== ''
+                        || trim((string) $item->description_purpose) !== ''
+                        || trim((string) ($item->amount_raw ?? $item->amount ?? '')) !== '';
+                });
+            })
+            ->count();
     }
 
     /**

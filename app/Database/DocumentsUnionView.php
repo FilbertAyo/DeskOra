@@ -19,25 +19,22 @@ class DocumentsUnionView
 
     public static function exists(): bool
     {
-        if (Schema::hasTable('documents')) {
-            return true;
-        }
-
-        if (DB::connection()->getDriverName() !== 'mysql') {
-            return false;
-        }
-
-        $result = DB::select(
-            'SELECT COUNT(*) AS aggregate FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = ?',
-            ['documents']
-        );
-
-        return ((int) ($result[0]->aggregate ?? 0)) > 0;
+        return self::isView();
     }
 
     public static function isView(): bool
     {
-        if (DB::connection()->getDriverName() !== 'mysql') {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $result = DB::select(
+                "SELECT type FROM sqlite_master WHERE name = 'documents' LIMIT 1"
+            );
+
+            return ($result[0]->type ?? null) === 'view';
+        }
+
+        if ($driver !== 'mysql') {
             return false;
         }
 
@@ -51,7 +48,12 @@ class DocumentsUnionView
 
     public static function dropIfExists(): void
     {
-        DB::statement('DROP VIEW IF EXISTS documents');
+        if (self::isView()) {
+            DB::statement('DROP VIEW IF EXISTS documents');
+
+            return;
+        }
+
         Schema::dropIfExists('documents');
     }
 
@@ -103,13 +105,15 @@ class DocumentsUnionView
 
     public static function recreate(bool $withUnicodeCollation = true): void
     {
-        DB::statement('DROP VIEW IF EXISTS documents');
+        self::dropIfExists();
 
-        if ($withUnicodeCollation) {
+        if ($withUnicodeCollation && DB::connection()->getDriverName() === 'mysql') {
             DB::statement(self::createViewSqlWithCollation());
-        } else {
-            DB::statement(self::createViewSql());
+
+            return;
         }
+
+        DB::statement(self::createViewSql());
     }
 
     public static function createViewSqlWithCollation(): string

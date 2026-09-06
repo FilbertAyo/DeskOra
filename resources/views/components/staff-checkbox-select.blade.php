@@ -15,7 +15,8 @@
     $selectedIds = is_array($selected) ? array_map('strval', $selected) : [];
     $groupId = $id ?? 'staff-cb-' . substr(md5($name . '-' . collect($users)->count()), 0, 12);
     $errorBagKey = $errorKey ?? ($name !== '' ? rtrim(str_replace('[]', '', $name), ']') : null);
-    $hasError = filled($errorBagKey) && $errors->has($errorBagKey);
+    $errorBag = $errors ?? new \Illuminate\Support\ViewErrorBag;
+    $hasError = filled($errorBagKey) && $errorBag->has($errorBagKey);
     $usersPayload = collect($users)->map(fn ($user) => ['id' => (string) $user->id, 'name' => $user->name])->values();
     $selectedNames = $usersPayload
         ->filter(fn ($user) => in_array((string) $user['id'], $selectedIds, true))

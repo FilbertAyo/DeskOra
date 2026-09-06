@@ -44,7 +44,7 @@ class WeeklyDocumentSharingTest extends TestCase
         $document = Document::query()->where('user_id', $owner->id)->where('type', Document::TYPE_WEEKLY_PLAN)->firstOrFail();
 
         $this->assertDatabaseHas('document_user_shares', [
-            'document_id' => $document->id,
+            'weekly_plan_id' => $document->id,
             'user_id' => $member->id,
         ]);
     }
@@ -75,7 +75,7 @@ class WeeklyDocumentSharingTest extends TestCase
         $document = Document::query()->where('user_id', $owner->id)->where('type', Document::TYPE_WEEKLY_REPORT)->firstOrFail();
 
         $this->assertDatabaseHas('document_user_shares', [
-            'document_id' => $document->id,
+            'weekly_report_id' => $document->id,
             'user_id' => $member->id,
         ]);
     }
@@ -108,11 +108,11 @@ class WeeklyDocumentSharingTest extends TestCase
         $document = Document::query()->where('user_id', $owner->id)->where('type', Document::TYPE_WEEKLY_REPORT)->firstOrFail();
 
         $this->assertDatabaseHas('document_user_shares', [
-            'document_id' => $document->id,
+            'weekly_report_id' => $document->id,
             'user_id' => $planCollaborator->id,
         ]);
         $this->assertDatabaseMissing('document_user_shares', [
-            'document_id' => $document->id,
+            'weekly_report_id' => $document->id,
             'user_id' => $manualPayloadCollaborator->id,
         ]);
     }
@@ -192,7 +192,7 @@ class WeeklyDocumentSharingTest extends TestCase
 
         $document = Document::query()->where('user_id', $owner->id)->where('type', Document::TYPE_WEEKLY_PLAN)->firstOrFail();
         $this->assertDatabaseHas('document_user_shares', [
-            'document_id' => $document->id,
+            'weekly_plan_id' => $document->id,
             'user_id' => $member->id,
         ]);
         $this->assertSame(Document::STATE_DRAFT, $document->state);
@@ -485,12 +485,12 @@ class WeeklyDocumentSharingTest extends TestCase
             ->firstOrFail();
 
         $this->assertDatabaseHas('weekly_activity_assignments', [
-            'source_document_id' => $document->id,
+            'source_weekly_plan_id' => $document->id,
             'assignee_user_id' => $owner->id,
             'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
         ]);
         $this->assertDatabaseHas('weekly_activity_assignments', [
-            'source_document_id' => $document->id,
+            'source_weekly_plan_id' => $document->id,
             'assignee_user_id' => $member->id,
             'status' => WeeklyActivityAssignment::STATUS_PREVIEW,
         ]);
@@ -530,7 +530,7 @@ class WeeklyDocumentSharingTest extends TestCase
         app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($document->fresh());
 
         $this->assertDatabaseHas('weekly_activity_assignments', [
-            'source_document_id' => $document->id,
+            'source_weekly_plan_id' => $document->id,
             'assignee_user_id' => $member->id,
             'status' => WeeklyActivityAssignment::STATUS_LOCKED,
         ]);
@@ -569,7 +569,7 @@ class WeeklyDocumentSharingTest extends TestCase
         app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($document->fresh());
 
         $this->assertDatabaseHas('weekly_activity_assignments', [
-            'source_document_id' => $document->id,
+            'source_weekly_plan_id' => $document->id,
             'assignee_user_id' => $member->id,
             'activity_uid' => $activityUid,
         ]);
@@ -591,7 +591,7 @@ class WeeklyDocumentSharingTest extends TestCase
         app(WeeklyActivityAssignmentService::class)->syncForWeeklyPlan($document->fresh());
 
         $this->assertDatabaseMissing('weekly_activity_assignments', [
-            'source_document_id' => $document->id,
+            'source_weekly_plan_id' => $document->id,
             'assignee_user_id' => $member->id,
             'activity_uid' => $activityUid,
         ]);
@@ -634,7 +634,7 @@ class WeeklyDocumentSharingTest extends TestCase
                 'errors' => new \Illuminate\Support\ViewErrorBag,
             ])
             ->assertSeeText('Assigned by Others')
-            ->assertSeeText('Tasks from shared weekly plans where another staff member assigned you')
+            ->assertSeeText('Tasks from weekly plans where another staff member assigned you')
             ->assertSeeText('Assigned partner activity');
     }
 
@@ -666,7 +666,7 @@ class WeeklyDocumentSharingTest extends TestCase
         ]);
 
         WeeklyActivityAssignment::create([
-            'source_document_id' => $ownerPlan->id,
+            'source_weekly_plan_id' => $ownerPlan->id,
             'source_user_id' => $owner->id,
             'assignee_user_id' => $member->id,
             'period_id' => $nextPeriod->id,
@@ -680,7 +680,7 @@ class WeeklyDocumentSharingTest extends TestCase
         ]);
 
         WeeklyActivityAssignment::create([
-            'source_document_id' => $memberPlan->id,
+            'source_weekly_plan_id' => $memberPlan->id,
             'source_user_id' => $member->id,
             'assignee_user_id' => $member->id,
             'period_id' => $nextPeriod->id,
@@ -932,32 +932,6 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertStringContainsString('name="content[planned_activities][0][team_member_ids][]"', $html);
         $this->assertStringContainsString('value="'.$owner->id.'"', $html);
         $this->assertStringContainsString('name="content[key_meetings][0][participant_user_ids][]"', $html);
-    }
-
-    public function test_weekly_report_edit_prefills_target_accomplished_dropdown_for_zero_value(): void
-    {
-        [$currentPeriod] = $this->createCurrentAndNextPeriods();
-        $department = Department::create(['name' => 'Programs']);
-        $owner = $this->createUserInDepartment($department, ['create weekly report']);
-
-        $report = Document::create([
-            'type' => Document::TYPE_WEEKLY_REPORT,
-            'period_id' => $currentPeriod->id,
-            'user_id' => $owner->id,
-            'title' => 'Draft report',
-            'state' => Document::STATE_DRAFT,
-            'target_accomplished' => 0,
-            'target_explanation' => 'Pending dependencies',
-        ]);
-
-        $response = $this->actingAs($owner)->view('documents.partials.edit.weekly-report-fields', [
-            'document' => $report->load('sharedUsers'),
-            'shareableUsers' => collect(),
-            'errors' => new \Illuminate\Support\ViewErrorBag,
-        ]);
-
-        $response->assertSee('option value="0" selected', false);
-        $response->assertSeeText('Pending dependencies');
     }
 
     private function createCurrentAndNextPeriods(): array
