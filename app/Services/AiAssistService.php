@@ -8,9 +8,12 @@ use App\Models\User;
 use App\Models\WeeklyWorkLog;
 use App\Models\WorkPeriod;
 use App\Support\ActionLogTaskSupport;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use RuntimeException;
+use Throwable;
 
 class AiAssistService
 {
@@ -133,11 +136,13 @@ class AiAssistService
                 'message' => null,
                 'draft' => $parsed,
             ];
-        } catch (RuntimeException) {
+        } catch (Throwable $exception) {
+            Log::warning('AI weekly-report draft failed.', ['message' => $exception->getMessage()]);
+
             return [
-                'available' => false,
+                'available' => $this->isConfigured(),
                 'used_ai' => false,
-                'message' => 'AI currently unavailable. A basic draft was built from your logs and tasks.',
+                'message' => $this->userFacingAiFailure($exception, 'AI currently unavailable. A basic draft was built from your logs and tasks.'),
                 'draft' => $heuristic,
             ];
         }
@@ -174,7 +179,7 @@ class AiAssistService
             return [
                 'available' => false,
                 'used_ai' => false,
-                'message' => 'AI currently unavailable. Showing original tips.',
+                'message' => 'AI is not configured on this server yet. Add a free Groq API key to .env, then run php artisan config:clear.',
                 'tips' => $normalized,
             ];
         }
@@ -214,11 +219,13 @@ class AiAssistService
                 'message' => null,
                 'tips' => $polished,
             ];
-        } catch (RuntimeException) {
+        } catch (Throwable $exception) {
+            Log::warning('AI polish failed.', ['message' => $exception->getMessage()]);
+
             return [
-                'available' => false,
+                'available' => $this->isConfigured(),
                 'used_ai' => false,
-                'message' => 'AI currently unavailable. Showing original tips.',
+                'message' => $this->userFacingAiFailure($exception, 'AI currently unavailable. Showing original tips.'),
                 'tips' => $normalized,
             ];
         }
@@ -860,12 +867,20 @@ class AiAssistService
 
         $this->acquireAiSlot();
 
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer '.config('services.groq.api_key'),
-        ])
-            ->timeout((int) config('services.groq.timeout', 30))
-            ->post($url, $payload);
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer '.config('services.groq.api_key'),
+            ])
+                ->timeout((int) config('services.groq.timeout', 30))
+                ->post($url, $payload);
+        } catch (ConnectionException $exception) {
+            Log::warning('Groq connection failed.', ['message' => $exception->getMessage()]);
+
+            throw new RuntimeException(
+                'This server cannot reach Groq (api.groq.com). Ask hosting to allow outbound HTTPS, then try again.'
+            );
+        }
 
         if ($response->successful()) {
             $result = trim((string) $response->json('choices.0.message.content', ''));
@@ -995,6 +1010,21 @@ class AiAssistService
             }
 
             return 'AI free tier limit reached. Please wait about a minute and try again.';
+        }
+
+        return $message;
+    }
+
+    private function userFacingAiFailure(Throwable $exception, string $fallback): string
+    {
+        $message = trim($exception->getMessage());
+        if ($message === '') {
+            return $fallback;
+        }
+
+        $normalized = strtolower($message);
+        if (str_contains($normalized, 'sqlstate') || str_contains($normalized, 'stack trace')) {
+            return $fallback;
         }
 
         return $message;

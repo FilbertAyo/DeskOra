@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Services\AiAssistService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class AiAssistActionController extends Controller
 {
@@ -92,11 +93,15 @@ class AiAssistActionController extends Controller
                 'suggestion' => $suggestion,
                 'message' => null,
             ]);
-        } catch (RuntimeException $exception) {
+        } catch (Throwable $exception) {
+            Log::warning('AI rejection suggestion failed.', ['message' => $exception->getMessage()]);
+
             return response()->json([
                 'available' => false,
                 'suggestion' => null,
-                'message' => 'AI currently unavailable.',
+                'message' => $exception->getMessage() !== ''
+                    ? $exception->getMessage()
+                    : 'AI currently unavailable.',
             ]);
         }
     }

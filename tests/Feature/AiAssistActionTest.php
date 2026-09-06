@@ -193,6 +193,32 @@ class AiAssistActionTest extends TestCase
             ->assertJsonPath('tips.0', 'You missed 1 weekly report in July.');
     }
 
+    public function test_polish_performance_tips_returns_api_error_message(): void
+    {
+        config([
+            'services.groq.api_key' => 'gsk_test_key',
+            'services.groq.base_url' => 'https://api.groq.com/openai/v1',
+            'services.groq.model' => 'openai/gpt-oss-120b',
+        ]);
+
+        Http::fake([
+            'api.groq.com/*' => Http::response([
+                'error' => ['message' => 'Invalid API Key'],
+            ], 401),
+        ]);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $this->actingAs($user)
+            ->postJson(route('ai-assist.polish-performance-tips'), [
+                'tips' => ['Keep submitting weekly reports on time.'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('used_ai', false)
+            ->assertJsonPath('available', true)
+            ->assertJsonFragment(['message' => 'AI is not configured correctly. Set a valid GROQ_API_KEY (starts with gsk_) in .env, then run php artisan config:clear.']);
+    }
+
     public function test_draft_weekly_report_fills_activity_progress_from_work_logs(): void
     {
         config(['services.groq.api_key' => '']);
