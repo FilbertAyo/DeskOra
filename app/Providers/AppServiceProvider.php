@@ -10,6 +10,7 @@ use App\Models\WorkPeriod;
 use App\Services\RequestApprovalNavService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Support\ShortId;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
         Validator::extend('short_id', static function (string $attribute, mixed $value): bool {
             return is_string($value) && ShortId::is($value);
         });
+
+        Paginator::useBootstrapFive();
 
         $this->ensureDocumentsUnionView();
         $this->configureSessionAndUrl();

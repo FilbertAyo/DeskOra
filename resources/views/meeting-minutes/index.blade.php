@@ -135,7 +135,7 @@
                         </div>
 
                         <div class="mt-3">
-                            {{ $periods->links() }}
+                            {{ $periods->links('pagination::bootstrap-5') }}
                         </div>
                     @else
                         <div class="text-center py-5">

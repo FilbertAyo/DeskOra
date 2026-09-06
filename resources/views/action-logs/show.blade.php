@@ -130,7 +130,13 @@
             <div class="card shadow-none border mb-4">
                 <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0">{{ $document->display_title }}</h5>
-                    <small class="text-muted"><i class="ti ti-history me-1"></i>Click <strong>Progress</strong> on any task to see its full week-by-week history.</small>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <small class="text-muted d-inline-flex align-items-center gap-1">
+                            <span class="al-my-task-key" aria-hidden="true"></span>
+                            Vertical bar marks <strong>your</strong> tasks
+                        </small>
+                        <small class="text-muted"><i class="ti ti-history me-1"></i>Click <strong>Progress</strong> on any task to see its full week-by-week history.</small>
+                    </div>
                 </div>
                 <div class="card-body">
                     @php
@@ -152,6 +158,7 @@
                             ->all();
                         $allUserIds = collect(array_merge($responsibleIds, $historyUpdaterIds))->unique()->values()->all();
                         $responsibleNameMap = \App\Models\User::whereIn('id', $allUserIds)->pluck('name', 'id')->toArray();
+                        $viewerId = (string) auth()->id();
                     @endphp
 
                     @if(!empty($tasks))
@@ -174,14 +181,20 @@
                                         @php
                                             $row = is_array($row) ? $row : [];
                                             $ids = is_array($row['responsible_user_ids'] ?? null) ? array_map('strval', $row['responsible_user_ids']) : [];
+                                            $isMine = $viewerId !== '' && in_array($viewerId, $ids, true);
                                             $names = collect($ids)->map(fn($id) => $responsibleNameMap[$id] ?? null)->filter()->values()->all();
                                             $history = is_array($row['display_history'] ?? null) ? array_values(array_filter($row['display_history'], fn($entry) => is_array($entry))) : [];
                                             $timelineId = 'taskTimeline' . $loop->index;
                                             $displayNotes = array_key_exists('display_notes_progress', $row) ? (string) $row['display_notes_progress'] : (string) ($row['notes_progress'] ?? '');
                                             $displayProgress = array_key_exists('display_progress', $row) ? $row['display_progress'] : ($row['progress'] ?? 'Not Started');
                                         @endphp
-                                        <tr>
-                                            <td class="text-center fw-bold">{{ $row['task_no'] ?? $loop->iteration }}</td>
+                                        <tr @class(['al-my-task' => $isMine]) @if($isMine) data-assignee-self="1" @endif>
+                                            <td class="text-center fw-bold al-task-no">
+                                                @if($isMine)
+                                                    <span class="visually-hidden">Your task:</span>
+                                                @endif
+                                                {{ $row['task_no'] ?? $loop->iteration }}
+                                            </td>
                                             <td class="text-wrap">{{ $row['task'] ?? '' }}</td>
                                             <td class="text-muted small">
                                                 @if(!empty($names))
@@ -236,7 +249,7 @@
                                         </tr>
 
                                         @if(!empty($history))
-                                            <tr class="collapse bg-light" id="{{ $timelineId }}">
+                                            <tr class="collapse bg-light{{ $isMine ? ' al-my-task' : '' }}" id="{{ $timelineId }}">
                                                 <td colspan="8">
                                                     <div class="p-2">
                                                         <h6 class="mb-3 text-primary">
@@ -356,6 +369,35 @@
             border: 1px solid #e3e6ef;
             border-radius: 6px;
             padding: 8px 12px;
+        }
+        .al-my-task-key {
+            display: inline-block;
+            width: 4px;
+            height: 14px;
+            border-radius: 2px;
+            background: var(--bs-primary, #4680ff);
+        }
+        tr.al-my-task > td {
+            background-color: rgba(70, 128, 255, 0.06);
+        }
+        tr.al-my-task > td.al-task-no {
+            position: relative;
+        }
+        tr.al-my-task > td.al-task-no::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--bs-primary, #4680ff);
+            border-radius: 0 3px 3px 0;
+        }
+        .table-hover > tbody > tr.al-my-task:hover > td {
+            background-color: rgba(70, 128, 255, 0.12);
+        }
+        tr.al-my-task.collapse > td:first-child {
+            box-shadow: inset 4px 0 0 var(--bs-primary, #4680ff);
         }
     </style>
 </x-app-layout>

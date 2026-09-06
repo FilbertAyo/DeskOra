@@ -1671,4 +1671,43 @@ class ActionLogPanelCorrectionsTest extends TestCase
             'status' => WorkPeriod::STATUS_OPEN,
         ]);
     }
+
+    public function test_action_log_show_marks_authenticated_users_own_tasks(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        /** @var User $assignee */
+        $assignee = User::factory()->create(['name' => 'Amina Hassan', 'status' => 'active']);
+        /** @var User $other */
+        $other = User::factory()->create(['name' => 'Other Staff', 'status' => 'active']);
+        $period = $this->createOpenPeriod(2026, 20, '2026-05-11', '2026-05-17');
+
+        $document = Document::create([
+            'user_id' => $manager->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_ACTION_LOG,
+            'title' => 'Action Log - Week 20 of 2026',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [
+                'tasks' => [
+                    $this->taskRow('mine', 'Prepare field report', [(string) $assignee->id]),
+                    $this->taskRow('theirs', 'Review budget', [(string) $manager->id]),
+                ],
+            ],
+        ]);
+
+        $this->actingAs($assignee)
+            ->get(route('action-logs.show', $document))
+            ->assertOk()
+            ->assertSee('data-assignee-self="1"', false)
+            ->assertSee('Prepare field report')
+            ->assertSee('Your task:', false);
+
+        $html = $this->actingAs($other)
+            ->get(route('action-logs.show', $document))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString('data-assignee-self="1"', $html);
+    }
 }

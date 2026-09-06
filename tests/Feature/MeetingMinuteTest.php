@@ -265,6 +265,26 @@ class MeetingMinuteTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_index_uses_bootstrap_five_pagination(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create(['status' => 'active']);
+        $user->assignRole('staff');
+
+        for ($week = 1; $week <= 16; $week++) {
+            $start = now()->setISODate(2026, $week)->startOfWeek()->toDateString();
+            $end = now()->setISODate(2026, $week)->endOfWeek()->toDateString();
+            $this->createPeriod(2026, $week, $start, $end);
+        }
+
+        $this->actingAs($user)
+            ->get(route('meeting-minutes.index'))
+            ->assertOk()
+            ->assertSee('pagination', false)
+            ->assertSee('page-link', false)
+            ->assertDontSee('h-5 w-5', false);
+    }
+
     private function createPeriod(int $year, int $weekNumber, string $start, string $end): WorkPeriod
     {
         return WorkPeriod::create([
