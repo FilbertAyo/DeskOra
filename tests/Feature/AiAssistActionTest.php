@@ -118,6 +118,47 @@ class AiAssistActionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('available', true)
             ->assertJsonPath('suggestion', 'The requested amount exceeds the approved weekly budget. Please revise the quantity and resubmit.');
+
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return ($data['model'] ?? null) === 'openai/gpt-oss-120b'
+                && array_key_exists('max_completion_tokens', $data)
+                && ($data['reasoning_effort'] ?? null) === 'low';
+        });
+    }
+
+    public function test_retired_groq_model_is_mapped_to_replacement(): void
+    {
+        config([
+            'services.groq.api_key' => 'gsk_test_key',
+            'services.groq.base_url' => 'https://api.groq.com/openai/v1',
+            'services.groq.model' => 'llama-3.3-70b-versatile',
+        ]);
+
+        Http::fake([
+            'api.groq.com/*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => 'Please attach receipts and resubmit with the approved amount.',
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $this->actingAs($user)
+            ->postJson(route('ai-assist.suggest-rejection'), [
+                'context_type' => 'finance',
+                'title' => 'Laptop purchase',
+                'amount' => '3500000',
+                'outcome' => 'rejected',
+            ])
+            ->assertOk()
+            ->assertJsonPath('available', true);
+
+        Http::assertSent(fn ($request) => ($request->data()['model'] ?? null) === 'openai/gpt-oss-120b');
     }
 
     public function test_service_heuristic_draft_handles_empty_tasks(): void

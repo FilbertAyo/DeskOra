@@ -122,7 +122,7 @@ if [ "$GROQ_KEY_SET" != "yes" ]; then
   echo "WARNING: GROQ_API_KEY is empty in runtime config. AI Summary buttons will be hidden."
 else
   echo "    Groq API key: configured"
-  echo "    Groq model: ${GROQ_MODEL:-llama-3.3-70b-versatile}"
+  echo "    Groq model: ${GROQ_MODEL:-openai/gpt-oss-120b}"
   echo "    Summary cache: ${GROQ_CACHE_ENABLED:-yes}"
   echo "    Cache store: ${CACHE_STORE:-database}"
   echo "    Groq max requests/min: ${GROQ_RPM:-30}"

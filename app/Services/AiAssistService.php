@@ -14,6 +14,20 @@ use RuntimeException;
 
 class AiAssistService
 {
+    private const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+
+    /**
+     * Groq retired these public-tier IDs on 16 Aug 2026.
+     *
+     * @var array<string, string>
+     */
+    private const RETIRED_MODELS = [
+        'llama-3.3-70b-versatile' => 'openai/gpt-oss-120b',
+        'llama-3.3-70b-specdec' => 'openai/gpt-oss-120b',
+        'llama-3.1-8b-instant' => 'openai/gpt-oss-20b',
+        'llama-3.1-70b-versatile' => 'openai/gpt-oss-20b',
+    ];
+
     public function __construct(
         private ?PortalNavigationIntelligenceService $navigationIntelligence = null,
         private ?PortalAiContextResolver $contextResolver = null,
@@ -803,15 +817,32 @@ class AiAssistService
         return $text;
     }
 
+    private function resolveModel(): string
+    {
+        $model = trim((string) config('services.groq.model', self::DEFAULT_MODEL));
+
+        if ($model === '') {
+            return self::DEFAULT_MODEL;
+        }
+
+        return self::RETIRED_MODELS[$model] ?? $model;
+    }
+
+    private function modelSupportsReasoningEffort(string $model): bool
+    {
+        return str_starts_with($model, 'openai/gpt-oss-');
+    }
+
     private function generate(string $systemPrompt, string $userText, ?int $maxTokens = null, bool $formatAsSummary = false): string
     {
         if (! $this->isConfigured()) {
             throw new RuntimeException('AI is not configured. Add GROQ_API_KEY to your .env file.');
         }
 
-        $model = config('services.groq.model', 'llama-3.3-70b-versatile');
+        $model = $this->resolveModel();
         $baseUrl = rtrim((string) config('services.groq.base_url', 'https://api.groq.com/openai/v1'), '/');
         $url = $baseUrl.'/chat/completions';
+        $maxCompletionTokens = $maxTokens ?? (int) config('services.groq.max_tokens', 500);
 
         $payload = [
             'model' => $model,
@@ -820,8 +851,12 @@ class AiAssistService
                 ['role' => 'user', 'content' => $userText],
             ],
             'temperature' => 0.4,
-            'max_tokens' => $maxTokens ?? (int) config('services.groq.max_tokens', 500),
+            'max_completion_tokens' => $maxCompletionTokens,
         ];
+
+        if ($this->modelSupportsReasoningEffort($model)) {
+            $payload['reasoning_effort'] = (string) config('services.groq.reasoning_effort', 'low');
+        }
 
         $this->acquireAiSlot();
 
@@ -942,6 +977,10 @@ class AiAssistService
     private function friendlyApiError(int $status, string $message): string
     {
         $normalized = strtolower($message);
+
+        if (str_contains($normalized, 'does not exist') || str_contains($normalized, 'do not have access')) {
+            return 'The configured Groq model is no longer available. Set GROQ_MODEL=openai/gpt-oss-120b in .env, then run php artisan config:clear.';
+        }
 
         if (str_contains($normalized, 'invalid api key') || str_contains($normalized, 'invalid authentication')) {
             return 'AI is not configured correctly. Set a valid GROQ_API_KEY (starts with gsk_) in .env, then run php artisan config:clear.';

@@ -34,10 +34,11 @@ return [
     'groq' => [
         'api_key' => trim(trim((string) env('GROQ_API_KEY', '')), '"\''),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
-        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
+        'reasoning_effort' => env('GROQ_REASONING_EFFORT', 'low'),
         'max_tokens' => env('GROQ_MAX_TOKENS', 500),
         'summary_max_tokens' => env('GROQ_SUMMARY_MAX_TOKENS', 800),
-        'question_max_tokens' => env('GROQ_QUESTION_MAX_TOKENS', 400),
+        'question_max_tokens' => env('GROQ_QUESTION_MAX_TOKENS', 800),
         'timeout' => env('GROQ_TIMEOUT', 30),
         'summary_cache_enabled' => filter_var(env('GROQ_SUMMARY_CACHE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'summary_cache_seconds' => env('GROQ_SUMMARY_CACHE_SECONDS', 604800),
