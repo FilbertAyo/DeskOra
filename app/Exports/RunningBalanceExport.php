@@ -8,7 +8,9 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 class RunningBalanceExport implements FromArray, WithHeadings
 {
     protected $transactions;
+
     protected $department;
+
     protected $isFiltered;
 
     public function __construct($transactions, $department, $isFiltered)
@@ -31,7 +33,7 @@ class RunningBalanceExport implements FromArray, WithHeadings
                 'Running Balance' => $tx['remaining'],
             ];
 
-            if (!$this->isFiltered) {
+            if (! $this->isFiltered) {
                 $row = array_merge(
                     ['Name' => $tx['requested_by'] ?? '-', 'Deposit' => $tx['deposit'] ?? 0],
                     $row
@@ -46,7 +48,7 @@ class RunningBalanceExport implements FromArray, WithHeadings
     {
         $headings = ['Date', 'Deduction', 'Running Balance'];
 
-        if (!$this->isFiltered) {
+        if (! $this->isFiltered) {
             array_unshift($headings, 'Deposit');
             array_unshift($headings, 'Name');
         }

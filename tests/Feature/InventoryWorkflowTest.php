@@ -3,15 +3,15 @@
 namespace Tests\Feature;
 
 use App\Mail\InventoryAssignmentReportMail;
+use App\Models\Department;
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryDisposalRequest;
+use App\Models\InventoryLocation;
 use App\Models\InventoryMaintenanceRecord;
 use App\Models\InventoryReceipt;
 use App\Models\InventoryStockIssue;
 use App\Models\InventoryStockItem;
-use App\Models\InventoryLocation;
-use App\Models\Department;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;

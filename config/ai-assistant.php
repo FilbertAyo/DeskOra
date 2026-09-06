@@ -17,10 +17,10 @@ return [
     'suggested_questions' => [
         'What tasks are assigned to me this week?',
         'How do I submit a weekly plan?',
-    'How does staff requisition approval work?',
+        'How does staff requisition approval work?',
         'What year plan activities apply to my sub-department?',
         'How do I record impact in the weekly matrix?',
-       
+
     ],
 
     /*

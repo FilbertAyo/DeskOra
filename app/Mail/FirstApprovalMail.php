@@ -14,7 +14,9 @@ class FirstApprovalMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public $name;
+
     public $reason;
+
     public $id;
 
     public function __construct($name, $reason, $id)

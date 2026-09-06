@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\WorkPeriod;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class PeriodStatsController extends Controller
 {

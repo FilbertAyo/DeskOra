@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('petty_requests', function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->foreignUlid('request_id')->unique()->constrained('requests')->cascadeOnDelete();
-           $table->string('request_for')->nullable();
+            $table->string('request_for')->nullable();
             $table->decimal('amount', 10, 2)->default(0);
             $table->text('reason')->nullable();
             $table->boolean('is_transporter')->default(false);

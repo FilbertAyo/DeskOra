@@ -56,7 +56,7 @@ class CheckPendingReports extends Command
             // Default: Current week for weekly, current month for monthly
             $startDate = Carbon::now()->startOfWeek();
             $endDate = Carbon::now()->endOfWeek();
-            $periodLabel = "Current Week (" . $startDate->format('M d') . ' - ' . $endDate->format('M d, Y') . ')';
+            $periodLabel = 'Current Week ('.$startDate->format('M d').' - '.$endDate->format('M d, Y').')';
         }
 
         // For monthly reports, use month range
@@ -65,7 +65,7 @@ class CheckPendingReports extends Command
 
         $this->info("📅 Period: {$periodLabel}");
         $this->info("📆 Weekly Date Range: {$startDate->format('Y-m-d')} to {$endDate->format('Y-m-d')}");
-        if (!$week) {
+        if (! $week) {
             $this->info("📆 Monthly Date Range: {$monthStartDate->format('Y-m-d')} to {$monthEndDate->format('Y-m-d')}");
         }
         $this->newLine();
@@ -75,6 +75,7 @@ class CheckPendingReports extends Command
 
         if ($employees->isEmpty()) {
             $this->warn('⚠️  No active employees found.');
+
             return Command::SUCCESS;
         }
 
@@ -91,7 +92,7 @@ class CheckPendingReports extends Command
 
         foreach ($employees as $employee) {
             // Check Weekly Plan
-            if (!$type || $type === 'weekly_plan') {
+            if (! $type || $type === 'weekly_plan') {
                 $hasWeeklyPlan = $this->hasSubmittedDocument(
                     $employee,
                     Document::TYPE_WEEKLY_PLAN,
@@ -99,13 +100,13 @@ class CheckPendingReports extends Command
                     $endDate
                 );
 
-                if (!$hasWeeklyPlan) {
+                if (! $hasWeeklyPlan) {
                     $pendingWeeklyPlans[] = $employee;
                 }
             }
 
             // Check Weekly Report
-            if (!$type || $type === 'weekly_report') {
+            if (! $type || $type === 'weekly_report') {
                 $hasWeeklyReport = $this->hasSubmittedDocument(
                     $employee,
                     Document::TYPE_WEEKLY_REPORT,
@@ -113,13 +114,13 @@ class CheckPendingReports extends Command
                     $endDate
                 );
 
-                if (!$hasWeeklyReport) {
+                if (! $hasWeeklyReport) {
                     $pendingWeeklyReports[] = $employee;
                 }
             }
 
             // Check Monthly Report (always check current month for monthly reports)
-            if (!$type || $type === 'monthly_report') {
+            if (! $type || $type === 'monthly_report') {
                 $hasMonthlyReport = $this->hasSubmittedDocument(
                     $employee,
                     Document::TYPE_MONTHLY_REPORT,
@@ -127,7 +128,7 @@ class CheckPendingReports extends Command
                     $monthEndDate
                 );
 
-                if (!$hasMonthlyReport) {
+                if (! $hasMonthlyReport) {
                     $pendingMonthlyReports[] = $employee;
                 }
             }
@@ -140,22 +141,24 @@ class CheckPendingReports extends Command
 
         // Display results
         // Only show monthly reports if not filtering by specific week
-        if (!$week) {
+        if (! $week) {
             $this->displayResults('Monthly Reports', $pendingMonthlyReports, $verbose);
         }
-        
+
         $this->displayResults('Weekly Plans', $pendingWeeklyPlans, $verbose);
         $this->displayResults('Weekly Reports', $pendingWeeklyReports, $verbose);
 
         // Summary
         $this->newLine();
         $totalPending = count($pendingWeeklyPlans) + count($pendingWeeklyReports) + count($pendingMonthlyReports);
-        
+
         if ($totalPending > 0) {
             $this->warn("⚠️  Total: {$totalPending} pending document(s)");
+
             return Command::FAILURE;
         } else {
-            $this->info("✅ All employees have submitted their required documents!");
+            $this->info('✅ All employees have submitted their required documents!');
+
             return Command::SUCCESS;
         }
     }
@@ -179,11 +182,12 @@ class CheckPendingReports extends Command
     {
         if (empty($employees)) {
             $this->info("✅ {$type}: All employees submitted");
+
             return;
         }
 
         $this->warn("⚠️  {$type}: {$this->getCountText(count($employees))} pending");
-        
+
         if ($verbose || count($employees) <= 10) {
             $this->table(
                 ['#', 'Name', 'Email', 'Department'],
@@ -197,9 +201,9 @@ class CheckPendingReports extends Command
                 })->toArray()
             );
         } else {
-            $this->line("   " . collect($employees)->pluck('name')->implode(', '));
+            $this->line('   '.collect($employees)->pluck('name')->implode(', '));
         }
-        
+
         $this->newLine();
     }
 

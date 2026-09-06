@@ -12,12 +12,16 @@ use Illuminate\Queue\SerializesModels;
 class ResubmitMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
+
     public $name;
+
     public $reason;
+
     public $id;
+
     public function __construct($name, $reason, $id)
     {
-         $this->name = $name;
+        $this->name = $name;
         $this->reason = $reason;
         $this->id = $id;
     }
@@ -37,7 +41,7 @@ class ResubmitMail extends Mailable implements ShouldQueue
      */
     public function content(): Content
     {
-         return new Content(
+        return new Content(
             view: 'mail.resubmit',
             with: [
                 'name' => $this->name,

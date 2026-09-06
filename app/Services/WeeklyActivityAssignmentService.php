@@ -3,10 +3,9 @@
 namespace App\Services;
 
 use App\Models\Document;
-use App\Models\WeeklyPlan;
 use App\Models\WeeklyActivityAssignment;
+use App\Models\WeeklyPlan;
 use App\Services\Documents\DocumentContentAssembler;
-use App\Services\ShortIdGenerator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 

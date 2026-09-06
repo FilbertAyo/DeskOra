@@ -4,9 +4,9 @@ namespace App\Models;
 
 use App\Concerns\HasShortId;
 use App\Models\Builders\DocumentBuilder;
+use App\Services\ActionLogTimelineService;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Services\Documents\DocumentDomainSyncService;
-use App\Services\ActionLogTimelineService;
 use App\Services\ShortIdGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -124,7 +123,6 @@ class Document extends Model
     /**
      * Keep activity_log rows small when large JSON payloads change.
      *
-     * @param  mixed  $content
      * @return array<string, mixed>|null
      */
     private function summarizeLoggedContent(mixed $content): ?array

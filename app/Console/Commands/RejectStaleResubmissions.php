@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\Request as FinanceRequest;
+use Illuminate\Console\Command;
 
 class RejectStaleResubmissions extends Command
 {

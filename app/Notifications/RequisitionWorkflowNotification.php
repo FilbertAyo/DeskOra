@@ -8,7 +8,6 @@ use Illuminate\Notifications\Notification;
 
 class RequisitionWorkflowNotification extends Notification
 {
-
     public function __construct(
         private readonly RequisitionMailContext $context,
     ) {}

@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Concerns\HasShortId;
-
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;

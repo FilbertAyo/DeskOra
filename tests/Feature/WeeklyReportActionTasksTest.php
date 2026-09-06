@@ -7,8 +7,8 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class WeeklyReportActionTasksTest extends TestCase

@@ -231,7 +231,6 @@ class DocumentAiSummaryBuilder
 
     /**
      * @param  list<string>  $lines
-     * @param  mixed  $meetings
      */
     private function appendMeetings(array &$lines, mixed $meetings, bool $includeStatus = false): void
     {
@@ -275,7 +274,6 @@ class DocumentAiSummaryBuilder
 
     /**
      * @param  list<string>  $lines
-     * @param  mixed  $budget
      */
     private function appendBudget(array &$lines, mixed $budget, ?string $reviewStatus = null): void
     {
@@ -311,7 +309,6 @@ class DocumentAiSummaryBuilder
     }
 
     /**
-     * @param  mixed  $ids
      * @return list<string>
      */
     private function resolveUserNames(mixed $ids): array

@@ -374,7 +374,6 @@ class WeeklyBudgetReviewService
      * Staff from different weeks stay in separate sections.
      * Processors only see items in their review / approve / authorize queue.
      *
-     * @param  User|null  $viewer
      * @return array<string, array{
      *     period: \App\Models\WorkPeriod|null,
      *     period_id: string,

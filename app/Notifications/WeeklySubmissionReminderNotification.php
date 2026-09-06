@@ -14,8 +14,7 @@ class WeeklySubmissionReminderNotification extends Notification
         public readonly string $activityType,
         public readonly string $activityLabel,
         public readonly string $periodLabel
-    ) {
-    }
+    ) {}
 
     public function via(object $notifiable): array
     {

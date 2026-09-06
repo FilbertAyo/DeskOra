@@ -2,25 +2,18 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Exports\WeeklyBudgetReviewExport;
 use App\Models\Document;
 use App\Models\User;
-use App\Models\WeeklyPlan;
-use App\Models\WeeklyPlanBudgetItem;
-use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
 use App\Services\MonthlyReportYearPlanActivities;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * CRUD actions for weekly plans, weekly reports and monthly reports.
@@ -791,8 +784,8 @@ trait HandlesDocumentCrud
                     $existingDocument,
                     $updateData,
                     $sharedUserIds,
-                    $user,
-                    $action
+                    $user
+
                 ) {
                     $existingDocument->update($updateData);
                     $this->documentDomainSyncService->syncFromDocument($existingDocument);
@@ -883,7 +876,7 @@ trait HandlesDocumentCrud
 
         $document = null;
         try {
-            DB::transaction(function () use ($documentData, &$document, $sharedUserIds, $user, $action) {
+            DB::transaction(function () use ($documentData, &$document, $sharedUserIds, $user) {
                 $document = Document::create($documentData);
 
                 if (Document::supportsSharedEditing($document->type)) {
@@ -1379,8 +1372,8 @@ trait HandlesDocumentCrud
                 $document,
                 $updateData,
                 $sharedUserIds,
-                $actingUser,
-                $action
+                $actingUser
+
             ) {
                 $document->update($updateData);
                 $this->documentDomainSyncService->syncFromDocument($document);

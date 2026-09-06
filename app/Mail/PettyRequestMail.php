@@ -14,10 +14,12 @@ class PettyRequestMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public $name;
+
     public $reason;
+
     public $id;
 
-    public function __construct($name,$reason, $id)
+    public function __construct($name, $reason, $id)
     {
         $this->name = $name;
         $this->reason = $reason;

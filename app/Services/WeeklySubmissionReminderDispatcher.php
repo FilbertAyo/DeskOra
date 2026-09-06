@@ -18,8 +18,7 @@ class WeeklySubmissionReminderDispatcher
 {
     public function __construct(
         protected ReminderConfigService $configService
-    ) {
-    }
+    ) {}
 
     public function dispatchIfDue(?Carbon $now = null): array
     {

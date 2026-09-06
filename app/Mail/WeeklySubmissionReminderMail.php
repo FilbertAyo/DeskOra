@@ -18,8 +18,7 @@ class WeeklySubmissionReminderMail extends Mailable implements ShouldQueue
         public readonly string $staffName,
         public readonly string $activityLabel,
         public readonly string $periodLabel
-    ) {
-    }
+    ) {}
 
     public function envelope(): Envelope
     {

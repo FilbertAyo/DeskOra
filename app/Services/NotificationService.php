@@ -10,8 +10,9 @@ class NotificationService
     public function sendSms(string $phone, string $message): bool
     {
         $phone = $this->normalizeTzPhone($phone);
-        if (!$phone) {
+        if (! $phone) {
             Log::warning('Beem SMS: Invalid phone number', ['phone' => $phone]);
+
             return false;
         }
 
@@ -20,15 +21,16 @@ class NotificationService
         $secret = config('beem.secret_key');
         $sender = config('beem.sender_id', 'Adilisha Portal');
 
-        if (!$apiKey || !$secret) {
+        if (! $apiKey || ! $secret) {
             Log::warning('Beem credentials missing');
+
             return false;
         }
 
         // Use secret key as-is (base64 encoded) - this is what works with Beem API
         // The secret key from Beem is provided as base64 and should be used directly
-        $auth = base64_encode($apiKey . ':' . $secret);
-        $endpoint = rtrim($baseUrl, '/') . '/send';
+        $auth = base64_encode($apiKey.':'.$secret);
+        $endpoint = rtrim($baseUrl, '/').'/send';
 
         try {
             Log::info('Beem SMS: Sending SMS', [
@@ -38,8 +40,8 @@ class NotificationService
             ]);
 
             $resp = Http::timeout(30)->withHeaders([
-                'Authorization' => 'Basic ' . $auth,
-                'Content-Type'  => 'application/json',
+                'Authorization' => 'Basic '.$auth,
+                'Content-Type' => 'application/json',
             ])->post($endpoint, [
                 'source_addr' => $sender,
                 'encoding' => 0,
@@ -55,6 +57,7 @@ class NotificationService
                     'phone' => $phone,
                     'response' => $resp->json(),
                 ]);
+
                 return true;
             }
 
@@ -78,10 +81,12 @@ class NotificationService
 
     private function normalizeTzPhone(?string $phone): ?string
     {
-        if (!$phone) return null;
+        if (! $phone) {
+            return null;
+        }
         $digits = preg_replace('/\D+/', '', $phone);
         if (str_starts_with($digits, '0') && strlen($digits) === 10) {
-            return '255' . substr($digits, 1);
+            return '255'.substr($digits, 1);
         }
         if (str_starts_with($digits, '255') && (strlen($digits) === 12)) {
             return $digits;
@@ -89,6 +94,7 @@ class NotificationService
         if (str_starts_with($digits, '+255') && strlen($digits) === 13) {
             return substr($digits, 1);
         }
+
         return $digits ?: null;
     }
 
@@ -100,18 +106,19 @@ class NotificationService
         $apiKey = config('beem.api_key');
         $secret = config('beem.secret_key');
 
-        if (!$apiKey || !$secret) {
+        if (! $apiKey || ! $secret) {
             Log::warning('Beem credentials missing for balance check');
+
             return null;
         }
 
-        $auth = base64_encode($apiKey . ':' . $secret);
+        $auth = base64_encode($apiKey.':'.$secret);
         $endpoint = 'https://apisms.beem.africa/public/v1/vendors/balance';
 
         try {
             $resp = Http::timeout(30)->withHeaders([
-                'Authorization' => 'Basic ' . $auth,
-                'Content-Type'  => 'application/json',
+                'Authorization' => 'Basic '.$auth,
+                'Content-Type' => 'application/json',
             ])->get($endpoint);
 
             if ($resp->successful()) {
@@ -121,8 +128,9 @@ class NotificationService
 
                 if ($balance === null) {
                     Log::warning('Beem SMS balance: credit_balance not found in response', [
-                        'response' => $data
+                        'response' => $data,
                     ]);
+
                     return null;
                 }
 
@@ -155,7 +163,7 @@ class NotificationService
     {
         $balanceData = $this->getSmsBalance();
 
-        if (!$balanceData) {
+        if (! $balanceData) {
             return null;
         }
 
@@ -163,7 +171,7 @@ class NotificationService
             'balance' => $balanceData['balance'] ?? 0,
             'currency' => $balanceData['currency'] ?? 'TZS',
             'sender_id' => config('beem.sender_id', 'Adilisha Portal'),
-            'api_key' => substr(config('beem.api_key', ''), 0, 8) . '...', // Masked for security
+            'api_key' => substr(config('beem.api_key', ''), 0, 8).'...', // Masked for security
             'status' => $balanceData['success'] ?? false,
         ];
     }

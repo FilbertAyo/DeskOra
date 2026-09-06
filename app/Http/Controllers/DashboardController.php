@@ -611,5 +611,4 @@ class DashboardController extends Controller
             return $document;
         });
     }
-
 }

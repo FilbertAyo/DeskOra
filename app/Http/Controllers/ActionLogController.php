@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
-use App\Models\Department;
 use App\Services\ActionLogCarryForwardService;
 use App\Services\ActionLogKanbanService;
 use App\Support\ActionLogTaskSupport;

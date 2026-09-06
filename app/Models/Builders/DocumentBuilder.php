@@ -87,7 +87,7 @@ class DocumentBuilder extends Builder
      */
     protected function addArrayOfWheres($column, $boolean, $method = 'where')
     {
-        return $this->whereNested(function ($query) use ($column, $method, $boolean) {
+        return $this->whereNested(function ($query) use ($column, $method) {
             foreach ($column as $key => $value) {
                 if (is_numeric($key) && $value instanceof \Closure) {
                     $query->where($value, boolean: 'and');

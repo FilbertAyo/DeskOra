@@ -12,7 +12,6 @@ use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-
     public function edit(Request $request): View
     {
         return view('profile.edit', [
@@ -56,6 +55,7 @@ class ProfileController extends Controller
 
         return Redirect::to('/');
     }
+
     public function updateProfile(Request $request)
     {
         $validated = $request->validate([
@@ -65,20 +65,20 @@ class ProfileController extends Controller
 
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return redirect()->back()->withErrors(['error' => 'Something went wrong. Please try again later.']);
         }
 
         if ($request->hasFile('profile_image')) {
             $image = $request->file('profile_image');
             $imagePath = $image->store('profile', 'public'); // saved in storage/app/public/profile
-            $user->file = 'storage/' . $imagePath; // accessible via public/storage/profile/...
+            $user->file = 'storage/'.$imagePath; // accessible via public/storage/profile/...
         }
 
         if ($request->hasFile('signature')) {
             $signature = $request->file('signature');
             $signaturePath = $signature->store('signatures', 'public'); // saved in storage/app/public/signatures
-            $user->signature = 'storage/' . $signaturePath; // accessible via public/storage/signatures/...
+            $user->signature = 'storage/'.$signaturePath; // accessible via public/storage/signatures/...
         }
 
         $user->save();

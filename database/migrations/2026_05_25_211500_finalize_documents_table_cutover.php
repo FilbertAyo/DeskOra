@@ -149,4 +149,3 @@ return new class extends Migration
         return ((int) ($result[0]->aggregate ?? 0)) > 0;
     }
 };
-

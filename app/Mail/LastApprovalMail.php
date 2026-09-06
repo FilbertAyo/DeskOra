@@ -14,7 +14,9 @@ class LastApprovalMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public $name;
+
     public $reason;
+
     public $id;
 
     public function __construct($name, $reason, $id)
@@ -23,6 +25,7 @@ class LastApprovalMail extends Mailable implements ShouldQueue
         $this->reason = $reason;
         $this->id = $id;
     }
+
     /**
      * Get the message envelope.
      */

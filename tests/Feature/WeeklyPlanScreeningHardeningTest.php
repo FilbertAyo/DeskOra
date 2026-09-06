@@ -2,22 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Database\DocumentsUnionView;
 use App\Models\Department;
 use App\Models\Document;
-use App\Models\WeeklyPlan;
 use App\Models\User;
-use App\Models\WorkPeriod;
+use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanActivity;
+use App\Models\WorkPeriod;
+use Carbon\Carbon;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
-use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use Carbon\Carbon;
 use Tests\TestCase;
-use App\Database\DocumentsUnionView;
 
 class WeeklyPlanScreeningHardeningTest extends TestCase
 {
@@ -463,4 +462,3 @@ class WeeklyPlanScreeningHardeningTest extends TestCase
         return $user;
     }
 }
-

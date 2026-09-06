@@ -924,7 +924,7 @@ class PettyController extends Controller
      * Resolve activity_code / is_off_plan from activity_selection or manual entry.
      *
      * @param  array<string, mixed>  $validated
-     * @return array<string, mixed>|null  Null when activity code cannot be resolved for submit.
+     * @return array<string, mixed>|null Null when activity code cannot be resolved for submit.
      */
     private function resolveRequisitionActivityFields(Request $request, array $validated, bool $isDraft): ?array
     {
