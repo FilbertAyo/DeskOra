@@ -40,7 +40,16 @@ if [ "$CUTOVER_MODE" = "1" ]; then
 fi
 
 echo "==> Pulling latest code..."
-git pull --ff-only
+git fetch origin
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+REMOTE="origin/${BRANCH}"
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "    Discarding local changes to tracked files so deploy can proceed:"
+  git status --porcelain --untracked-files=no
+  git reset --hard "$REMOTE"
+else
+  git pull --ff-only
+fi
 
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction

@@ -3,6 +3,7 @@ name: Deploy to production
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -16,5 +17,13 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
+            set -euo pipefail
             cd ~/portal
+            git fetch origin
+            BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+            echo "==> Syncing tracked files to origin/${BRANCH}"
+            echo "    Local edits to tracked files are discarded so deploy can proceed."
+            echo "    Untracked files such as .env and uploads are kept."
+            git status --porcelain || true
+            git reset --hard "origin/${BRANCH}"
             ./deploy.sh
