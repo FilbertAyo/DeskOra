@@ -3,8 +3,8 @@
         const message = @json(config('demo.message'));
 
         function showDemoBlocked() {
-            if (window.notifier) {
-                notifier.show('Demo mode', message, 'warning', '', 5500);
+            if (typeof window.appToast === 'function') {
+                window.appToast('Demo mode', message, 'warning');
                 return;
             }
 

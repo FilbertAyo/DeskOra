@@ -116,6 +116,10 @@
     let searchTimer = null;
 
     function showAlert(type, message) {
+        if (typeof window.appToast === 'function') {
+            window.appToast(type === 'danger' ? 'Could not nominate' : 'Notice', message, type);
+            return;
+        }
         alertBox.className = 'alert alert-' + type;
         alertBox.textContent = message;
         alertBox.classList.remove('d-none');
@@ -235,6 +239,9 @@
                         if (res.ok && res.body.ok) {
                             actionTaken = true;
                             modal.hide();
+                            if (typeof window.appToast === 'function') {
+                                window.appToast('Nomination submitted', 'Thank you — your nomination was recorded.', 'success');
+                            }
                         } else {
                             setSubmitting(false);
                             showAlert('danger', res.body.message || 'Something went wrong. Please try again.');

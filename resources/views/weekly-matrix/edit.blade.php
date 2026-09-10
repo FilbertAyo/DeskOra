@@ -54,13 +54,6 @@
         </div>
     </div>
 
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
     @if ($isEditing && $suggestions->isNotEmpty())
         <div class="card shadow-none border mb-3">
             <div class="card-header bg-white border-bottom py-2">

@@ -18,8 +18,16 @@
             let sessionExpiredHandled = false;
 
             function showNotifier(title, message, type) {
-                if (!window.notifier || typeof window.notifier.show !== 'function') return;
-                window.notifier.show(title, message, type || 'info', '', 6000);
+                if (typeof window.appToast !== 'function') return;
+                const payload = {
+                    type: type === 'danger' ? 'error' : (type || 'info'),
+                    title: title,
+                    message: message,
+                };
+                if (type === 'danger') {
+                    payload.persistent = true;
+                }
+                window.appToast(payload);
             }
 
             function lockWeeklyForm() {

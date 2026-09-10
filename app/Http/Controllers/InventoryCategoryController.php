@@ -37,12 +37,14 @@ class InventoryCategoryController extends Controller
             $category = InventoryCategory::query()->findOrFail($categoryId);
             $category->update($validated);
 
-            return redirect()->route('inventory.categories.index')->with('success', 'Category updated successfully.');
+            return redirect()->route('inventory.categories.index')
+                ->toastSuccess('Category updated', $category->name.' was saved.');
         }
 
         InventoryCategory::query()->create($validated);
 
-        return redirect()->route('inventory.categories.index')->with('success', 'Category created successfully.');
+        return redirect()->route('inventory.categories.index')
+            ->toastSuccess('Category created', $validated['name'].' was added.');
     }
 
     public function update(Request $request, InventoryCategory $category)
@@ -60,13 +62,16 @@ class InventoryCategoryController extends Controller
 
         $category->update($validated);
 
-        return redirect()->route('inventory.categories.index')->with('success', 'Category updated successfully.');
+        return redirect()->route('inventory.categories.index')
+            ->toastSuccess('Category updated', $category->name.' was saved.');
     }
 
     public function destroy(InventoryCategory $category)
     {
+        $name = $category->name;
         $category->delete();
 
-        return redirect()->route('inventory.categories.index')->with('success', 'Category deleted successfully.');
+        return redirect()->route('inventory.categories.index')
+            ->toastSuccess('Category deleted', $name.' was removed.');
     }
 }

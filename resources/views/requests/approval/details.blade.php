@@ -105,46 +105,6 @@
         </div>
     @endif
 
-    @php
-        $actionFeedback = match (true) {
-            session()->has('success') => [
-                'variant' => 'success',
-                'icon' => 'ti-circle-check',
-                'title' => 'Action recorded',
-                'message' => session('success'),
-            ],
-            session()->has('error') => [
-                'variant' => 'danger',
-                'icon' => 'ti-alert-circle',
-                'title' => 'Action not completed',
-                'message' => session('error'),
-            ],
-            session()->has('warning') => [
-                'variant' => 'warning',
-                'icon' => 'ti-alert-triangle',
-                'title' => 'Please review',
-                'message' => session('warning'),
-            ],
-            default => null,
-        };
-    @endphp
-
-    @if ($actionFeedback)
-        <div class="alert alert-{{ $actionFeedback['variant'] }} alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-start gap-3">
-                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light-{{ $actionFeedback['variant'] }} border border-{{ $actionFeedback['variant'] }} text-{{ $actionFeedback['variant'] }} flex-shrink-0"
-                    style="width: 2.5rem; height: 2.5rem;">
-                    <i class="ti {{ $actionFeedback['icon'] }} fs-5"></i>
-                </span>
-                <div class="flex-grow-1 pe-2">
-                    <h6 class="alert-heading mb-1">{{ $actionFeedback['title'] }}</h6>
-                    <p class="mb-0 small">{{ $actionFeedback['message'] }}</p>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        </div>
-    @endif
-
     <div class="row">
         <!-- Request Details Card -->
         <div class="col-12">

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use A89s\GooeyToast\Facades\GooeyToast;
 use App\Data\WeeklySubmissionReminder;
 use App\Database\DocumentsUnionView;
 use App\Models\AnonymousFeedback;
@@ -10,6 +11,7 @@ use App\Models\WorkPeriod;
 use App\Services\RequestApprovalNavService;
 use App\Services\WeeklySubmissionReminderService;
 use App\Support\ShortId;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -41,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
 
         Paginator::useBootstrapFive();
 
+        $this->registerGooeyToastMacros();
         $this->ensureDocumentsUnionView();
         $this->configureSessionAndUrl();
 
@@ -214,6 +217,68 @@ class AppServiceProvider extends ServiceProvider
             $view->with('weeklyPlanGraceEndsAt', $firstPlanGrace?->graceEndsAt);
             $view->with('weeklyReportGracePeriod', $firstReportGrace?->period);
             $view->with('weeklyReportGraceEndsAt', $firstReportGrace?->graceEndsAt);
+        });
+    }
+
+    /**
+     * Queue Gooey toasts on redirects without also flashing session('success').
+     */
+    protected function registerGooeyToastMacros(): void
+    {
+        RedirectResponse::macro('toastSuccess', function (string $title, ?string $message = null) {
+            GooeyToast::success($title, $message);
+
+            return $this;
+        });
+
+        RedirectResponse::macro('toastError', function (string $title, ?string $message = null) {
+            GooeyToast::error($title, $message);
+
+            return $this;
+        });
+
+        RedirectResponse::macro('toastWarning', function (string $title, ?string $message = null) {
+            GooeyToast::warning($title, $message);
+
+            return $this;
+        });
+
+        RedirectResponse::macro('toastInfo', function (string $title, ?string $message = null) {
+            GooeyToast::info($title, $message);
+
+            return $this;
+        });
+
+        RedirectResponse::macro('withGooeyToast', function (string $type, string $title, array $options = []) {
+            $builder = GooeyToast::make($title, $type);
+
+            if (! empty($options['message'])) {
+                $builder->message((string) $options['message']);
+            }
+
+            if (! empty($options['details']) && is_array($options['details'])) {
+                $builder->details($options['details']);
+            }
+
+            if (! empty($options['footer'])) {
+                $builder->footer((string) $options['footer']);
+            }
+
+            if (! empty($options['actions']) && is_array($options['actions'])) {
+                $builder->actions($options['actions']);
+            }
+
+            if (! empty($options['duration'])) {
+                $builder->duration((int) $options['duration']);
+            }
+
+            if (! empty($options['persistent'])) {
+                $builder->persistent();
+            }
+
+            $builder->send();
+
+            return $this;
         });
     }
 

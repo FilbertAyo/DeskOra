@@ -97,7 +97,8 @@ class AdminController extends Controller
         // Send notification email
         Mail::to($user->email)->send(new NotificationMail($user->name, $user->email));
 
-        return redirect()->back()->with('success', 'New user registered successfully');
+        return redirect()->back()
+            ->toastSuccess('User registered', $user->name.' can now sign in.');
     }
 
     /**
@@ -173,7 +174,8 @@ class AdminController extends Controller
             $oldDepartmentId
         );
 
-        return redirect()->back()->with('success', 'User updated successfully');
+        return redirect()->back()
+            ->toastSuccess('User updated', $user->name.' was saved.');
     }
 
     public function updateNotificationChannel(Request $request, User $user)

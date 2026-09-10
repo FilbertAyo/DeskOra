@@ -4,8 +4,60 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "40e7f5c148c0ee707f3e1db380557e87",
+    "content-hash": "d33c183ee5a4ee07f7e636ab51309990",
     "packages": [
+        {
+            "name": "a89s/gooey-toast",
+            "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/a89s/gooey-toast.git",
+                "reference": "8f169cd63417edc647b738ba25cd5cc8c0ae2539"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/a89s/gooey-toast/zipball/8f169cd63417edc647b738ba25cd5cc8c0ae2539",
+                "reference": "8f169cd63417edc647b738ba25cd5cc8c0ae2539",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^8.0|^9.0|^10.0",
+                "pestphp/pest": "^2.0|^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "A89s\\GooeyToast\\GooeyToastServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "A89s\\GooeyToast\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Arturs Sprogis",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A gooey expandable toast notification component for Laravel, Livewire",
+            "support": {
+                "issues": "https://github.com/a89s/gooey-toast/issues",
+                "source": "https://github.com/a89s/gooey-toast/tree/1.0.0"
+            },
+            "time": "2026-02-20T06:35:06+00:00"
+        },
         {
             "name": "bacon/bacon-qr-code",
             "version": "v3.0.4",

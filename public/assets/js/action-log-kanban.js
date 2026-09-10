@@ -28,44 +28,55 @@
     }
 
     function toast(message, type) {
-        const el = document.createElement('div');
-        el.className = 'alert alert-' + (type || 'info') + ' alert-dismissible fade show position-fixed';
-        el.style.cssText = 'top:1rem;right:1rem;z-index:2000;max-width:360px;';
-        el.setAttribute('role', 'alert');
-        el.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 4000);
+        if (typeof window.appToast === 'function') {
+            window.appToast(message, null, type || 'info');
+            return;
+        }
+        if (typeof window.toast === 'function') {
+            window.toast({ type: type === 'danger' ? 'error' : (type || 'info'), title: message });
+        }
     }
 
     async function persistMove(card, status, previousParent, nextSibling) {
         const taskUid = card.getAttribute('data-task-uid');
-        try {
-            const response = await fetch(moveUrl, {
-                method: 'PATCH',
-                credentials: 'same-origin',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrf,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({
-                    task_uid: taskUid,
-                    progress: status,
-                }),
-            });
+        const request = fetch(moveUrl, {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                task_uid: taskUid,
+                progress: status,
+            }),
+        }).then(async (response) => {
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.success) {
-                previousParent.insertBefore(card, nextSibling);
-                updateCounts();
-                toast((data && data.message) || 'Could not move task.', 'warning');
-                return;
+                throw new Error((data && data.message) || 'Could not move task.');
             }
+            return data;
+        });
+
+        if (window.toast && typeof window.toast.promise === 'function') {
+            window.toast.promise(request, {
+                loading: 'Moving task…',
+                success: 'Task moved.',
+                error: 'Could not move task.',
+            });
+        }
+
+        try {
+            await request;
             card.setAttribute('data-progress', status);
         } catch (e) {
             previousParent.insertBefore(card, nextSibling);
             updateCounts();
-            toast('Could not move task.', 'warning');
+            if (!(window.toast && typeof window.toast.promise === 'function')) {
+                toast((e && e.message) || 'Could not move task.', 'warning');
+            }
         }
     }
 

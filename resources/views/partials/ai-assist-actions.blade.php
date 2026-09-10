@@ -54,13 +54,13 @@
 
     function toast(message, type) {
         if (!message) return;
-        const el = document.createElement('div');
-        el.className = 'alert alert-' + (type || 'info') + ' alert-dismissible fade show position-fixed';
-        el.style.cssText = 'top:1rem;right:1rem;z-index:2000;max-width:360px;';
-        el.setAttribute('role', 'alert');
-        el.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 5000);
+        if (typeof window.appToast === 'function') {
+            window.appToast(message, null, type || 'info');
+            return;
+        }
+        if (typeof window.toast === 'function') {
+            window.toast({ type: type === 'danger' ? 'error' : (type || 'info'), title: message });
+        }
     }
 
     async function revealAiButtons(root) {
@@ -92,20 +92,29 @@
         }
 
         setBusy(button, true, 'Drafting…');
-        try {
-            const { ok, data } = await fetchJson(draftUrl, {
-                method: 'POST',
-                body: JSON.stringify({
-                    period_id: periodId || null,
-                    activity_progress: activityProgress,
-                }),
-            });
-
+        const request = fetchJson(draftUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                period_id: periodId || null,
+                activity_progress: activityProgress,
+            }),
+        }).then(({ ok, data }) => {
             if (!ok || !data || !data.draft) {
-                toast((data && data.message) || 'Could not draft report right now.', 'warning');
-                return;
+                throw new Error((data && data.message) || 'Could not draft report right now.');
             }
+            return data;
+        });
 
+        if (typeof window.toast?.promise === 'function') {
+            window.toast.promise(request, {
+                loading: 'Drafting report…',
+                success: 'Draft ready — review before submitting.',
+                error: 'Could not draft report right now.',
+            });
+        }
+
+        try {
+            const data = await request;
             const draft = data.draft;
             const summary = document.getElementById('weekly_report_summary')
                 || document.querySelector('textarea[name="content[summary]"]');
@@ -118,14 +127,10 @@
             fillActivityProgress(draft.activity_progress || [], overwrite);
             fillAchievements(draft.achievements || [], overwrite);
             fillChallenges(draft.challenges || [], overwrite);
-
-            if (data.message) {
-                toast(data.message, data.used_ai ? 'success' : 'info');
-            } else {
-                toast(data.used_ai ? 'Draft ready — review before submitting.' : 'Basic draft ready — review before submitting.', 'success');
-            }
         } catch (e) {
-            toast('AI currently unavailable.', 'warning');
+            if (typeof window.toast?.promise !== 'function') {
+                toast(e.message || 'AI currently unavailable.', 'warning');
+            }
         } finally {
             setBusy(button, false);
         }
@@ -231,29 +236,34 @@
             : {};
 
         setBusy(button, true, 'Polishing…');
-        try {
-            const { ok, data } = await fetchJson(polishTipsUrl, {
-                method: 'POST',
-                body: JSON.stringify({ tips, metrics }),
-            });
-
+        const request = fetchJson(polishTipsUrl, {
+            method: 'POST',
+            body: JSON.stringify({ tips, metrics }),
+        }).then(({ ok, data }) => {
             if (!ok || !data || !Array.isArray(data.tips) || !data.tips.length) {
-                toast((data && data.message) || 'Could not polish tips right now.', 'warning');
-                return;
+                throw new Error((data && data.message) || 'Could not polish tips right now.');
             }
+            return data;
+        });
 
+        if (typeof window.toast?.promise === 'function') {
+            window.toast.promise(request, {
+                loading: 'Polishing tips…',
+                success: 'Tips polished — still based on your metrics.',
+                error: 'Could not polish tips right now.',
+            });
+        }
+
+        try {
+            const data = await request;
             list.innerHTML = data.tips.map((tip) => '<li>' + String(tip)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;') + '</li>').join('');
-
-            if (data.message) {
-                toast(data.message, data.used_ai ? 'success' : 'info');
-            } else {
-                toast(data.used_ai ? 'Tips polished — still based on your metrics.' : 'Original tips kept.', 'success');
-            }
         } catch (e) {
-            toast('AI currently unavailable.', 'warning');
+            if (typeof window.toast?.promise !== 'function') {
+                toast(e.message || 'AI currently unavailable.', 'warning');
+            }
         } finally {
             setBusy(button, false);
         }
@@ -283,28 +293,38 @@
         if (outcomeInput) payload.outcome = outcomeInput.value;
 
         setBusy(button, true, 'Suggesting…');
-        try {
-            const { ok, data } = await fetchJson(rejectUrl, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
-
+        const request = fetchJson(rejectUrl, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        }).then(({ ok, data }) => {
             if (!ok || !data || !data.available || !data.suggestion) {
-                toast((data && data.message) || 'AI currently unavailable.', 'warning');
                 if (data && data.available === false) {
                     document.querySelectorAll('[data-ai-assist-only]').forEach((el) => el.classList.add('d-none'));
                     availableCache = false;
                 }
-                return;
+                throw new Error((data && data.message) || 'AI currently unavailable.');
             }
+            return data;
+        });
 
+        if (typeof window.toast?.promise === 'function') {
+            window.toast.promise(request, {
+                loading: 'Writing suggestion…',
+                success: 'Suggestion ready — edit before submitting.',
+                error: 'AI currently unavailable.',
+            });
+        }
+
+        try {
+            const data = await request;
             if (target.value.trim() && !confirm('Replace the current comment with the AI suggestion?')) {
                 return;
             }
             target.value = data.suggestion;
-            toast('Suggestion ready — edit before submitting.', 'success');
         } catch (e) {
-            toast('AI currently unavailable.', 'warning');
+            if (typeof window.toast?.promise !== 'function') {
+                toast(e.message || 'AI currently unavailable.', 'warning');
+            }
         } finally {
             setBusy(button, false);
         }

@@ -163,7 +163,23 @@ trait HandlesDocumentWorkflow
         }
 
         return redirect()->route('documents.show', $document)
-            ->with('success', 'Document submitted successfully.');
+            ->withGooeyToast('success', 'Document submitted', [
+                'message' => $document->type_name.' is now submitted.',
+                'details' => array_values(array_filter([
+                    ['label' => 'Type', 'value' => $document->type_name],
+                    $document->period
+                        ? ['label' => 'Period', 'value' => $document->period->display_name]
+                        : null,
+                ])),
+                'actions' => [
+                    [
+                        'label' => 'View',
+                        'event' => 'gooey-navigate',
+                        'icon' => 'eye',
+                        'data' => ['url' => route('documents.show', $document)],
+                    ],
+                ],
+            ]);
     }
 
     /**
@@ -189,6 +205,22 @@ trait HandlesDocumentWorkflow
         $this->workflowEmailNotificationService->notifyWeeklyDocumentReturnedToDraft($document, $actingUser, $reason);
 
         return redirect()->route('documents.show', $document->id)
-            ->with('warning', 'Document returned to draft. Staff can now update and re-submit after addressing the review reason.');
+            ->withGooeyToast('warning', 'Returned to draft', [
+                'message' => 'Staff can update and re-submit after addressing the review reason.',
+                'details' => array_values(array_filter([
+                    ['label' => 'Type', 'value' => $document->type_name],
+                    $document->period
+                        ? ['label' => 'Period', 'value' => $document->period->display_name]
+                        : null,
+                ])),
+                'actions' => [
+                    [
+                        'label' => 'View',
+                        'event' => 'gooey-navigate',
+                        'icon' => 'eye',
+                        'data' => ['url' => route('documents.show', $document)],
+                    ],
+                ],
+            ]);
     }
 }

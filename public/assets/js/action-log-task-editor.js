@@ -89,6 +89,11 @@
     }
 
     function showAutosaveAlert(container, message, type) {
+        const text = String(message || '').replace(/<[^>]*>/g, '').trim();
+        if (typeof window.appToast === 'function') {
+            window.appToast(text || 'Saved', null, type === 'danger' ? 'error' : (type || 'success'));
+            return;
+        }
         if (!container) {
             return;
         }

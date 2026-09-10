@@ -18,12 +18,6 @@
                                 Your message is anonymous. Do not include your name or other identifying details if you want to stay anonymous.
                             </p>
 
-                            @if (session('status') || session('success'))
-                                <div class="alert alert-success mb-4" role="alert">
-                                    {{ session('success') ?? session('status') }}
-                                </div>
-                            @endif
-
                             <form method="POST" action="{{ route('anonymous-feedback.store', ['token' => request()->route('token')]) }}" class="pt-1" id="anonymous-feedback-form">
                                 @csrf
 

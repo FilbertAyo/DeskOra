@@ -27,20 +27,6 @@
         </div>
     </div>
 
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
-            <i class="ti ti-circle-check me-2"></i>{{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
-            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
-            <a href="{{ route('profile.edit') }}" class="alert-link ms-1">Go to Profile Settings</a>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
     <div class="card shadow-none border">
         <div class="card-body">
             <table class="table table-bordered datatables">

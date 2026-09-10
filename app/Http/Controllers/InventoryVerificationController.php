@@ -188,7 +188,9 @@ class InventoryVerificationController extends Controller
 
         return redirect()
             ->route('inventory.verification.show', $verification)
-            ->with('success', 'Session completed. Missing, damaged, location, and person changes were applied.');
+            ->withGooeyToast('success', 'Verification completed', [
+                'message' => 'Missing, damaged, location, and person changes were applied.',
+            ]);
     }
 
     private function formOptions(): array

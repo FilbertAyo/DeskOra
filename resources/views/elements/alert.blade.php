@@ -1,32 +1,35 @@
-@once
-    <link rel="stylesheet" href="{{ asset('assets/css/plugins/notifier.css') }}">
-    <style>
-        .notifier-container {
-            z-index: 2000 !important;
-        }
-    </style>
-    <script src="{{ asset('assets/js/plugins/notifier.js') }}"></script>
-@endonce
-
 @php
     $globalNotifications = [];
+    $profileSettingsUrl = \Illuminate\Support\Facades\Route::has('profile.edit')
+        ? route('profile.edit')
+        : null;
 
     if (session('success')) {
         $globalNotifications[] = [
             'title' => 'Success',
             'message' => session('success'),
             'type' => 'success',
-            'delay' => 4500,
         ];
     }
 
     if (session('error')) {
-        $globalNotifications[] = [
+        $errorMessage = (string) session('error');
+        $errorToast = [
             'title' => 'Error',
-            'message' => session('error'),
-            'type' => 'danger',
-            'delay' => 5500,
+            'message' => $errorMessage,
+            'type' => 'error',
         ];
+        if ($profileSettingsUrl && str_contains($errorMessage, 'Profile Settings')) {
+            $errorToast['actions'] = [
+                [
+                    'label' => 'Open profile',
+                    'event' => 'gooey-navigate',
+                    'icon' => 'external-link',
+                    'data' => ['url' => $profileSettingsUrl],
+                ],
+            ];
+        }
+        $globalNotifications[] = $errorToast;
     }
 
     if (session('warning')) {
@@ -34,7 +37,6 @@
             'title' => 'Warning',
             'message' => session('warning'),
             'type' => 'warning',
-            'delay' => 5000,
         ];
     }
 
@@ -43,33 +45,50 @@
             'title' => 'Info',
             'message' => session('info'),
             'type' => 'info',
-            'delay' => 5000,
         ];
     }
 
-    // Backwards-compatible flash support.
-    // Some controllers still use `with('status', ...)` instead of `success/error/warning`.
-    if (session('status')) {
-        $globalNotifications[] = [
-            'title' => 'Notice',
-            'message' => session('status'),
-            'type' => 'info',
-            'delay' => 5000,
+    $status = session('status');
+    if (is_string($status) && $status !== '') {
+        $statusMessages = [
+            'password-updated' => 'Your password has been updated.',
+            'verification-link-sent' => 'A new verification link has been sent to your email.',
+            'signature-updated' => 'Your signature has been updated.',
         ];
+        if (isset($statusMessages[$status])) {
+            $globalNotifications[] = [
+                'title' => 'Notice',
+                'message' => $statusMessages[$status],
+                'type' => 'info',
+            ];
+        } elseif (str_contains($status, ' ')) {
+            $globalNotifications[] = [
+                'title' => 'Notice',
+                'message' => $status,
+                'type' => 'info',
+            ];
+        }
     }
 
     if (isset($errors) && $errors->any()) {
-        $globalNotifications = array_merge(
-            $globalNotifications,
-            array_map(static function ($validationError) {
-                return [
-                    'title' => 'Validation Error',
-                    'message' => $validationError,
-                    'type' => 'danger',
-                    'delay' => 6000,
+        $details = [];
+        foreach ($errors->messages() as $field => $fieldMessages) {
+            $label = ucfirst(str_replace(['_', '-'], ' ', (string) $field));
+            foreach ($fieldMessages as $fieldMessage) {
+                $details[] = [
+                    'label' => $label,
+                    'value' => $fieldMessage,
                 ];
-            }, $errors->all())
-        );
+            }
+        }
+
+        $globalNotifications[] = [
+            'title' => 'Please fix the highlighted fields',
+            'message' => $errors->first(),
+            'type' => 'error',
+            'details' => count($details) > 1 ? $details : [],
+            'duration' => 6000,
+        ];
     }
 @endphp
 
@@ -80,29 +99,21 @@
         const notificationsElement = document.getElementById('global-notifications-data');
         const notifications = notificationsElement ? JSON.parse(notificationsElement.textContent || '[]') : [];
 
-        if (window.notifier && Array.isArray(notifications) && notifications.length > 0) {
+        if (Array.isArray(notifications) && notifications.length > 0 && typeof window.appToast === 'function') {
             notifications.forEach(function (notification) {
-                notifier.show(
-                    notification.title || 'Notice',
-                    notification.message || '',
-                    notification.type || '',
-                    '',
-                    Number(notification.delay) || 4500
-                );
+                window.appToast(notification);
             });
         }
 
         document.body.addEventListener('click', function (event) {
             if (!event.target.closest('.permission-alert')) return;
-            if (!window.notifier) return;
+            if (typeof window.appToast !== 'function') return;
 
-            notifier.show(
-                'Permission denied',
-                'You do not have permission to perform this action.',
-                'danger',
-                '',
-                4500
-            );
+            window.appToast({
+                type: 'error',
+                title: 'Permission denied',
+                message: 'You do not have permission to perform this action.',
+            });
         });
     });
 </script>

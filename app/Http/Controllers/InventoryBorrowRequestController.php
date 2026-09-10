@@ -139,7 +139,12 @@ class InventoryBorrowRequestController extends Controller
             'review_notes' => $validated['review_notes'] ?? null,
         ]);
 
-        return redirect()->route('inventory.borrowing.show', $borrowRequest)->with('success', 'Request approved.');
+        return redirect()->route('inventory.borrowing.show', $borrowRequest)
+            ->withGooeyToast('success', 'Request approved', [
+                'details' => [
+                    ['label' => 'Request', 'value' => (string) $borrowRequest->request_number],
+                ],
+            ]);
     }
 
     public function reject(Request $request, InventoryBorrowRequest $borrowRequest)
@@ -202,7 +207,13 @@ class InventoryBorrowRequestController extends Controller
             ]);
         });
 
-        return redirect()->route('inventory.borrowing.show', $borrowRequest)->with('success', 'Item issued to borrower.');
+        return redirect()->route('inventory.borrowing.show', $borrowRequest)
+            ->withGooeyToast('success', 'Item issued', [
+                'message' => 'The item was issued to the borrower.',
+                'details' => [
+                    ['label' => 'Request', 'value' => (string) $borrowRequest->request_number],
+                ],
+            ]);
     }
 
     public function returnItem(Request $request, InventoryBorrowRequest $borrowRequest)
@@ -257,7 +268,13 @@ class InventoryBorrowRequestController extends Controller
             ]);
         });
 
-        return redirect()->route('inventory.borrowing.show', $borrowRequest)->with('success', 'Return recorded.');
+        return redirect()->route('inventory.borrowing.show', $borrowRequest)
+            ->withGooeyToast('success', 'Return recorded', [
+                'details' => [
+                    ['label' => 'Request', 'value' => (string) $borrowRequest->request_number],
+                    ['label' => 'Condition', 'value' => (string) ($validated['return_condition'] ?? '')],
+                ],
+            ]);
     }
 
     private function validatedRequest(Request $request): array

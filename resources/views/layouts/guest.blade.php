@@ -474,6 +474,11 @@
     <script>layout_rtl_change('false');</script>
     <script>preset_change("preset-1");</script>
     <script>font_change("Public-Sans");</script>
+
+    @include('elements.alert')
+    <x-gooey-toast />
+    @include('partials.gooey-toast-setup')
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 
 </html>

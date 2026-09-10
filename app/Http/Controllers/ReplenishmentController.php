@@ -183,7 +183,20 @@ class ReplenishmentController extends Controller
             });
 
             return redirect()->route('replenishment.index')
-                ->with('success', "Replenishment created successfully! {$availablePetties} petty cash records have been linked to this replenishment.")
+                ->withGooeyToast('success', 'Replenishment created', [
+                    'message' => 'Petty cash records have been linked to this replenishment.',
+                    'details' => [
+                        ['label' => 'Linked records', 'value' => (string) $availablePetties],
+                    ],
+                    'actions' => $replenishment
+                        ? [[
+                            'label' => 'View',
+                            'event' => 'gooey-navigate',
+                            'icon' => 'eye',
+                            'data' => ['url' => route('replenishment.show', $replenishment)],
+                        ]]
+                        : [],
+                ])
                 ->with('replenishment_id', $replenishment ? $replenishment->id : null);
 
         } catch (\Exception $e) {

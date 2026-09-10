@@ -384,10 +384,9 @@
             let isAsking = false;
 
             function showNotifier(title, message, type) {
-                if (!window.notifier || typeof window.notifier.show !== 'function') {
-                    return;
+                if (typeof window.appToast === 'function') {
+                    window.appToast(title, message, type === 'danger' ? 'error' : (type || 'info'));
                 }
-                window.notifier.show(title, message, type || 'info', '', 6000);
             }
 
             function renderParagraphs(container, text) {

@@ -40,7 +40,8 @@ class RoleController extends Controller
 
         $role->syncPermissions($validated['permissions'] ?? []);
 
-        return redirect()->route('roles.index')->with('success', 'Role created successfully.');
+        return redirect()->route('roles.index')
+            ->toastSuccess('Role created', $role->name.' is ready to assign.');
     }
 
     public function edit(Role $role)
@@ -76,7 +77,8 @@ class RoleController extends Controller
 
         $role->syncPermissions($validated['permissions'] ?? []);
 
-        return redirect()->route('roles.index')->with('success', 'Role updated successfully.');
+        return redirect()->route('roles.index')
+            ->toastSuccess('Role updated', $role->name.' was saved.');
     }
 
     public function destroy(Role $role)
@@ -90,9 +92,11 @@ class RoleController extends Controller
             return redirect()->route('roles.index')->with('error', 'Cannot delete a role that is assigned to users.');
         }
 
+        $roleName = $role->name;
         $role->delete();
 
-        return redirect()->route('roles.index')->with('success', 'Role deleted successfully.');
+        return redirect()->route('roles.index')
+            ->toastSuccess('Role deleted', $roleName.' was removed.');
     }
 
     private function isSystemManagedRole(Role $role): bool

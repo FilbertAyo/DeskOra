@@ -1422,11 +1422,13 @@ trait HandlesDocumentCrud
         // Authorize delete action
         $this->authorize('delete', $document);
 
+        $typeName = $document->type_name;
+
         $this->weeklyActivityAssignmentService->clearForSourceDocument($document);
         $document->delete();
 
         return redirect()->route('documents.index')
-            ->with('success', 'Document deleted successfully.');
+            ->toastSuccess('Document deleted', $typeName.' was removed.');
     }
 
     protected function findExistingWeeklyDocumentForStore(User $user, string $periodId, string $type): ?Document

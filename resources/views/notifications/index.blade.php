@@ -8,17 +8,6 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="alert alert-success mb-4">
-            <i class="ti ti-check me-1"></i>{{ session('success') }}
-        </div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger mb-4">
-            <i class="ti ti-alert-circle me-1"></i>{{ session('error') }}
-        </div>
-    @endif
-
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card shadow-none border h-100">

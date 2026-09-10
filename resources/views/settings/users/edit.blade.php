@@ -28,13 +28,6 @@
 
     <div class="row">
         <div class="col-md-12">
-            @if (session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="ti ti-check-circle me-2"></i>{{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
-
             <form method="POST" action="{{ route('admin.update', $user->id) }}" id="editUserForm">
                 @csrf
                 @method('PUT')
