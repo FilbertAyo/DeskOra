@@ -249,6 +249,8 @@
                     this.startTimer(toast, toastDuration);
                 }
 
+                this.scheduleAutoExpand(toast);
+
                 if (data.vibrate && navigator.vibrate) {
                     const pattern = Array.isArray(data.vibrate) ? data.vibrate : [200];
                     navigator.vibrate(pattern);
@@ -358,12 +360,34 @@
                 }
             },
 
+            shouldAutoExpand(toast) {
+                if (toast.isUndo || toast.type === 'loading') return false;
+                return Boolean(toast.message)
+                    || (Array.isArray(toast.details) && toast.details.length > 0)
+                    || Boolean(toast.footer)
+                    || (Array.isArray(toast.actions) && toast.actions.length > 0);
+            },
+
+            scheduleAutoExpand(toast) {
+                if (!this.shouldAutoExpand(toast)) return;
+
+                const delay = this.prefersReducedMotion
+                    ? 80
+                    : (toast.type === 'error' || toast.type === 'warning' ? 650 : 450);
+
+                setTimeout(() => {
+                    const current = this.toasts.find(t => t.id === toast.id);
+                    if (!current || current.removing || current.expanded) return;
+                    current.expanded = true;
+                }, delay);
+            },
+
             startTimer(toast, ms) {
                 toast.timerStartedAt = Date.now();
                 toast.timerRemaining = ms;
                 toast.timerPaused = false;
                 this.timers[toast.id] = setTimeout(() => {
-                    if (!toast.expanded) this.dismiss(toast);
+                    this.dismiss(toast);
                 }, ms);
             },
 
@@ -383,7 +407,7 @@
             },
 
             resumeTimer(toast) {
-                if (!toast.timerPaused || toast.expanded || toast.duration <= 0) return;
+                if (!toast.timerPaused || toast.duration <= 0) return;
                 if (toast.timerRemaining <= 0) {
                     this.dismiss(toast);
                     return;
