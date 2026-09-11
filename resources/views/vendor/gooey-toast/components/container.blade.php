@@ -56,8 +56,6 @@
             :style="toastStyle(toast)"
             :class="[toast.expanded ? 'gooey-toast-expanded' : '', toast.collapsing ? 'gooey-toast-collapsing' : '', toast.duration > 0 && toast.progress === null ? 'gooey-toast-has-timer' : '', toast.progress !== null ? 'gooey-toast-has-progress' : '']"
             @animationend="if ($event.target === $el) toast.removing ? remove(toast.id) : (toast.entered = true)"
-            @mouseenter="pauseTimer(toast)"
-            @mouseleave="resumeTimer(toast)"
             @touchstart="swipeStart(toast, $event)"
             @touchmove="swipeMove(toast, $event)"
             @touchend="swipeEnd(toast, $event)"

@@ -379,16 +379,26 @@
                     const current = this.toasts.find(t => t.id === toast.id);
                     if (!current || current.removing || current.expanded) return;
                     current.expanded = true;
+                    if (current.duration > 0 && !current.persistent && !this.timers[current.id]) {
+                        this.startTimer(current, current.timerRemaining || current.duration);
+                    }
                 }, delay);
             },
 
             startTimer(toast, ms) {
+                this.clearTimer(toast);
+                const wait = Math.max(0, Number(ms) || 0);
+                if (wait <= 0 || toast.persistent) {
+                    return;
+                }
                 toast.timerStartedAt = Date.now();
-                toast.timerRemaining = ms;
+                toast.timerRemaining = wait;
                 toast.timerPaused = false;
-                this.timers[toast.id] = setTimeout(() => {
-                    this.dismiss(toast);
-                }, ms);
+                const toastId = toast.id;
+                this.timers[toastId] = setTimeout(() => {
+                    const current = this.toasts.find(t => t.id === toastId) || toast;
+                    this.dismiss(current);
+                }, wait);
             },
 
             clearTimer(toast) {
@@ -422,18 +432,13 @@
                     toast.expanded = false;
                     toast.collapsing = true;
                     setTimeout(() => { toast.collapsing = false; }, 450);
-
-                    if (toast.duration > 0 && toast.timerRemaining > 0) {
-                        this.startTimer(toast, toast.timerRemaining);
-                    }
                 } else {
                     toast.expanded = true;
-                    this.clearTimer(toast);
-                    toast.timerPaused = true;
                 }
             },
 
             dismiss(toast, isUserAction) {
+                if (!toast || toast.removing) return;
                 if (toast.isUndo && !isUserAction && toast.confirmEvent) {
                     window.dispatchEvent(new CustomEvent(toast.confirmEvent, { detail: toast.undoData || {} }));
                 }
@@ -442,7 +447,13 @@
                 toast.removing = true;
                 if (this.prefersReducedMotion) {
                     this.remove(toast.id);
+                    return;
                 }
+                setTimeout(() => {
+                    if (this.toasts.some(t => t.id === toast.id)) {
+                        this.remove(toast.id);
+                    }
+                }, 280);
             },
 
             dismissMostRecent() {

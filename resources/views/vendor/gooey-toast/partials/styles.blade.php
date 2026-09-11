@@ -230,7 +230,7 @@
     .gooey-toast-timer-bar:nth-child(odd) { height: 80%; }
 
     .gooey-toast-item:hover .gooey-toast-timer-bar {
-        animation-play-state: paused;
+        animation-play-state: running;
     }
 
     .gooey-toast-timer-success { --timer-color: #22c55e; }
