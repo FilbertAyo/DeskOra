@@ -569,7 +569,18 @@
                 }
                 
                 if (action === 'submit') {
-                    if (!confirm('Are you sure you want to submit this document? Once submitted, it cannot be edited.')) {
+                    const weeklyTypes = ['weekly_plan', 'weekly_report'];
+                    if (weeklyTypes.includes(documentType) && window.DeskOraWeeklySubmitScan) {
+                        if (!window.DeskOraWeeklySubmitScan.consumeConfirmed(form)) {
+                            e.preventDefault();
+                            window.DeskOraWeeklySubmitScan.open({
+                                form: form,
+                                submitter: clickedButton,
+                                documentType: documentType,
+                            });
+                            return false;
+                        }
+                    } else if (!confirm('Are you sure you want to submit this document? Once submitted, it cannot be edited.')) {
                         e.preventDefault();
                         return false;
                     }

@@ -115,6 +115,9 @@
                     </div>
                 </div>
             </form>
+            @if(isset($selectedType) && in_array($selectedType, ['weekly_plan', 'weekly_report'], true))
+                @include('documents.partials.weekly-submit-scan-modal')
+            @endif
         </div>
     </div>
 
@@ -1102,7 +1105,17 @@
                 }
                 
                 if (action === 'submit') {
-                    if (!confirm('Are you sure you want to submit this document? Once submitted, it cannot be edited.')) {
+                    if (weeklyTypes.includes(selectedTypeValue) && window.DeskOraWeeklySubmitScan) {
+                        if (!window.DeskOraWeeklySubmitScan.consumeConfirmed(form)) {
+                            e.preventDefault();
+                            window.DeskOraWeeklySubmitScan.open({
+                                form: form,
+                                submitter: clickedButton,
+                                documentType: selectedTypeValue,
+                            });
+                            return false;
+                        }
+                    } else if (!confirm('Are you sure you want to submit this document? Once submitted, it cannot be edited.')) {
                         e.preventDefault();
                         return false;
                     }

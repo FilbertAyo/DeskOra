@@ -48,6 +48,12 @@
                 </div>
             </div>
 
+            <script type="application/json" id="weekly-submit-scan-source">
+                @json([
+                    'document_type' => 'weekly_report',
+                    'text' => app(\App\Services\WeeklyDocumentAiStyleScanner::class)->extractFromDocument($document),
+                ])
+            </script>
             <form method="POST" action="{{ route('documents.update', $document) }}" id="weeklyReportReviewForm">
                 @csrf
                 @method('PUT')
@@ -162,7 +168,17 @@
                             return;
                         }
                     }
-                    if (!confirm('Are you sure you want to submit this weekly report? Once submitted, it cannot be edited.')) {
+                    if (window.DeskOraWeeklySubmitScan) {
+                        if (!window.DeskOraWeeklySubmitScan.consumeConfirmed(form)) {
+                            e.preventDefault();
+                            window.DeskOraWeeklySubmitScan.open({
+                                form: form,
+                                submitter: document.getElementById('weeklyReportSubmitBtn'),
+                                documentType: 'weekly_report',
+                            });
+                            return;
+                        }
+                    } else if (!confirm('Are you sure you want to submit this weekly report? Once submitted, it cannot be edited.')) {
                         e.preventDefault();
                         return;
                     }
@@ -176,5 +192,6 @@
         });
     </script>
     @endpush
+    @include('documents.partials.weekly-submit-scan-modal')
     @include('documents.partials.deskora-ai-document-context')
 </x-app-layout>

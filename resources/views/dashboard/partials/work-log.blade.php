@@ -52,8 +52,7 @@
         @if($reportReadyHint)
             <div class="alert alert-light border mt-3 mb-0 py-2 px-3 small">
                 You have work logs for this week.
-                <a href="{{ route('documents.create', ['type' => 'weekly_report']) }}">Start your weekly report</a>
-                and use Draft with AI to fill the blanks.
+                <a href="{{ route('documents.create', ['type' => 'weekly_report']) }}">Start your weekly report</a>.
             </div>
         @endif
     </div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AiAssistService;
+use App\Services\WeeklyDocumentAiStyleScanner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +13,7 @@ class AiAssistActionController extends Controller
 {
     public function __construct(
         private readonly AiAssistService $aiAssist,
+        private readonly WeeklyDocumentAiStyleScanner $writingScanner,
     ) {}
 
     public function status(): JsonResponse
@@ -61,6 +63,24 @@ class AiAssistActionController extends Controller
         );
 
         return response()->json($result);
+    }
+
+    public function scanWeeklyWriting(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->status ?? '') === 'active', 403);
+
+        $validated = $request->validate([
+            'document_type' => ['required', 'string', 'in:weekly_plan,weekly_report'],
+            'text' => ['nullable', 'string', 'max:50000'],
+        ]);
+
+        return response()->json(
+            $this->writingScanner->scan(
+                $validated['document_type'],
+                (string) ($validated['text'] ?? '')
+            )
+        );
     }
 
     public function suggestRejection(Request $request): JsonResponse

@@ -253,4 +253,109 @@ class AiAssistActionTest extends TestCase
         $this->assertSame('Monday - Partner visit', $response->json('draft.activity_progress.0.activity_output'));
         $this->assertContains('Visited partner site', $response->json('draft.achievements'));
     }
+
+    public function test_scan_weekly_writing_is_advisory_and_fails_open_without_api_key(): void
+    {
+        config(['services.groq.api_key' => '']);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $response = $this->actingAs($user)->postJson(route('ai-assist.scan-weekly-writing'), [
+            'document_type' => 'weekly_report',
+            'text' => 'This week we will delve into the landscape of partner work — a testament to meticulous planning. Furthermore, it is important to note this tapestry of delivery.',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('advisory', true);
+        $response->assertJsonPath('used_ai', false);
+        $response->assertJsonPath('available', false);
+        $this->assertGreaterThanOrEqual(50, $response->json('ai_percent'));
+        $this->assertSame(100 - (int) $response->json('ai_percent'), $response->json('human_percent'));
+    }
+
+    public function test_scan_weekly_writing_blends_groq_score_when_available(): void
+    {
+        config([
+            'services.groq.api_key' => 'gsk_test_key',
+            'services.groq.base_url' => 'https://api.groq.com/openai/v1',
+            'services.groq.model' => 'openai/gpt-oss-120b',
+        ]);
+
+        Http::fake([
+            'api.groq.com/*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => '{"ai_percent":80,"signals":["em dashes","formal AI wording"]}',
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $response = $this->actingAs($user)->postJson(route('ai-assist.scan-weekly-writing'), [
+            'document_type' => 'weekly_plan',
+            'text' => 'Finish partner visits on Tuesday and print the remaining books for the field team after the office meeting with finance.',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('advisory', true);
+        $response->assertJsonPath('used_ai', true);
+        $response->assertJsonPath('available', true);
+        $this->assertGreaterThan(8, $response->json('ai_percent'));
+        $this->assertContains('em dashes', $response->json('signals'));
+        Http::assertSent(fn ($request) => ($request->data()['temperature'] ?? null) === 0.1);
+    }
+
+    public function test_scan_weekly_writing_still_returns_heuristic_when_groq_fails(): void
+    {
+        config([
+            'services.groq.api_key' => 'gsk_test_key',
+            'services.groq.base_url' => 'https://api.groq.com/openai/v1',
+        ]);
+
+        Http::fake([
+            'api.groq.com/*' => Http::response([
+                'error' => ['message' => 'Invalid API Key'],
+            ], 401),
+        ]);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $this->actingAs($user)
+            ->postJson(route('ai-assist.scan-weekly-writing'), [
+                'document_type' => 'weekly_plan',
+                'text' => 'Visit the remaining schools on Thursday and collect signed forms from the head teachers before Friday.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('advisory', true)
+            ->assertJsonPath('used_ai', false)
+            ->assertJsonPath('available', true);
+    }
+
+    public function test_weekly_report_fields_no_longer_offer_draft_with_ai(): void
+    {
+        $user = User::factory()->create(['status' => 'active']);
+        $this->actingAs($user);
+        \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
+
+        $html = view('documents.partials.create.weekly-report-fields', [
+            'relatedPlan' => null,
+            'reportMeetingRows' => [],
+            'teamUsers' => collect(),
+        ])->render();
+
+        $this->assertStringNotContainsString('Draft with AI', $html);
+        $this->assertStringNotContainsString('data-ai-draft-weekly-report', $html);
+    }
+
+    public function test_submit_scan_modal_is_advisory_and_covers_all_sections(): void
+    {
+        $html = view('documents.partials.weekly-submit-scan-modal')->render();
+
+        $this->assertStringContainsString('id="weeklySubmitScanModal"', $html);
+        $this->assertStringContainsString('Checking writing style across all sections', $html);
+        $this->assertStringContainsString('Guide only', $html);
+        $this->assertStringContainsString('weeklySubmitScanConfirmBtn', $html);
+    }
 }

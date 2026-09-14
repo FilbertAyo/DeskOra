@@ -840,7 +840,84 @@ class AiAssistService
         return str_starts_with($model, 'openai/gpt-oss-');
     }
 
-    private function generate(string $systemPrompt, string $userText, ?int $maxTokens = null, bool $formatAsSummary = false): string
+    /**
+     * Advisory scan of weekly plan/report writing for AI-like dashes, wording, and sentence structure.
+     * Fail-open: returns null if Groq is unavailable.
+     *
+     * @return array{ai_percent: int, signals: list<string>}|null
+     */
+    public function assessWeeklyWritingStyle(string $text): ?array
+    {
+        $text = trim($text);
+        if ($text === '' || ! $this->isConfigured()) {
+            return null;
+        }
+
+        if (mb_strlen($text) > 12000) {
+            $text = mb_substr($text, 0, 12000);
+        }
+
+        try {
+            $raw = $this->generate(
+                'You scan workplace weekly plans and weekly reports for AI-writing tells only: '
+                    .'em dashes used as asides, ChatGPT-style wording, and overly polished or parallel sentence structure. '
+                    .'Do not detect language. Do not treat short notes, lists, names, dates, or normal workplace English as AI. '
+                    .'Score the WHOLE document, not one section. '
+                    .'Return ONLY JSON: {"ai_percent":0-100,"signals":["short phrase"]}. '
+                    .'ai_percent is how AI-like the writing looks, not a word count. '
+                    .'Include at most 4 short signals staff can understand, such as "em dashes", "formal AI wording", or "even sentence rhythm". '
+                    .'If the writing looks human, use a low ai_percent and an empty signals array.',
+                $text,
+                250,
+                formatAsSummary: false,
+                options: [
+                    'sanitize' => false,
+                    'temperature' => 0.1,
+                    'timeout' => 12,
+                ],
+            );
+        } catch (Throwable $exception) {
+            Log::warning('AI writing-style scan failed.', ['message' => $exception->getMessage()]);
+
+            return null;
+        }
+
+        if (preg_match('/\{.*\}/s', $raw, $matches)) {
+            $raw = $matches[0];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $aiPercent = (int) round((float) ($decoded['ai_percent'] ?? -1));
+        if ($aiPercent < 0 || $aiPercent > 100) {
+            return null;
+        }
+
+        $signals = [];
+        foreach (($decoded['signals'] ?? []) as $signal) {
+            $label = trim((string) $signal);
+            if ($label === '') {
+                continue;
+            }
+            $signals[] = mb_substr($label, 0, 80);
+            if (count($signals) >= 4) {
+                break;
+            }
+        }
+
+        return [
+            'ai_percent' => $aiPercent,
+            'signals' => $signals,
+        ];
+    }
+
+    /**
+     * @param  array{sanitize?: bool, temperature?: float, timeout?: int}  $options
+     */
+    private function generate(string $systemPrompt, string $userText, ?int $maxTokens = null, bool $formatAsSummary = false, array $options = []): string
     {
         if (! $this->isConfigured()) {
             throw new RuntimeException('AI is not configured. Add GROQ_API_KEY to your .env file.');
@@ -850,6 +927,11 @@ class AiAssistService
         $baseUrl = rtrim((string) config('services.groq.base_url', 'https://api.groq.com/openai/v1'), '/');
         $url = $baseUrl.'/chat/completions';
         $maxCompletionTokens = $maxTokens ?? (int) config('services.groq.max_tokens', 500);
+        $sanitize = array_key_exists('sanitize', $options) ? (bool) $options['sanitize'] : true;
+        $temperature = array_key_exists('temperature', $options) ? (float) $options['temperature'] : 0.4;
+        $timeout = array_key_exists('timeout', $options)
+            ? max(5, (int) $options['timeout'])
+            : (int) config('services.groq.timeout', 30);
 
         $payload = [
             'model' => $model,
@@ -857,7 +939,7 @@ class AiAssistService
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userText],
             ],
-            'temperature' => 0.4,
+            'temperature' => $temperature,
             'max_completion_tokens' => $maxCompletionTokens,
         ];
 
@@ -872,7 +954,7 @@ class AiAssistService
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer '.config('services.groq.api_key'),
             ])
-                ->timeout((int) config('services.groq.timeout', 30))
+                ->timeout($timeout)
                 ->post($url, $payload);
         } catch (ConnectionException $exception) {
             Log::warning('Groq connection failed.', ['message' => $exception->getMessage()]);
@@ -889,9 +971,11 @@ class AiAssistService
                 throw new RuntimeException('AI returned an empty response. Please try again.');
             }
 
-            return $formatAsSummary
-                ? $this->formatSummaryAsParagraphs($result)
-                : $this->sanitizePlainText($result);
+            if ($formatAsSummary) {
+                return $this->formatSummaryAsParagraphs($result);
+            }
+
+            return $sanitize ? $this->sanitizePlainText($result) : $result;
         }
 
         $message = (string) ($response->json('error.message') ?? 'AI request failed. Please try again.');

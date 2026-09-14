@@ -43,6 +43,9 @@
                     @include('documents.partials.edit.form-footer')
                 </div>
             </form>
+            @if(in_array($document->type, ['weekly_plan', 'weekly_report'], true))
+                @include('documents.partials.weekly-submit-scan-modal')
+            @endif
         </div>
     </div>
 

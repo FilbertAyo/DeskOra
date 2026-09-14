@@ -60,19 +60,10 @@
                                     </div>
                                 </div>
 
-                                <!-- 1. Summary -->
                                 <div class="col-12 mb-3">
                                     <div class="card border-secondary">
                                         <div class="card-header bg-white border-bottom">
-                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                                <h6 class="mb-0"><i class="ti ti-book-open me-2"></i>1. Summary of the Week</h6>
-                                                <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary"
-                                                    data-ai-draft-weekly-report
-                                                    title="Draft from your action-log tasks">
-                                                    <i class="ti ti-sparkles me-1"></i> Draft with AI
-                                                </button>
-                                            </div>
+                                            <h6 class="mb-0"><i class="ti ti-book-open me-2"></i>1. Summary of the Week</h6>
                                         </div>
                                         <div class="card-body">
                                             <textarea class="form-control"
@@ -80,9 +71,6 @@
                                                 name="content[summary]"
                                                 rows="5"
                                                 placeholder="Describe what this week focused on (and the overall progress)">{{ old('content.summary', $objectiveSummary) }}</textarea>
-                                            <small class="text-muted d-block mt-2">
-                                                Draft with AI uses your action-log tasks for this period. Always review before submitting.
-                                            </small>
                                         </div>
                                     </div>
                                 </div>
