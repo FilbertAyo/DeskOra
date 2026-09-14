@@ -41,7 +41,6 @@
                             <div class="progress-bar bg-warning" id="weeklySubmitScanAiBar" role="progressbar" style="width: 0%"></div>
                         </div>
                     </div>
-                    <p class="small mb-2" id="weeklySubmitScanRecommendation"></p>
                     <ul class="small text-muted mb-0 ps-3" id="weeklySubmitScanSignals"></ul>
                 </div>
             </div>
@@ -70,7 +69,6 @@
     const aiPctEl = document.getElementById('weeklySubmitScanAiPct');
     const humanBarEl = document.getElementById('weeklySubmitScanHumanBar');
     const aiBarEl = document.getElementById('weeklySubmitScanAiBar');
-    const recommendationEl = document.getElementById('weeklySubmitScanRecommendation');
     const signalsEl = document.getElementById('weeklySubmitScanSignals');
     const confirmBtn = document.getElementById('weeklySubmitScanConfirmBtn');
 
@@ -167,8 +165,6 @@
         const aiPercent = data && typeof data.ai_percent === 'number' ? data.ai_percent : null;
         const humanPercent = data && typeof data.human_percent === 'number' ? data.human_percent : null;
         labelEl.textContent = (data && data.label) || 'Writing check';
-        recommendationEl.textContent = (data && data.recommendation)
-            || ('This is a guide only. You can still submit this ' + nounFor(documentType) + '.');
 
         if (aiPercent === null || humanPercent === null) {
             humanPctEl.textContent = '—';
@@ -219,7 +215,6 @@
             if (token !== scanToken) return;
             renderResult({
                 label: 'Could not check writing style',
-                recommendation: 'The writing check is unavailable right now. You can still submit.',
                 human_percent: null,
                 ai_percent: null,
                 signals: [],

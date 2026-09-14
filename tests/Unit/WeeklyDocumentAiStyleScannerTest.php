@@ -56,7 +56,8 @@ class WeeklyDocumentAiStyleScannerTest extends TestCase
         $this->assertNull($result['ai_percent']);
         $this->assertNull($result['human_percent']);
         $this->assertTrue($result['advisory']);
-        $this->assertStringContainsString('still submit', (string) $result['message']);
+        $this->assertStringContainsString('Not enough writing', (string) $result['message']);
+        $this->assertArrayNotHasKey('recommendation', $result);
     }
 
     public function test_extracts_all_plan_sections_including_main_target(): void

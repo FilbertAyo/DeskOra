@@ -59,7 +59,6 @@ class WeeklyDocumentAiStyleScanner
      *     human_percent: ?int,
      *     ai_percent: ?int,
      *     label: string,
-     *     recommendation: string,
      *     signals: list<string>,
      *     message: ?string
      * }
@@ -87,7 +86,6 @@ class WeeklyDocumentAiStyleScanner
         }
 
         $humanPercent = $aiPercent === null ? null : max(0, min(100, 100 - $aiPercent));
-        $noun = $this->documentNoun($documentType);
 
         return [
             'document_type' => $documentType,
@@ -98,10 +96,9 @@ class WeeklyDocumentAiStyleScanner
             'human_percent' => $humanPercent,
             'ai_percent' => $aiPercent,
             'label' => $this->labelFor($aiPercent),
-            'recommendation' => $this->recommendationFor($noun, $aiPercent, $signals),
             'signals' => $signals,
             'message' => $wordCount < 12
-                ? 'There is not enough writing yet to estimate AI-like style. You can still submit.'
+                ? 'Not enough writing yet to estimate AI-like style.'
                 : null,
         ];
     }
@@ -373,37 +370,6 @@ class WeeklyDocumentAiStyleScanner
         }
 
         return 'Looks heavily AI-assisted';
-    }
-
-    /**
-     * @param  list<string>  $signals
-     */
-    private function recommendationFor(string $noun, ?int $aiPercent, array $signals): string
-    {
-        if ($aiPercent === null) {
-            return 'This is a guide only. You can still submit this '.$noun.'.';
-        }
-
-        $base = 'This estimate covers the whole '.$noun.' — every section together. It is a guide only, and you can still submit.';
-        if ($aiPercent >= 50) {
-            return 'This '.$noun.' has several AI-like patterns'
-                .($signals !== [] ? ' ('.implode(', ', array_slice($signals, 0, 3)).')' : '')
-                .'. '.$base;
-        }
-        if ($aiPercent >= 25) {
-            return 'Some parts of this '.$noun.' look AI-assisted. '.$base;
-        }
-
-        return 'This '.$noun.' looks like your own writing. '.$base;
-    }
-
-    private function documentNoun(string $documentType): string
-    {
-        return match ($documentType) {
-            Document::TYPE_WEEKLY_PLAN => 'plan',
-            Document::TYPE_WEEKLY_REPORT => 'report',
-            default => 'document',
-        };
     }
 
     private function normalizeDocumentType(string $documentType): string
