@@ -5,7 +5,13 @@
                 <div class="col-md-12">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="page-header-title">
-                            <h5 class="m-b-10">Official Letter</h5>
+                            <h5 class="m-b-10">
+                                @if(filled($letter->name))
+                                    {{ $letter->name }}
+                                @else
+                                    Official Letter
+                                @endif
+                            </h5>
                             <ul class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
                                 <li class="breadcrumb-item"><a href="{{ route('official-letters.index') }}">Official Letters</a></li>
@@ -167,6 +173,21 @@
                     <dl class="mb-0">
                         <dt class="small text-muted">Reference</dt>
                         <dd><code>{{ $letter->reference_number }}</code></dd>
+                        <dt class="small text-muted">Letter name</dt>
+                        <dd>
+                            @if(filled($letter->name))
+                                {{ $letter->name }}
+                                <div class="small text-muted">Portal only — not printed on the download.</div>
+                            @else
+                                <span class="text-muted">Not set</span>
+                                @if($canUpdate)
+                                    <div class="small">
+                                        <a href="{{ route('official-letters.edit', $letter) }}">Add a name</a>
+                                        so this letter is easier to tell apart from others with the same subject.
+                                    </div>
+                                @endif
+                            @endif
+                        </dd>
                         <dt class="small text-muted">Department</dt>
                         <dd>{{ $letter->department_code }} — {{ $letter->departmentLabel() }}</dd>
                         <dt class="small text-muted">Letter Date</dt>

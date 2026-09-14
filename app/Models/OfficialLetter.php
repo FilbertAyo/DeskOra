@@ -28,6 +28,7 @@ class OfficialLetter extends Model
     protected $fillable = [
         'department_code',
         'letter_date',
+        'name',
         'recipient',
         'subject',
         'salutation',
@@ -57,6 +58,7 @@ class OfficialLetter extends Model
                 'department_code',
                 'letter_date',
                 'sequence',
+                'name',
                 'recipient',
                 'subject',
                 'salutation',

@@ -110,6 +110,7 @@
                                     <tr>
                                         <th class="text-center" style="width: 50px;">No.</th>
                                         <th>Reference</th>
+                                        <th>Name</th>
                                         <th>Subject</th>
                                         <th style="width: 100px;">Dept</th>
                                         <th style="width: 120px;">Letter Date</th>
@@ -138,6 +139,13 @@
                                                     <span class="badge bg-light-info border border-info ms-1">Shared</span>
                                                 @endif
                                                 @include('official-letters.partials.download-status-badge', ['letter' => $letter, 'class' => 'ms-1'])
+                                            </td>
+                                            <td>
+                                                @if(filled($letter->name))
+                                                    {{ \Illuminate\Support\Str::limit($letter->name, 50) }}
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
                                             </td>
                                             <td>{{ \Illuminate\Support\Str::limit($letter->subject, 60) }}</td>
                                             <td>{{ $letter->department_code }}</td>

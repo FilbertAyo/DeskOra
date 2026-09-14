@@ -38,6 +38,7 @@ class OfficialLetterDownloadDecisionNotification extends Notification
             ->subject('Official letter download '.$outcome.' — '.$this->letter->reference_number)
             ->greeting('Hello '.$notifiable->name.',')
             ->line($deciderName.' '.$outcome.' your request to download '.$this->letter->reference_number.'.')
+            ->when(filled($this->letter->name), fn (MailMessage $mail) => $mail->line('Name: '.$this->letter->name))
             ->line('Subject: '.$this->letter->subject);
 
         $note = trim((string) $this->downloadRequest->decision_note);

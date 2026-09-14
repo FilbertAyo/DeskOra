@@ -24,6 +24,22 @@
             </div>
         @endif
 
+        <div class="mb-3">
+            <label for="name" class="form-label">Letter name</label>
+            <input type="text" name="name" id="name"
+                   class="form-control @error('name') is-invalid @enderror"
+                   value="{{ old('name', $isEdit ? $letter->name : '') }}"
+                   maxlength="255"
+                   placeholder="e.g. Mwanza follow-up, Kigoma round 2">
+            <small class="text-muted">
+                Used only in the portal so you can tell letters apart when they share the same subject.
+                It does not appear on the downloaded letter.
+            </small>
+            @error('name')
+                <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
+        </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="department_code" class="form-label">Department <span class="text-danger">*</span></label>

@@ -224,6 +224,115 @@ class OfficialLetterTest extends TestCase
         ])->value('last_sequence'));
     }
 
+    public function test_letter_name_can_be_saved_and_updated_on_existing_letters(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.store'), $this->validPayload())
+            ->assertRedirect();
+
+        $letter = OfficialLetter::query()->firstOrFail();
+        $this->assertNull($letter->name);
+
+        $this->actingAs($manager)
+            ->put(route('official-letters.update', $letter), $this->validPayload([
+                'name' => '  Mwanza follow-up  ',
+            ]))
+            ->assertRedirect(route('official-letters.show', $letter));
+
+        $letter->refresh();
+        $this->assertSame('Mwanza follow-up', $letter->name);
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.index'))
+            ->assertOk()
+            ->assertSee('Mwanza follow-up')
+            ->assertSee('REQUEST FOR CONTINUED IMPLEMENTATION');
+
+        $this->actingAs($manager)
+            ->get(route('official-letters.show', $letter))
+            ->assertOk()
+            ->assertSee('Mwanza follow-up')
+            ->assertSee('Portal only');
+    }
+
+    public function test_letter_name_is_not_included_in_downloaded_pdf(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+        $manager->givePermissionTo('authorize official letter downloads');
+
+        $internalName = 'PORTAL-ONLY-NAME-MWANZA-ROUND-2';
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.store'), $this->validPayload([
+                'name' => $internalName,
+            ]))
+            ->assertRedirect();
+
+        $letter = OfficialLetter::query()->firstOrFail();
+        $this->assertSame($internalName, $letter->name);
+
+        $response = $this->actingAs($manager)
+            ->get(route('official-letters.download', $letter));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $pdf = $response->getContent();
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertStringNotContainsString($internalName, $pdf);
+        $this->assertStringNotContainsString('PORTAL-ONLY-NAME', $pdf);
+    }
+
+    public function test_letter_name_is_not_shown_on_verification_page(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        /** @var User $outsider */
+        $outsider = User::factory()->create(['status' => 'active']);
+        $outsider->assignRole('staff');
+
+        $internalName = 'PORTAL-ONLY-NAME-KIGOMA';
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.store'), $this->validPayload([
+                'name' => $internalName,
+            ]))
+            ->assertRedirect();
+
+        $letter = OfficialLetter::query()->firstOrFail();
+
+        $this->actingAs($outsider)
+            ->get(route('official-letters.verify', $letter))
+            ->assertOk()
+            ->assertSee($letter->reference_number)
+            ->assertSee($letter->subject)
+            ->assertDontSee($internalName);
+    }
+
+    public function test_blank_letter_name_is_stored_as_null(): void
+    {
+        /** @var User $manager */
+        $manager = User::factory()->create(['status' => 'active']);
+        $manager->givePermissionTo('manage official letters');
+
+        $this->actingAs($manager)
+            ->post(route('official-letters.store'), $this->validPayload([
+                'name' => '   ',
+            ]))
+            ->assertRedirect();
+
+        $letter = OfficialLetter::query()->firstOrFail();
+        $this->assertNull($letter->name);
+    }
+
     public function test_changing_department_or_month_on_update_allocates_new_reference(): void
     {
         /** @var User $manager */

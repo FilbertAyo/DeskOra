@@ -37,6 +37,7 @@ class OfficialLetterDownloadRequestedNotification extends Notification
             ->greeting('Hello '.$notifiable->name.',')
             ->line($this->requestedBy->name.' requested permission to download an official letter.')
             ->line('Reference: '.$this->letter->reference_number)
+            ->when(filled($this->letter->name), fn (MailMessage $mail) => $mail->line('Name: '.$this->letter->name))
             ->line('Subject: '.$this->letter->subject);
 
         $note = trim((string) $this->downloadRequest->request_note);

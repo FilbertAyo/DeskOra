@@ -485,6 +485,7 @@ class OfficialLetterController extends Controller
         $validated = $request->validate([
             'department_code' => ['required', 'string', Rule::in($departmentCodes)],
             'letter_date' => ['required', 'date'],
+            'name' => ['nullable', 'string', 'max:255'],
             'recipient' => ['required', 'string', 'max:5000'],
             'subject' => ['required', 'string', 'max:500'],
             'salutation' => ['required', 'string', Rule::in($salutations)],
@@ -503,6 +504,7 @@ class OfficialLetterController extends Controller
 
         $signatory = User::query()->findOrFail($validated['signatory_id']);
         $validated['department_code'] = strtoupper($validated['department_code']);
+        $validated['name'] = $this->optionalNote($validated['name'] ?? null);
         $validated['recipient'] = mb_strtoupper($validated['recipient'], 'UTF-8');
         $validated['subject'] = mb_strtoupper($validated['subject'], 'UTF-8');
         $validated['body'] = $this->sanitizeBodyHtml($validated['body']);

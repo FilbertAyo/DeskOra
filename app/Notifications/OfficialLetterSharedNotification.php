@@ -35,6 +35,7 @@ class OfficialLetterSharedNotification extends Notification
             ->greeting('Hello '.$notifiable->name.',')
             ->line($this->sharedBy->name.' shared an official letter with you.')
             ->line('Reference: '.$this->letter->reference_number)
+            ->when(filled($this->letter->name), fn (MailMessage $mail) => $mail->line('Name: '.$this->letter->name))
             ->line('Subject: '.$this->letter->subject)
             ->action('Open Letter', route('official-letters.show', $this->letter))
             ->line('You can view and edit this letter in the portal.');
