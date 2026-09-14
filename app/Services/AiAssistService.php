@@ -841,6 +841,95 @@ class AiAssistService
     }
 
     /**
+     * Advisory SMART evaluation of a weekly plan's main target sentence.
+     * Returns null if Groq is unavailable (fail-open).
+     *
+     * @return array{
+     *     scores: array{specific: int, measurable: int, achievable: int, relevant: int, time_bound: int},
+     *     overall: int,
+     *     tips: list<string>
+     * }|null
+     */
+    public function evaluateSmartTarget(string $mainTarget): ?array
+    {
+        $mainTarget = trim($mainTarget);
+        if ($mainTarget === '' || ! $this->isConfigured()) {
+            return null;
+        }
+
+        if (mb_strlen($mainTarget) > 4000) {
+            $mainTarget = mb_substr($mainTarget, 0, 4000);
+        }
+
+        try {
+            $raw = $this->generate(
+                'You evaluate a weekly work plan\'s main target against the SMART framework for ONE week. '
+                    .'SMART means: Specific (clear what), Measurable (has a number or clear done-state), '
+                    .'Achievable (realistic in one week), Relevant (fits a work context), '
+                    .'Time-bound (the week itself counts, but bonus if a day or deadline is named). '
+                    .'Score each dimension 0-100. Be generous with Achievable and Relevant for short workplace targets. '
+                    .'Return ONLY JSON: '
+                    .'{"scores":{"specific":0-100,"measurable":0-100,"achievable":0-100,"relevant":0-100,"time_bound":0-100},'
+                    .'"overall":0-100,'
+                    .'"tips":["one short improvement tip per weak dimension, max 3 total"]}. '
+                    .'tips must be short, practical, and specific to the text. '
+                    .'If all dimensions are strong, return an empty tips array.',
+                'Weekly plan main target: '.$mainTarget,
+                300,
+                formatAsSummary: false,
+                options: [
+                    'sanitize' => false,
+                    'temperature' => 0.1,
+                    'timeout' => 12,
+                ],
+            );
+        } catch (Throwable $exception) {
+            Log::warning('AI SMART evaluation failed.', ['message' => $exception->getMessage()]);
+
+            return null;
+        }
+
+        if (preg_match('/\{.*\}/s', $raw, $matches)) {
+            $raw = $matches[0];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded) || ! isset($decoded['scores']) || ! is_array($decoded['scores'])) {
+            return null;
+        }
+
+        $dims = ['specific', 'measurable', 'achievable', 'relevant', 'time_bound'];
+        $scores = [];
+        foreach ($dims as $dim) {
+            $val = (int) round((float) ($decoded['scores'][$dim] ?? -1));
+            if ($val < 0 || $val > 100) {
+                return null;
+            }
+            $scores[$dim] = $val;
+        }
+
+        $overall = (int) round((float) ($decoded['overall'] ?? array_sum($scores) / count($scores)));
+        $overall = max(0, min(100, $overall));
+
+        $tips = [];
+        foreach (($decoded['tips'] ?? []) as $tip) {
+            $label = trim((string) $tip);
+            if ($label !== '') {
+                $tips[] = mb_substr($label, 0, 120);
+                if (count($tips) >= 3) {
+                    break;
+                }
+            }
+        }
+
+        return [
+            'scores' => $scores,
+            'overall' => $overall,
+            'tips' => $tips,
+        ];
+    }
+
+    /**
      * Advisory scan of weekly plan/report writing for AI-like dashes, wording, and sentence structure.
      * Fail-open: returns null if Groq is unavailable.
      *

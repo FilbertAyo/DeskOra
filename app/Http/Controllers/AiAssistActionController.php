@@ -83,6 +83,54 @@ class AiAssistActionController extends Controller
         );
     }
 
+    public function evaluateSmartTarget(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->status ?? '') === 'active', 403);
+
+        $validated = $request->validate([
+            'main_target' => ['nullable', 'string', 'max:4000'],
+        ]);
+
+        $mainTarget = trim((string) ($validated['main_target'] ?? ''));
+
+        if ($mainTarget === '') {
+            return response()->json([
+                'available' => $this->aiAssist->isConfigured(),
+                'used_ai' => false,
+                'advisory' => true,
+                'scores' => null,
+                'overall' => null,
+                'tips' => [],
+                'message' => 'No main target provided.',
+            ]);
+        }
+
+        $result = $this->aiAssist->evaluateSmartTarget($mainTarget);
+
+        if ($result === null) {
+            return response()->json([
+                'available' => $this->aiAssist->isConfigured(),
+                'used_ai' => false,
+                'advisory' => true,
+                'scores' => null,
+                'overall' => null,
+                'tips' => [],
+                'message' => 'SMART check unavailable — AI is not configured.',
+            ]);
+        }
+
+        return response()->json([
+            'available' => true,
+            'used_ai' => true,
+            'advisory' => true,
+            'scores' => $result['scores'],
+            'overall' => $result['overall'],
+            'tips' => $result['tips'],
+            'message' => null,
+        ]);
+    }
+
     public function suggestRejection(Request $request): JsonResponse
     {
         $user = $request->user();

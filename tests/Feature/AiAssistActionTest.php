@@ -355,7 +355,74 @@ class AiAssistActionTest extends TestCase
 
         $this->assertStringContainsString('id="weeklySubmitScanModal"', $html);
         $this->assertStringContainsString('Checking writing style across all sections', $html);
-        $this->assertStringContainsString('Guide only', $html);
+        $this->assertStringContainsString('data-check-panel="smart"', $html);
+        $this->assertStringContainsString('data-check-panel="writing"', $html);
+        $this->assertStringContainsString('SMART check', $html);
         $this->assertStringContainsString('weeklySubmitScanConfirmBtn', $html);
+    }
+
+    public function test_evaluate_smart_target_fails_open_without_api_key(): void
+    {
+        config(['services.groq.api_key' => '']);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $response = $this->actingAs($user)->postJson(route('ai-assist.evaluate-smart-target'), [
+            'main_target' => 'Finish partner outreach',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('advisory', true);
+        $response->assertJsonPath('used_ai', false);
+        $response->assertJsonPath('available', false);
+        $response->assertJsonPath('scores', null);
+    }
+
+    public function test_evaluate_smart_target_returns_scores_when_groq_succeeds(): void
+    {
+        config([
+            'services.groq.api_key' => 'gsk_test_key',
+            'services.groq.base_url' => 'https://api.groq.com/openai/v1',
+            'services.groq.model' => 'openai/gpt-oss-120b',
+        ]);
+
+        Http::fake([
+            'api.groq.com/*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => '{"scores":{"specific":80,"measurable":60,"achievable":90,"relevant":85,"time_bound":50},"overall":73,"tips":["Add a number to make it measurable","Mention a day or deadline for time-bound clarity"]}',
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['status' => 'active']);
+
+        $response = $this->actingAs($user)->postJson(route('ai-assist.evaluate-smart-target'), [
+            'main_target' => 'Complete partner outreach visits this week',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('advisory', true);
+        $response->assertJsonPath('used_ai', true);
+        $response->assertJsonPath('overall', 73);
+        $this->assertIsArray($response->json('scores'));
+        $this->assertCount(5, $response->json('scores'));
+        $this->assertCount(2, $response->json('tips'));
+
+        Http::assertSent(fn ($r) => ($r->data()['temperature'] ?? null) === 0.1);
+    }
+
+    public function test_evaluate_smart_target_empty_target_returns_no_score(): void
+    {
+        $user = User::factory()->create(['status' => 'active']);
+
+        $response = $this->actingAs($user)->postJson(route('ai-assist.evaluate-smart-target'), [
+            'main_target' => '',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('scores', null);
+        $response->assertJsonPath('overall', null);
     }
 }

@@ -108,6 +108,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/ai-assist/scan-weekly-writing', [AiAssistActionController::class, 'scanWeeklyWriting'])
         ->middleware('throttle:20,1')
         ->name('ai-assist.scan-weekly-writing');
+    Route::post('/ai-assist/evaluate-smart-target', [AiAssistActionController::class, 'evaluateSmartTarget'])
+        ->middleware('throttle:20,1')
+        ->name('ai-assist.evaluate-smart-target');
 
     Route::get('/commands', [CommandPaletteController::class, 'index'])
         ->middleware('throttle:60,1')
