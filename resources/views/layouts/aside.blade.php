@@ -207,14 +207,15 @@
 
                 @canany(['view inventory', 'view own inventory items'])
                     @php
-                        $inventoryOpsOpen = Request::routeIs('inventory.borrowing.*', 'inventory.maintenance.*', 'inventory.disposal.*', 'inventory.verification.*');
+                        $inventoryOpsOpen = Request::routeIs('inventory.borrowing.*', 'inventory.dispatches.*', 'inventory.maintenance.*', 'inventory.disposal.*', 'inventory.verification.*');
                         $inventorySetupOpen = Request::routeIs('inventory.categories.*', 'inventory.locations.*', 'inventory.suppliers.*', 'inventory.donors.*', 'inventory.projects.*');
                         $inventoryOverdueCount = \App\Models\InventoryBorrowRequest::overdueCount();
                         $inventoryPendingBorrowCount = \App\Models\InventoryBorrowRequest::pendingReviewCount();
                         $inventoryRepairCount = \App\Models\InventoryMaintenanceRecord::openCount();
                         $inventoryDisposalPending = \App\Models\InventoryDisposalRequest::pendingReviewCount();
                         $inventoryOpenVerification = \App\Models\InventoryVerificationSession::openCount();
-                        $inventoryOpsAttention = $inventoryOverdueCount + $inventoryPendingBorrowCount + $inventoryRepairCount + $inventoryDisposalPending + $inventoryOpenVerification;
+                        $inventoryDispatchAttention = \App\Models\InventoryDispatch::overdueCount() + \App\Models\InventoryDispatch::openMovementCount();
+                        $inventoryOpsAttention = $inventoryOverdueCount + $inventoryPendingBorrowCount + $inventoryRepairCount + $inventoryDisposalPending + $inventoryOpenVerification + $inventoryDispatchAttention;
                     @endphp
                     <li class="pc-item pc-hasmenu {{ Request::routeIs('inventory.*') ? 'active pc-trigger' : '' }}">
                         <a href="javascript:void(0);" class="pc-link">
@@ -270,6 +271,11 @@
                                     <li class="{{ Request::routeIs('inventory.borrowing.*') ? 'active' : '' }}">
                                         <a href="{{ route('inventory.borrowing.index') }}" class="pc-link">
                                             <span class="pc-mtext">Borrowing</span>
+                                        </a>
+                                    </li>
+                                    <li class="{{ Request::routeIs('inventory.dispatches.*') ? 'active' : '' }}">
+                                        <a href="{{ route('inventory.dispatches.index') }}" class="pc-link">
+                                            <span class="pc-mtext">Dispatch</span>
                                         </a>
                                     </li>
                                     @canany(['manage inventory maintenance', 'view inventory'])

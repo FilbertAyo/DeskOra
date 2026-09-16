@@ -63,7 +63,7 @@ class InventoryMaintenanceController extends Controller
         return view('inventory.maintenance.create', [
             'asset' => $asset,
             'assets' => InventoryAsset::query()
-                ->whereNotIn('status', [InventoryAsset::STATUS_DISPOSED, InventoryAsset::STATUS_UNDER_REPAIR])
+                ->whereNotIn('status', [InventoryAsset::STATUS_DISPOSED, InventoryAsset::STATUS_UNDER_REPAIR, InventoryAsset::STATUS_DISPATCHED])
                 ->orderBy('name')
                 ->get(['id', 'asset_code', 'name']),
         ]);
@@ -81,7 +81,7 @@ class InventoryMaintenanceController extends Controller
         $asset = InventoryAsset::query()->findOrFail($validated['asset_id']);
         $this->authorize('reportProblem', $asset);
 
-        if ($asset->isDisposed() || $asset->status === InventoryAsset::STATUS_BORROWED) {
+        if ($asset->isDisposed() || $asset->status === InventoryAsset::STATUS_BORROWED || $asset->isDispatched()) {
             throw ValidationException::withMessages([
                 'asset_id' => 'This asset cannot be sent to repair in its current status.',
             ]);
@@ -175,7 +175,7 @@ class InventoryMaintenanceController extends Controller
                 ? InventoryAsset::STATUS_ASSIGNED
                 : InventoryAsset::STATUS_AVAILABLE;
 
-            if (in_array($restoredStatus, [InventoryAsset::STATUS_BORROWED, InventoryAsset::STATUS_UNDER_REPAIR, InventoryAsset::STATUS_DISPOSED], true)) {
+            if (in_array($restoredStatus, [InventoryAsset::STATUS_BORROWED, InventoryAsset::STATUS_DISPATCHED, InventoryAsset::STATUS_UNDER_REPAIR, InventoryAsset::STATUS_DISPOSED], true)) {
                 $restoredStatus = InventoryAsset::STATUS_AVAILABLE;
             }
 

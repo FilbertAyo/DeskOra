@@ -112,6 +112,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory receipts',
             'manage inventory transfers',
             'manage inventory borrowing',
+            'manage inventory dispatches',
             'manage inventory maintenance',
             'approve inventory requests',
             'view own inventory items',
@@ -202,6 +203,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory receipts',
             'manage inventory transfers',
             'manage inventory borrowing',
+            'manage inventory dispatches',
             'manage inventory maintenance',
         ];
         $inventoryApproverPermissions = [
@@ -213,12 +215,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory stock',
             'manage inventory receipts',
             'manage inventory borrowing',
+            'manage inventory dispatches',
         ];
         $inventoryAssetOfficerPermissions = [
             'view inventory',
             'manage inventory assets',
             'manage inventory transfers',
             'manage inventory maintenance',
+            'manage inventory dispatches',
         ];
 
         // Superadmin and demo viewer always mirror the full permission catalog.

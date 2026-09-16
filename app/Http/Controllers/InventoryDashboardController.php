@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
+use App\Models\InventoryDispatch;
 use App\Models\InventoryDisposalRequest;
 use App\Models\InventoryMaintenanceRecord;
 use App\Models\InventoryStockItem;
@@ -24,6 +25,8 @@ class InventoryDashboardController extends Controller
             'overdue_borrow_count' => InventoryBorrowRequest::overdueCount(),
             'under_repair_count' => InventoryMaintenanceRecord::openCount(),
             'pending_disposal_count' => InventoryDisposalRequest::pendingReviewCount(),
+            'open_dispatch_count' => InventoryDispatch::openMovementCount(),
+            'overdue_dispatch_count' => InventoryDispatch::overdueCount(),
         ];
 
         return view('inventory.index', compact('stats'));

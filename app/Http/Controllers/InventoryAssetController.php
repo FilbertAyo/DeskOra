@@ -91,6 +91,9 @@ class InventoryAssetController extends Controller
             'assignments.assignedToUser', 'assignments.assignedToDepartment.parent', 'assignments.assignedByUser',
             'transfers.fromLocation.parent', 'transfers.toLocation.parent', 'transfers.transferredByUser',
             'borrowRequests.borrower', 'borrowRequests.requestedBy',
+            'dispatchItems.dispatch.responsibleUsers',
+            'dispatchItems.originalResponsibleUser',
+            'dispatchItems.originalLocation.parent',
             'maintenanceRecords.reportedBy', 'maintenanceRecords.completedBy',
             'disposalRequests.requestedBy', 'disposalRequests.reviewedBy',
         ]);
@@ -141,6 +144,38 @@ class InventoryAssetController extends Controller
             }
         }
 
+        foreach ($asset->dispatchItems as $item) {
+            $timeline->push([
+                'type' => 'dispatch_included',
+                'at' => $item->created_at,
+                'record' => $item,
+            ]);
+
+            if ($item->dispatch?->dispatched_at) {
+                $timeline->push([
+                    'type' => 'dispatch_out',
+                    'at' => $item->dispatch->dispatched_at,
+                    'record' => $item,
+                ]);
+            }
+
+            if ($item->dispatch?->returned_at) {
+                $timeline->push([
+                    'type' => 'dispatch_return',
+                    'at' => $item->dispatch->returned_at,
+                    'record' => $item,
+                ]);
+            }
+
+            if ($item->dispatch?->closed_at) {
+                $timeline->push([
+                    'type' => 'dispatch_closed',
+                    'at' => $item->dispatch->closed_at,
+                    'record' => $item,
+                ]);
+            }
+        }
+
         foreach ($asset->maintenanceRecords as $record) {
             $timeline->push([
                 'type' => 'maintenance_report',
@@ -173,6 +208,10 @@ class InventoryAssetController extends Controller
             }
         }
 
+        $currentDispatch = $asset->dispatchItems
+            ->first(fn ($item) => $item->dispatch && in_array($item->dispatch->status, \App\Models\InventoryDispatch::activeMovementStatuses(), true))
+            ?->dispatch;
+
         $timeline = $timeline
             ->filter(fn ($entry) => $entry['at'] !== null)
             ->sortByDesc('at')
@@ -181,6 +220,7 @@ class InventoryAssetController extends Controller
         return view('inventory.assets.show', array_merge($this->formOptions(), [
             'asset' => $asset,
             'timeline' => $timeline,
+            'currentDispatch' => $currentDispatch,
             'statusOptions' => InventoryAsset::statusOptions(),
             'conditionOptions' => InventoryAsset::conditionOptions(),
             'sourceTypeOptions' => InventoryAsset::sourceTypeOptions(),
@@ -236,6 +276,12 @@ class InventoryAssetController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'This asset has disposal history and cannot be deleted. Use disposal workflow instead.');
+        }
+
+        if ($asset->dispatchItems()->exists()) {
+            return redirect()
+                ->back()
+                ->with('error', 'This asset appears on a dispatch and cannot be deleted.');
         }
 
         if (InventoryVerificationResult::query()->where('asset_id', $asset->id)->exists()) {

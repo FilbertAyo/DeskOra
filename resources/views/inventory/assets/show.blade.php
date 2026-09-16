@@ -84,6 +84,17 @@
         <div class="alert alert-secondary">This asset is disposed. History stays visible and editing is locked.</div>
     @endif
 
+    @if($currentDispatch ?? null)
+        <div class="alert alert-secondary">
+            Currently on dispatch
+            <a href="{{ route('inventory.dispatches.show', $currentDispatch) }}">{{ $currentDispatch->dispatch_number }}</a>
+            — {{ $currentDispatch->title }}
+            ({{ $currentDispatch->destination }}).
+            Temporary responsible people: {{ $currentDispatch->responsiblePeopleLabel() }}.
+            The permanent custodian has not changed.
+        </div>
+    @endif
+
     <div class="row">
         <div class="col-md-4">
             <div class="card shadow-none border mb-3">
@@ -205,6 +216,70 @@
                                         <br>Condition: {{ \App\Models\InventoryBorrowRequest::returnConditionOptions()[$row->return_condition] ?? $row->return_condition }}
                                     @endif
                                 </div>
+                            @elseif($entry['type'] === 'dispatch_included')
+                                @php $row = $entry['record']; $dispatch = $row->dispatch; @endphp
+                                <div class="d-flex justify-content-between">
+                                    <strong><i class="ti ti-clipboard-list me-1"></i> Included in dispatch</strong>
+                                    <small class="text-muted">{{ $entry['at']->format('M d, Y h:i A') }}</small>
+                                </div>
+                                <div class="small mt-2">
+                                    @if($dispatch)
+                                        Dispatch: <a href="{{ route('inventory.dispatches.show', $dispatch) }}">{{ $dispatch->dispatch_number }}</a>
+                                        — {{ $dispatch->title }}<br>
+                                        Destination: {{ $dispatch->destination }}<br>
+                                        Temporary responsible: {{ $dispatch->responsiblePeopleLabel() }}
+                                    @endif
+                                    @if($row->originalResponsibleUser || $row->original_responsible_user_id)
+                                        <br>Normal assignment kept: {{ $row->originalResponsibleUser?->name ?? 'assigned staff' }}
+                                    @endif
+                                </div>
+                            @elseif($entry['type'] === 'dispatch_out')
+                                @php $row = $entry['record']; $dispatch = $row->dispatch; @endphp
+                                <div class="d-flex justify-content-between">
+                                    <strong><i class="ti ti-truck-delivery me-1"></i> Dispatched</strong>
+                                    <small class="text-muted">{{ $entry['at']->format('M d, Y h:i A') }}</small>
+                                </div>
+                                <div class="small mt-2">
+                                    @if($dispatch)
+                                        <a href="{{ route('inventory.dispatches.show', $dispatch) }}">{{ $dispatch->dispatch_number }}</a>
+                                        to {{ $dispatch->destination }}
+                                    @endif
+                                    @if($row->condition_at_dispatch)
+                                        <br>Condition at dispatch: {{ \App\Models\InventoryAsset::conditionOptions()[$row->condition_at_dispatch] ?? $row->condition_at_dispatch }}
+                                    @endif
+                                </div>
+                            @elseif($entry['type'] === 'dispatch_return')
+                                @php $row = $entry['record']; $dispatch = $row->dispatch; @endphp
+                                <div class="d-flex justify-content-between">
+                                    <strong><i class="ti ti-package-import me-1"></i> Dispatch returned</strong>
+                                    <small class="text-muted">{{ $entry['at']->format('M d, Y h:i A') }}</small>
+                                </div>
+                                <div class="small mt-2">
+                                    @if($dispatch)
+                                        <a href="{{ route('inventory.dispatches.show', $dispatch) }}">{{ $dispatch->dispatch_number }}</a>
+                                    @endif
+                                    @if($row->return_outcome)
+                                        <br>Return condition: {{ \App\Models\InventoryDispatchItem::returnOutcomeOptions()[$row->return_outcome] ?? $row->return_outcome }}
+                                    @endif
+                                    @if($row->return_notes)
+                                        <br>Notes: {{ $row->return_notes }}
+                                    @endif
+                                </div>
+                            @elseif($entry['type'] === 'dispatch_closed')
+                                @php $row = $entry['record']; $dispatch = $row->dispatch; @endphp
+                                <div class="d-flex justify-content-between">
+                                    <strong><i class="ti ti-circle-check me-1"></i> Back to normal assignment</strong>
+                                    <small class="text-muted">{{ $entry['at']->format('M d, Y h:i A') }}</small>
+                                </div>
+                                <div class="small mt-2">
+                                    @if($dispatch)
+                                        Closed: <a href="{{ route('inventory.dispatches.show', $dispatch) }}">{{ $dispatch->dispatch_number }}</a><br>
+                                    @endif
+                                    Restored custodian: {{ $row->originalResponsibleUser?->name ?? '—' }}
+                                    @if($row->originalLocation)
+                                        · Location: {{ $row->originalLocation->pathLabel() }}
+                                    @endif
+                                </div>
                             @elseif($entry['type'] === 'maintenance_report')
                                 @php $row = $entry['record']; @endphp
                                 <div class="d-flex justify-content-between">
@@ -252,7 +327,7 @@
                             @endif
                         </div>
                     @empty
-                        <p class="text-muted mb-0">No history yet. Receipt, assignment, transfer, borrow, repair, and disposal events will appear here.</p>
+                        <p class="text-muted mb-0">No history yet. Receipt, assignment, transfer, borrow, dispatch, repair, and disposal events will appear here.</p>
                     @endforelse
                 </div>
             </div>

@@ -69,6 +69,14 @@
             </a>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
+            <a href="{{ route('inventory.dispatches.index', ['tab' => 'dispatched']) }}" class="card shadow-none border h-100 text-decoration-none text-body">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Open dispatches</div>
+                    <div class="fs-4 fw-semibold">{{ $stats['open_dispatch_count'] ?? 0 }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
             <a href="{{ route('inventory.disposal.index', ['tab' => 'pending']) }}" class="card shadow-none border h-100 text-decoration-none text-body">
                 <div class="card-body py-3">
                     <div class="text-muted small">Disposal review</div>
@@ -102,6 +110,7 @@
     <div class="row g-2 mb-4">
         @foreach([
             ['label' => 'Borrowing', 'hint' => 'Lend and return', 'url' => route('inventory.borrowing.index'), 'icon' => 'ti-hand-grab'],
+            ['label' => 'Dispatch', 'hint' => 'Workshops and field kits', 'url' => route('inventory.dispatches.index'), 'icon' => 'ti-truck-delivery'],
             ['label' => 'Maintenance', 'hint' => 'Repair tracking', 'url' => route('inventory.maintenance.index'), 'icon' => 'ti-tool'],
             ['label' => 'Disposal', 'hint' => 'Needs approval', 'url' => route('inventory.disposal.index'), 'icon' => 'ti-trash'],
             ['label' => 'Verification', 'hint' => 'Count what we have', 'url' => route('inventory.verification.index'), 'icon' => 'ti-clipboard-check'],

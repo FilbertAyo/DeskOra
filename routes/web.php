@@ -20,6 +20,7 @@ use App\Http\Controllers\InventoryAssetController;
 use App\Http\Controllers\InventoryBorrowRequestController;
 use App\Http\Controllers\InventoryCategoryController;
 use App\Http\Controllers\InventoryDashboardController;
+use App\Http\Controllers\InventoryDispatchController;
 use App\Http\Controllers\InventoryDisposalRequestController;
 use App\Http\Controllers\InventoryDonorController;
 use App\Http\Controllers\InventoryLocationController;
@@ -339,6 +340,31 @@ Route::middleware('auth')->group(function () {
         Route::middleware('permission:manage inventory borrowing|view inventory|approve inventory requests')->group(function () {
             Route::get('/borrowing', [InventoryBorrowRequestController::class, 'index'])->name('borrowing.index');
             Route::get('/borrowing/{borrowRequest}', [InventoryBorrowRequestController::class, 'show'])->name('borrowing.show');
+        });
+
+        Route::middleware('permission:manage inventory dispatches')->group(function () {
+            Route::get('/dispatches/create', [InventoryDispatchController::class, 'create'])->name('dispatches.create');
+            Route::post('/dispatches', [InventoryDispatchController::class, 'store'])->name('dispatches.store');
+            Route::get('/dispatches/{dispatch}/edit', [InventoryDispatchController::class, 'edit'])->name('dispatches.edit');
+            Route::put('/dispatches/{dispatch}', [InventoryDispatchController::class, 'update'])->name('dispatches.update');
+            Route::delete('/dispatches/{dispatch}', [InventoryDispatchController::class, 'destroy'])->name('dispatches.destroy');
+            Route::post('/dispatches/{dispatch}/assets', [InventoryDispatchController::class, 'addAssets'])->name('dispatches.assets.add');
+            Route::post('/dispatches/{dispatch}/stock', [InventoryDispatchController::class, 'addStock'])->name('dispatches.stock.add');
+            Route::delete('/dispatches/{dispatch}/items/{item}', [InventoryDispatchController::class, 'removeItem'])->name('dispatches.items.destroy');
+            Route::post('/dispatches/{dispatch}/ready', [InventoryDispatchController::class, 'markReady'])->name('dispatches.ready');
+            Route::post('/dispatches/{dispatch}/reopen', [InventoryDispatchController::class, 'reopen'])->name('dispatches.reopen');
+            Route::post('/dispatches/{dispatch}/confirm', [InventoryDispatchController::class, 'confirm'])->name('dispatches.confirm');
+            Route::post('/dispatches/{dispatch}/start-return', [InventoryDispatchController::class, 'startReturn'])->name('dispatches.start-return');
+            Route::get('/dispatches/{dispatch}/return', [InventoryDispatchController::class, 'returnForm'])->name('dispatches.return');
+            Route::post('/dispatches/{dispatch}/return', [InventoryDispatchController::class, 'saveReturn'])->name('dispatches.return.save');
+            Route::post('/dispatches/{dispatch}/return/mark-all-good', [InventoryDispatchController::class, 'markAllGood'])->name('dispatches.return.mark-all-good');
+            Route::post('/dispatches/{dispatch}/complete-return', [InventoryDispatchController::class, 'completeReturn'])->name('dispatches.complete-return');
+            Route::post('/dispatches/{dispatch}/close', [InventoryDispatchController::class, 'close'])->name('dispatches.close');
+        });
+
+        Route::middleware('permission:manage inventory dispatches|view inventory')->group(function () {
+            Route::get('/dispatches', [InventoryDispatchController::class, 'index'])->name('dispatches.index');
+            Route::get('/dispatches/{dispatch}', [InventoryDispatchController::class, 'show'])->name('dispatches.show');
         });
 
         Route::middleware('permission:manage inventory maintenance')->group(function () {

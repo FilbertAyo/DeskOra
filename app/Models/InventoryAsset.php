@@ -18,6 +18,8 @@ class InventoryAsset extends Model
 
     public const STATUS_BORROWED = 'borrowed';
 
+    public const STATUS_DISPATCHED = 'dispatched';
+
     public const STATUS_UNDER_REPAIR = 'under_repair';
 
     public const STATUS_MISSING = 'missing';
@@ -155,6 +157,11 @@ class InventoryAsset extends Model
         return $this->hasMany(InventoryDisposalRequest::class, 'asset_id');
     }
 
+    public function dispatchItems()
+    {
+        return $this->hasMany(InventoryDispatchItem::class, 'asset_id');
+    }
+
     /**
      * Items assigned to this user personally, or to a whole department / sub-department they belong to.
      * Does not include items assigned to another person in the same unit.
@@ -194,6 +201,38 @@ class InventoryAsset extends Model
         return $this->status === self::STATUS_DISPOSED;
     }
 
+    public function isDispatched(): bool
+    {
+        return $this->status === self::STATUS_DISPATCHED;
+    }
+
+    public function isDispatchable(): bool
+    {
+        return in_array($this->status, self::dispatchableStatuses(), true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function dispatchableStatuses(): array
+    {
+        return [
+            self::STATUS_AVAILABLE,
+            self::STATUS_ASSIGNED,
+        ];
+    }
+
+    public function currentDispatch(): ?InventoryDispatch
+    {
+        $item = $this->dispatchItems()
+            ->whereHas('dispatch', fn ($query) => $query->whereIn('status', InventoryDispatch::activeMovementStatuses()))
+            ->with('dispatch.responsibleUsers')
+            ->latest()
+            ->first();
+
+        return $item?->dispatch;
+    }
+
     public function hasOpenMaintenance(): bool
     {
         return $this->maintenanceRecords()
@@ -219,6 +258,7 @@ class InventoryAsset extends Model
             self::STATUS_AVAILABLE => 'Available',
             self::STATUS_ASSIGNED => 'Assigned',
             self::STATUS_BORROWED => 'Borrowed',
+            self::STATUS_DISPATCHED => 'Dispatched',
             self::STATUS_UNDER_REPAIR => 'Under Repair',
             self::STATUS_MISSING => 'Missing',
             self::STATUS_DISPOSED => 'Disposed',

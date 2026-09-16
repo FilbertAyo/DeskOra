@@ -28,7 +28,7 @@ class InventoryAssetPolicy
 
     public function update(User $user, InventoryAsset $asset): bool
     {
-        return $user->can('manage inventory assets') && ! $asset->isDisposed();
+        return $user->can('manage inventory assets') && ! $asset->isDisposed() && ! $asset->isDispatched();
     }
 
     public function delete(User $user, InventoryAsset $asset): bool
@@ -38,21 +38,21 @@ class InventoryAssetPolicy
 
     public function assign(User $user, InventoryAsset $asset): bool
     {
-        return $user->can('manage inventory assets') && ! $asset->isDisposed();
+        return $user->can('manage inventory assets') && ! $asset->isDisposed() && ! $asset->isDispatched();
     }
 
     public function transfer(User $user, InventoryAsset $asset): bool
     {
-        return $user->can('manage inventory transfers') && ! $asset->isDisposed();
+        return $user->can('manage inventory transfers') && ! $asset->isDisposed() && ! $asset->isDispatched();
     }
 
     public function reportProblem(User $user, InventoryAsset $asset): bool
     {
-        return $user->can('manage inventory maintenance') && ! $asset->isDisposed();
+        return $user->can('manage inventory maintenance') && ! $asset->isDisposed() && ! $asset->isDispatched();
     }
 
     public function requestDisposal(User $user, InventoryAsset $asset): bool
     {
-        return $user->can('manage inventory assets') && ! $asset->isDisposed();
+        return $user->can('manage inventory assets') && ! $asset->isDisposed() && ! $asset->isDispatched();
     }
 }

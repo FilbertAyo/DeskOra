@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\FeatureUsageEvent;
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
+use App\Models\InventoryDispatch;
 use App\Models\InventoryDisposalRequest;
 use App\Models\InventoryMaintenanceRecord;
 use App\Models\InventoryReceipt;
@@ -22,6 +23,7 @@ use App\Policies\DocumentPolicy;
 use App\Policies\FeatureUsageEventPolicy;
 use App\Policies\InventoryAssetPolicy;
 use App\Policies\InventoryBorrowRequestPolicy;
+use App\Policies\InventoryDispatchPolicy;
 use App\Policies\InventoryDisposalRequestPolicy;
 use App\Policies\InventoryMaintenanceRecordPolicy;
 use App\Policies\InventoryReceiptPolicy;
@@ -54,6 +56,7 @@ class AuthServiceProvider extends ServiceProvider
         InventoryStockItem::class => InventoryStockItemPolicy::class,
         InventoryReceipt::class => InventoryReceiptPolicy::class,
         InventoryBorrowRequest::class => InventoryBorrowRequestPolicy::class,
+        InventoryDispatch::class => InventoryDispatchPolicy::class,
         InventoryMaintenanceRecord::class => InventoryMaintenanceRecordPolicy::class,
         InventoryDisposalRequest::class => InventoryDisposalRequestPolicy::class,
         InventoryVerificationSession::class => InventoryVerificationSessionPolicy::class,

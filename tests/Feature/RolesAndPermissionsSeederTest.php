@@ -65,6 +65,7 @@ class RolesAndPermissionsSeederTest extends TestCase
 
         $this->assertTrue($officer->hasPermissionTo('manage inventory receipts'));
         $this->assertTrue($officer->hasPermissionTo('manage inventory borrowing'));
+        $this->assertTrue($officer->hasPermissionTo('manage inventory dispatches'));
         $this->assertFalse($officer->hasPermissionTo('approve inventory requests'));
         $this->assertFalse($officer->hasPermissionTo('manage inventory settings'));
 
@@ -75,6 +76,7 @@ class RolesAndPermissionsSeederTest extends TestCase
         $this->assertTrue($admin->hasPermissionTo('approve inventory requests'));
 
         $this->assertTrue($clerk->hasPermissionTo('manage inventory stock'));
+        $this->assertTrue($clerk->hasPermissionTo('manage inventory dispatches'));
         $this->assertFalse($clerk->hasPermissionTo('manage inventory assets'));
 
         $this->assertTrue($assetOfficer->hasPermissionTo('manage inventory assets'));
