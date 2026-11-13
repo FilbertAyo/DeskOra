@@ -13,6 +13,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PettyRequisitionFinanceTest extends TestCase
@@ -159,9 +160,11 @@ class PettyRequisitionFinanceTest extends TestCase
         $response = $this->actingAs($cashier)->get(route('petty.cashier'));
 
         $response->assertOk();
-        $response->assertSee('Petty Cash Payments');
-        $response->assertSee('50,000.00');
-        $response->assertDontSee('120,000.00');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Finance/Payments')
+            ->has('requests', 1)
+            ->where('requests.0.amount', 50000)
+            ->where('requests.0.requestType', 'Petty Cash'));
     }
 
     public function test_c_approve_rejects_staff_requisition(): void
@@ -198,11 +201,12 @@ class PettyRequisitionFinanceTest extends TestCase
         $response = $this->actingAs($viewer)->get(route('requisition.records'));
 
         $response->assertOk();
-        $response->assertSee('Requisition Records');
-        $response->assertSee('120,000.00');
-        $response->assertSee('Training Materials');
-        $response->assertDontSee('80,000.00');
-        $response->assertSee((string) $authorized->code);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Finance/RequisitionRecords')
+            ->has('transactions', 1)
+            ->where('transactions.0.amount', 120000)
+            ->where('transactions.0.activity', 'Training Materials')
+            ->where('transactions.0.reference', (string) $authorized->code));
     }
 
     public function test_review_pettycash_permission_does_not_allow_staff_requisition_review(): void
@@ -254,9 +258,11 @@ class PettyRequisitionFinanceTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Review Requisitions');
-        $response->assertSee('90,000.00');
-        $response->assertSee('Training Materials');
-        $response->assertDontSee('50,000.00');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Finance/Approvals/Index')
+            ->where('title', 'Review Requisitions')
+            ->has('requests', 1)
+            ->where('requests.0.amount', 90000)
+            ->where('requests.0.activityTitle', 'Training Materials'));
     }
 }

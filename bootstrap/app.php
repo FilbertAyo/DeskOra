@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureAnonymousFeedbackToken;
 use App\Http\Middleware\EnsureDemoReadOnly;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventAuthResponseCache;
 use App\Http\Middleware\TrackFeatureUsage;
 use Illuminate\Foundation\Application;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             EnsureDemoReadOnly::class,
             TrackFeatureUsage::class,
+            HandleInertiaRequests::class,
         ]);
 
         $middleware->alias([ // Use 'alias' for route middleware

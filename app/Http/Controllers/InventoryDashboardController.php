@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryDispatch;
@@ -29,6 +31,6 @@ class InventoryDashboardController extends Controller
             'overdue_dispatch_count' => InventoryDispatch::overdueCount(),
         ];
 
-        return view('inventory.index', compact('stats'));
+        return Inertia::render('Inventory/Index', compact('stats'));
     }
 }

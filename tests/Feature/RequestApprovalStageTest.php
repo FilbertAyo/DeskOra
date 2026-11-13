@@ -12,6 +12,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class RequestApprovalStageTest extends TestCase
@@ -118,8 +119,10 @@ class RequestApprovalStageTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'review']));
 
         $response->assertOk();
-        $response->assertSee('60,000.00');
-        $response->assertSee('Completed', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Finance/Approvals/Index')
+            ->where('requests.0.amount', 60000)
+            ->where('requests.0.stageApproved', true));
     }
 
     public function test_actionable_requests_are_listed_before_completed_ones(): void
@@ -136,9 +139,9 @@ class RequestApprovalStageTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'review']));
 
         $response->assertOk();
-        $this->assertTrue(
-            strpos($response->getContent(), '50,000.00') < strpos($response->getContent(), '60,000.00')
-        );
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('requests.0.amount', 50000)
+            ->where('requests.1.amount', 60000));
     }
 
     public function test_reviewer_sees_pending_and_already_reviewed_items(): void
@@ -155,10 +158,10 @@ class RequestApprovalStageTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('petty.list', ['stage' => 'review']));
 
         $response->assertOk();
-        $response->assertSee('50,000.00');
-        $response->assertSee('75,000.00');
-        $response->assertSee('Pending', false);
-        $response->assertSee('Completed', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('requests', 2)
+            ->where('requests.0.canAct', true)
+            ->where('requests.1.stageApproved', true));
     }
 
     public function test_rejected_request_stays_on_stage_list_but_is_not_counted(): void
@@ -188,10 +191,10 @@ class RequestApprovalStageTest extends TestCase
         $response = $this->actingAs($approver)->get(route('petty.list', ['stage' => 'approve']));
 
         $response->assertOk();
-        $response->assertSee('88,000.00');
-        $response->assertSee('44,000.00');
-        $response->assertSee('Rejected', false);
-        $response->assertSee('Pending', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('requests', 2)
+            ->where('requests.0.amount', 44000)
+            ->where('requests.1.amount', 88000));
     }
 
     public function test_reject_endpoint_logs_current_stage_and_clears_actionable_count(): void
@@ -241,8 +244,9 @@ class RequestApprovalStageTest extends TestCase
         $response = $this->actingAs($approver)->get(route('petty.list', ['stage' => 'approve']));
 
         $response->assertOk();
-        $response->assertSee('75,000.00');
-        $response->assertDontSee('50,000.00');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('requests', 1)
+            ->where('requests.0.amount', 75000));
     }
 
     public function test_authorizer_sees_only_post_approve_items(): void
@@ -261,8 +265,9 @@ class RequestApprovalStageTest extends TestCase
         $response = $this->actingAs($authorizer)->get(route('petty.list', ['stage' => 'authorize']));
 
         $response->assertOk();
-        $response->assertSee('90,000.00');
-        $response->assertDontSee('75,000.00');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('requests', 1)
+            ->where('requests.0.amount', 90000));
     }
 
     public function test_user_without_stage_permission_gets_forbidden(): void
@@ -307,8 +312,9 @@ class RequestApprovalStageTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('View only', false);
-        $response->assertDontSee('data-bs-target="#approvalModal"', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Finance/Approvals/Show')
+            ->where('canActOnRequest', false));
     }
 
     public function test_requisition_approvals_route_redirects_to_review_queue(): void
@@ -359,9 +365,9 @@ class RequestApprovalStageTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Staff Requisition');
-        $response->assertSee('Pending');
-        $response->assertDontSee((string) $otherDeptPetty->request_no);
-        $response->assertDontSee('No authorization requests found.');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('requests', 1)
+            ->where('requests.0.requestType', 'Staff Requisition')
+            ->where('requests.0.canAct', true));
     }
 }

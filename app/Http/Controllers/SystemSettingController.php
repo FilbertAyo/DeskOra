@@ -6,7 +6,8 @@ use App\Models\SystemSetting;
 use App\Services\SystemSettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class SystemSettingController extends Controller
 {
@@ -14,7 +15,7 @@ class SystemSettingController extends Controller
         private readonly SystemSettingService $settings,
     ) {}
 
-    public function edit(): View
+    public function edit(): Response
     {
         $this->settings->ensureDefaults();
 
@@ -23,11 +24,12 @@ class SystemSettingController extends Controller
         $usingDefaultLogo = $this->settings->get(SystemSetting::KEY_FORMS_LOGO) === null
             || $this->settings->get(SystemSetting::KEY_FORMS_LOGO) === '';
 
-        return view('settings.system.edit', compact(
-            'formsLogoPath',
-            'formsLogoUrl',
-            'usingDefaultLogo',
-        ));
+        return Inertia::render('Settings/System/Edit', [
+            'formsLogoPath' => $formsLogoPath,
+            'formsLogoUrl' => $formsLogoUrl,
+            'usingDefaultLogo' => $usingDefaultLogo,
+            'updateUrl' => route('settings.system.update'),
+        ]);
     }
 
     public function update(Request $request): RedirectResponse

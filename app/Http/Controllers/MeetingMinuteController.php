@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class MeetingMinuteController extends Controller
 {
@@ -37,12 +38,24 @@ class MeetingMinuteController extends Controller
         $years = WorkPeriod::select('year')->distinct()->orderByDesc('year')->pluck('year');
         $currentPeriod = WorkPeriod::getCurrent();
 
-        return view('meeting-minutes.index', compact(
-            'periods',
-            'years',
-            'currentPeriod',
-            'canManageMinutes',
-        ));
+        return Inertia::render('MeetingMinutes/Index', [
+            'periods' => [
+                'data' => $periods->getCollection()->map(fn (WorkPeriod $period) => [
+                    'id' => $period->id,
+                    'weekNumber' => $period->week_number,
+                    'year' => $period->year,
+                    'dateRange' => $period->date_range,
+                    'isCurrent' => $currentPeriod?->id === $period->id,
+                    'minute' => $period->meetingMinute ? $this->minutePayload($period->meetingMinute) : null,
+                    'uploadUrl' => route('meeting-minutes.create', ['period_id' => $period->id]),
+                ])->values(),
+                'links' => $periods->linkCollection(),
+            ],
+            'years' => $years->values(),
+            'selectedYear' => $request->input('year'),
+            'canManageMinutes' => $canManageMinutes,
+            'indexUrl' => route('meeting-minutes.index'),
+        ]);
     }
 
     public function create(Request $request)
@@ -61,7 +74,13 @@ class MeetingMinuteController extends Controller
                 ->with('info', 'Minutes already exist for this work period. You can replace the file below.');
         }
 
-        return view('meeting-minutes.create', compact('period'));
+        return Inertia::render('MeetingMinutes/Form', [
+            'mode' => 'create',
+            'period' => $this->periodPayload($period),
+            'meetingMinute' => null,
+            'submitUrl' => route('meeting-minutes.store'),
+            'backUrl' => route('meeting-minutes.index'),
+        ]);
     }
 
     public function store(Request $request)
@@ -113,7 +132,11 @@ class MeetingMinuteController extends Controller
                 ->with('error', 'The minutes file was not found in storage.');
         }
 
-        return view('meeting-minutes.show', compact('meetingMinute'));
+        return Inertia::render('MeetingMinutes/Show', [
+            'meetingMinute' => $this->minutePayload($meetingMinute),
+            'canManageMinutes' => request()->user()?->can('manage minutes') ?? false,
+            'backUrl' => route('meeting-minutes.index'),
+        ]);
     }
 
     public function edit(MeetingMinute $meetingMinute)
@@ -121,7 +144,13 @@ class MeetingMinuteController extends Controller
         $this->authorize('update', $meetingMinute);
         $meetingMinute->load(['period', 'uploader']);
 
-        return view('meeting-minutes.edit', compact('meetingMinute'));
+        return Inertia::render('MeetingMinutes/Form', [
+            'mode' => 'edit',
+            'period' => $this->periodPayload($meetingMinute->period),
+            'meetingMinute' => $this->minutePayload($meetingMinute),
+            'submitUrl' => route('meeting-minutes.update', $meetingMinute),
+            'backUrl' => route('meeting-minutes.show', $meetingMinute),
+        ]);
     }
 
     public function update(Request $request, MeetingMinute $meetingMinute)
@@ -181,5 +210,33 @@ class MeetingMinuteController extends Controller
             Storage::disk('public')->path($meetingMinute->path),
             $meetingMinute->stored_name
         );
+    }
+
+    private function periodPayload(WorkPeriod $period): array
+    {
+        return [
+            'id' => $period->id,
+            'weekNumber' => $period->week_number,
+            'year' => $period->year,
+            'dateRange' => $period->date_range,
+        ];
+    }
+
+    private function minutePayload(MeetingMinute $minute): array
+    {
+        $minute->loadMissing(['period', 'uploader']);
+
+        return [
+            'id' => $minute->id,
+            'storedName' => $minute->stored_name,
+            'size' => $minute->size,
+            'uploadedBy' => $minute->uploader?->name,
+            'updatedAt' => $minute->updated_at?->format('M d, Y H:i'),
+            'period' => $minute->period ? $this->periodPayload($minute->period) : null,
+            'showUrl' => route('meeting-minutes.show', $minute),
+            'viewUrl' => route('meeting-minutes.view', $minute),
+            'downloadUrl' => route('meeting-minutes.download', $minute),
+            'editUrl' => route('meeting-minutes.edit', $minute),
+        ];
     }
 }

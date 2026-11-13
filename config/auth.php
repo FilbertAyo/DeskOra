@@ -122,6 +122,6 @@ return [
     |
     */
 
-    'login_otp_inactivity_hours' => env('LOGIN_OTP_INACTIVITY_HOURS', 120),
+    'login_otp_inactivity_hours' => (int) env('LOGIN_OTP_INACTIVITY_HOURS', 120),
 
 ];

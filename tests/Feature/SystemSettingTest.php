@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class SystemSettingTest extends TestCase
@@ -40,8 +41,10 @@ class SystemSettingTest extends TestCase
         $this->actingAs($admin)
             ->get(route('settings.system.edit'))
             ->assertOk()
-            ->assertSee('Forms logo')
-            ->assertSee('System configuration');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Settings/System/Edit')
+                ->has('formsLogoUrl')
+                ->has('updateUrl'));
 
         $file = UploadedFile::fake()->image('forms-logo.png', 200, 80);
 
@@ -140,3 +143,4 @@ class SystemSettingTest extends TestCase
         $this->assertGreaterThan(1000, strlen($response->getContent()));
     }
 }
+

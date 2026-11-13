@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class OfficialLetterController extends Controller
 {
@@ -83,23 +84,53 @@ class OfficialLetterController extends Controller
             ? OfficialLetter::pendingDownloadAuthorizationCount()
             : 0;
 
-        return view('official-letters.index', compact(
-            'letters',
-            'departments',
-            'years',
-            'canManage',
-            'canAuthorizeDownloads',
-            'tab',
-            'pendingAuthorizationCount',
-            'user',
-        ));
+        $letters->through(fn (OfficialLetter $letter) => [
+            'id' => $letter->id,
+            'reference_number' => $letter->reference_number,
+            'name' => $letter->name,
+            'subject' => $letter->subject,
+            'department_code' => $letter->department_code,
+            'letter_date' => optional($letter->letter_date)->toDateString(),
+            'creator' => $letter->creator?->name,
+            'requested_by' => $letter->latestDownloadRequest?->requester?->name,
+            'is_shared' => ! $letter->isOwnedBy($user) && $letter->isSharedWith($user),
+            'can_edit' => $user->can('update', $letter),
+            'can_download' => $user->can('download', $letter),
+            'can_request_download' => $user->can('requestDownload', $letter),
+            'can_authorize_download' => $user->can('authorizeDownload', $letter),
+            'show_url' => route('official-letters.show', $letter),
+            'edit_url' => route('official-letters.edit', $letter),
+            'download_url' => route('official-letters.download', $letter),
+            'request_download_url' => route('official-letters.request-download', $letter),
+            'authorize_download_url' => route('official-letters.authorize-download', $letter),
+            'reject_download_url' => route('official-letters.reject-download', $letter),
+        ]);
+
+        return Inertia::render('OfficialLetters/Index', [
+            'letters' => $letters,
+            'departments' => $departments,
+            'years' => $years,
+            'canManage' => $canManage,
+            'canAuthorizeDownloads' => $canAuthorizeDownloads,
+            'tab' => $tab,
+            'pendingAuthorizationCount' => $pendingAuthorizationCount,
+            'filters' => $request->only(['department_code', 'year', 'month']),
+            'urls' => [
+                'index' => route('official-letters.index'),
+                'create' => route('official-letters.create'),
+            ],
+        ]);
     }
 
     public function create()
     {
         $this->authorize('create', OfficialLetter::class);
 
-        return view('official-letters.create', $this->formOptions());
+        return Inertia::render('OfficialLetters/Create', [
+            ...$this->formOptions(),
+            'storeUrl' => route('official-letters.store'),
+            'indexUrl' => route('official-letters.index'),
+        ]);
     }
 
     public function store(Request $request)
@@ -163,7 +194,7 @@ class OfficialLetterController extends Controller
         $isAuthorizerReview = $officialLetter->userCanReviewDownloadRequest($user)
             && ! $officialLetter->userHasFullAccess($user);
 
-        return view('official-letters.show', [
+        return Inertia::render('OfficialLetters/Show', [
             'letter' => $officialLetter,
             'shareableUsers' => $shareableUsers,
             'canShare' => $canShare,
@@ -174,6 +205,16 @@ class OfficialLetterController extends Controller
             'canAuthorizeDownload' => $canAuthorizeDownload,
             'isSharedWithMe' => $isSharedWithMe,
             'isAuthorizerReview' => $isAuthorizerReview,
+            'urls' => [
+                'index' => route('official-letters.index'),
+                'edit' => route('official-letters.edit', $officialLetter),
+                'download' => route('official-letters.download', $officialLetter),
+                'share' => route('official-letters.share', $officialLetter),
+                'destroy' => route('official-letters.destroy', $officialLetter),
+                'requestDownload' => route('official-letters.request-download', $officialLetter),
+                'authorizeDownload' => route('official-letters.authorize-download', $officialLetter),
+                'rejectDownload' => route('official-letters.reject-download', $officialLetter),
+            ],
         ]);
     }
 
@@ -246,10 +287,12 @@ class OfficialLetterController extends Controller
     {
         $this->authorize('update', $officialLetter);
 
-        return view('official-letters.edit', array_merge(
-            $this->formOptions(),
-            ['letter' => $officialLetter],
-        ));
+        return Inertia::render('OfficialLetters/Edit', [
+            ...$this->formOptions(),
+            'letter' => $officialLetter,
+            'updateUrl' => route('official-letters.update', $officialLetter),
+            'indexUrl' => route('official-letters.index'),
+        ]);
     }
 
     public function update(Request $request, OfficialLetter $officialLetter)

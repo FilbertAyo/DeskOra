@@ -12,6 +12,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $this->withoutVite();
+
         if (DocumentsUnionView::canCreate() && ! DocumentsUnionView::exists()) {
             DocumentsUnionView::recreate(DB::connection()->getDriverName() === 'mysql');
         }

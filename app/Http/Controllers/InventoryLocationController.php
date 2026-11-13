@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryLocation;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,7 +26,7 @@ class InventoryLocationController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('inventory.locations.index', [
+        return Inertia::render('Inventory/Locations/Index', [
             'tab' => $tab,
             'sites' => $sites,
             'rooms' => $rooms,

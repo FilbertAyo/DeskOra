@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\CashFlowForecastService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CashFlowForecastTest extends TestCase
@@ -82,7 +83,9 @@ class CashFlowForecastTest extends TestCase
         $this->actingAs($user)
             ->get(route('deposit.index'))
             ->assertOk()
-            ->assertSee('Available balance')
-            ->assertSee('Committed (awaiting payment)');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Finance/Deposits')
+                ->where('cashFlowForecast.available', 50000)
+                ->where('cashFlowForecast.committed', 0));
     }
 }

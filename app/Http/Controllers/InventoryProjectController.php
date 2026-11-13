@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryDonor;
 use App\Models\InventoryProject;
 use Illuminate\Http\Request;
@@ -22,7 +24,7 @@ class InventoryProjectController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('inventory.projects.index', compact('projects', 'donors'));
+        return Inertia::render('Inventory/Projects/Index', compact('projects', 'donors'));
     }
 
     public function store(Request $request)

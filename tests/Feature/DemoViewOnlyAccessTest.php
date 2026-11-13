@@ -7,6 +7,7 @@ use Database\Seeders\DemoUserSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -31,11 +32,16 @@ class DemoViewOnlyAccessTest extends TestCase
         $this->actingAs($demo)
             ->get(route('roles.index'))
             ->assertOk()
-            ->assertSee('Demo — view only.', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Settings/Roles/Index')
+                ->where('auth.user.isDemo', true));
 
         $this->actingAs($demo)
             ->get(route('profile.edit'))
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/Edit')
+                ->where('auth.user.isDemo', true));
     }
 
     public function test_demo_viewer_cannot_submit_mutating_requests(): void

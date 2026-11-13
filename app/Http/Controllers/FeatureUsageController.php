@@ -7,11 +7,12 @@ use App\Models\User;
 use App\Services\FeatureUsage\FeatureUsageAnalyticsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class FeatureUsageController extends Controller
 {
-    public function index(Request $request, FeatureUsageAnalyticsService $analytics): View
+    public function index(Request $request, FeatureUsageAnalyticsService $analytics): Response
     {
         $this->authorize('viewAny', FeatureUsageEvent::class);
 
@@ -45,7 +46,7 @@ class FeatureUsageController extends Controller
 
         $modules = $analytics->availableModules();
 
-        return view('settings.feature-usage.index', [
+        return Inertia::render('Settings/FeatureUsage/Index', [
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'activeUsers' => $summary['active_users'],

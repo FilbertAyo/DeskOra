@@ -10,6 +10,7 @@ use App\Services\ActionLogProgressService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ActionLogPanelCorrectionsTest extends TestCase
@@ -107,17 +108,19 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $response = $this->actingAs($manager)->get(route('action-logs.create'));
 
         $response->assertOk();
-        $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
-            $texts = collect($carryForwardTasks)->map(fn ($task) => $task['task'] ?? null)->filter()->values()->all();
-            $carried = collect($carryForwardTasks)->firstWhere('task', 'Carry this open task');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('carryForwardTasks', function ($carryForwardTasks): bool {
+                $carryForwardTasks = collect($carryForwardTasks)->map(fn ($task) => (array) $task)->values()->all();
+                $texts = collect($carryForwardTasks)->map(fn ($task) => $task['task'] ?? null)->filter()->values()->all();
+                $carried = collect($carryForwardTasks)->firstWhere('task', 'Carry this open task');
 
-            return in_array('Carry this open task', $texts, true)
-                && ! in_array('Done task', $texts, true)
-                && ! in_array('Cancelled task', $texts, true)
-                && is_array($carried)
-                && ($carried['notes_progress'] ?? null) === ''
-                && ($carried['history'] ?? null) === [];
-        });
+                return in_array('Carry this open task', $texts, true)
+                    && ! in_array('Done task', $texts, true)
+                    && ! in_array('Cancelled task', $texts, true)
+                    && is_array($carried)
+                    && blank($carried['notes_progress'] ?? null)
+                    && blank($carried['history'] ?? null);
+            }));
 
         Carbon::setTestNow();
     }
@@ -768,80 +771,86 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->actingAs($manager)
             ->get(route('action-logs.show', $week18Doc))
             ->assertOk()
-            ->assertViewHas('tasks', function (array $tasks): bool {
-                if (count($tasks) !== 1) {
-                    return false;
-                }
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tasks', function ($tasks): bool {
+                    $tasks = collect($tasks)->map(fn ($task) => (array) $task)->values();
+                    if ($tasks->count() !== 1) {
+                        return false;
+                    }
 
-                $row = $tasks[0];
-                $timeline = is_array($row['display_history'] ?? null) ? $row['display_history'] : [];
-                if (count($timeline) !== 3) {
-                    return false;
-                }
+                    $row = $tasks->first();
+                    $timeline = collect($row['display_history'] ?? [])->map(fn ($entry) => (array) $entry)->values();
+                    if ($timeline->count() !== 3) {
+                        return false;
+                    }
 
-                $byLabel = collect($timeline)->keyBy(fn ($entry) => (string) ($entry['period_label'] ?? ''));
-                $week16 = $byLabel->get('Week 16 of 2026');
-                $week17 = $byLabel->get('Week 17 of 2026');
-                $week18 = $byLabel->get('Week 18 of 2026');
+                    $byLabel = $timeline->keyBy(fn ($entry) => (string) ($entry['period_label'] ?? ''));
+                    $week16 = $byLabel->get('Week 16 of 2026');
+                    $week17 = $byLabel->get('Week 17 of 2026');
+                    $week18 = $byLabel->get('Week 18 of 2026');
 
-                return ($row['display_notes_progress'] ?? null) === ''
-                    && array_key_exists('display_progress', $row)
-                    && $row['display_progress'] === null
-                    && is_array($week16)
-                    && ($week16['is_empty'] ?? null) === false
-                    && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
-                    && (string) ($week16['period_id'] ?? '') === (string) WorkPeriod::where('week_number', 16)->value('id')
-                    && is_array($week17)
-                    && ($week17['is_empty'] ?? null) === true
-                    && is_array($week18)
-                    && ($week18['is_empty'] ?? null) === true;
-            });
+                    return blank($row['display_notes_progress'] ?? null)
+                        && array_key_exists('display_progress', $row)
+                        && $row['display_progress'] === null
+                        && is_array($week16)
+                        && ($week16['is_empty'] ?? null) === false
+                        && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
+                        && (string) ($week16['period_id'] ?? '') === (string) WorkPeriod::where('week_number', 16)->value('id')
+                        && is_array($week17)
+                        && ($week17['is_empty'] ?? null) === true
+                        && is_array($week18)
+                        && ($week18['is_empty'] ?? null) === true;
+                }));
 
         // Viewing Week 17: row empty, timeline shows Week 16 (real) + Week 17 empty (no Week-17-labeled clone of Week 16 content).
         $this->actingAs($manager)
             ->get(route('action-logs.show', $week17Doc))
             ->assertOk()
-            ->assertViewHas('tasks', function (array $tasks): bool {
-                if (count($tasks) !== 1) {
-                    return false;
-                }
-                $row = $tasks[0];
-                $timeline = is_array($row['display_history'] ?? null) ? $row['display_history'] : [];
-                if (count($timeline) !== 2) {
-                    return false;
-                }
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tasks', function ($tasks): bool {
+                    $tasks = collect($tasks)->map(fn ($task) => (array) $task)->values();
+                    if ($tasks->count() !== 1) {
+                        return false;
+                    }
+                    $row = $tasks->first();
+                    $timeline = collect($row['display_history'] ?? [])->map(fn ($entry) => (array) $entry)->values();
+                    if ($timeline->count() !== 2) {
+                        return false;
+                    }
 
-                $byLabel = collect($timeline)->keyBy(fn ($entry) => (string) ($entry['period_label'] ?? ''));
-                $week16 = $byLabel->get('Week 16 of 2026');
-                $week17 = $byLabel->get('Week 17 of 2026');
+                    $byLabel = $timeline->keyBy(fn ($entry) => (string) ($entry['period_label'] ?? ''));
+                    $week16 = $byLabel->get('Week 16 of 2026');
+                    $week17 = $byLabel->get('Week 17 of 2026');
 
-                return ($row['display_notes_progress'] ?? null) === ''
-                    && array_key_exists('display_progress', $row)
-                    && $row['display_progress'] === null
-                    && is_array($week16)
-                    && ($week16['is_empty'] ?? null) === false
-                    && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
-                    && is_array($week17)
-                    && ($week17['is_empty'] ?? null) === true;
-            });
+                    return blank($row['display_notes_progress'] ?? null)
+                        && array_key_exists('display_progress', $row)
+                        && $row['display_progress'] === null
+                        && is_array($week16)
+                        && ($week16['is_empty'] ?? null) === false
+                        && ($week16['notes_progress'] ?? null) === 'Updated on week 16 only'
+                        && is_array($week17)
+                        && ($week17['is_empty'] ?? null) === true;
+                }));
 
         // Viewing Week 16: row filled from its own real entry, timeline shows only Week 16.
         $this->actingAs($manager)
             ->get(route('action-logs.show', $week16Doc))
             ->assertOk()
-            ->assertViewHas('tasks', function (array $tasks): bool {
-                if (count($tasks) !== 1) {
-                    return false;
-                }
-                $row = $tasks[0];
-                $timeline = is_array($row['display_history'] ?? null) ? $row['display_history'] : [];
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tasks', function ($tasks): bool {
+                    $tasks = collect($tasks)->map(fn ($task) => (array) $task)->values();
+                    if ($tasks->count() !== 1) {
+                        return false;
+                    }
+                    $row = $tasks->first();
+                    $timeline = collect($row['display_history'] ?? [])->map(fn ($entry) => (array) $entry)->values();
 
-                return ($row['display_notes_progress'] ?? null) === 'Updated on week 16 only'
-                    && ($row['display_progress'] ?? null) === 'In Progress'
-                    && count($timeline) === 1
-                    && ($timeline[0]['period_label'] ?? null) === 'Week 16 of 2026'
-                    && ($timeline[0]['is_empty'] ?? null) === false;
-            });
+                    return ($row['display_notes_progress'] ?? null) === 'Updated on week 16 only'
+                        && ($row['display_progress'] ?? null) === 'In Progress'
+                        && $timeline->count() === 1
+                        && ($timeline[0]['period_label'] ?? null) === 'Week 16 of 2026'
+                        && ($timeline[0]['is_empty'] ?? null) === false;
+                }));
     }
 
     public function test_manager_update_uses_existing_period_when_period_id_not_submitted(): void
@@ -939,15 +948,16 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $response = $this->actingAs($manager)->get(route('action-logs.create'));
 
             $response->assertOk();
-            $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
-                $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
+            $response->assertInertia(fn (Assert $page) => $page
+                ->where('carryForwardTasks', function ($carryForwardTasks): bool {
+                    $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
 
-                return in_array('Week 24 previous task', $texts, true)
-                    && ! in_array('Stale week 21 task', $texts, true)
-                    && ! in_array('Week 23 only task', $texts, true)
-                    && ! in_array('Week 24 done task', $texts, true)
-                    && count($texts) === 1;
-            });
+                    return in_array('Week 24 previous task', $texts, true)
+                        && ! in_array('Stale week 21 task', $texts, true)
+                        && ! in_array('Week 23 only task', $texts, true)
+                        && ! in_array('Week 24 done task', $texts, true)
+                        && count($texts) === 1;
+                }));
         } finally {
             Carbon::setTestNow();
         }
@@ -983,13 +993,14 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $response = $this->actingAs($manager)->get(route('action-logs.create'));
 
             $response->assertOk();
-            $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks): bool {
-                $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
+            $response->assertInertia(fn (Assert $page) => $page
+                ->where('carryForwardTasks', function ($carryForwardTasks): bool {
+                    $texts = collect($carryForwardTasks)->pluck('task')->filter()->values()->all();
 
-                return in_array('Week 28 open task', $texts, true)
-                    && ! in_array('Week 28 done task', $texts, true)
-                    && count($texts) === 1;
-            });
+                    return in_array('Week 28 open task', $texts, true)
+                        && ! in_array('Week 28 done task', $texts, true)
+                        && count($texts) === 1;
+                }));
         } finally {
             Carbon::setTestNow();
         }
@@ -1028,18 +1039,20 @@ class ActionLogPanelCorrectionsTest extends TestCase
             $response = $this->actingAs($manager)->get(route('action-logs.create'));
 
             $response->assertOk();
-            $response->assertViewHas('carryForwardTasks', function (array $carryForwardTasks) use ($staffA, $staffB): bool {
-                if (count($carryForwardTasks) !== 1) {
-                    return false;
-                }
+            $response->assertInertia(fn (Assert $page) => $page
+                ->where('carryForwardTasks', function ($carryForwardTasks) use ($staffA, $staffB): bool {
+                    $carryForwardTasks = collect($carryForwardTasks)->values();
+                    if ($carryForwardTasks->count() !== 1) {
+                        return false;
+                    }
 
-                $task = $carryForwardTasks[0];
-                $assignees = collect($task['responsible_user_ids'] ?? [])->map(fn ($id) => (string) $id)->sort()->values()->all();
-                $expected = collect([(string) $staffA->id, (string) $staffB->id])->sort()->values()->all();
+                    $task = (array) $carryForwardTasks->first();
+                    $assignees = collect($task['responsible_user_ids'] ?? [])->map(fn ($id) => (string) $id)->sort()->values()->all();
+                    $expected = collect([(string) $staffA->id, (string) $staffB->id])->sort()->values()->all();
 
-                return ($task['task'] ?? null) === 'Shared follow-up task'
-                    && $assignees === $expected;
-            });
+                    return ($task['task'] ?? null) === 'Shared follow-up task'
+                        && $assignees === $expected;
+                }));
         } finally {
             Carbon::setTestNow();
         }
@@ -1699,15 +1712,20 @@ class ActionLogPanelCorrectionsTest extends TestCase
         $this->actingAs($assignee)
             ->get(route('action-logs.show', $document))
             ->assertOk()
-            ->assertSee('data-assignee-self="1"', false)
-            ->assertSee('Prepare field report')
-            ->assertSee('Your task:', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ActionLogs/Show')
+                ->where('tasks', fn ($tasks) => collect($tasks)->contains(fn ($task) =>
+                    data_get($task, 'task') === 'Prepare field report'
+                    && data_get($task, 'is_assignee_self') === true
+                )));
 
-        $html = $this->actingAs($other)
+        $this->actingAs($other)
             ->get(route('action-logs.show', $document))
             ->assertOk()
-            ->getContent();
-
-        $this->assertStringNotContainsString('data-assignee-self="1"', $html);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ActionLogs/Show')
+                ->where('tasks', fn ($tasks) => collect($tasks)->every(fn ($task) =>
+                    data_get($task, 'is_assignee_self') !== true
+                )));
     }
 }

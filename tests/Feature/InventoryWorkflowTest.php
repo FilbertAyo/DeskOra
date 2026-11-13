@@ -17,6 +17,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class InventoryWorkflowTest extends TestCase
@@ -436,8 +437,16 @@ class InventoryWorkflowTest extends TestCase
         $this->actingAs($officer)
             ->get(route('inventory.assets.index', ['location_id' => $hq->id]))
             ->assertOk()
-            ->assertSee('Projector')
-            ->assertSee('Adilisha HQ › Board Room');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Assets/Index')
+                ->where('assets.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                    data_get($row, 'name') === 'Projector'
+                    && (
+                        data_get($row, 'location.name') === 'Board Room'
+                        || data_get($row, 'location.parent.name') === 'Adilisha HQ'
+                        || str_contains(json_encode($row), 'Board Room')
+                    )
+                )));
     }
 
     public function test_staff_only_see_assets_and_stock_in_their_custody(): void
@@ -793,15 +802,20 @@ class InventoryWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('inventory.locations.index'))
             ->assertOk()
-            ->assertSee('Adilisha HQ')
-            ->assertDontSee('Conference Suite');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Locations/Index')
+                ->where('tab', 'locations')
+                ->where('sites', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'name') === 'Adilisha HQ'))
+                ->where('rooms', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'name') === 'Conference Suite')));
 
         $this->actingAs($user)
             ->get(route('inventory.locations.index', ['tab' => 'rooms']))
             ->assertOk()
-            ->assertSee('Conference Suite')
-            ->assertSee('Adilisha HQ')
-            ->assertSee('New Room');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Locations/Index')
+                ->where('tab', 'rooms')
+                ->where('rooms', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'name') === 'Conference Suite'))
+                ->where('parentLocations', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'name') === 'Adilisha HQ')));
     }
 
     /**

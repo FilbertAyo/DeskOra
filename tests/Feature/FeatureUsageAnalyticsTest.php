@@ -9,6 +9,7 @@ use App\Services\FeatureUsage\FeatureUsageRecorder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class FeatureUsageAnalyticsTest extends TestCase
@@ -42,11 +43,10 @@ class FeatureUsageAnalyticsTest extends TestCase
         $this->actingAs($user)
             ->get(route('feature-usage.index'))
             ->assertOk()
-            ->assertSee('Feature usage', false)
-            ->assertSee('Modules', false)
-            ->assertSee('Features &amp; pages', false)
-            ->assertSee('Adoption', false)
-            ->assertSee('Share', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Settings/FeatureUsage/Index')
+                ->has('moduleRows')
+                ->has('featureRows'));
     }
 
     public function test_authenticated_page_visit_records_page_view(): void
@@ -215,3 +215,4 @@ class FeatureUsageAnalyticsTest extends TestCase
         $this->assertDatabaseHas('feature_usage_events', ['id' => $recent->id]);
     }
 }
+

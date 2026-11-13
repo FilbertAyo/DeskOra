@@ -33,8 +33,10 @@ class UserNotificationInboxTest extends TestCase
         $this->actingAs($user)
             ->get(route('notifications.inbox'))
             ->assertOk()
-            ->assertSee('Your notifications')
-            ->assertSee('Reminder: submit weekly plan');
+            ->assertInertia(fn ($page) => $page
+                ->component('Notifications/Inbox')
+                ->where('items.0.title', 'Reminder: submit weekly plan')
+                ->where('unreadCount', 1));
     }
 
     public function test_opening_notification_marks_it_read_and_redirects(): void

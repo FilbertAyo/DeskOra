@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class WeeklyBudgetReviewTest extends TestCase
@@ -177,7 +178,11 @@ class WeeklyBudgetReviewTest extends TestCase
         // Default view (no filters) should show only next-week plans
         $response = $this->actingAs($viewer)->get(route('documents.weekly-budget-review'));
         $response->assertOk();
-        $response->assertSee('All Weeks');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/WeeklyBudgetReview')
+            ->where('showingAllPendingWeeks', false)
+            ->has('periodOptions')
+            ->has('documents'));
     }
 
     public function test_responsible_reviewer_is_sent_to_all_pending_weeks_when_backlog_exists(): void
@@ -213,7 +218,12 @@ class WeeklyBudgetReviewTest extends TestCase
             'period_id' => $current->id,
         ]));
         $response->assertStatus(200);
-        $response->assertSee('Desk');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/WeeklyBudgetReview')
+            ->where('activePeriodId', (string) $current->id)
+            ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Desk')
+            )));
     }
 
     public function test_pending_status_without_period_shows_older_weeks_oldest_first(): void
@@ -238,7 +248,10 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('documents.weekly-budget-review', ['status' => 'pending']))
             ->assertOk()
-            ->assertSee('All Weeks');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Documents/WeeklyBudgetReview')
+                ->where('showingAllPendingWeeks', true)
+                ->where('statusFilter', 'pending'));
     }
 
     public function test_pending_view_keeps_each_staff_budget_under_its_own_work_period(): void

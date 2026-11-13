@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Exports\InventoryStockItemsExport;
 use App\Models\Department;
 use App\Models\InventoryCategory;
@@ -35,7 +37,7 @@ class InventoryStockItemController extends Controller
             ->whereColumn('quantity_remaining', '<=', 'minimum_level')
             ->count();
 
-        return view('inventory.stock-items.index', array_merge(
+        return Inertia::render('Inventory/StockItems/Index', array_merge(
             compact('stockItems', 'lowStockCount'),
             $this->formOptions(),
             [
@@ -49,7 +51,7 @@ class InventoryStockItemController extends Controller
     {
         $this->authorize('create', InventoryStockItem::class);
 
-        return view('inventory.stock-items.create', array_merge(
+        return Inertia::render('Inventory/StockItems/Create', array_merge(
             $this->formOptions(),
             ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
         ));
@@ -72,7 +74,7 @@ class InventoryStockItemController extends Controller
     {
         $this->authorize('update', $stockItem);
 
-        return view('inventory.stock-items.edit', array_merge(
+        return Inertia::render('Inventory/StockItems/Edit', array_merge(
             compact('stockItem'),
             $this->formOptions(),
             ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]

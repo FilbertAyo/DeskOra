@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryAsset;
 use App\Models\InventoryCategory;
 use App\Models\InventoryDispatch;
@@ -68,7 +70,7 @@ class InventoryDispatchController extends Controller
             'closed' => InventoryDispatch::query()->where('status', InventoryDispatch::STATUS_CLOSED)->count(),
         ];
 
-        return view('inventory.dispatches.index', [
+        return Inertia::render('Inventory/Dispatches/Index', [
             'dispatches' => $dispatches,
             'tab' => $tab,
             'counts' => $counts,
@@ -80,7 +82,7 @@ class InventoryDispatchController extends Controller
     {
         $this->authorize('create', InventoryDispatch::class);
 
-        return view('inventory.dispatches.create', $this->formOptions());
+        return Inertia::render('Inventory/Dispatches/Create', $this->formOptions());
     }
 
     public function store(Request $request)
@@ -139,7 +141,7 @@ class InventoryDispatchController extends Controller
 
         $picker = $request->string('picker')->toString() ?: 'assets';
 
-        return view('inventory.dispatches.show', array_merge(
+        return Inertia::render('Inventory/Dispatches/Show', array_merge(
             $this->formOptions(),
             [
                 'dispatch' => $dispatch,
@@ -167,7 +169,7 @@ class InventoryDispatchController extends Controller
 
         $dispatch->load('responsibleUsers');
 
-        return view('inventory.dispatches.edit', array_merge(
+        return Inertia::render('Inventory/Dispatches/Edit', array_merge(
             compact('dispatch'),
             $this->formOptions()
         ));
@@ -426,7 +428,7 @@ class InventoryDispatchController extends Controller
             'items.stockItem',
         ]);
 
-        return view('inventory.dispatches.return', [
+        return Inertia::render('Inventory/Dispatches/Return', [
             'dispatch' => $dispatch,
             'statusOptions' => InventoryDispatch::statusOptions(),
             'returnOutcomeOptions' => InventoryDispatchItem::returnOutcomeOptions(),

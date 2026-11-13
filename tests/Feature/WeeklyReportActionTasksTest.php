@@ -216,7 +216,8 @@ class WeeklyReportActionTasksTest extends TestCase
         $this->assertFalse(app(\App\Services\ActionLogProgressService::class)->hasPendingUpdates($staff));
 
         $reviewPage = $this->actingAs($staff)->get(route('documents.weekly-report.review', $report));
-        $reviewPage->assertOk()->assertViewIs('documents.weekly-report.review');
+        $reviewPage->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->component('Documents/WeeklyReportReview'));
 
         $response = $this->actingAs($staff)->put(route('documents.update', $report), [
             'action' => 'submit',

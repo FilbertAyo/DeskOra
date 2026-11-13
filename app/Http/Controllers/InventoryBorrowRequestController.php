@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryStockItem;
@@ -61,7 +63,7 @@ class InventoryBorrowRequestController extends Controller
             'overdue' => InventoryBorrowRequest::overdueCount(),
         ];
 
-        return view('inventory.borrowing.index', [
+        return Inertia::render('Inventory/Borrowing/Index', [
             'requests' => $requests,
             'tab' => $tab,
             'counts' => $counts,
@@ -73,7 +75,7 @@ class InventoryBorrowRequestController extends Controller
     {
         $this->authorize('create', InventoryBorrowRequest::class);
 
-        return view('inventory.borrowing.create', array_merge(
+        return Inertia::render('Inventory/Borrowing/Create', array_merge(
             $this->formOptions(),
             [
                 'prefillAssetId' => $request->input('asset_id'),
@@ -112,7 +114,7 @@ class InventoryBorrowRequestController extends Controller
             'reviewedBy', 'issuedBy', 'returnedBy',
         ]);
 
-        return view('inventory.borrowing.show', [
+        return Inertia::render('Inventory/Borrowing/Show', [
             'borrowRequest' => $borrowRequest,
             'statusOptions' => InventoryBorrowRequest::statusOptions(),
             'returnConditionOptions' => InventoryBorrowRequest::returnConditionOptions(),

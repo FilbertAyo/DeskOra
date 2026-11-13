@@ -8,14 +8,59 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
+use Spatie\Activitylog\Models\Activity;
 
 class ProfileController extends Controller
 {
-    public function edit(Request $request): View
+    public function edit(Request $request): Response
     {
-        return view('profile.edit', [
-            'user' => $request->user(),
+        $user = $request->user()->loadMissing('department', 'roles');
+
+        $nameParts = preg_split('/\s+/', trim((string) $user->name)) ?: [];
+        $initials = collect(array_slice($nameParts, 0, 2))
+            ->map(fn (string $part) => mb_strtoupper(mb_substr($part, 0, 1)))
+            ->implode('');
+
+        $activities = Activity::query()
+            ->causedBy($user)
+            ->latest()
+            ->limit(8)
+            ->get()
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'title' => $activity->description ?: ucfirst((string) $activity->event),
+                'description' => filled($activity->log_name)
+                    ? ucfirst(str_replace(['-', '_'], ' ', (string) $activity->log_name))
+                    : null,
+                'time' => $activity->created_at?->diffForHumans(),
+            ])
+            ->values();
+
+        return Inertia::render('Profile/Edit', [
+            'profile' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'notification_channel' => $user->notification_channel ?? 'sms',
+                'avatar' => asset($user->file ?? 'assets/images/profile.png'),
+                'initials' => $initials !== '' ? $initials : 'U',
+                'signature' => $user->signature ? asset($user->signature) : null,
+                'department' => $user->department?->name,
+                'role' => $user->getRoleNames()->first() ?: 'Staff',
+                'status' => ucfirst((string) ($user->status ?: 'active')),
+                'member_since' => optional($user->created_at)->format('M d, Y'),
+                'joined_label' => optional($user->created_at)->format('F Y'),
+            ],
+            'activities' => $activities,
+            'tab' => $request->string('tab')->toString() ?: 'profile',
+            'urls' => [
+                'update' => route('profile.update'),
+                'image' => route('profile.image'),
+                'password' => route('password.update'),
+            ],
         ]);
     }
 

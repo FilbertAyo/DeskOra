@@ -12,6 +12,7 @@ use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class WeeklyMatrixTest extends TestCase
@@ -32,8 +33,11 @@ class WeeklyMatrixTest extends TestCase
         $response = $this->actingAs($user)->get(route('weekly-matrix.index', ['year' => $period->year]));
 
         $response->assertOk();
-        $response->assertSee('Week '.$period->week_number);
-        $response->assertSee($period->date_range);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('WeeklyMatrix/Index')
+            ->where('year', $period->year)
+            ->where('periodCards.0.period.weekNumber', $period->week_number)
+            ->where('periodCards.0.period.dateRange', $period->date_range));
     }
 
     public function test_create_update_and_delete_matrix_for_sub_department(): void
@@ -155,10 +159,10 @@ class WeeklyMatrixTest extends TestCase
         );
 
         $view->assertOk();
-        $view->assertSee('Item one', false);
-        $view->assertSee('Item two', false);
-        $view->assertSee('Bullet three', false);
-        $view->assertSee('white-space: pre-wrap', false);
+        $view->assertInertia(fn (Assert $page) => $page
+            ->component('WeeklyMatrix/Form')
+            ->where('viewMode', true)
+            ->where('entryDefaults.0.key_activity', $formattedText));
     }
 
     public function test_suggestions_endpoint_returns_weekly_plan_activities(): void
@@ -237,8 +241,11 @@ class WeeklyMatrixTest extends TestCase
         $response = $this->actingAs($user)->get(route('weekly-matrix.period', $period));
 
         $response->assertOk();
-        $response->assertSee('No matrix present');
-        $response->assertSee('Create');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('WeeklyMatrix/Period')
+            ->has('matrices', 0)
+            ->where('canCreate', true)
+            ->has('createUrl'));
     }
 
     public function test_period_table_endpoint_returns_matrix_html(): void

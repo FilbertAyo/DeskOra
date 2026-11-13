@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 use SadiqSalau\LaravelOtp\Facades\Otp;
 
 class AuthenticatedSessionController extends Controller
@@ -20,9 +21,9 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): View
+    public function create(): Response
     {
-        return view('auth.login');
+        return Inertia::render('Auth/Login');
     }
 
     /**
@@ -38,10 +39,10 @@ class AuthenticatedSessionController extends Controller
             return $this->sendLoginOtp($request, $user);
         }
 
-        return $this->completeLogin($request, $user);
+        return $this->completeLogin($request, $user, $request->boolean('remember'));
     }
 
-    public function showVerifyOtp(Request $request): RedirectResponse|View
+    public function showVerifyOtp(Request $request): RedirectResponse|Response
     {
         if (! $this->hasPendingLogin($request)) {
             return redirect()->route('login');
@@ -55,8 +56,9 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('login');
         }
 
-        return view('auth.login-verify-otp', [
+        return Inertia::render('Auth/VerifyOtp', [
             'maskedEmail' => $user->maskedEmail(),
+            'status' => $request->session()->get('status'),
         ]);
     }
 
@@ -95,9 +97,9 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
-        $this->clearPendingLogin($request);
+        $remember = (bool) $request->session()->get('pending_login_remember', false);
 
-        return $this->completeLogin($request, $user);
+        return $this->completeLogin($request, $user, $remember);
     }
 
     public function resendOtp(Request $request): RedirectResponse
@@ -163,6 +165,7 @@ class AuthenticatedSessionController extends Controller
             'pending_login_user_id' => $user->id,
             'pending_login_identifier' => $identifier,
             'pending_login_at' => now()->toISOString(),
+            'pending_login_remember' => $request->boolean('remember'),
         ]);
 
         return redirect()
@@ -170,9 +173,11 @@ class AuthenticatedSessionController extends Controller
             ->with('status', 'We sent a 4-digit verification code to your email.');
     }
 
-    private function completeLogin(Request $request, User $user): RedirectResponse
+    private function completeLogin(Request $request, User $user, bool $remember = false): RedirectResponse
     {
-        Auth::login($user);
+        $this->clearPendingLogin($request);
+
+        Auth::login($user, $remember);
 
         $user->update(['last_login_at' => now()]);
 
@@ -203,6 +208,7 @@ class AuthenticatedSessionController extends Controller
             'pending_login_user_id',
             'pending_login_identifier',
             'pending_login_at',
+            'pending_login_remember',
         ]);
     }
 

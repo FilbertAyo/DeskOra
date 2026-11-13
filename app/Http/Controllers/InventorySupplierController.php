@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventorySupplier;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +17,7 @@ class InventorySupplierController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('inventory.suppliers.index', compact('suppliers'));
+        return Inertia::render('Inventory/Suppliers/Index', compact('suppliers'));
     }
 
     public function store(Request $request)

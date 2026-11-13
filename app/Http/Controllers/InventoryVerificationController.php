@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\Department;
 use App\Models\InventoryAsset;
 use App\Models\InventoryLocation;
@@ -38,7 +40,7 @@ class InventoryVerificationController extends Controller
             ->orderByDesc('started_at')
             ->paginate(20);
 
-        return view('inventory.verification.index', [
+        return Inertia::render('Inventory/Verification/Index', [
             'sessions' => $sessions,
             'statusOptions' => InventoryVerificationSession::statusOptions(),
         ]);
@@ -48,7 +50,7 @@ class InventoryVerificationController extends Controller
     {
         $this->authorize('create', InventoryVerificationSession::class);
 
-        return view('inventory.verification.create', $this->formOptions());
+        return Inertia::render('Inventory/Verification/Create', $this->formOptions());
     }
 
     public function store(Request $request)
@@ -117,7 +119,7 @@ class InventoryVerificationController extends Controller
             ->with(['asset.location.parent', 'asset.responsibleUser', 'recordedLocation.parent', 'recordedResponsibleUser'])
             ->get();
 
-        return view('inventory.verification.show', array_merge($this->formOptions(), [
+        return Inertia::render('Inventory/Verification/Show', array_merge($this->formOptions(), [
             'session' => $session,
             'results' => $results,
             'resultOptions' => InventoryVerificationResult::resultOptions(),

@@ -9,6 +9,7 @@ use App\Support\ActionLogTaskSupport;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ActionLogKanbanTest extends TestCase
@@ -50,12 +51,10 @@ class ActionLogKanbanTest extends TestCase
         $this->actingAs($manager)
             ->get(route('action-logs.board', ['period_id' => $period->id]))
             ->assertOk()
-            ->assertSee('Action Log Board')
-            ->assertSee('Prepare partner brief')
-            ->assertSee('Not Started')
-            ->assertSee('In Progress')
-            ->assertSee('Done')
-            ->assertSee('Cancelled');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ActionLogs/Board')
+                ->where('progressOptions', fn ($options) => collect($options)->intersect(['Not Started', 'In Progress', 'Done', 'Cancelled'])->count() === 4)
+                ->where('board.columns', fn ($columns) => collect($columns)->flatten(1)->contains(fn ($task) => data_get($task, 'task') === 'Prepare partner brief')));
     }
 
     public function test_board_move_updates_task_progress(): void
@@ -131,3 +130,4 @@ class ActionLogKanbanTest extends TestCase
             ->assertForbidden();
     }
 }
+

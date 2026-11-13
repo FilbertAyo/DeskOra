@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Exports\InventoryAssetsExport;
 use App\Exports\InventoryIssuedStockExport;
 use App\Models\InventoryAsset;
@@ -35,7 +37,7 @@ class InventoryMyItemsController extends Controller
             ->paginate(20, ['*'], 'stock_page')
             ->withQueryString();
 
-        return view('inventory.my-items.index', [
+        return Inertia::render('Inventory/MyItems/Index', [
             'tab' => $tab,
             'assets' => $assets,
             'issues' => $issues,

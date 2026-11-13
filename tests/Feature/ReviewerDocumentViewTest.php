@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ReviewerDocumentViewTest extends TestCase
@@ -71,13 +72,18 @@ class ReviewerDocumentViewTest extends TestCase
 
         $reviewerResponse = $this->actingAs($reviewer)->get(route('documents.reviewer-show', $plan->id));
         $reviewerResponse->assertOk();
-        $reviewerResponse->assertSee('Related Weekly Report', false);
-        $reviewerResponse->assertSee('Return to Draft', false);
+        $reviewerResponse->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/Show')
+            ->where('reviewerPresentation', true)
+            ->where('showWeeklyRelatedPanel', true)
+            ->where('relatedDocument.type', Document::TYPE_WEEKLY_REPORT));
 
         $standardResponse = $this->actingAs($reviewer)->get(route('documents.show', $plan->id));
         $standardResponse->assertOk();
-        $standardResponse->assertSee('Related Weekly Report', false);
-        $standardResponse->assertDontSee('Return to Draft', false);
+        $standardResponse->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/Show')
+            ->where('reviewerPresentation', false)
+            ->where('showWeeklyRelatedPanel', true));
 
         $report = Document::query()
             ->where('period_id', $period->id)
@@ -87,7 +93,9 @@ class ReviewerDocumentViewTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('documents.reviewer-show', $report->id))
             ->assertOk()
-            ->assertSee('Related Weekly Plan', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Documents/Show')
+                ->where('relatedDocument.type', Document::TYPE_WEEKLY_PLAN));
     }
 
     public function test_reviewer_show_includes_assigned_activities_for_weekly_plan(): void
@@ -178,8 +186,10 @@ class ReviewerDocumentViewTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('documents.reviewer-show', $plan->id))
             ->assertOk()
-            ->assertSee('Related Weekly Report', false)
-            ->assertSee('Not Created', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Documents/Show')
+                ->where('showWeeklyRelatedPanel', true)
+                ->where('relatedDocument', null));
     }
 
     public function test_reviewer_show_returns_403_for_monthly_report(): void

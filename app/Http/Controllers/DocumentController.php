@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class DocumentController extends Controller
 {
@@ -198,19 +199,19 @@ class DocumentController extends Controller
 
         $selectedPeriod = $periodOptions->firstWhere('id', $periodFilterId);
 
-        return view('documents.employee-dashboard', compact(
-            'pendingDocuments',
-            'allDocuments',
-            'pendingByType',
-            'stats',
-            'periodInfo',
-            'deadlineStatuses',
-            'availableTypes',
-            'periodOptions',
-            'selectedPeriod',
-            'periodFilterId',
-            'timelineData'
-        ));
+        return Inertia::render('Documents/EmployeeDashboard', [
+            'pendingDocuments' => $pendingDocuments,
+            'allDocuments' => $allDocuments,
+            'pendingByType' => $pendingByType,
+            'stats' => $stats,
+            'periodInfo' => $periodInfo,
+            'deadlineStatuses' => $deadlineStatuses,
+            'availableTypes' => $availableTypes,
+            'periodOptions' => $periodOptions,
+            'selectedPeriod' => $selectedPeriod,
+            'periodFilterId' => $periodFilterId,
+            'timelineData' => $timelineData,
+        ]);
     }
 
     protected function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
@@ -2093,5 +2094,63 @@ class DocumentController extends Controller
 
         return redirect()->route('documents.show', ['document' => $resolved->id])
             ->with('success', $successMessage);
+    }
+
+    protected function documentPayload(Document $document): array
+    {
+        $document->loadMissing(['user', 'period', 'sharedUsers:id,name']);
+
+        return [
+            'id' => $document->id,
+            'type' => $document->type,
+            'typeName' => $document->type_name,
+            'title' => $document->display_title,
+            'state' => $document->state,
+            'userId' => $document->user_id,
+            'userName' => $document->user?->name,
+            'periodId' => $document->period_id,
+            'period' => $document->period ? [
+                'id' => $document->period->id,
+                'weekNumber' => $document->period->week_number,
+                'year' => $document->period->year,
+                'dateRange' => $document->period->date_range,
+                'isOpen' => $document->period->isOpen(),
+            ] : null,
+            'month' => $document->month,
+            'year' => $document->year,
+            'mainTarget' => $document->main_target,
+            'targetAccomplished' => $document->target_accomplished,
+            'targetExplanation' => $document->target_explanation,
+            'reviewRejectionReason' => $document->review_rejection_reason,
+            'content' => is_array($document->content) ? $document->content : [],
+            'sharedUsers' => $document->sharedUsers->map(fn (User $sharedUser) => [
+                'id' => $sharedUser->id,
+                'name' => $sharedUser->name,
+            ])->values(),
+            'createdAt' => $document->created_at?->format('M d, Y'),
+            'updatedAt' => $document->updated_at?->format('M d, Y'),
+            'updatedAgo' => $document->updated_at?->diffForHumans(),
+            'canEdit' => $document->canBeEdited(),
+            'showUrl' => route('documents.show', $document),
+            'editUrl' => route('documents.edit', $document),
+            'downloadUrl' => in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)
+                ? route('documents.download', $document)
+                : null,
+        ];
+    }
+
+    protected function periodPayload(?WorkPeriod $period): ?array
+    {
+        if (! $period) {
+            return null;
+        }
+
+        return [
+            'id' => $period->id,
+            'weekNumber' => $period->week_number,
+            'year' => $period->year,
+            'dateRange' => $period->date_range,
+            'status' => $period->status,
+        ];
     }
 }

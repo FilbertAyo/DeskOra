@@ -11,6 +11,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class WeeklyMatrixController extends Controller
 {
@@ -39,10 +40,16 @@ class WeeklyMatrixController extends Controller
 
         $periodCards = $this->weeklyMatrixService->periodsForCalendar($year);
 
-        return view('weekly-matrix.index', [
+        return Inertia::render('WeeklyMatrix/Index', [
             'year' => $year,
             'availableYears' => $availableYears,
-            'periodCards' => $periodCards,
+            'periodCards' => $periodCards->map(fn (array $card) => [
+                'period' => $this->periodPayload($card['period']),
+                'matrixCount' => $card['matrix_count'],
+                'subDepartmentCount' => $card['sub_department_count'],
+                'isCurrent' => $card['is_current'],
+                'url' => route('weekly-matrix.period', $card['period']),
+            ])->values(),
         ]);
     }
 
@@ -51,10 +58,27 @@ class WeeklyMatrixController extends Controller
         $matrices = $this->weeklyMatrixService->matricesForPeriodTable($period);
         $canCreate = $this->weeklyMatrixService->subDepartmentsWithoutMatrix($period)->isNotEmpty();
 
-        return view('weekly-matrix.period', [
-            'period' => $period,
-            'matrices' => $matrices,
+        return Inertia::render('WeeklyMatrix/Period', [
+            'period' => $this->periodPayload($period),
+            'matrices' => $matrices->map(fn (array $row) => [
+                'department' => $row['department'] ? [
+                    'id' => $row['department']->id,
+                    'name' => $row['department']->name,
+                    'parentName' => $row['department']->parent?->name,
+                ] : null,
+                'entry' => $row['entry'] ? [
+                    'keyActivity' => $row['entry']->key_activity,
+                ] : null,
+                'yearPlanLinkCount' => $row['year_plan_link_count'],
+                'updatedAt' => $row['matrix']->updated_at?->diffForHumans(),
+                'viewUrl' => $row['department'] ? route('weekly-matrix.edit', [$period, $row['department'], 'view' => 1]) : null,
+                'editUrl' => $row['department'] ? route('weekly-matrix.edit', [$period, $row['department']]) : null,
+            ])->values(),
             'canCreate' => $canCreate,
+            'indexUrl' => route('weekly-matrix.index', ['year' => $period->year]),
+            'createUrl' => route('weekly-matrix.create', $period),
+            'downloadUrl' => route('weekly-matrix.download', $period),
+            'tableUrl' => route('weekly-matrix.period.table', $period),
         ]);
     }
 
@@ -113,13 +137,16 @@ class WeeklyMatrixController extends Controller
 
         $entry = $this->singleEntryDefaults(old('entry'));
 
-        return view('weekly-matrix.create', [
-            'period' => $period,
+        return Inertia::render('WeeklyMatrix/Form', [
+            'mode' => 'create',
+            'period' => $this->periodPayload($period),
             'availableSubDepartments' => $availableSubDepartments,
             'selectedDepartment' => $selectedDepartment,
             'entry' => $entry,
             'yearPlanOptions' => $yearPlanOptions,
             'suggestions' => $suggestions,
+            'submitUrl' => route('weekly-matrix.create.store', $period),
+            'backUrl' => route('weekly-matrix.period', $period),
         ]);
     }
 
@@ -212,14 +239,17 @@ class WeeklyMatrixController extends Controller
 
         $viewMode = request()->boolean('view');
 
-        return view('weekly-matrix.edit', [
-            'period' => $period,
+        return Inertia::render('WeeklyMatrix/Form', [
+            'mode' => 'edit',
+            'period' => $this->periodPayload($period),
             'department' => $department->load('parent'),
             'matrix' => $matrix,
             'entryDefaults' => $entryDefaults,
             'yearPlanOptions' => $yearPlanOptions,
             'suggestions' => $suggestions,
             'viewMode' => $viewMode,
+            'submitUrl' => route('weekly-matrix.update', [$period, $department]),
+            'backUrl' => route('weekly-matrix.period', $period),
         ]);
     }
 
@@ -341,5 +371,16 @@ class WeeklyMatrixController extends Controller
         }
 
         return array_merge($this->emptyEntry(), $input);
+    }
+
+    private function periodPayload(WorkPeriod $period): array
+    {
+        return [
+            'id' => $period->id,
+            'weekNumber' => $period->week_number,
+            'year' => $period->year,
+            'dateRange' => $period->date_range,
+            'status' => $period->status,
+        ];
     }
 }

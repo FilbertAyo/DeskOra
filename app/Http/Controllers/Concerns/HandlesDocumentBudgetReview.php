@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
+use Inertia\Inertia;
 
 /**
  * Weekly plan budget review panel, exports and per-item decisions.
@@ -97,22 +98,54 @@ trait HandlesDocumentBudgetReview
             ? (string) $request->string('period_id')
             : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
 
-        return view('documents.reviewer.budget-weekly', [
-            'documents' => $documents,
+        return Inertia::render('Documents/WeeklyBudgetReview', [
+            'documents' => $documents->through(fn (Document $document) => array_merge(
+                $this->documentPayload($document),
+                [
+                    'budgetItems' => $document->budgetItems(),
+                    'budgetReviews' => $document->budgetReviewItemsByUid(),
+                ]
+            )),
             'grouped' => $grouped,
             'stats' => $aggregateStats,
-            'usersWithBudgets' => $usersWithBudgets,
-            'periodOptions' => $periodOptions,
-            'financeTargetUsers' => $financeTargetUsers,
-            'currentBudgetEntryPeriod' => $currentBudgetEntryPeriod,
+            'usersWithBudgets' => $usersWithBudgets->map(fn (User $budgetUser) => [
+                'id' => (string) $budgetUser->id,
+                'name' => $budgetUser->name,
+            ])->values(),
+            'periodOptions' => $periodOptions->map(fn (WorkPeriod $period) => [
+                'id' => (string) $period->id,
+                'weekNumber' => $period->week_number,
+                'year' => $period->year,
+                'dateRange' => $period->date_range,
+            ])->values(),
+            'financeTargetUsers' => $financeTargetUsers->map(fn (User $targetUser) => [
+                'id' => (string) $targetUser->id,
+                'name' => $targetUser->name,
+            ])->values(),
+            'currentBudgetEntryPeriod' => $currentBudgetEntryPeriod ? [
+                'id' => (string) $currentBudgetEntryPeriod->id,
+                'weekNumber' => $currentBudgetEntryPeriod->week_number,
+                'year' => $currentBudgetEntryPeriod->year,
+                'dateRange' => $currentBudgetEntryPeriod->date_range,
+            ] : null,
             'years' => $years,
             'statusFilter' => $statusFilter,
-            'defaultPeriod' => $defaultPeriod,
+            'defaultPeriod' => $defaultPeriod ? [
+                'id' => (string) $defaultPeriod->id,
+                'weekNumber' => $defaultPeriod->week_number,
+                'year' => $defaultPeriod->year,
+                'dateRange' => $defaultPeriod->date_range,
+            ] : null,
             'activePeriodId' => $activePeriodId,
             'approvalFlowSteps' => \App\Support\WeeklyBudgetApprovalFlow::steps(),
             'userApprovalActions' => \App\Support\WeeklyBudgetApprovalFlow::userActionSummary($user),
             'showingAllPendingWeeks' => $this->weeklyBudgetReviewService->isAllPendingWeeksView($request)
                 || ($request->has('period_id') && ! $request->filled('period_id')),
+            'filters' => $request->only(['period_id', 'status', 'user_id', 'year']),
+            'indexUrl' => route('documents.weekly-budget-review'),
+            'exportPdfUrl' => route('documents.weekly-budget-review.export.pdf', $request->query()),
+            'exportExcelUrl' => route('documents.weekly-budget-review.export.excel', $request->query()),
+            'addMidweekUrl' => route('documents.weekly-budget-review.add-midweek-budget'),
         ]);
     }
 

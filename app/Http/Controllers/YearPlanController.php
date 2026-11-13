@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,7 +32,38 @@ class YearPlanController extends Controller
             ->orderByDesc('year')
             ->get();
 
-        return view('year-plan.index', compact('plans', 'monthLabels'));
+        return Inertia::render('YearPlan/Index', [
+            'plans' => $plans->map(function (YearPlan $plan) use ($monthLabels) {
+                $activities = $plan->activities->sortBy(fn (YearPlanActivity $activity) => [
+                    sprintf('%05d', $activity->department?->plan_section_number ?? 99999),
+                    $activity->sort_order,
+                ])->values();
+
+                return [
+                    'id' => $plan->id,
+                    'year' => $plan->year,
+                    'activitiesCount' => $plan->activities_count,
+                    'showUrl' => route('year-plan.show', $plan),
+                    'months' => collect($monthLabels)->map(fn (string $label, int $month) => [
+                        'number' => $month,
+                        'label' => $label,
+                        'activities' => $activities
+                            ->filter(fn (YearPlanActivity $activity) => $activity->isPlannedInMonth($month))
+                            ->map(fn (YearPlanActivity $activity) => [
+                                'code' => $activity->displayCode(),
+                                'department' => collect([
+                                    $activity->department?->parent?->name,
+                                    $activity->department?->name,
+                                ])->filter()->implode(' - '),
+                                'description' => $activity->description,
+                                'total' => number_format((float) $activity->total_cost_tzs, 2),
+                            ])->values(),
+                    ])->values(),
+                ];
+            })->values(),
+            'storeUrl' => route('year-plan.store'),
+            'currentYear' => (int) date('Y'),
+        ]);
     }
 
     public function store(Request $request)
@@ -61,11 +93,46 @@ class YearPlanController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('year-plan.show', [
-            'yearPlan' => $year,
-            'sections' => $built['sections'],
+        return Inertia::render('YearPlan/Show', [
+            'yearPlan' => [
+                'id' => $year->id,
+                'year' => $year->year,
+                'indexUrl' => route('year-plan.index'),
+                'storeActivityUrl' => route('year-plan.activities.store', $year),
+                'pdfUrl' => route('year-plan.download', [$year, 'format' => 'pdf']),
+                'excelUrl' => route('year-plan.download', [$year, 'format' => 'excel']),
+            ],
+            'sections' => $built['sections']->map(fn (array $section) => [
+                'department' => [
+                    'id' => $section['department']->id,
+                    'name' => $section['department']->name,
+                    'parentName' => $section['department']->parent?->name,
+                    'sectionNumber' => $section['department']->plan_section_number,
+                    'pdfUrl' => route('year-plan.department.download', [$year, $section['department'], 'format' => 'pdf']),
+                    'excelUrl' => route('year-plan.department.download', [$year, $section['department'], 'format' => 'excel']),
+                ],
+                'activities' => $section['activities']->map(fn (YearPlanActivity $activity) => [
+                    'id' => $activity->id,
+                    'code' => $activity->displayCode(),
+                    'departmentId' => $activity->department_id,
+                    'sortOrder' => $activity->sort_order,
+                    'description' => $activity->description,
+                    'frequency' => $activity->frequency,
+                    'unitCount' => $activity->unit_count,
+                    'unitValueTzs' => $activity->unit_value_tzs,
+                    'totalCostTzs' => $activity->total_cost_tzs,
+                    'plannedMonths' => array_values(array_map('intval', $activity->planned_months ?? [])),
+                    'updateUrl' => route('year-plan.activities.update', [$year, $activity]),
+                    'destroyUrl' => route('year-plan.activities.destroy', [$year, $activity]),
+                ])->values(),
+                'subtotal' => $section['subtotal'],
+            ])->values(),
             'grandTotal' => $built['grandTotal'],
-            'subDepartments' => $subDepartments,
+            'subDepartments' => $subDepartments->map(fn (Department $department) => [
+                'id' => $department->id,
+                'name' => $department->name,
+                'parentName' => $department->parent?->name,
+            ])->values(),
         ]);
     }
 

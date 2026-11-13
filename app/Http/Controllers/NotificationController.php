@@ -9,6 +9,8 @@ use App\Services\WeeklyGracePeriodNotificationDispatcher;
 use App\Services\WeeklySubmissionReminderDispatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class NotificationController extends Controller
 {
@@ -45,14 +47,37 @@ class NotificationController extends Controller
             ->latest('created_at')
             ->value('created_at');
 
-        return view('notifications.index', compact(
-            'smsInfo',
-            'reminderConfig',
-            'graceConfig',
-            'recentReminderLogs',
-            'lastReminderSentAt',
-            'lastGraceSentAt',
-        ));
+        return Inertia::render('Notifications/Settings', [
+            'smsInfo' => $smsInfo,
+            'reminderConfig' => [
+                'id' => $reminderConfig->id,
+                'name' => $reminderConfig->name,
+                'enabled' => (bool) $reminderConfig->enabled,
+                'day_of_week' => $reminderConfig->day_of_week,
+                'time' => $reminderConfig->time,
+                'channels' => $reminderConfig->channels ?? [],
+            ],
+            'graceConfig' => [
+                'id' => $graceConfig->id,
+                'name' => $graceConfig->name,
+                'enabled' => (bool) $graceConfig->enabled,
+            ],
+            'recentReminderLogs' => $recentReminderLogs->map(fn (ReminderDispatchLog $log) => [
+                'id' => $log->id,
+                'user' => $log->user?->only(['id', 'name', 'email']),
+                'dispatch_type_label' => $log->dispatch_type_label,
+                'channel' => $log->channel,
+                'status' => $log->status,
+                'created_at' => optional($log->created_at)?->toDateTimeString(),
+            ])->values(),
+            'lastReminderSentAt' => optional($lastReminderSentAt)?->toDateTimeString(),
+            'lastGraceSentAt' => optional($lastGraceSentAt)?->toDateTimeString(),
+            'urls' => [
+                'updateReminder' => route('notification.weekly-reminder.update'),
+                'updateGrace' => route('notification.grace-period.update'),
+                'inbox' => route('notifications.inbox'),
+            ],
+        ]);
     }
 
     public function updateGracePeriod(Request $request, ReminderConfigService $reminderConfigService)
@@ -108,7 +133,7 @@ class NotificationController extends Controller
         return back();
     }
 
-    public function inbox(Request $request)
+    public function inbox(Request $request): Response
     {
         $notifications = $request->user()
             ->notifications()
@@ -116,9 +141,28 @@ class NotificationController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $unreadCount = $request->user()->unreadNotifications()->count();
+        return Inertia::render('Notifications/Inbox', [
+            'unreadCount' => $request->user()->unreadNotifications()->count(),
+            'items' => $notifications->getCollection()->map(function ($notification) {
+                $data = is_array($notification->data ?? null) ? $notification->data : [];
 
-        return view('notifications.inbox', compact('notifications', 'unreadCount'));
+                return [
+                    'id' => (string) $notification->id,
+                    'title' => (string) ($data['title'] ?? 'Notification'),
+                    'message' => (string) ($data['message'] ?? 'You have a new update.'),
+                    'isUnread' => $notification->read_at === null,
+                    'time' => $notification->created_at?->format('M d, Y H:i'),
+                    'relative' => $notification->created_at?->diffForHumans(),
+                    'href' => route('notifications.open', $notification->id),
+                ];
+            })->values(),
+            'pagination' => [
+                'current' => $notifications->currentPage(),
+                'last' => $notifications->lastPage(),
+                'prev' => $notifications->previousPageUrl(),
+                'next' => $notifications->nextPageUrl(),
+            ],
+        ]);
     }
 
     public function open(Request $request, string $notificationId): RedirectResponse

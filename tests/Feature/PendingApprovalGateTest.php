@@ -15,6 +15,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PendingApprovalGateTest extends TestCase
@@ -148,10 +149,9 @@ class PendingApprovalGateTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertSee('id="pendingApprovalGateModal"', false)
-            ->assertSee('Remind me later')
-            ->assertSee('Open requisitions')
-            ->assertDontSee('Profile / signature');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/Edit')
+                ->where('overlays.approvalGate.requisition_count', 1));
 
         $snapshot = $this->actingAs($reviewer)->getJson(route('approval-gate.snapshot'));
         $snapshot->assertOk();
@@ -193,8 +193,9 @@ class PendingApprovalGateTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertSee('Open requisitions')
-            ->assertSee('Open weekly budgets');
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.approvalGate.requisition_count', 1)
+                ->where('overlays.approvalGate.budget_remaining', 1));
 
         $this->actingAs($reviewer)
             ->postJson(route('approval-gate.remind-later'))
@@ -205,7 +206,8 @@ class PendingApprovalGateTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertDontSee('id="pendingApprovalGateModal"', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.approvalGate', null));
 
         $this->actingAs($reviewer)
             ->getJson(route('approval-gate.snapshot'))
@@ -260,9 +262,8 @@ class PendingApprovalGateTest extends TestCase
         $this->actingAs($reviewer)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertSee('id="pendingApprovalGateModal"', false)
-            ->assertSee('Open weekly budgets')
-            ->assertSee('Remind me later');
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.approvalGate.budget_remaining', 1));
     }
 
     public function test_unrelated_staff_are_not_prompted(): void
@@ -276,6 +277,7 @@ class PendingApprovalGateTest extends TestCase
         $this->actingAs($staff)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertDontSee('id="pendingApprovalGateModal"', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.approvalGate', null));
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 /**
  * Reviewer view and submit/reject/wizard-step workflow actions.
@@ -57,7 +58,22 @@ trait HandlesDocumentWorkflow
             );
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'reviewerPresentation', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers', 'reportMeetingRows'));
+        return Inertia::render('Documents/Show', [
+            'document' => $this->documentPayload($document),
+            'relatedDocument' => $relatedDocument ? $this->documentPayload($relatedDocument) : null,
+            'relatedAction' => $relatedAction,
+            'reviewerPresentation' => $reviewerPresentation,
+            'showWeeklyRelatedPanel' => $showWeeklyRelatedPanel,
+            'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'carriedActivities' => $carriedActivities,
+            'incomingMeetings' => $incomingMeetings,
+            'teamUsers' => $teamUsers->map(fn ($teamUser) => [
+                'id' => (string) $teamUser->id,
+                'name' => $teamUser->name,
+            ])->values(),
+            'reportMeetingRows' => $reportMeetingRows,
+            'indexUrl' => route('documents.reviewer-dashboard'),
+        ]);
     }
 
     /**
@@ -79,7 +95,14 @@ trait HandlesDocumentWorkflow
         $document->loadMissing(['user', 'period']);
         $teamUsers = $this->teamUsersForSelection();
 
-        return view('documents.weekly-report.action-tasks', compact('document', 'actionLogProgress', 'teamUsers'));
+        return Inertia::render('Documents/WeeklyReportActionTasks', [
+            'document' => $this->documentPayload($document),
+            'actionLogProgress' => $actionLogProgress,
+            'teamUsers' => $teamUsers->map(fn ($teamUser) => [
+                'id' => (string) $teamUser->id,
+                'name' => $teamUser->name,
+            ])->values(),
+        ]);
     }
 
     /**
@@ -107,13 +130,14 @@ trait HandlesDocumentWorkflow
         $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
         $hasActionTasksStep = ! empty($actionLogProgress['activeTasks'] ?? []);
 
-        return view('documents.weekly-report.review', compact(
-            'document',
-            'relatedPlan',
-            'content',
-            'actionLogProgress',
-            'hasActionTasksStep'
-        ));
+        return Inertia::render('Documents/WeeklyReportReview', [
+            'document' => $this->documentPayload($document),
+            'relatedPlan' => $relatedPlan ? $this->documentPayload($relatedPlan) : null,
+            'content' => $content,
+            'actionLogProgress' => $actionLogProgress,
+            'hasActionTasksStep' => $hasActionTasksStep,
+            'submitUrl' => route('documents.update', $document),
+        ]);
     }
 
     /**

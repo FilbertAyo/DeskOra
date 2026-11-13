@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 use Spatie\Activitylog\Models\Activity;
 
 class ActivityLogController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Activity::class);
 
@@ -69,16 +70,17 @@ class ActivityLogController extends Controller
             ->pluck('subject_type')
             ->values();
 
-        return view('settings.activity-log.index', compact(
-            'activities',
-            'staffUsers',
-            'logNames',
-            'events',
-            'subjectTypes'
-        ));
+        return Inertia::render('Settings/ActivityLog/Index', [
+            'activities' => $activities,
+            'staffUsers' => $staffUsers,
+            'logNames' => $logNames,
+            'events' => $events,
+            'subjectTypes' => $subjectTypes,
+            'filters' => $request->only(['causer_id', 'log_name', 'event', 'subject_type', 'from', 'to']),
+        ]);
     }
 
-    public function show(Request $request, Activity $activity): JsonResponse|View
+    public function show(Request $request, Activity $activity): JsonResponse|Response
     {
         $this->authorize('view', $activity);
 
@@ -90,9 +92,16 @@ class ActivityLogController extends Controller
             return response()->json($payload);
         }
 
-        return view('settings.activity-log.show', [
-            'activity' => $activity,
+        return Inertia::render('Settings/ActivityLog/Show', [
+            'activity' => [
+                'id' => $activity->id,
+                'description' => $activity->description,
+                'log_name' => $activity->log_name,
+                'event' => $activity->event,
+                'created_at' => optional($activity->created_at)?->toDateTimeString(),
+            ],
             'detail' => $payload,
+            'indexUrl' => route('activity-log.index'),
         ]);
     }
 

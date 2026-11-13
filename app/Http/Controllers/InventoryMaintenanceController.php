@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryAsset;
 use App\Models\InventoryMaintenanceRecord;
 use App\Services\Inventory\InventoryNumberGenerator;
@@ -42,7 +44,7 @@ class InventoryMaintenanceController extends Controller
                 ->count(),
         ];
 
-        return view('inventory.maintenance.index', [
+        return Inertia::render('Inventory/Maintenance/Index', [
             'records' => $records,
             'tab' => $tab,
             'counts' => $counts,
@@ -60,7 +62,7 @@ class InventoryMaintenanceController extends Controller
             $this->authorize('reportProblem', $asset);
         }
 
-        return view('inventory.maintenance.create', [
+        return Inertia::render('Inventory/Maintenance/Create', [
             'asset' => $asset,
             'assets' => InventoryAsset::query()
                 ->whereNotIn('status', [InventoryAsset::STATUS_DISPOSED, InventoryAsset::STATUS_UNDER_REPAIR, InventoryAsset::STATUS_DISPATCHED])
@@ -133,7 +135,7 @@ class InventoryMaintenanceController extends Controller
 
         $maintenance->load(['asset.location', 'reportedBy', 'completedBy']);
 
-        return view('inventory.maintenance.show', [
+        return Inertia::render('Inventory/Maintenance/Show', [
             'record' => $maintenance,
             'statusOptions' => InventoryMaintenanceRecord::statusOptions(),
             'conditionOptions' => InventoryAsset::conditionOptions(),
@@ -146,7 +148,7 @@ class InventoryMaintenanceController extends Controller
 
         $maintenance->load(['asset']);
 
-        return view('inventory.maintenance.complete', [
+        return Inertia::render('Inventory/Maintenance/Complete', [
             'record' => $maintenance,
             'conditionOptions' => InventoryAsset::conditionOptions(),
         ]);

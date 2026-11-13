@@ -16,19 +16,19 @@
 
             if (titleOrOptions && typeof titleOrOptions === 'object') {
                 const options = Object.assign({}, titleOrOptions);
-                options.type = typeMap[options.type] || options.type || 'info';
-                window.toast(options);
+                const text = options.message ? String(options.message) : String(options.title || 'Notice');
+                window.toast({
+                    type: typeMap[options.type] || options.type || 'info',
+                    title: text,
+                    duration: options.duration,
+                });
                 return;
             }
 
-            const payload = {
+            window.toast({
                 type: typeMap[type] || type || 'info',
-                title: String(titleOrOptions || 'Notice'),
-            };
-            if (message) {
-                payload.message = String(message);
-            }
-            window.toast(payload);
+                title: message ? String(message) : String(titleOrOptions || 'Notice'),
+            });
         };
 
         window.addEventListener('gooey-navigate', function (event) {

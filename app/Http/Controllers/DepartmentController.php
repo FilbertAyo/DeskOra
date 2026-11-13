@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class DepartmentController extends Controller
 {
@@ -23,7 +24,12 @@ class DepartmentController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'department_id']);
 
-        return view('settings.departments.index', compact('departments', 'parentDepartments', 'departmentHeads'));
+        return Inertia::render('Settings/Departments/Index', [
+            'departments' => $departments,
+            'parentDepartments' => $parentDepartments,
+            'departmentHeads' => $departmentHeads,
+            'storeUrl' => route('department.store'),
+        ]);
     }
 
     /**
@@ -95,7 +101,32 @@ class DepartmentController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'department_id']);
 
-        return view('settings.departments.view', compact('department', 'users', 'departmentHeads'));
+        return Inertia::render('Settings/Departments/Show', [
+            'department' => [
+                'id' => $department->id,
+                'name' => $department->name,
+                'status' => $department->status,
+                'users_count' => $department->users_count,
+                'children_count' => $department->children_count,
+                'parent' => $department->parent?->only(['id', 'name']),
+                'head' => $department->head?->only(['id', 'name']),
+                'children' => $department->children->map(fn ($child) => [
+                    'id' => $child->id,
+                    'name' => $child->name,
+                    'users_count' => $child->users_count,
+                    'children_count' => $child->children_count,
+                ])->values(),
+            ],
+            'users' => $users->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+            ])->values(),
+            'departmentHeads' => $departmentHeads,
+            'indexUrl' => route('departments.index'),
+            'updateUrl' => route('departments.update', $department),
+        ]);
     }
 
     /**

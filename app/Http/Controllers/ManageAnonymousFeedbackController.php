@@ -10,12 +10,13 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class ManageAnonymousFeedbackController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $this->authorize('viewAny', AnonymousFeedback::class);
 
@@ -43,12 +44,21 @@ class ManageAnonymousFeedbackController extends Controller
             margin: 8,
         ))->getString();
 
-        return view('settings.anonymous-feedback.index', [
-            'items' => $items,
+        return Inertia::render('AnonymousFeedback/Index', [
+            'items' => $items->through(fn (AnonymousFeedback $item) => [
+                'id' => $item->id,
+                'category' => $item->category,
+                'body' => $item->body,
+                'status' => $item->status,
+                'updateUrl' => route('anonymous-feedback.update', $item),
+            ]),
             'statuses' => AnonymousFeedback::statuses(),
             'statusCounts' => $statusCounts,
             'feedbackUrl' => $feedbackUrl,
             'qrSvg' => $qrSvg,
+            'activeStatus' => is_string($status) ? $status : null,
+            'indexUrl' => route('anonymous-feedback.index'),
+            'qrDownloadUrl' => route('anonymous-feedback.qr-download'),
         ]);
     }
 

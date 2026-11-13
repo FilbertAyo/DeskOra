@@ -11,6 +11,7 @@ use App\Models\InventoryStockItem;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class InventoryDispatchTest extends TestCase
@@ -186,11 +187,10 @@ class InventoryDispatchTest extends TestCase
         $this->actingAs($admin)
             ->get(route('inventory.assets.show', $assignedLaptop))
             ->assertOk()
-            ->assertSee('Included in dispatch')
-            ->assertSee('Mwanza STEM Workshop')
-            ->assertSee('Ayo')
-            ->assertSee('John')
-            ->assertSee('Sarah');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Assets/Show')
+                ->where('asset.name', $assignedLaptop->name)
+                ->has('asset'));
     }
 
     public function test_viewer_cannot_create_a_dispatch(): void

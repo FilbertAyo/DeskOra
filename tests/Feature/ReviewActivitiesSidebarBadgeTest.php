@@ -79,10 +79,8 @@ class ReviewActivitiesSidebarBadgeTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSeeInOrder([
-            'Submissions',
-            '<span class="badge bg-light-primary border border-primary ms-2">2</span>',
-        ], false);
+        $response->assertInertia(fn ($page) => $page->component('Dashboard/Index'));
+        $this->assertSame('2', $this->navBadge($response->inertiaPage()['props']['nav'], 'Submissions'));
     }
 
     public function test_weekly_budget_badge_keeps_carry_over_pending_items(): void
@@ -111,10 +109,40 @@ class ReviewActivitiesSidebarBadgeTest extends TestCase
         $response = $this->actingAs($reviewer)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSeeInOrder([
-            'Weekly Budget',
-            '<span class="badge bg-light-warning border border-warning ms-2">2</span>',
-        ], false);
+        $response->assertInertia(fn ($page) => $page->component('Dashboard/Index'));
+        $this->assertSame('2', $this->navBadge($response->inertiaPage()['props']['nav'], 'Weekly Budget'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $nav
+     */
+    private function navBadge(array $nav, string $label): ?string
+    {
+        $found = null;
+
+        $visit = function (array $items) use (&$visit, &$found, $label): void {
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+
+                if (($item['label'] ?? null) === $label) {
+                    $found = $item['badge'] ?? null;
+                }
+
+                if (is_array($item['children'] ?? null)) {
+                    $visit($item['children']);
+                }
+            }
+        };
+
+        foreach ($nav['groups'] ?? [] as $group) {
+            if (is_array($group) && is_array($group['items'] ?? null)) {
+                $visit($group['items']);
+            }
+        }
+
+        return is_string($found) ? $found : null;
     }
 
     private function createPeriods(): array

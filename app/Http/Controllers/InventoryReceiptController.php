@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryCategory;
 use App\Models\InventoryDonor;
 use App\Models\InventoryLocation;
@@ -45,7 +47,7 @@ class InventoryReceiptController extends Controller
 
         $receipts = $query->orderByDesc('received_at')->orderByDesc('created_at')->paginate(20)->withQueryString();
 
-        return view('inventory.receipts.index', [
+        return Inertia::render('Inventory/Receipts/Index', [
             'receipts' => $receipts,
             'filters' => $request->only(['search', 'source_type']),
             'sourceTypeOptions' => InventoryReceipt::sourceTypeOptions(),
@@ -56,7 +58,7 @@ class InventoryReceiptController extends Controller
     {
         $this->authorize('create', InventoryReceipt::class);
 
-        return view('inventory.receipts.create', $this->formOptions());
+        return Inertia::render('Inventory/Receipts/Create', $this->formOptions());
     }
 
     public function store(Request $request)
@@ -89,7 +91,7 @@ class InventoryReceiptController extends Controller
             'assets',
         ]);
 
-        return view('inventory.receipts.show', [
+        return Inertia::render('Inventory/Receipts/Show', [
             'receipt' => $receipt,
             'sourceTypeOptions' => InventoryReceipt::sourceTypeOptions(),
         ]);
@@ -108,7 +110,7 @@ class InventoryReceiptController extends Controller
             'lines.category', 'lines.stockItem',
         ]);
 
-        return view('inventory.receipts.add-items', array_merge(
+        return Inertia::render('Inventory/Receipts/AddItems', array_merge(
             $this->formOptions(),
             ['receipt' => $receipt]
         ));

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 
 /**
  * Dashboard and listing endpoints (reviewer + weekly/monthly reports).
@@ -95,15 +96,50 @@ trait HandlesDocumentDashboard
             }
         })->orderBy('name')->get();
 
-        return view('documents.reviewer.dashboard', compact(
-            'mergedWeeklyRows',
-            'groupedDocuments',
-            'stats',
-            'usersWithDocuments',
-            'selectedWorkPeriodId',
-            'defaultWorkPeriodFilter',
-            'periodOptions'
-        ));
+        return Inertia::render('Documents/ReviewerDashboard', [
+            'weeklyRows' => $mergedWeeklyRows->map(fn (array $row) => [
+                'period' => $row['period'] ? [
+                    'weekNumber' => $row['period']->week_number,
+                    'year' => $row['period']->year,
+                    'dateRange' => $row['period']->date_range,
+                ] : null,
+                'participants' => collect($row['participants'] ?? [])->pluck('name')->values(),
+                'plan' => $row['plan'] ? [
+                    'title' => $row['plan']->display_title,
+                    'showUrl' => route('documents.reviewer-show', $row['plan']),
+                    'sharedNames' => collect($row['plan_shared_users'] ?? [])->pluck('name')->filter()->unique()->values(),
+                ] : null,
+                'report' => $row['report'] ? [
+                    'title' => $row['report']->display_title,
+                    'showUrl' => route('documents.reviewer-show', $row['report']),
+                    'sharedNames' => collect($row['report_shared_users'] ?? [])->pluck('name')->filter()->unique()->values(),
+                ] : null,
+                'updatedAt' => $row['updated_at']?->diffForHumans(),
+            ])->values(),
+            'actionLogs' => $groupedDocuments['action_log']->map(fn (Document $document) => [
+                'id' => $document->id,
+                'title' => $document->display_title,
+                'userName' => $document->user?->name ?? '—',
+                'submittedAt' => $document->updated_at?->format('M d, Y'),
+                'submittedAgo' => $document->updated_at?->diffForHumans(),
+                'showUrl' => route('action-logs.show', $document),
+            ])->values(),
+            'stats' => $stats,
+            'users' => $usersWithDocuments->map(fn (User $documentUser) => [
+                'id' => $documentUser->id,
+                'name' => $documentUser->name,
+            ])->values(),
+            'periodOptions' => $periodOptions->map(fn (WorkPeriod $period) => [
+                'id' => $period->id,
+                'label' => "Week {$period->week_number}, {$period->year} ({$period->date_range})",
+            ])->values(),
+            'filters' => [
+                'userId' => $request->input('user_id'),
+                'workPeriodId' => (string) $selectedWorkPeriodId,
+                'defaultWorkPeriod' => $defaultWorkPeriodFilter,
+            ],
+            'indexUrl' => route('documents.reviewer-dashboard'),
+        ]);
     }
 
     /**
@@ -183,17 +219,26 @@ trait HandlesDocumentDashboard
             $weeklyPlanAlreadySubmitted = $existingPlan?->isSubmitted() ?? false;
         }
 
-        return view('documents.weekly.plans', [
-            'documents' => $documents,
-            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
-            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
-            'currentPeriod' => $currentPeriod,
-            'nextPeriod' => $nextPeriod,
+        return Inertia::render('Documents/WeeklyPlans', [
+            'documents' => $documents->through(fn (Document $document) => $this->documentPayload($document)),
+            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get()->map(fn (WorkPeriod $period) => $this->periodPayload($period)),
+            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year')->values(),
+            'currentPeriod' => $this->periodPayload($currentPeriod),
+            'nextPeriod' => $this->periodPayload($nextPeriod),
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
-            'weeklyPlanSlot' => $weeklyPlanSlot,
+            'weeklyPlanSlot' => [
+                'period' => $this->periodPayload($weeklyPlanSlot->period),
+                'graceActive' => $weeklyPlanSlot->graceActive,
+                'graceEndsAt' => $weeklyPlanSlot->graceEndsAt?->toIso8601String(),
+                'showAction' => $weeklyPlanSlot->showAction(),
+                'actionUrl' => $weeklyPlanSlot->actionUrl(Document::TYPE_WEEKLY_PLAN),
+                'actionLabel' => $weeklyPlanSlot->actionLabel(Document::TYPE_WEEKLY_PLAN),
+            ],
             'weeklyPlanAlreadySubmitted' => $weeklyPlanAlreadySubmitted,
+            'filters' => $request->only(['period_id', 'year', 'review_status']),
+            'indexUrl' => route('documents.weekly-plans'),
         ]);
     }
 
@@ -345,17 +390,26 @@ trait HandlesDocumentDashboard
             $weeklyReportAlreadySubmitted = $existingReport?->isSubmitted() ?? false;
         }
 
-        return view('documents.weekly.reports', [
-            'documents' => $documents,
-            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
-            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year'),
-            'currentPeriod' => $currentPeriod,
-            'nextPeriod' => $nextPeriod,
+        return Inertia::render('Documents/WeeklyReports', [
+            'documents' => $documents->through(fn (Document $document) => $this->documentPayload($document)),
+            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get()->map(fn (WorkPeriod $period) => $this->periodPayload($period)),
+            'years' => WorkPeriod::select('year')->distinct()->orderBy('year', 'desc')->pluck('year')->values(),
+            'currentPeriod' => $this->periodPayload($currentPeriod),
+            'nextPeriod' => $this->periodPayload($nextPeriod),
             'deadlineStatuses' => $deadlineStatuses,
             'availableTypes' => $availableTypes,
             'returnedDocumentMap' => $returnedDocumentMap,
-            'weeklyReportSlot' => $weeklyReportSlot,
+            'weeklyReportSlot' => [
+                'period' => $this->periodPayload($weeklyReportSlot->period),
+                'graceActive' => $weeklyReportSlot->graceActive,
+                'graceEndsAt' => $weeklyReportSlot->graceEndsAt?->toIso8601String(),
+                'showAction' => $weeklyReportSlot->showAction(),
+                'actionUrl' => $weeklyReportSlot->actionUrl(Document::TYPE_WEEKLY_REPORT),
+                'actionLabel' => $weeklyReportSlot->actionLabel(Document::TYPE_WEEKLY_REPORT),
+            ],
             'weeklyReportAlreadySubmitted' => $weeklyReportAlreadySubmitted,
+            'filters' => $request->only(['period_id', 'year', 'review_status']),
+            'indexUrl' => route('documents.weekly-reports'),
         ]);
     }
 
@@ -418,13 +472,20 @@ trait HandlesDocumentDashboard
 
         $ref = now()->startOfMonth()->subMonth();
 
-        return view('documents.monthly.reports', [
-            'documents' => $documents,
-            'years' => $years,
+        return Inertia::render('Documents/MonthlyReports', [
+            'documents' => $documents->through(fn (Document $document) => $this->documentPayload($document)),
+            'years' => $years->values(),
             'returnedDocumentMap' => $returnedDocumentMap,
             'availableTypes' => $availableTypes,
             'defaultReportYear' => (int) $ref->year,
             'defaultReportMonth' => (int) $ref->month,
+            'filters' => $request->only(['month', 'year', 'review_status']),
+            'indexUrl' => route('documents.monthly-report'),
+            'createUrl' => route('documents.create', [
+                'type' => Document::TYPE_MONTHLY_REPORT,
+                'year' => (int) $ref->year,
+                'month' => (int) $ref->month,
+            ]),
         ]);
     }
 }

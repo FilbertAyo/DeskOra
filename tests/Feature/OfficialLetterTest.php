@@ -14,6 +14,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class OfficialLetterTest extends TestCase
@@ -249,14 +250,17 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($manager)
             ->get(route('official-letters.index'))
             ->assertOk()
-            ->assertSee('Mwanza follow-up')
-            ->assertSee('REQUEST FOR CONTINUED IMPLEMENTATION');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Index')
+                ->where('letters.data.0.name', 'Mwanza follow-up')
+                ->where('letters.data.0.subject', 'REQUEST FOR CONTINUED IMPLEMENTATION'));
 
         $this->actingAs($manager)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('Mwanza follow-up')
-            ->assertSee('Portal only');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Show')
+                ->where('letter.name', 'Mwanza follow-up'));
     }
 
     public function test_letter_name_is_not_included_in_downloaded_pdf(): void
@@ -449,17 +453,22 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($sharee)
             ->get(route('official-letters.index'))
             ->assertOk()
-            ->assertSee('Shared')
-            ->assertSee($letter->reference_number);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Index')
+                ->where('letters.data.0.reference_number', $letter->reference_number)
+                ->where('letters.data.0.is_shared', true));
 
         $this->actingAs($sharee)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('shared with you');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Show')
+                ->where('isSharedWithMe', true));
 
         $this->actingAs($sharee)
             ->get(route('official-letters.edit', $letter))
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('OfficialLetters/Edit'));
     }
 
     public function test_unshared_staff_scanning_qr_show_route_gets_verification_page(): void
@@ -525,19 +534,25 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($creator)
             ->get(route('official-letters.index'))
             ->assertOk()
-            ->assertSee($letter->reference_number)
-            ->assertSee('CREATOR PRIVATE LETTER');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Index')
+                ->where('letters.data.0.reference_number', $letter->reference_number)
+                ->where('letters.data.0.subject', 'CREATOR PRIVATE LETTER'));
 
         $this->actingAs($sharee)
             ->get(route('official-letters.index'))
             ->assertOk()
-            ->assertSee($letter->reference_number);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Index')
+                ->where('letters.data.0.reference_number', $letter->reference_number)
+                ->where('letters.data.0.is_shared', true));
 
         $this->actingAs($colleague)
             ->get(route('official-letters.index'))
             ->assertOk()
-            ->assertDontSee($letter->reference_number)
-            ->assertDontSee('CREATOR PRIVATE LETTER');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Index')
+                ->has('letters.data', 0));
 
         $this->actingAs($colleague)
             ->get(route('official-letters.show', $letter))
@@ -563,7 +578,10 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($manager)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('Request download authorization');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Show')
+                ->where('canDownload', false)
+                ->where('canRequestDownload', true));
 
         $this->actingAs($manager)
             ->get(route('official-letters.download', $letter))
@@ -601,16 +619,19 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($authorizer)
             ->get(route('official-letters.index', ['tab' => 'authorizations']))
             ->assertOk()
-            ->assertSee($letter->reference_number)
-            ->assertSee('Download authorizations')
-            ->assertSee('Letter Writer');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Index')
+                ->where('tab', 'authorizations')
+                ->where('letters.data.0.reference_number', $letter->reference_number)
+                ->where('letters.data.0.requested_by', 'Letter Writer'));
 
         $this->actingAs($authorizer)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('Download authorization needed')
-            ->assertSee('Authorize')
-            ->assertSee('Reference is made to your letter', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Show')
+                ->where('canAuthorizeDownload', true)
+                ->where('letter.body', fn ($body) => is_string($body) && str_contains($body, 'Reference is made to your letter')));
 
         $method = new \ReflectionMethod(\App\Http\Controllers\DashboardController::class, 'approvalActionsFor');
         $method->setAccessible(true);
@@ -702,7 +723,10 @@ class OfficialLetterTest extends TestCase
         $this->actingAs($manager)
             ->get(route('official-letters.show', $letter))
             ->assertOk()
-            ->assertSee('Rejected');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfficialLetters/Show')
+                ->where('letter.latest_download_request.status', 'rejected')
+                ->where('canRequestDownload', true));
 
         $this->actingAs($manager)
             ->post(route('official-letters.request-download', $letter))

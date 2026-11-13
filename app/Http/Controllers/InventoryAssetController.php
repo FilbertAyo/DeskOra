@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Exports\InventoryAssetsExport;
 use App\Models\Department;
 use App\Models\InventoryAsset;
@@ -40,7 +42,7 @@ class InventoryAssetController extends Controller
 
         $assets = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
 
-        return view('inventory.assets.index', array_merge(
+        return Inertia::render('Inventory/Assets/Index', array_merge(
             compact('assets'),
             $this->formOptions(),
             [
@@ -54,7 +56,7 @@ class InventoryAssetController extends Controller
     {
         $this->authorize('create', InventoryAsset::class);
 
-        return view('inventory.assets.create', array_merge(
+        return Inertia::render('Inventory/Assets/Create', array_merge(
             $this->formOptions(),
             ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
         ));
@@ -217,7 +219,7 @@ class InventoryAssetController extends Controller
             ->sortByDesc('at')
             ->values();
 
-        return view('inventory.assets.show', array_merge($this->formOptions(), [
+        return Inertia::render('Inventory/Assets/Show', array_merge($this->formOptions(), [
             'asset' => $asset,
             'timeline' => $timeline,
             'currentDispatch' => $currentDispatch,
@@ -236,7 +238,7 @@ class InventoryAssetController extends Controller
     {
         $this->authorize('update', $asset);
 
-        return view('inventory.assets.edit', array_merge(
+        return Inertia::render('Inventory/Assets/Edit', array_merge(
             compact('asset'),
             $this->formOptions(),
             ['inventoryPickerData' => InventoryHierarchy::pickerPayload()]
@@ -358,7 +360,7 @@ class InventoryAssetController extends Controller
             ?: InventoryReturnUrl::sanitize(url()->previous())
             ?: route('inventory.assets.show', $asset);
 
-        return view('inventory.assets.transfer', array_merge(
+        return Inertia::render('Inventory/Assets/Transfer', array_merge(
             compact('asset'),
             $this->formOptions(),
             [
@@ -420,7 +422,7 @@ class InventoryAssetController extends Controller
 
         $this->authorize('view', $asset);
 
-        return view('inventory.assets.scan', [
+        return Inertia::render('Inventory/Assets/Scan', [
             'asset' => $asset,
             'statusOptions' => InventoryAsset::statusOptions(),
             'conditionOptions' => InventoryAsset::conditionOptions(),
@@ -461,7 +463,7 @@ class InventoryAssetController extends Controller
             'qr' => $this->qrCodeGenerator->pngDataUri($this->qrCodeGenerator->scanUrl($asset), 140),
         ]);
 
-        return view('inventory.assets.labels', compact('labels', 'location'));
+        return Inertia::render('Inventory/Assets/Labels', compact('labels', 'location'));
     }
 
     public function export(Request $request, string $format)

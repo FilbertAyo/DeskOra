@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryAsset;
 use App\Models\InventoryDisposalRequest;
 use App\Services\Inventory\InventoryNumberGenerator;
@@ -43,7 +45,7 @@ class InventoryDisposalRequestController extends Controller
             'rejected' => InventoryDisposalRequest::query()->where('status', InventoryDisposalRequest::STATUS_REJECTED)->count(),
         ];
 
-        return view('inventory.disposal.index', [
+        return Inertia::render('Inventory/Disposal/Index', [
             'requests' => $requests,
             'tab' => $tab,
             'counts' => $counts,
@@ -62,7 +64,7 @@ class InventoryDisposalRequestController extends Controller
             $this->authorize('requestDisposal', $asset);
         }
 
-        return view('inventory.disposal.create', [
+        return Inertia::render('Inventory/Disposal/Create', [
             'asset' => $asset,
             'assets' => InventoryAsset::query()
                 ->whereNotIn('status', [
@@ -125,7 +127,7 @@ class InventoryDisposalRequestController extends Controller
 
         $disposal->load(['asset.location', 'asset.responsibleUser', 'requestedBy', 'reviewedBy']);
 
-        return view('inventory.disposal.show', [
+        return Inertia::render('Inventory/Disposal/Show', [
             'disposal' => $disposal,
             'statusOptions' => InventoryDisposalRequest::statusOptions(),
             'methodOptions' => InventoryDisposalRequest::methodOptions(),

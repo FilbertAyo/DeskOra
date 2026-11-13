@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class WorkPeriodController extends Controller
 {
@@ -61,7 +62,7 @@ class WorkPeriodController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        $query = WorkPeriod::query();
+        $query = WorkPeriod::query()->withCount('documents');
 
         // Filter by year if provided
         if ($request->has('year') && $request->year) {
@@ -97,15 +98,25 @@ class WorkPeriodController extends Controller
         $nextWeekYear = $nextWeekStartDate->isoWeekYear();
         $nextWeekNumber = $nextWeekStartDate->isoWeek();
 
-        return view('settings.work-periods.index', compact(
-            'periods',
-            'years',
-            'currentPeriod',
-            'currentYear',
-            'nextWeekStartDate',
-            'nextWeekYear',
-            'nextWeekNumber'
-        ));
+        return Inertia::render('WorkPeriods/Index', [
+            'periods' => $periods->through(fn (WorkPeriod $period) => [
+                ...$this->periodData($period),
+                'documentsCount' => $period->documents_count,
+            ]),
+            'years' => $years,
+            'filters' => [
+                'year' => $request->input('year', $currentYear),
+                'status' => $request->input('status'),
+            ],
+            'currentPeriod' => $currentPeriod ? $this->periodData($currentPeriod) : null,
+            'nextPeriod' => [
+                'year' => $nextWeekYear,
+                'weekNumber' => $nextWeekNumber,
+                'weekStartDate' => $nextWeekStartDate->format('Y-m-d'),
+            ],
+            'storeUrl' => route('work-periods.store'),
+            'bulkResetUrl' => route('work-periods.reopen-and-reset'),
+        ]);
     }
 
     /**
@@ -125,7 +136,20 @@ class WorkPeriodController extends Controller
         $currentYear = Carbon::now()->year;
         $currentWeek = Carbon::now()->week;
 
-        return view('settings.work-periods.create', compact('lastPeriod', 'currentYear', 'currentWeek'));
+        $nextWeekStartDate = Carbon::now()->startOfWeek(Carbon::MONDAY)->addWeek();
+
+        return Inertia::render('WorkPeriods/Create', [
+            'lastPeriod' => $lastPeriod ? $this->periodData($lastPeriod) : null,
+            'currentYear' => $currentYear,
+            'currentWeek' => $currentWeek,
+            'nextPeriod' => [
+                'year' => $nextWeekStartDate->isoWeekYear(),
+                'weekNumber' => $nextWeekStartDate->isoWeek(),
+                'weekStartDate' => $nextWeekStartDate->format('Y-m-d'),
+            ],
+            'storeUrl' => route('work-periods.store'),
+            'indexUrl' => route('work-periods.index'),
+        ]);
     }
 
     /**
@@ -217,7 +241,23 @@ class WorkPeriodController extends Controller
             'monthly_reports' => $period->monthlyReports()->count(),
         ];
 
-        return view('settings.work-periods.show', compact('period', 'stats'));
+        return Inertia::render('WorkPeriods/Show', [
+            'period' => [
+                ...$this->periodData($period),
+                'documents' => $period->documents->sortBy('type')->map(fn (Document $document) => [
+                    'id' => $document->id,
+                    'type' => $document->type,
+                    'typeName' => $document->type_name,
+                    'title' => $document->display_title,
+                    'userName' => $document->user?->name ?? '—',
+                    'state' => $document->state,
+                    'showUrl' => $document->type === Document::TYPE_ACTION_LOG
+                        ? route('action-logs.show', $document)
+                        : route('documents.show', $document),
+                ])->values(),
+            ],
+            'stats' => $stats,
+        ]);
     }
 
     /**
@@ -232,7 +272,11 @@ class WorkPeriodController extends Controller
 
         $period = $work_period;
 
-        return view('settings.work-periods.edit', compact('period'));
+        return Inertia::render('WorkPeriods/Edit', [
+            'period' => $this->periodData($period),
+            'updateUrl' => route('work-periods.update', $period),
+            'indexUrl' => route('work-periods.index'),
+        ]);
     }
 
     /**
@@ -393,5 +437,30 @@ class WorkPeriodController extends Controller
             'success',
             "Bulk reset completed for {$counts['selected_periods']} selected period(s): {$counts['reopened_periods']} closed period(s) reopened, {$counts['updated_documents']} weekly document(s) moved to draft ({$counts['updated_weekly_plans']} plans, {$counts['updated_weekly_reports']} reports)."
         );
+    }
+
+    private function periodData(WorkPeriod $period): array
+    {
+        return [
+            'id' => $period->id,
+            'year' => $period->year,
+            'weekNumber' => $period->week_number,
+            'dateRange' => $period->date_range,
+            'weekStartDate' => $period->week_start_date?->format('Y-m-d'),
+            'planDeadlineDate' => $period->plan_deadline?->format('Y-m-d'),
+            'reportDeadlineDate' => $period->report_deadline?->format('Y-m-d'),
+            'planDeadline' => $period->getPlanDeadlineCutoff()->format('M d, Y H:i'),
+            'reportDeadline' => $period->getReportDeadlineCutoff()->format('M d, Y H:i'),
+            'status' => $period->status,
+            'planDeadlineState' => $period->isPlanDeadlineToday()
+                ? 'today'
+                : ($period->isPlanDeadlinePassed() ? 'passed' : $period->getDaysUntilPlanDeadline().' days'),
+            'reportDeadlineState' => $period->isReportDeadlineToday()
+                ? 'today'
+                : ($period->isReportDeadlinePassed() ? 'passed' : $period->getDaysUntilReportDeadline().' days'),
+            'showUrl' => route('work-periods.show', $period),
+            'editUrl' => route('work-periods.edit', $period),
+            'closeUrl' => route('work-periods.close', $period),
+        ];
     }
 }

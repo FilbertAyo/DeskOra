@@ -10,6 +10,7 @@ use App\Services\CashFlowForecastService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DepositController extends Controller
@@ -26,7 +27,7 @@ class DepositController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $scopeIds = $user->departmentScopeIds();
-        $deposits = Deposit::orderBy('id', 'desc')
+        $deposits = Deposit::with('user:id,name')->orderBy('id', 'desc')
             ->whereIn('department_id', $scopeIds)
             ->get();
 
@@ -37,7 +38,23 @@ class DepositController extends Controller
         $remaining = $latestDeposit ? $latestDeposit->remaining : 0;
         $cashFlowForecast = $this->cashFlowForecast->forUser($user);
 
-        return view('requests.finance.cashier', compact('deposits', 'remaining', 'cashFlowForecast'));
+        return Inertia::render('Finance/Deposits', [
+            'deposits' => $deposits->map(fn (Deposit $deposit) => [
+                'id' => (string) $deposit->id,
+                'deposit' => (float) $deposit->deposit,
+                'remaining' => (float) $deposit->remaining,
+                'createdAt' => $deposit->created_at?->toIso8601String(),
+                'description' => $deposit->description,
+                'depositedBy' => $deposit->user?->name ?? 'Unknown',
+            ]),
+            'remaining' => (float) $remaining,
+            'cashFlowForecast' => $cashFlowForecast,
+            'formContext' => [
+                'userId' => (string) $user->id,
+                'departmentId' => (string) $user->department_id,
+                'canDeposit' => $user->can('approve pettycash payments'),
+            ],
+        ]);
     }
 
     private function getCashflowTransactions($filterType)
@@ -138,7 +155,10 @@ class DepositController extends Controller
         $data = $this->getCashflowTransactions($filterType);
         $data['cashFlowForecast'] = $this->cashFlowForecast->forUser(Auth::user());
 
-        return view('requests.finance.cashflow', $data);
+        return Inertia::render('Finance/Cashflow', [
+            ...$data,
+            'transactions' => collect($data['transactions'])->values(),
+        ]);
     }
 
     public function download(Request $request)
@@ -254,7 +274,18 @@ class DepositController extends Controller
         $filterType = $request->input('filter_type');
         $data = $this->getRequisitionRecordTransactions($filterType);
 
-        return view('requests.finance.requisition-records', $data);
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        return Inertia::render('Finance/RequisitionRecords', [
+            ...$data,
+            'transactions' => collect($data['transactions'])->values(),
+            'canDownloadRequisition' => $user->canAny([
+                'download staff requisition',
+                'authorize staff requisition',
+                'approve pettycash payments',
+            ]),
+        ]);
     }
 
     public function downloadRequisitionRecords(Request $request)

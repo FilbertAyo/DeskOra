@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 use NumberToWords\NumberToWords;
 
 class ReplenishmentController extends Controller
@@ -23,7 +24,19 @@ class ReplenishmentController extends Controller
         $replenishments = Replenishment::orderBy('created_at', 'desc')
             ->get();
 
-        return view('pettycash.replenishments.index', compact('replenishments'));
+        return Inertia::render('Finance/Replenishments/Index', [
+            'replenishments' => $replenishments->map(fn (Replenishment $item) => [
+                'id' => $item->id,
+                'from' => optional($item->from)?->toDateString(),
+                'to' => optional($item->to)?->toDateString(),
+                'total_amount' => $item->total_amount,
+                'status' => $item->status,
+                'description' => $item->description,
+                'created_at' => optional($item->created_at)?->toDateTimeString(),
+                'showUrl' => route('replenishment.show', $item),
+            ])->values(),
+            'createListUrl' => route('replenishment.pettycash'),
+        ]);
     }
 
     public function pettycash(Request $request)
@@ -43,7 +56,20 @@ class ReplenishmentController extends Controller
 
         $petties = $query->get();
 
-        return view('pettycash.replenishments.list', compact('petties'));
+        return Inertia::render('Finance/Replenishments/List', [
+            'petties' => $petties->map(fn (FinanceRequest $item) => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'amount' => $item->amount,
+                'status' => $item->status,
+                'request_type' => $item->request_type,
+                'paid_at' => optional($item->paid_at)?->toDateTimeString(),
+                'user' => $item->user?->only(['id', 'name']),
+            ])->values(),
+            'filters' => $request->only(['from', 'to']),
+            'createUrl' => route('replenishment.create'),
+            'indexUrl' => route('replenishment.index'),
+        ]);
     }
 
     public function create(Request $request)
@@ -76,7 +102,13 @@ class ReplenishmentController extends Controller
             ->get()
             ->sum('amount');
 
-        return view('pettycash.replenishments.create', compact('from', 'to', 'totalAmount'));
+        return Inertia::render('Finance/Replenishments/Create', [
+            'from' => $from,
+            'to' => $to,
+            'totalAmount' => $totalAmount,
+            'storeUrl' => route('replenishment.store'),
+            'indexUrl' => route('replenishment.index'),
+        ]);
     }
 
     /**
@@ -249,7 +281,37 @@ class ReplenishmentController extends Controller
         $verifier = $approvalLogs->get(0); // First approver (verifier)
         $approver = $approvalLogs->get(1); // Second approver
 
-        return view('pettycash.replenishments.view', compact('amountInWords', 'replenishment', 'petties', 'initiator', 'verifier', 'approver'));
+        return Inertia::render('Finance/Replenishments/Show', [
+            'amountInWords' => $amountInWords,
+            'replenishment' => [
+                'id' => $replenishment->id,
+                'from' => optional($replenishment->from)?->toDateString(),
+                'to' => optional($replenishment->to)?->toDateString(),
+                'total_amount' => $replenishment->total_amount,
+                'status' => $replenishment->status,
+                'description' => $replenishment->description,
+            ],
+            'petties' => collect($petties)->map(fn ($item) => [
+                'id' => data_get($item, 'id'),
+                'code' => data_get($item, 'code'),
+                'amount' => data_get($item, 'amount'),
+                'user' => data_get($item, 'user.name'),
+            ])->values(),
+            'initiator' => $initiator ? [
+                'user' => $initiator->user?->only(['id', 'name']),
+                'created_at' => optional($initiator->created_at)?->toDateTimeString(),
+            ] : null,
+            'verifier' => $verifier ? [
+                'user' => $verifier->user?->only(['id', 'name']),
+                'created_at' => optional($verifier->created_at)?->toDateTimeString(),
+            ] : null,
+            'approver' => $approver ? [
+                'user' => $approver->user?->only(['id', 'name']),
+                'created_at' => optional($approver->created_at)?->toDateTimeString(),
+            ] : null,
+            'downloadUrl' => route('replenishment.download', $replenishment),
+            'indexUrl' => route('replenishment.index'),
+        ]);
     }
 
     /**

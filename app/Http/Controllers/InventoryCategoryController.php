@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryCategory;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +17,7 @@ class InventoryCategoryController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('inventory.categories.index', compact('categories'));
+        return Inertia::render('Inventory/Categories/Index', compact('categories'));
     }
 
     public function store(Request $request)

@@ -9,6 +9,7 @@ use App\Models\WorkPeriod;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class DocumentsOrganizationWideCatalogTest extends TestCase
@@ -53,8 +54,12 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
 
         $response = $this->actingAs($viewer)->get(route('documents.index'));
         $response->assertOk();
-        $response->assertSee('Colleague Plan', false);
-        $response->assertSee(e($author->name), false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/Index')
+            ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                data_get($row, 'plan.title') === 'Colleague Plan'
+                && data_get($row, 'plan.userName') === $author->name
+            )));
     }
 
     public function test_staff_can_view_another_users_submitted_weekly_plan(): void
@@ -197,8 +202,12 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
         $this->actingAs($staff)
             ->get(route('documents.index'))
             ->assertOk()
-            ->assertSee('Staff Week 16 Plan', false)
-            ->assertSee('Staff Week 16 Report', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Documents/Index')
+                ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                    data_get($row, 'plan.title') === 'Staff Week 16 Plan'
+                    && data_get($row, 'report.title') === 'Staff Week 16 Report'
+                )));
     }
 
     public function test_documents_index_pairs_collaborator_report_with_plan_owner_plan(): void
@@ -241,10 +250,14 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
 
         $response = $this->actingAs($planOwner)->get(route('documents.index'));
         $response->assertOk();
-        $response->assertSee('Team Week 16 Plan', false);
-        $response->assertSee('Collaborator Week 16 Report', false);
-        $response->assertSee(e($planOwner->name), false);
-        $response->assertSee(e($collaborator->name), false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/Index')
+            ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                data_get($row, 'plan.title') === 'Team Week 16 Plan'
+                && data_get($row, 'report.title') === 'Collaborator Week 16 Report'
+                && collect(data_get($row, 'participants', []))->contains($planOwner->name)
+                && collect(data_get($row, 'participants', []))->contains($collaborator->name)
+            )));
     }
 
     public function test_staff_cannot_view_another_users_draft_weekly_plan(): void
@@ -281,3 +294,4 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
             ->assertForbidden();
     }
 }
+

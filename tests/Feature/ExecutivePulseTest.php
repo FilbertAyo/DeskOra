@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ExecutivePulseTest extends TestCase
@@ -41,11 +42,14 @@ class ExecutivePulseTest extends TestCase
         $this->actingAs($user)
             ->get(route('executive-pulse.index'))
             ->assertOk()
-            ->assertSee('Executive Pulse')
-            ->assertSee('Highlights', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ExecutivePulse/Index')
+                ->has('snapshot.highlights')
+                ->has('downloadUrl'));
 
         $this->actingAs($user)
             ->get(route('executive-pulse.download'))
             ->assertOk();
     }
 }
+

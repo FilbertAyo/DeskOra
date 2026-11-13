@@ -125,12 +125,15 @@ class WeeklyReportGracePeriodCreateTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertDontSee('Account Deactivated', false);
-        $response->assertSee('UNIQUE_WEEK_29_PLAN_TARGET', false);
-        $response->assertDontSee('UNIQUE_WEEK_30_PLAN_TARGET', false);
-        $response->assertSee('Week 29 activity only', false);
-        $response->assertDontSee('Week 30 activity only', false);
-        $response->assertSee('value="'.$week29->id.'"', false);
+        $response->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->component('Documents/Form')
+            ->where('selectedType', Document::TYPE_WEEKLY_REPORT)
+            ->where('defaultPeriodId', (string) $week29->id)
+            ->where('relatedPlan.mainTarget', 'UNIQUE_WEEK_29_PLAN_TARGET')
+            ->where('relatedPlan.content.planned_activities.0.activity', 'Week 29 activity only')
+            ->where('relatedPlan.content.planned_activities', fn ($rows) => collect($rows)->every(
+                fn ($row) => data_get($row, 'activity') !== 'Week 30 activity only'
+            )));
     }
 
     public function test_shared_plan_collaborator_does_not_see_report_grace_when_group_report_submitted(): void

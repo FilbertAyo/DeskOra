@@ -1,0 +1,91 @@
+/* Visual bridge for pages that still use the existing Blade markup.
+   Navigation items, order, and links stay in layouts/aside.blade.php.
+   Download buttons and file routes are not changed here. */
+
+:root {
+  --bs-primary: #0077b6;
+  --bs-primary-rgb: 0, 119, 182;
+  --bs-link-color: #0077b6;
+  --bs-link-hover-color: #015f92;
+  --bs-primary-text-emphasis: #014e78;
+  --bs-primary-bg-subtle: #e6f4fb;
+  --bs-primary-border-subtle: #b9dff2;
+  --pc-sidebar-active-color: #0077b6;
+  --pc-sidebar-background: #ffffff;
+  --pc-sidebar-color: #3f3f46;
+  --pc-sidebar-caption-color: #71717a;
+  --pc-header-background: #ffffff;
+  --pc-header-shadow: none;
+  --pc-sidebar-shadow: none;
+}
+
+body {
+  font-family: Geist, "Segoe UI", sans-serif;
+  background: #f4f4f5;
+}
+
+.pc-sidebar {
+  border-right: 1px solid #e4e4e7;
+  box-shadow: none;
+}
+
+.pc-sidebar .pc-caption label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.pc-sidebar .pc-link {
+  border-radius: 0.5rem;
+  margin: 1px 8px;
+}
+
+.pc-sidebar .pc-navbar > .pc-item.active > .pc-link,
+.pc-sidebar .pc-navbar > .pc-item .pc-submenu .pc-item.active > .pc-link {
+  background: rgba(0, 119, 182, 0.1);
+  color: #0077b6;
+}
+
+.pc-header {
+  border-bottom: 1px solid #e4e4e7;
+  box-shadow: none;
+}
+
+.pc-container {
+  background: #f4f4f5;
+}
+
+.pc-content .card {
+  border-radius: 0.75rem;
+  border-color: #e4e4e7;
+  box-shadow: none;
+}
+
+.btn-primary {
+  --bs-btn-bg: #0077b6;
+  --bs-btn-border-color: #0077b6;
+  --bs-btn-hover-bg: #015f92;
+  --bs-btn-hover-border-color: #015f92;
+  --bs-btn-active-bg: #014e78;
+  --bs-btn-active-border-color: #014e78;
+  --bs-btn-disabled-bg: #0077b6;
+  --bs-btn-disabled-border-color: #0077b6;
+}
+
+.bg-primary {
+  background-color: #0077b6 !important;
+}
+
+.text-primary {
+  color: #0077b6 !important;
+}
+
+.border-primary {
+  border-color: #0077b6 !important;
+}
+
+.badge.bg-light-primary {
+  background: rgba(0, 119, 182, 0.1) !important;
+  color: #015f92 !important;
+}

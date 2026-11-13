@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\OrganizationReport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 
 class ReportController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $search = trim((string) request('search', ''));
 
@@ -27,7 +28,26 @@ class ReportController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        return view('reports.index', compact('organizationReports', 'search'));
+        $organizationReports->through(fn (OrganizationReport $report) => [
+            'id' => $report->id,
+            'name' => $report->name,
+            'stored_name' => $report->stored_name,
+            'mime_type' => $report->mime_type,
+            'size' => $report->size,
+            'uploader' => $report->uploader?->name,
+            'created_at' => optional($report->created_at)->toIso8601String(),
+            'view_url' => route('reports.organization-documents.view', $report),
+            'download_url' => route('reports.organization-documents.download', $report),
+            'update_url' => route('reports.organization-documents.update', $report),
+            'destroy_url' => route('reports.organization-documents.destroy', $report),
+        ]);
+
+        return Inertia::render('Reports/Index', [
+            'organizationReports' => $organizationReports,
+            'search' => $search,
+            'canUpload' => $request->user()->can('upload organization reports'),
+            'storeUrl' => route('reports.organization-documents.store'),
+        ]);
     }
 
     public function storeOrganizationDocument(Request $request)

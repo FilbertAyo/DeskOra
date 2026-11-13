@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Exports\InventoryAssetsExport;
 use App\Exports\InventoryStockItemsExport;
 use App\Models\Department;
@@ -59,7 +61,7 @@ class InventoryReportController extends Controller
                 ->get();
         }
 
-        return view('inventory.reports.index', [
+        return Inertia::render('Inventory/Reports/Index', [
             'statusCounts' => $statusCounts,
             'conditionCounts' => $conditionCounts,
             'sourceCounts' => $sourceCounts,

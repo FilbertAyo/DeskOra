@@ -6,7 +6,8 @@ use App\Services\ExecutivePulseService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExecutivePulseController extends Controller
@@ -15,7 +16,7 @@ class ExecutivePulseController extends Controller
         private readonly ExecutivePulseService $pulse,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $user = $request->user();
         abort_unless($user && ($user->status ?? '') === 'active', 403);
@@ -23,7 +24,13 @@ class ExecutivePulseController extends Controller
 
         $snapshot = $this->pulse->snapshot($user);
 
-        return view('executive-pulse.index', compact('snapshot'));
+        $snapshot['generated_at'] = $snapshot['generated_at']->format('d M Y, H:i');
+
+        return Inertia::render('ExecutivePulse/Index', [
+            'snapshot' => $snapshot,
+            'downloadUrl' => route('executive-pulse.download'),
+            'approvalsUrl' => route('petty.list'),
+        ]);
     }
 
     public function download(Request $request): Response|StreamedResponse

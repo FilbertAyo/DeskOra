@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -16,14 +17,32 @@ class RoleController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('settings.roles.index', compact('roles'));
+        return Inertia::render('Settings/Roles/Index', [
+            'roles' => $roles->map(fn (Role $role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'permissions_count' => $role->permissions_count,
+                'users_count' => $role->users_count,
+                'is_system_managed' => $this->isSystemManagedRole($role),
+                'edit_url' => route('roles.edit', $role),
+                'destroy_url' => route('roles.destroy', $role),
+            ]),
+            'createUrl' => route('roles.create'),
+        ]);
     }
 
     public function create()
     {
         $permissions = Permission::query()->orderBy('name')->get();
 
-        return view('settings.roles.create', compact('permissions'));
+        return Inertia::render('Settings/Roles/Create', [
+            'permissions' => $permissions->map(fn (Permission $permission) => [
+                'id' => $permission->id,
+                'name' => $permission->name,
+            ])->values(),
+            'storeUrl' => route('roles.store'),
+            'indexUrl' => route('roles.index'),
+        ]);
     }
 
     public function store(Request $request)
@@ -50,7 +69,20 @@ class RoleController extends Controller
         $selectedPermissions = $role->permissions->pluck('name')->all();
         $isSystemManaged = $this->isSystemManagedRole($role);
 
-        return view('settings.roles.edit', compact('role', 'permissions', 'selectedPermissions', 'isSystemManaged'));
+        return Inertia::render('Settings/Roles/Edit', [
+            'role' => [
+                'id' => $role->id,
+                'name' => $role->name,
+            ],
+            'permissions' => $permissions->map(fn (Permission $permission) => [
+                'id' => $permission->id,
+                'name' => $permission->name,
+            ])->values(),
+            'selectedPermissions' => $selectedPermissions,
+            'isSystemManaged' => $isSystemManaged,
+            'updateUrl' => route('roles.update', $role),
+            'indexUrl' => route('roles.index'),
+        ]);
     }
 
     public function update(Request $request, Role $role)

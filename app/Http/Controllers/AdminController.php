@@ -12,6 +12,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 
 class AdminController extends Controller
@@ -25,7 +26,12 @@ class AdminController extends Controller
 
         $user = User::with(['department.head', 'subDepartments', 'roles'])->latest()->paginate(20);
 
-        return view('settings.users.index', compact('user'));
+        return Inertia::render('Settings/Users/Index', [
+            'users' => $user,
+            'urls' => [
+                'create' => route('admin.create'),
+            ],
+        ]);
     }
 
     /**
@@ -39,7 +45,16 @@ class AdminController extends Controller
         $topDepartments = $this->topDepartmentsWithChildren();
         $roles = Role::all();
 
-        return view('settings.users.create', compact('departments', 'topDepartments', 'roles'));
+        return Inertia::render('Settings/Users/Create', [
+            'departments' => $departments,
+            'topDepartments' => $topDepartments,
+            'roles' => $roles->map(fn (Role $role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+            ])->values(),
+            'storeUrl' => route('admin.store'),
+            'indexUrl' => route('admin.index'),
+        ]);
     }
 
     /**
@@ -110,19 +125,55 @@ class AdminController extends Controller
 
         $user = $admin->load(['department', 'subDepartments', 'roles', 'permissions']);
 
-        return view('settings.users.view', compact('user'));
+        return Inertia::render('Settings/Users/Show', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'title' => $user->title,
+                'phone' => $user->phone,
+                'status' => $user->status,
+                'department' => $user->department?->only(['id', 'name']),
+                'subDepartments' => $user->subDepartments->map->only(['id', 'name'])->values(),
+                'roles' => $user->roles->pluck('name')->values(),
+                'permissions' => $user->getAllPermissions()->pluck('name')->values(),
+            ],
+            'editUrl' => route('admin.edit', $user),
+            'indexUrl' => route('admin.index'),
+        ]);
     }
 
     public function edit(Request $request, User $admin)
     {
         abort_unless($request->user()?->can('users management settings'), 403);
 
-        $user = $admin->load(['department', 'subDepartments']);
+        $user = $admin->load(['department', 'subDepartments', 'roles']);
         $departments = $this->hierarchicalDepartments();
         $topDepartments = $this->topDepartmentsWithChildren();
         $roles = Role::all();
 
-        return view('settings.users.edit', compact('user', 'departments', 'topDepartments', 'roles'));
+        return Inertia::render('Settings/Users/Edit', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'title' => $user->title,
+                'phone' => $user->phone,
+                'status' => $user->status,
+                'department_id' => $user->department_id,
+                'sub_department_ids' => $user->subDepartments->pluck('id')->values(),
+                'roles' => $user->roles->pluck('name')->values(),
+                'is_department_head' => $user->department?->head_user_id === $user->id,
+            ],
+            'departments' => $departments,
+            'topDepartments' => $topDepartments,
+            'roles' => $roles->map(fn (Role $role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+            ])->values(),
+            'updateUrl' => route('admin.update', $user),
+            'indexUrl' => route('admin.index'),
+        ]);
     }
 
     public function update(UpdateAdminUserRequest $request, User $admin)

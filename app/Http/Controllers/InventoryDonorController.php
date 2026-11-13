@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
+
 use App\Models\InventoryDonor;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,7 +18,7 @@ class InventoryDonorController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('inventory.donors.index', compact('donors'));
+        return Inertia::render('Inventory/Donors/Index', compact('donors'));
     }
 
     public function store(Request $request)

@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class MeetingMinuteTest extends TestCase
@@ -34,8 +35,9 @@ class MeetingMinuteTest extends TestCase
             ->get(route('meeting-minutes.index'));
 
         $response->assertOk()
-            ->assertSee('Meeting Minutes')
-            ->assertSee('Not Available');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('MeetingMinutes/Index')
+                ->where('periods.data.0.minute', null));
     }
 
     public function test_authenticated_staff_can_view_existing_minutes(): void
@@ -51,7 +53,10 @@ class MeetingMinuteTest extends TestCase
         $this->actingAs($user)
             ->get(route('meeting-minutes.show', $minute))
             ->assertOk()
-            ->assertSee('Week 10 of 2026');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('MeetingMinutes/Show')
+                ->where('meetingMinute.period.weekNumber', 10)
+                ->where('meetingMinute.period.year', 2026));
     }
 
     public function test_user_without_manage_minutes_cannot_access_create_or_store(): void
@@ -280,9 +285,10 @@ class MeetingMinuteTest extends TestCase
         $this->actingAs($user)
             ->get(route('meeting-minutes.index'))
             ->assertOk()
-            ->assertSee('pagination', false)
-            ->assertSee('page-link', false)
-            ->assertDontSee('h-5 w-5', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('MeetingMinutes/Index')
+                ->has('periods.data')
+                ->has('periods.links'));
     }
 
     private function createPeriod(int $year, int $weekNumber, string $start, string $end): WorkPeriod
@@ -313,3 +319,4 @@ class MeetingMinuteTest extends TestCase
         ]);
     }
 }
+

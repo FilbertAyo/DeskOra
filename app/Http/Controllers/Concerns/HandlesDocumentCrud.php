@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 /**
  * CRUD actions for weekly plans, weekly reports and monthly reports.
@@ -141,15 +142,76 @@ trait HandlesDocumentCrud
         $nextPeriod = $this->workPeriodService->periodForWeeklyPlanSubmission();
         $deadlineStatuses = $this->workPeriodService->deadlineStatusesForUi($currentPeriod, $nextPeriod);
 
-        return view('documents.index', [
-            'documents' => $weeklyRows,
+        $weeklyRows->through(function ($row) {
+            $period = data_get($row, 'period');
+            $plan = data_get($row, 'plan');
+            $report = data_get($row, 'report');
+            $participants = collect(data_get($row, 'participants', []))
+                ->map(fn ($participant) => is_object($participant) ? data_get($participant, 'name') : $participant)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($participants === []) {
+                $participants = collect([
+                    data_get($plan, 'user.name'),
+                    data_get($report, 'user.name'),
+                ])->filter()->unique()->values()->all();
+            }
+
+            $updatedAt = data_get($row, 'updated_at');
+
+            return [
+                'period' => $period ? [
+                    'id' => data_get($period, 'id'),
+                    'weekNumber' => data_get($period, 'week_number'),
+                    'year' => data_get($period, 'year'),
+                    'dateRange' => data_get($period, 'date_range'),
+                ] : null,
+                'participants' => $participants,
+                'plan' => $plan ? [
+                    'id' => data_get($plan, 'id'),
+                    'title' => data_get($plan, 'display_title') ?? data_get($plan, 'title'),
+                    'userName' => data_get($plan, 'user.name'),
+                    'showUrl' => route('documents.show', data_get($plan, 'id')),
+                ] : null,
+                'report' => $report ? [
+                    'id' => data_get($report, 'id'),
+                    'title' => data_get($report, 'display_title') ?? data_get($report, 'title'),
+                    'userName' => data_get($report, 'user.name'),
+                    'showUrl' => route('documents.show', data_get($report, 'id')),
+                ] : null,
+                'updatedAt' => $updatedAt instanceof \Carbon\CarbonInterface
+                    ? $updatedAt->diffForHumans()
+                    : (is_string($updatedAt) ? $updatedAt : null),
+            ];
+        });
+
+        return Inertia::render('Documents/Index', [
             'weeklyRows' => $weeklyRows,
-            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get(),
+            'periods' => WorkPeriod::orderBy('year', 'desc')->orderBy('week_number', 'desc')->get()->map(fn (WorkPeriod $period) => [
+                'id' => $period->id,
+                'weekNumber' => $period->week_number,
+                'year' => $period->year,
+                'dateRange' => $period->date_range,
+            ])->values(),
             'years' => $years,
-            'currentPeriod' => $currentPeriod,
-            'nextPeriod' => $nextPeriod,
+            'currentPeriod' => $currentPeriod ? [
+                'id' => $currentPeriod->id,
+                'weekNumber' => $currentPeriod->week_number,
+                'year' => $currentPeriod->year,
+                'dateRange' => $currentPeriod->date_range,
+            ] : null,
+            'nextPeriod' => $nextPeriod ? [
+                'id' => $nextPeriod->id,
+                'weekNumber' => $nextPeriod->week_number,
+                'year' => $nextPeriod->year,
+                'dateRange' => $nextPeriod->date_range,
+            ] : null,
             'deadlineStatuses' => $deadlineStatuses,
-            'returnedDocumentMap' => $returnedDocumentMap,
+            'filters' => $request->only(['period_id', 'year', 'review_status']),
+            'indexUrl' => route('documents.index'),
         ]);
     }
 
@@ -271,54 +333,42 @@ trait HandlesDocumentCrud
             );
         }
 
-        // If type is provided in query string, pre-select it
-        if ($selectedType && isset($availableTypes[$selectedType])) {
-            // Validate that user can create this type
-            if (Document::canUserCreateType($user, $selectedType)) {
-                return view('documents.create', compact(
-                    'availableTypes',
-                    'selectedType',
-                    'workPeriods',
-                    'defaultPeriodId',
-                    'currentPeriod',
-                    'nextPeriod',
-                    'relatedPlan',
-                    'carriedActivities',
-                    'reportMeetingRows',
-                    'teamUsers',
-                    'shareableUsers',
-                    'monthlyYearPlan',
-                    'monthlyPlannedActivities',
-                    'monthlyDefaultMonth',
-                    'monthlyDefaultYear',
-                    'monthlyYearChoices',
-                    'monthlyHasSubDepartments',
-                    'assignedWeeklyActivities',
-                    'incomingMeetings'
-                ));
-            }
-        }
+        $resolvedType = ($selectedType && isset($availableTypes[$selectedType]) && Document::canUserCreateType($user, $selectedType))
+            ? $selectedType
+            : null;
 
-        return view('documents.create', compact(
-            'availableTypes',
-            'workPeriods',
-            'defaultPeriodId',
-            'currentPeriod',
-            'nextPeriod',
-            'relatedPlan',
-            'carriedActivities',
-            'reportMeetingRows',
-            'teamUsers',
-            'shareableUsers',
-            'monthlyYearPlan',
-            'monthlyPlannedActivities',
-            'monthlyDefaultMonth',
-            'monthlyDefaultYear',
-            'monthlyYearChoices',
-            'monthlyHasSubDepartments',
-            'assignedWeeklyActivities',
-            'incomingMeetings'
-        ));
+        return Inertia::render('Documents/Form', [
+            'mode' => 'create',
+            'document' => null,
+            'selectedType' => $resolvedType,
+            'availableTypes' => $availableTypes,
+            'workPeriods' => $workPeriods->map(fn (WorkPeriod $period) => $this->periodPayload($period))->values(),
+            'defaultPeriodId' => $defaultPeriodId,
+            'currentPeriod' => $this->periodPayload($currentPeriod),
+            'nextPeriod' => $this->periodPayload($nextPeriod),
+            'relatedPlan' => $relatedPlan ? $this->documentPayload($relatedPlan) : null,
+            'carriedActivities' => $carriedActivities,
+            'reportMeetingRows' => $reportMeetingRows,
+            'teamUsers' => $teamUsers->map(fn (User $teamUser) => [
+                'id' => (string) $teamUser->id,
+                'name' => $teamUser->name,
+            ])->values(),
+            'shareableUsers' => $shareableUsers->map(fn (User $shareableUser) => [
+                'id' => (string) $shareableUser->id,
+                'name' => $shareableUser->name,
+            ])->values(),
+            'monthlyYearPlan' => $monthlyYearPlan,
+            'monthlyPlannedActivities' => $monthlyPlannedActivities,
+            'monthlyDefaultMonth' => $monthlyDefaultMonth,
+            'monthlyDefaultYear' => $monthlyDefaultYear,
+            'monthlyYearChoices' => $monthlyYearChoices,
+            'monthlyHasSubDepartments' => $monthlyHasSubDepartments,
+            'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'incomingMeetings' => $incomingMeetings,
+            'currentUserId' => (string) $user->id,
+            'indexUrl' => session('documents.last_listing_url') ?: route('documents.index'),
+            'submitUrl' => route('documents.store'),
+        ]);
     }
 
     /**
@@ -962,7 +1012,23 @@ trait HandlesDocumentCrud
             $weeklyReportWizardProgress = $this->actionLogProgressService->buildForUser($viewer);
         }
 
-        return view('documents.show', compact('document', 'relatedDocument', 'relatedAction', 'showWeeklyRelatedPanel', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'teamUsers', 'weeklyReportWizardProgress', 'reportMeetingRows'));
+        return Inertia::render('Documents/Show', [
+            'document' => $this->documentPayload($document),
+            'relatedDocument' => $relatedDocument ? $this->documentPayload($relatedDocument) : null,
+            'relatedAction' => $relatedAction,
+            'showWeeklyRelatedPanel' => $showWeeklyRelatedPanel,
+            'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'carriedActivities' => $carriedActivities,
+            'incomingMeetings' => $incomingMeetings,
+            'teamUsers' => $teamUsers->map(fn (User $teamUser) => [
+                'id' => (string) $teamUser->id,
+                'name' => $teamUser->name,
+            ])->values(),
+            'weeklyReportWizardProgress' => $weeklyReportWizardProgress,
+            'reportMeetingRows' => $reportMeetingRows,
+            'reviewerPresentation' => false,
+            'indexUrl' => session('documents.last_listing_url') ?: route('documents.index'),
+        ]);
     }
 
     /**
@@ -1071,7 +1137,42 @@ trait HandlesDocumentCrud
             $actionLogProgress = $this->actionLogProgressService->buildForUser($viewer);
         }
 
-        return view('documents.edit', compact('document', 'teamUsers', 'shareableUsers', 'monthlyYearPlan', 'monthlyPlannedActivities', 'monthlyHasSubDepartments', 'assignedWeeklyActivities', 'carriedActivities', 'incomingMeetings', 'reportMeetingRows', 'actionLogProgress'));
+        $relatedPlanForEdit = null;
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->period_id) {
+            $relatedPlanForEdit = Document::findWeeklyPlanForUserAndPeriod(
+                (string) $document->period_id,
+                (string) $document->user_id
+            );
+        }
+
+        return Inertia::render('Documents/Form', [
+            'mode' => 'edit',
+            'document' => $this->documentPayload($document),
+            'selectedType' => $document->type,
+            'availableTypes' => [$document->type => $document->type_name],
+            'workPeriods' => collect([$document->period])->filter()->map(fn (WorkPeriod $period) => $this->periodPayload($period))->values(),
+            'defaultPeriodId' => $document->period_id,
+            'relatedPlan' => $relatedPlanForEdit ? $this->documentPayload($relatedPlanForEdit) : null,
+            'teamUsers' => $teamUsers->map(fn (User $teamUser) => [
+                'id' => (string) $teamUser->id,
+                'name' => $teamUser->name,
+            ])->values(),
+            'shareableUsers' => $shareableUsers->map(fn (User $shareableUser) => [
+                'id' => (string) $shareableUser->id,
+                'name' => $shareableUser->name,
+            ])->values(),
+            'monthlyYearPlan' => $monthlyYearPlan,
+            'monthlyPlannedActivities' => $monthlyPlannedActivities,
+            'monthlyHasSubDepartments' => $monthlyHasSubDepartments,
+            'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'carriedActivities' => $carriedActivities,
+            'incomingMeetings' => $incomingMeetings,
+            'reportMeetingRows' => $reportMeetingRows,
+            'actionLogProgress' => $actionLogProgress,
+            'currentUserId' => (string) $viewer->id,
+            'indexUrl' => session('documents.last_listing_url') ?: route('documents.index'),
+            'submitUrl' => route('documents.update', $document),
+        ]);
     }
 
     /**

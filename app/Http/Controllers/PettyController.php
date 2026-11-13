@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 use NumberToWords\NumberToWords;
 
 class PettyController extends Controller
@@ -195,7 +196,16 @@ class PettyController extends Controller
         $stageLabel = FinanceRequest::stageLabel($stage);
         $typeFilter = $httpRequest->query('type');
 
-        return view('requests.approval.index', compact('requests', 'stage', 'stageLabel', 'typeFilter'));
+        return Inertia::render('Finance/Approvals/Index', [
+            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request, $user, $stage)),
+            'stage' => $stage,
+            'stageLabel' => $stageLabel,
+            'typeFilter' => is_string($typeFilter) ? $typeFilter : null,
+            'title' => $typeFilter === 'petty'
+                ? "{$stageLabel} Petty Cash"
+                : ($typeFilter === 'requisition' ? "{$stageLabel} Requisitions" : FinanceRequest::stageQueueTitle($stage)),
+            'emptyMessage' => FinanceRequest::stageEmptyMessage($stage),
+        ]);
     }
 
     private function isRequisitionFullySigned(FinanceRequest $request): bool
@@ -228,12 +238,22 @@ class PettyController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('requests.petty.index', compact('requests'));
+        return Inertia::render('Finance/Petty/Index', [
+            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request)),
+        ]);
     }
 
     public function create()
     {
-        return view('requests.petty.create');
+        /** @var User $user */
+        $user = Auth::user();
+
+        return Inertia::render('Finance/Petty/Create', [
+            'formContext' => [
+                'userId' => (string) $user->id,
+                'departmentId' => (string) $user->department_id,
+            ],
+        ]);
     }
 
     public function createRequisition()
@@ -243,7 +263,16 @@ class PettyController extends Controller
         $planActivities = $this->requisitionPlanActivitiesForUser($user);
         $hasSignature = $this->userHasSignature();
 
-        return view('requests.requisition.create', compact('planActivities', 'hasSignature'));
+        return Inertia::render('Finance/Requisition/Form', [
+            'mode' => 'create',
+            'planActivities' => $planActivities,
+            'hasSignature' => $hasSignature,
+            'formContext' => [
+                'userId' => (string) $user?->id,
+                'departmentId' => (string) $user?->department_id,
+            ],
+            'request' => null,
+        ]);
     }
 
     public function store(Request $request)
@@ -365,7 +394,11 @@ class PettyController extends Controller
         $approvedBy = $approval_logs->where('action', 'approved')->values()->get(1);
         $gm = User::where('email', 'gm@marstanzania.com')->first();
 
-        return view('requests.petty.view', compact('request', 'amountInWords', 'approval_logs', 'verifiedBy', 'approvedBy', 'gm'));
+        return Inertia::render('Finance/Petty/Show', [
+            'request' => $this->requestPayload($request),
+            'amountInWords' => $amountInWords,
+            'approvalLogs' => $this->approvalPayload($approval_logs),
+        ]);
     }
 
     public function requestsCashier()
@@ -382,7 +415,9 @@ class PettyController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('requests.finance.payments', compact('requests'));
+        return Inertia::render('Finance/Payments', [
+            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request, $user)),
+        ]);
     }
 
     public function all_requests()
@@ -391,7 +426,14 @@ class PettyController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('requests.approval.index', compact('requests'));
+        return Inertia::render('Finance/Approvals/Index', [
+            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request)),
+            'stage' => null,
+            'stageLabel' => null,
+            'typeFilter' => null,
+            'title' => 'Requests Approval',
+            'emptyMessage' => 'No approval requests found.',
+        ]);
     }
 
     public function request_show(\Illuminate\Http\Request $httpRequest, FinanceRequest $petty)
@@ -421,18 +463,26 @@ class PettyController extends Controller
         $canActOnRequest = $request->userCanActAtStage($user, $request->approvalStage());
         $hasSignature = $this->userHasSignature();
 
-        return view('requests.approval.details', compact(
-            'request',
-            'amountInWords',
-            'approval',
-            'approval_logs',
-            'verifiedBy',
-            'approvedBy',
-            'gm',
-            'returnStage',
-            'canActOnRequest',
-            'hasSignature'
-        ));
+        $currentStage = $request->approvalStage();
+        $approvalRoute = match ($currentStage) {
+            'authorize' => route('requests.authorize', $request),
+            'approve' => route('l_approve.approve', $request),
+            default => route('f_approve.approve', $request),
+        };
+
+        return Inertia::render('Finance/Approvals/Show', [
+            'request' => $this->requestPayload($request, $user, $currentStage),
+            'amountInWords' => $amountInWords,
+            'approval' => $approval,
+            'approvalLogs' => $this->approvalPayload($approval_logs),
+            'returnStage' => $returnStage,
+            'returnType' => is_string($httpRequest->query('type')) ? $httpRequest->query('type') : null,
+            'canActOnRequest' => $canActOnRequest,
+            'hasSignature' => $hasSignature,
+            'currentStage' => $currentStage,
+            'currentStageLabel' => FinanceRequest::stageLabel(in_array($currentStage, FinanceRequest::APPROVAL_STAGES, true) ? $currentStage : 'review'),
+            'approvalRoute' => $approvalRoute,
+        ]);
     }
 
     public function f_approve(FinanceRequest $petty)
@@ -615,7 +665,9 @@ class PettyController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('requests.requisition.index', compact('requests'));
+        return Inertia::render('Finance/Requisition/Index', [
+            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request)),
+        ]);
     }
 
     public function requisitionShow(FinanceRequest $petty)
@@ -628,7 +680,10 @@ class PettyController extends Controller
         $request = $petty->load(['user', 'department', 'requisitionDetails', 'requisitionItems', 'approvals.user']);
         $approval_logs = $request->approvals()->with('user')->orderBy('acted_at')->get();
 
-        return view('requests.requisition.show', compact('request', 'approval_logs'));
+        return Inertia::render('Finance/Requisition/Show', [
+            'request' => $this->requestPayload($request),
+            'approvalLogs' => $this->approvalPayload($approval_logs),
+        ]);
     }
 
     public function requisitionEdit(FinanceRequest $petty)
@@ -650,7 +705,16 @@ class PettyController extends Controller
         $user = Auth::user();
         $planActivities = $this->requisitionPlanActivitiesForUser($user);
 
-        return view('requests.requisition.edit', compact('request', 'planActivities'));
+        return Inertia::render('Finance/Requisition/Form', [
+            'mode' => 'edit',
+            'planActivities' => $planActivities,
+            'hasSignature' => true,
+            'formContext' => [
+                'userId' => (string) $user?->id,
+                'departmentId' => (string) $request->department_id,
+            ],
+            'request' => $this->requestPayload($request),
+        ]);
     }
 
     public function requisitionUpdate(Request $request, FinanceRequest $petty)
@@ -1047,5 +1111,89 @@ class PettyController extends Controller
             $requestRow->fresh(['user', 'department', 'requisitionDetails']),
             'submitted'
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function requestPayload(FinanceRequest $request, ?User $user = null, ?string $stage = null): array
+    {
+        $request->loadMissing([
+            'user:id,name',
+            'department:id,name',
+            'pettyDetails',
+            'requisitionDetails',
+            'requisitionItems',
+            'approvals.actor:id,name',
+        ]);
+        $user ??= Auth::user();
+        $currentStage = $request->approvalStage();
+        $canDownload = $user?->canAny([
+            'download staff requisition',
+            'authorize staff requisition',
+            'approve pettycash payments',
+        ]) ?? false;
+        $canPay = $user?->can('approve pettycash payments') ?? false;
+
+        return [
+            'id' => (string) $request->id,
+            'code' => $request->code,
+            'requestType' => $request->request_type,
+            'requestFor' => $request->request_for,
+            'amount' => $request->amount,
+            'reason' => $request->reason,
+            'status' => $request->status,
+            'createdAt' => $request->created_at?->toIso8601String(),
+            'paidDate' => optional($request->paid_date)->toIso8601String(),
+            'user' => $request->user ? ['id' => (string) $request->user->id, 'name' => $request->user->name] : null,
+            'department' => $request->department ? ['id' => (string) $request->department->id, 'name' => $request->department->name] : null,
+            'departmentId' => (string) $request->department_id,
+            'projectProgram' => $request->project_program,
+            'activityCode' => $request->activity_code,
+            'activityTitle' => $request->activity_title,
+            'budgetCode' => $request->budget_code,
+            'isOffPlan' => $request->is_off_plan,
+            'dateOfRequest' => optional($request->date_of_request)->format('Y-m-d'),
+            'dateOfRequirement' => optional($request->date_of_requirement)->format('Y-m-d'),
+            'items' => $request->requisitionItems->map(fn (RequisitionItem $item) => [
+                'id' => (string) $item->id,
+                'serialNo' => $item->serial_no,
+                'description' => $item->description,
+                'unit' => $item->unit,
+                'cost' => (float) $item->cost,
+            ])->values(),
+            'currentStage' => $currentStage,
+            'reviewedAt' => optional($request->reviewed_at)->toIso8601String(),
+            'approvedAt' => optional($request->approved_at)->toIso8601String(),
+            'authorizedAt' => optional($request->authorized_at)->toIso8601String(),
+            'canAct' => $stage !== null && $user ? $request->userCanActAtStage($user, $stage) : false,
+            'stageApproved' => $stage !== null ? $request->stageHasApproval($stage) : false,
+            'closedAtStage' => $stage !== null ? $request->wasClosedAtStage($stage) : false,
+            'canDownload' => $request->request_type === 'Staff Requisition'
+                && $request->reviewed_at && $request->approved_at && $request->authorized_at && $canDownload,
+            'canPay' => $request->request_type !== 'Staff Requisition'
+                && $request->status === 'approved'
+                && $request->authorized_at
+                && ! $request->approvals->contains('action', 'paid')
+                && $canPay,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, RequestApproval>  $logs
+     * @return array<int, array<string, mixed>>
+     */
+    private function approvalPayload(Collection $logs): array
+    {
+        return $logs->map(fn (RequestApproval $log) => [
+            'id' => (string) $log->id,
+            'step' => $log->step,
+            'action' => $log->action,
+            'comment' => $log->comment,
+            'actedAt' => $log->acted_at?->toIso8601String(),
+            'actor' => $log->actor ?? $log->user
+                ? ['name' => ($log->actor ?? $log->user)?->name]
+                : null,
+        ])->values()->all();
     }
 }

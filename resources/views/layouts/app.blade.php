@@ -12,7 +12,7 @@
   <link rel="icon" href="{{ asset('assets/images/logo-icon.png') }}" type="image/png">
   <link rel="apple-touch-icon" href="{{ asset('assets/images/logo-icon.png') }}">
   @include('partials.pwa-head')
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" id="main-font-link">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Public+Sans:wght@300;400;500;600;700&display=swap" id="main-font-link">
 <!-- [Tabler Icons] https://tablericons.com -->
 <link rel="stylesheet" href="{{ asset('assets/fonts/tabler-icons.min.css') }}" >
 <!-- [Feather Icons] https://feathericons.com -->
@@ -24,6 +24,7 @@
 <!-- [Template CSS Files] -->
 <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}" id="main-style-link" >
 <link rel="stylesheet" href="{{ asset('assets/css/style-preset.css') }}" >
+<link rel="stylesheet" href="{{ asset('assets/css/admincn-bridge.css') }}" >
 <link rel="stylesheet" href="{{ asset('assets/css/deskora-document-thead.css') }}" >
 @if(request()->routeIs('inventory.*'))
 <link rel="stylesheet" href="{{ asset('css/inventory-ui.css') }}">
@@ -175,6 +176,7 @@
 
     <x-gooey-toast />
     @include('partials.gooey-toast-setup')
+    @include('partials.action-feedback')
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 
 </body>

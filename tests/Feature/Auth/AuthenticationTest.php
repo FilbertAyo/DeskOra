@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -17,14 +18,24 @@ class AuthenticationTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page->component('Auth/Login'));
     }
 
-    public function test_login_screen_does_not_show_remember_me(): void
+    public function test_users_can_choose_to_be_remembered(): void
     {
-        $response = $this->get('/login');
+        $user = User::factory()->create([
+            'last_login_at' => now()->subHours(48),
+        ]);
 
-        $response->assertDontSee('Keep me signed in', false);
-        $response->assertDontSee('name="remember"', false);
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'remember' => '1',
+        ]);
+
+        $this->assertAuthenticatedAs($user);
+        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertCookie(Auth::guard()->getRecallerName());
     }
 
     public function test_users_can_authenticate_using_the_login_screen_within_5_days(): void

@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class StaffAppreciationNominationTest extends TestCase
@@ -42,8 +43,10 @@ class StaffAppreciationNominationTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('profile.edit'));
 
-        $response->assertOk();
-        $response->assertSee('Monthly Staff Appreciation Nomination', false);
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/Edit')
+                ->has('overlays.nomination'));
     }
 
     public function test_modal_hidden_after_user_responds(): void
@@ -53,7 +56,8 @@ class StaffAppreciationNominationTest extends TestCase
         $this->actingAs($user)->post(route('appreciation.skip'))->assertOk();
 
         $response = $this->actingAs($user)->get(route('profile.edit'));
-        $response->assertDontSee('Monthly Staff Appreciation Nomination', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('overlays.nomination', null));
     }
 
     public function test_user_can_submit_anonymous_nomination(): void
@@ -115,7 +119,8 @@ class StaffAppreciationNominationTest extends TestCase
             ->assertSessionHas(StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
 
         $response = $this->actingAs($user)->get(route('profile.edit'));
-        $response->assertDontSee('Monthly Staff Appreciation Nomination', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('overlays.nomination', null));
     }
 
     public function test_staff_search_excludes_self_and_inactive(): void
@@ -156,7 +161,9 @@ class StaffAppreciationNominationTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('management.appreciation.show', $period));
         $response->assertOk();
-        $response->assertSee('Nominated Person', false);
-        $response->assertSee('Outstanding', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Management/Appreciation/Show')
+            ->where('detail.tallies.0.user.name', 'Nominated Person')
+            ->where('detail.reasons.0.reason', 'Outstanding'));
     }
 }

@@ -12,6 +12,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class RequisitionDraftTest extends TestCase
@@ -76,9 +77,9 @@ class RequisitionDraftTest extends TestCase
         $this->actingAs($requester)
             ->get(route('requisition.create'))
             ->assertOk()
-            ->assertSee('Signature required')
-            ->assertDontSee('Submit Requisition')
-            ->assertDontSee('Save as Draft');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Finance/Requisition/Form')
+                ->where('hasSignature', false));
 
         $response = $this->actingAs($requester)->from(route('requisition.create'))->post(route('requisition.store'), [
             'user_id' => $requester->id,
@@ -478,9 +479,11 @@ class RequisitionDraftTest extends TestCase
         $this->actingAs($requester)
             ->get(route('requisition.edit', $draft->id))
             ->assertOk()
-            ->assertSee('Not on the year plan')
-            ->assertSee('OP-99')
-            ->assertSee('BUD-OFF-01');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Finance/Requisition/Form')
+                ->where('request.isOffPlan', true)
+                ->where('request.activityCode', 'OP-99')
+                ->where('request.budgetCode', 'BUD-OFF-01'));
 
         $response = $this->actingAs($requester)->put(route('requisition.update', $draft->id), [
             'action' => 'draft',

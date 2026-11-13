@@ -9,6 +9,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -209,9 +210,11 @@ class AnonymousFeedbackTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('profile.edit'));
 
-        $response->assertOk();
-        $response->assertSee('anonymous-feedback-fab', false);
-        $response->assertSee(route('anonymous-feedback.index', ['status' => 'new']), false);
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/Edit')
+                ->where('overlays.anonymousFeedback.count', 1)
+                ->where('overlays.anonymousFeedback.hideOnCurrentPage', false));
     }
 
     public function test_user_without_permission_does_not_see_fab(): void
@@ -227,8 +230,9 @@ class AnonymousFeedbackTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('profile.edit'));
 
-        $response->assertOk();
-        $response->assertDontSee('anonymous-feedback-fab', false);
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.anonymousFeedback', null));
     }
 
     public function test_fab_hidden_when_no_new_feedback(): void
@@ -245,8 +249,9 @@ class AnonymousFeedbackTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('profile.edit'));
 
-        $response->assertOk();
-        $response->assertDontSee('anonymous-feedback-fab', false);
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.anonymousFeedback', null));
     }
 
     public function test_fab_hidden_on_anonymous_feedback_inbox(): void
@@ -263,8 +268,10 @@ class AnonymousFeedbackTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('anonymous-feedback.index'));
 
-        $response->assertOk();
-        $response->assertDontSee('anonymous-feedback-fab', false);
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.anonymousFeedback.count', 1)
+                ->where('overlays.anonymousFeedback.hideOnCurrentPage', true));
     }
 
     public function test_inbox_shows_status_chips_and_quick_actions(): void
@@ -287,11 +294,13 @@ class AnonymousFeedbackTest extends TestCase
         $response = $this->actingAs($manager)->get(route('anonymous-feedback.index'));
 
         $response->assertOk();
-        $response->assertSee('New (1)', false);
-        $response->assertSee('In progress (1)', false);
-        $response->assertSee('Mark in progress', false);
-        $response->assertSee('Mark resolved', false);
-        $response->assertSee('anonymous-feedback-status-form', false);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('AnonymousFeedback/Index')
+            ->where('statusCounts.new', 1)
+            ->where('statusCounts.in_progress', 1)
+            ->has('items.data', 2)
+            ->has('qrSvg')
+            ->has('feedbackUrl'));
     }
 
     public function test_marking_feedback_resolved_clears_fab_new_count(): void
@@ -308,7 +317,8 @@ class AnonymousFeedbackTest extends TestCase
 
         $this->actingAs($manager)
             ->get(route('profile.edit'))
-            ->assertSee('anonymous-feedback-fab', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.anonymousFeedback.count', 1));
 
         $this->actingAs($manager)->patch(
             route('anonymous-feedback.update', $row),
@@ -319,7 +329,8 @@ class AnonymousFeedbackTest extends TestCase
 
         $this->actingAs($manager)
             ->get(route('profile.edit'))
-            ->assertDontSee('anonymous-feedback-fab', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.anonymousFeedback', null));
     }
 
     public function test_marking_feedback_in_progress_clears_fab_new_count(): void
@@ -343,6 +354,7 @@ class AnonymousFeedbackTest extends TestCase
 
         $this->actingAs($manager)
             ->get(route('profile.edit'))
-            ->assertDontSee('anonymous-feedback-fab', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overlays.anonymousFeedback', null));
     }
 }

@@ -16,7 +16,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ActionLogController extends Controller
 {
@@ -81,13 +82,20 @@ class ActionLogController extends Controller
                 ->withQueryString();
         }
 
-        return view('action-logs.index', compact('documents', 'canManageActionLogs'));
+        return Inertia::render('ActionLogs/Index', [
+            'documents' => $documents->through(fn (Document $document) => $this->actionLogPayload($document)),
+            'canManageActionLogs' => $canManageActionLogs,
+            'stateFilter' => $request->input('state'),
+            'indexUrl' => route('action-logs.index'),
+            'boardUrl' => route('action-logs.board'),
+            'createUrl' => route('action-logs.create'),
+        ]);
     }
 
     /**
      * Visual Kanban board for action-log tasks in a work period.
      */
-    public function board(Request $request): View
+    public function board(Request $request): Response
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -114,11 +122,14 @@ class ActionLogController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('action-logs.board', [
+        return Inertia::render('ActionLogs/Board', [
             'board' => $board,
             'workPeriods' => $workPeriods,
             'departments' => $departments,
             'progressOptions' => ActionLogTaskSupport::PROGRESS_OPTIONS,
+            'filters' => $request->only(['period_id', 'assignee_id', 'department_id']),
+            'boardUrl' => route('action-logs.board'),
+            'indexUrl' => route('action-logs.index'),
         ]);
     }
 
@@ -255,7 +266,19 @@ class ActionLogController extends Controller
             : [];
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
 
-        return view('action-logs.create', compact('workPeriods', 'defaultPeriodId', 'currentPeriod', 'carryForwardTasks', 'teamUsers', 'isManager'));
+        return Inertia::render('ActionLogs/Form', [
+            'mode' => 'create',
+            'document' => null,
+            'workPeriods' => $workPeriods,
+            'defaultPeriodId' => $defaultPeriodId,
+            'currentPeriod' => $currentPeriod,
+            'tasks' => $carryForwardTasks,
+            'carryForwardTasks' => $carryForwardTasks,
+            'teamUsers' => $teamUsers,
+            'isManager' => $isManager,
+            'submitUrl' => route('action-logs.store'),
+            'backUrl' => route('action-logs.index'),
+        ]);
     }
 
     /**
@@ -395,7 +418,36 @@ class ActionLogController extends Controller
 
         $tasks = $document->getActionLogTasksForPeriodDisplay();
 
-        return view('action-logs.show', compact('document', 'tasks'));
+        $responsibleIds = collect($tasks)
+            ->flatMap(fn ($task) => is_array($task) ? ($task['responsible_user_ids'] ?? []) : [])
+            ->filter()
+            ->unique();
+
+        /** @var \App\Models\User $viewer */
+        $viewer = request()->user();
+        $viewerId = (string) $viewer->id;
+
+        $tasks = collect($tasks)->map(function ($task) use ($viewerId) {
+            $ids = collect(is_array($task) ? ($task['responsible_user_ids'] ?? []) : [])
+                ->map(fn ($id) => (string) $id)
+                ->all();
+            $isSelf = in_array($viewerId, $ids, true);
+
+            return array_merge(is_array($task) ? $task : [], [
+                'is_assignee_self' => $isSelf,
+                'assignee_label' => $isSelf ? 'Your task:' : null,
+            ]);
+        })->values();
+
+        return Inertia::render('ActionLogs/Show', [
+            'document' => $this->actionLogPayload($document),
+            'tasks' => $tasks,
+            'responsibleNames' => User::query()->whereIn('id', $responsibleIds)->pluck('name', 'id'),
+            'canManage' => $viewer->can('manageActionLogs', $document),
+            'canDelete' => $document->canBeDeleted(),
+            'backUrl' => route('action-logs.index'),
+            'viewerId' => $viewerId,
+        ]);
     }
 
     /**
@@ -476,7 +528,18 @@ class ActionLogController extends Controller
 
         $teamUsers = User::select('id', 'name')->orderBy('name')->get();
 
-        return view('action-logs.edit', compact('document', 'workPeriods', 'teamUsers', 'isManager'));
+        return Inertia::render('ActionLogs/Form', [
+            'mode' => 'edit',
+            'document' => $this->actionLogPayload($document),
+            'workPeriods' => $workPeriods,
+            'defaultPeriodId' => $document->period_id,
+            'currentPeriod' => $document->period,
+            'tasks' => $this->tasksForClientResponse($this->extractTasks($document->content)),
+            'teamUsers' => $teamUsers,
+            'isManager' => $isManager,
+            'submitUrl' => route('action-logs.update', $document),
+            'backUrl' => route('action-logs.show', $document),
+        ]);
     }
 
     /**
@@ -1194,6 +1257,34 @@ class ActionLogController extends Controller
         $content['tasks'] = $this->renumberTasks($tasks);
 
         return $content;
+    }
+
+    private function actionLogPayload(Document $document): array
+    {
+        $document->loadMissing(['user', 'period']);
+        $tasks = $this->extractTasks($document->content);
+
+        return [
+            'id' => $document->id,
+            'title' => $document->display_title,
+            'state' => $document->state,
+            'userName' => $document->user?->name,
+            'periodId' => $document->period_id,
+            'period' => $document->period ? [
+                'id' => $document->period->id,
+                'weekNumber' => $document->period->week_number,
+                'year' => $document->period->year,
+                'dateRange' => $document->period->date_range,
+                'isOpen' => $document->period->isOpen(),
+            ] : null,
+            'createdAt' => $document->created_at?->format('M d, Y h:i A'),
+            'updatedAt' => $document->updated_at?->format('M d, Y h:i A'),
+            'taskCount' => count($tasks),
+            'showUrl' => route('action-logs.show', $document),
+            'editUrl' => route('action-logs.edit', $document),
+            'downloadUrl' => route('action-logs.download', $document),
+            'deleteUrl' => route('action-logs.destroy', $document),
+        ];
     }
 
     /**
