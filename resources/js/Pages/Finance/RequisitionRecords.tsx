@@ -6,7 +6,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { FinanceTable, money, shortDate } from '@/Pages/Finance/components';
+import { FinanceTable, TruncateCell, money, shortDate } from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 
@@ -96,12 +96,18 @@ export default function RequisitionRecords({
                 >
                     {(transactions as RecordRow[]).map((tx) => (
                         <TableRow key={tx.request_id}>
-                            <TableCell>{shortDate(tx.date)}</TableCell>
-                            <TableCell className="font-mono">{tx.reference}</TableCell>
-                            <TableCell>{tx.requester}</TableCell>
-                            <TableCell>{tx.activity}</TableCell>
-                            <TableCell>{tx.project}</TableCell>
-                            <TableCell>{tx.budget_code}</TableCell>
+                            <TableCell className="whitespace-nowrap">{shortDate(tx.date)}</TableCell>
+                            <TableCell className="font-mono whitespace-nowrap">{tx.reference}</TableCell>
+                            <TruncateCell className="max-w-[10rem]" title={tx.requester}>
+                                {tx.requester}
+                            </TruncateCell>
+                            <TruncateCell className="max-w-[16rem]" title={tx.activity}>
+                                {tx.activity}
+                            </TruncateCell>
+                            <TruncateCell className="max-w-[10rem]" title={tx.project}>
+                                {tx.project}
+                            </TruncateCell>
+                            <TableCell className="whitespace-nowrap">{tx.budget_code}</TableCell>
                             <TableCell>{money(tx.amount)}</TableCell>
                             <TableCell>{money(tx.cumulative)}</TableCell>
                             <TableCell className="text-right">

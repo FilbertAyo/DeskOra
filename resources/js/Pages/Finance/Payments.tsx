@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { FinanceTable, type FinanceItem, money, PayButton, shortDate } from '@/Pages/Finance/components';
+import { FinanceTable, TruncateCell, type FinanceItem, money, PayButton, shortDate } from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 
@@ -18,10 +18,14 @@ export default function Payments({ requests }: { requests: FinanceItem[] }) {
             >
                 {requests.map((item, index) => (
                     <TableRow key={item.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{item.user?.name ?? 'N/A'}</TableCell>
-                        <TableCell>{item.requestFor}</TableCell>
-                        <TableCell>{item.requestType}</TableCell>
+                        <TableCell className="w-12">{index + 1}</TableCell>
+                        <TruncateCell className="max-w-[10rem]" title={item.user?.name ?? 'N/A'}>
+                            {item.user?.name ?? 'N/A'}
+                        </TruncateCell>
+                        <TruncateCell className="max-w-[18rem]" title={item.requestFor}>
+                            {item.requestFor}
+                        </TruncateCell>
+                        <TableCell className="whitespace-nowrap">{item.requestType}</TableCell>
                         <TableCell>{money(item.amount)}</TableCell>
                         <TableCell>{shortDate(item.createdAt)}</TableCell>
                         <TableCell>{item.status === 'paid' ? 'Paid' : 'Awaiting Payment'}</TableCell>

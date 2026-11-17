@@ -7,7 +7,7 @@ import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { FinanceTable, type FinanceItem, money, shortDate, StatusBadge } from '@/Pages/Finance/components';
+import { FinanceTable, TruncateCell, type FinanceItem, money, shortDate, StatusBadge } from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 
@@ -51,10 +51,14 @@ export default function Index({
                 ) : (
                     requests.map((item, index) => (
                         <TableRow key={item.id}>
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell>{item.user?.name ?? 'N/A'}</TableCell>
-                            <TableCell>{item.activityTitle ?? item.requestFor}</TableCell>
-                            <TableCell>
+                            <TableCell className="w-12">{index + 1}</TableCell>
+                            <TruncateCell className="max-w-[10rem]" title={item.user?.name ?? 'N/A'}>
+                                {item.user?.name ?? 'N/A'}
+                            </TruncateCell>
+                            <TruncateCell className="max-w-[18rem]" title={item.activityTitle ?? item.requestFor}>
+                                {item.activityTitle ?? item.requestFor}
+                            </TruncateCell>
+                            <TableCell className="whitespace-nowrap">
                                 <Badge variant="outline">{item.requestType}</Badge>
                             </TableCell>
                             <TableCell>

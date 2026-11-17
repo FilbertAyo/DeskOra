@@ -6,6 +6,28 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { route } from '@/lib/route';
+import { cn } from '@/lib/utils';
+
+/** Keep list tables from growing wider than the page when activity/description text is long. */
+export function TruncateCell({
+    children,
+    className,
+    title,
+}: {
+    children: ReactNode;
+    className?: string;
+    title?: string | null;
+}) {
+    const tip =
+        title ??
+        (typeof children === 'string' || typeof children === 'number' ? String(children) : undefined);
+
+    return (
+        <TableCell className={cn('max-w-[16rem]', className)} title={tip || undefined}>
+            <span className="block truncate">{children ?? '—'}</span>
+        </TableCell>
+    );
+}
 
 export type FinanceItem = {
     id: string;
@@ -71,7 +93,7 @@ export function FinanceTable({
     return (
         <Card>
             <CardContent className="overflow-x-auto p-0">
-                <Table>
+                <Table className="w-full table-fixed">
                     <TableHeader>
                         <TableRow>{headers.map((header) => <TableHead key={header}>{header}</TableHead>)}</TableRow>
                     </TableHeader>

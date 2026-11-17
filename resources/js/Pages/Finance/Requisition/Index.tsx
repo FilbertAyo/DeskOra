@@ -9,7 +9,7 @@ import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { FinanceTable, type FinanceItem, money, shortDate, StatusBadge } from '@/Pages/Finance/components';
+import { FinanceTable, TruncateCell, type FinanceItem, money, shortDate, StatusBadge } from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 
@@ -29,9 +29,11 @@ export default function Index({ requests }: { requests: FinanceItem[] }) {
             >
                 {requests.map((item, index) => (
                     <TableRow key={item.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{item.activityTitle ?? item.requestFor}</TableCell>
-                        <TableCell>{money(item.amount)}</TableCell>
+                        <TableCell className="w-12">{index + 1}</TableCell>
+                        <TruncateCell className="max-w-[22rem]" title={item.activityTitle ?? item.requestFor}>
+                            {item.activityTitle ?? item.requestFor}
+                        </TruncateCell>
+                        <TableCell className="whitespace-nowrap">{money(item.amount)}</TableCell>
                         <TableCell>{shortDate(item.createdAt)}</TableCell>
                         <TableCell>
                             {item.status === 'draft' ? (
