@@ -15,7 +15,7 @@ use Inertia\Inertia;
 
 class MeetingCallController extends Controller
 {
-    private const PEER_TTL_SECONDS = 20;
+    private const PEER_TTL_SECONDS = 15;
 
     public function show(InHouseMeeting $meeting)
     {
@@ -24,6 +24,11 @@ class MeetingCallController extends Controller
         /** @var User $user */
         $user = Auth::user();
         $meeting->load(['organizer:id,name', 'participants.user:id,name', 'actionItems.assignee:id,name']);
+
+        // Drop this user's leftover signaling so rejoin starts clean.
+        $this->clearUserCallState($meeting, $user, wipePeer: true);
+
+        $canManageRecords = $user->can('manageRecords', $meeting);
 
         return Inertia::render('Meetings/Call', [
             'meeting' => [
@@ -57,11 +62,9 @@ class MeetingCallController extends Controller
                 'name' => $user->name,
             ],
             'canEditMinutes' => $user->can('joinCall', $meeting),
-            'canManageRecords' => $user->can('manageRecords', $meeting),
-            'staffUsers' => User::query()->active()->orderBy('name')->get(['id', 'name'])->map(fn (User $row) => [
-                'id' => (string) $row->id,
-                'name' => $row->name,
-            ])->values()->all(),
+            'canManageRecords' => $canManageRecords,
+            // Avoid loading every active staff user on join; assignees = people already on the meeting.
+            'staffUsers' => $canManageRecords ? $this->assigneeOptions($meeting) : [],
             'urls' => [
                 'show' => route('meetings.show', $meeting),
                 'saveMinutes' => route('meetings.call.minutes', $meeting),
@@ -155,6 +158,7 @@ class MeetingCallController extends Controller
         );
 
         $this->pruneStalePeers($meeting);
+        $this->pruneOldSignals($meeting);
 
         return response()->json(['ok' => true]);
     }
@@ -162,8 +166,6 @@ class MeetingCallController extends Controller
     public function peers(InHouseMeeting $meeting)
     {
         $this->authorize('joinCall', $meeting);
-
-        $this->pruneStalePeers($meeting);
 
         $peers = MeetingCallPeer::query()
             ->with('user:id,name')
@@ -231,16 +233,11 @@ class MeetingCallController extends Controller
             ->limit(50)
             ->get();
 
-        foreach ($rows as $row) {
-            $row->update(['consumed_at' => now()]);
+        if ($rows->isNotEmpty()) {
+            MeetingCallSignal::query()
+                ->whereIn('id', $rows->pluck('id'))
+                ->update(['consumed_at' => now()]);
         }
-
-        // Cleanup old consumed signals
-        MeetingCallSignal::query()
-            ->where('meeting_id', $meeting->id)
-            ->whereNotNull('consumed_at')
-            ->where('consumed_at', '<', now()->subMinutes(10))
-            ->delete();
 
         return response()->json([
             'signals' => $rows->map(fn (MeetingCallSignal $signal) => [
@@ -259,10 +256,49 @@ class MeetingCallController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        MeetingCallPeer::query()
-            ->where('meeting_id', $meeting->id)
-            ->where('user_id', $user->id)
-            ->delete();
+        $this->clearUserCallState($meeting, $user, wipePeer: true);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * @return list<array{id: string, name: string}>
+     */
+    private function assigneeOptions(InHouseMeeting $meeting): array
+    {
+        $options = collect([
+            [
+                'id' => (string) $meeting->organizer_id,
+                'name' => $meeting->organizer?->name ?? 'Organizer',
+            ],
+        ]);
+
+        foreach ($meeting->participants as $participant) {
+            if (! $participant->user_id) {
+                continue;
+            }
+
+            $options->push([
+                'id' => (string) $participant->user_id,
+                'name' => $participant->user?->name ?? 'Staff',
+            ]);
+        }
+
+        return $options
+            ->unique('id')
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
+
+    private function clearUserCallState(InHouseMeeting $meeting, User $user, bool $wipePeer = true): void
+    {
+        if ($wipePeer) {
+            MeetingCallPeer::query()
+                ->where('meeting_id', $meeting->id)
+                ->where('user_id', $user->id)
+                ->delete();
+        }
 
         MeetingCallSignal::query()
             ->where('meeting_id', $meeting->id)
@@ -270,10 +306,7 @@ class MeetingCallController extends Controller
                 $query->where('from_user_id', $user->id)
                     ->orWhere('to_user_id', $user->id);
             })
-            ->whereNull('consumed_at')
             ->delete();
-
-        return response()->json(['ok' => true]);
     }
 
     private function pruneStalePeers(InHouseMeeting $meeting): void
@@ -284,19 +317,31 @@ class MeetingCallController extends Controller
             ->delete();
     }
 
+    private function pruneOldSignals(InHouseMeeting $meeting): void
+    {
+        MeetingCallSignal::query()
+            ->where('meeting_id', $meeting->id)
+            ->whereNotNull('consumed_at')
+            ->where('consumed_at', '<', now()->subMinutes(5))
+            ->limit(200)
+            ->delete();
+    }
+
     private function canReachPeer(InHouseMeeting $meeting, string $peerUserId): bool
     {
         if ((string) $meeting->organizer_id === $peerUserId) {
             return true;
         }
 
-        if ($meeting->participants()->where('user_id', $peerUserId)->exists()) {
+        // Prefer live call presence — avoids an extra participants query on every ICE packet.
+        if (MeetingCallPeer::query()
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', $peerUserId)
+            ->where('last_seen_at', '>=', now()->subSeconds(self::PEER_TTL_SECONDS))
+            ->exists()) {
             return true;
         }
 
-        return MeetingCallPeer::query()
-            ->where('meeting_id', $meeting->id)
-            ->where('user_id', $peerUserId)
-            ->exists();
+        return $meeting->participants()->where('user_id', $peerUserId)->exists();
     }
 }

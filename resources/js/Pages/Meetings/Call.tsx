@@ -136,6 +136,8 @@ async function getJson(url: string, timeoutMs = 8000) {
 
 function fireLeave(url: string) {
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 2500);
 
     void fetch(url, {
         method: 'POST',
@@ -148,7 +150,10 @@ function fireLeave(url: string) {
         credentials: 'same-origin',
         body: '{}',
         keepalive: true,
-    });
+        signal: controller.signal,
+    })
+        .catch(() => undefined)
+        .finally(() => window.clearTimeout(timer));
 }
 
 export default function MeetingCall({ meeting, me, canEditMinutes, canManageRecords, staffUsers, urls }: Props) {
@@ -181,10 +186,20 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
     const makingOfferRef = useRef<Set<string>>(new Set());
     const aliveRef = useRef(true);
     const leftRef = useRef(false);
+    const hangUpRef = useRef<(() => void) | null>(null);
+
+    useEffect(() => {
+        router.prefetch(urls.show);
+    }, [urls.show]);
 
     useEffect(() => {
         aliveRef.current = true;
         leftRef.current = false;
+        let tornDown = false;
+        let stopMicVisual: (() => void) | undefined;
+        let heartbeatTimer = 0;
+        let peersTimer = 0;
+        let signalsTimer = 0;
 
         const cleanupPeer = (peerId: string) => {
             const pc = peersRef.current.get(peerId);
@@ -207,11 +222,14 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         };
 
         const sendSignal = async (toUserId: string, type: string, payload: Record<string, unknown>) => {
+            if (leftRef.current || !aliveRef.current) {
+                return;
+            }
             await postJson(urls.signal, {
                 to_user_id: toUserId,
                 type,
                 payload,
-            });
+            }, 4000);
         };
 
         const ensurePeerConnection = (peerId: string, peerName: string) => {
@@ -319,7 +337,13 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         };
 
         const syncPeers = async () => {
-            const data = await getJson(urls.peers);
+            if (leftRef.current || !aliveRef.current) {
+                return;
+            }
+            const data = await getJson(urls.peers, 4000);
+            if (leftRef.current || !aliveRef.current) {
+                return;
+            }
             const nextPeers = (data.peers ?? []) as PeerInfo[];
             setPeers(nextPeers);
             peerNamesRef.current = new Map(nextPeers.map((peer) => [peer.id, peer.name]));
@@ -333,16 +357,48 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 }
             }
 
-            for (const peer of remotePeers) {
-                if (me.id < peer.id) {
-                    await createOfferFor(peer.id, peer.name);
-                } else {
+            // Kick offers in parallel so join does not wait peer-by-peer.
+            await Promise.all(
+                remotePeers.map(async (peer) => {
+                    if (me.id < peer.id) {
+                        await createOfferFor(peer.id, peer.name);
+                        return;
+                    }
                     ensurePeerConnection(peer.id, peer.name);
-                }
-            }
+                }),
+            );
 
-            if (remotePeers.length === 0) {
+            if (remotePeers.length === 0 && !leftRef.current) {
                 setStatus('Waiting for participants to join…');
+            }
+        };
+
+        const hangUp = (sendLeave: boolean) => {
+            if (tornDown) {
+                return;
+            }
+            tornDown = true;
+            aliveRef.current = false;
+            window.clearInterval(heartbeatTimer);
+            window.clearInterval(peersTimer);
+            window.clearInterval(signalsTimer);
+            window.removeEventListener('pagehide', onPageHide);
+            stopMicVisual?.();
+            stopMicVisual = undefined;
+            localStreamRef.current?.getTracks().forEach((track) => track.stop());
+            localStreamRef.current = null;
+            for (const peerId of Array.from(peersRef.current.keys())) {
+                cleanupPeer(peerId);
+            }
+            if (sendLeave) {
+                fireLeave(urls.leave);
+            }
+        };
+
+        const onPageHide = () => {
+            if (!leftRef.current) {
+                leftRef.current = true;
+                hangUp(true);
             }
         };
 
@@ -356,6 +412,10 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                     },
                     video: false,
                 });
+                if (leftRef.current || tornDown) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
                 localStreamRef.current = stream;
 
                 const audioContext = new AudioContext();
@@ -383,65 +443,59 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 raf = requestAnimationFrame(tick);
 
                 setStatus('Waiting for participants to join…');
-                await postJson(urls.heartbeat, undefined, 5000);
-                await syncPeers();
+                // Do not block the UI on presence/signaling — hang-up must stay instant.
+                void postJson(urls.heartbeat, undefined, 4000)
+                    .then(() => syncPeers())
+                    .catch(() => undefined);
 
-                return () => {
+                stopMicVisual = () => {
                     cancelAnimationFrame(raf);
                     void audioContext.close();
                 };
             } catch {
-                setMicError('Microphone access is required for the voice call. Allow the mic and refresh.');
-                setStatus('Microphone blocked');
+                if (!leftRef.current) {
+                    setMicError('Microphone access is required for the voice call. Allow the mic and refresh.');
+                    setStatus('Microphone blocked');
+                }
             }
         };
 
-        let stopMicVisual: (() => void) | undefined;
-        void start().then((cleanup) => {
-            if (typeof cleanup === 'function') {
-                stopMicVisual = cleanup;
-            }
-        });
+        void start();
 
-        const heartbeatTimer = window.setInterval(() => {
-            void postJson(urls.heartbeat, undefined, 4000).catch(() => undefined);
+        heartbeatTimer = window.setInterval(() => {
+            if (leftRef.current || !aliveRef.current) {
+                return;
+            }
+            void postJson(urls.heartbeat, undefined, 3000).catch(() => undefined);
         }, 8000);
 
-        const peersTimer = window.setInterval(() => {
+        peersTimer = window.setInterval(() => {
             void syncPeers().catch(() => undefined);
         }, 4000);
 
-        const signalsTimer = window.setInterval(() => {
-            void getJson(urls.signals, 4000)
+        signalsTimer = window.setInterval(() => {
+            if (leftRef.current || !aliveRef.current) {
+                return;
+            }
+            void getJson(urls.signals, 3000)
                 .then(async (data) => {
                     for (const signal of (data.signals ?? []) as SignalMessage[]) {
+                        if (leftRef.current) {
+                            return;
+                        }
                         await handleSignal(signal);
                     }
                 })
                 .catch(() => undefined);
         }, 1500);
 
-        const onPageHide = () => {
-            if (!leftRef.current) {
-                fireLeave(urls.leave);
-            }
-        };
         window.addEventListener('pagehide', onPageHide);
+        hangUpRef.current = () => hangUp(false);
 
         return () => {
-            aliveRef.current = false;
-            window.clearInterval(heartbeatTimer);
-            window.clearInterval(peersTimer);
-            window.clearInterval(signalsTimer);
-            window.removeEventListener('pagehide', onPageHide);
-            stopMicVisual?.();
-            if (!leftRef.current) {
-                fireLeave(urls.leave);
-            }
-            localStreamRef.current?.getTracks().forEach((track) => track.stop());
-            localStreamRef.current = null;
-            for (const peerId of Array.from(peersRef.current.keys())) {
-                cleanupPeer(peerId);
+            hangUpRef.current = null;
+            if (!tornDown) {
+                hangUp(!leftRef.current);
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- room lifecycle binds once per mount
@@ -456,15 +510,26 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
     };
 
     const leaveCall = () => {
-        if (leaving) {
+        if (leaving || leftRef.current) {
             return;
         }
-        setLeaving(true);
         leftRef.current = true;
+        setLeaving(true);
+        setStatus('Leaving…');
+        // Cut audio/peers/polls first so hang-up feels instant.
+        hangUpRef.current?.();
+        hangUpRef.current = null;
         fireLeave(urls.leave);
-        localStreamRef.current?.getTracks().forEach((track) => track.stop());
         notify('success', 'You left the voice call.');
-        router.visit(urls.show, { replace: true });
+        router.visit(urls.show, {
+            replace: true,
+            prefetch: true,
+            onFinish: () => setLeaving(false),
+            onError: () => {
+                setLeaving(false);
+                notify('error', 'Left the call, but the meeting page was slow to open. Try again from Meetings.');
+            },
+        });
     };
 
     const saveMinutes = async () => {
