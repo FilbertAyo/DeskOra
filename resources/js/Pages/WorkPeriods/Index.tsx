@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import type { NextPeriod, Period } from '@/Pages/WorkPeriods/types';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -304,7 +304,7 @@ export default function WorkPeriodsIndex({
 
 function Status({ status }: { status: Period['status'] }) {
     return (
-        <Badge variant="outline" className="capitalize">
+        <Badge variant={statusBadgeVariant(status)} className="capitalize">
             {status}
         </Badge>
     );
@@ -315,7 +315,7 @@ function Deadline({ value, state }: { value: string; state: string }) {
         <TableCell>
             {value}
             <br />
-            <Badge variant="outline" className="mt-1 capitalize">
+            <Badge variant={statusBadgeVariant(state)} className="mt-1 capitalize">
                 {state}
             </Badge>
         </TableCell>

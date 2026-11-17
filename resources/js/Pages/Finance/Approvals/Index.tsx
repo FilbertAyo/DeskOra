@@ -63,13 +63,13 @@ export default function Index({
                             </TableCell>
                             <TableCell>
                                 {item.canAct ? (
-                                    <Badge variant="secondary">Pending</Badge>
+                                    <Badge variant="warning">Pending</Badge>
                                 ) : item.closedAtStage ? (
-                                    <Badge variant="destructive">
+                                    <Badge variant={item.status === 'resubmission' ? 'warning' : 'destructive'}>
                                         {item.status === 'resubmission' ? 'Resubmission' : 'Rejected'}
                                     </Badge>
                                 ) : item.stageApproved ? (
-                                    <Badge>Completed</Badge>
+                                    <Badge variant="success">Completed</Badge>
                                 ) : (
                                     '—'
                                 )}

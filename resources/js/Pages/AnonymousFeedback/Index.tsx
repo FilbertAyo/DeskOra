@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -35,19 +35,6 @@ function formatDate(value?: string | null): string {
         return '—';
     }
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function statusTone(status: string): string {
-    if (status === 'new') {
-        return 'border-sky-200 bg-sky-50 text-sky-800';
-    }
-    if (status === 'in_progress') {
-        return 'border-amber-200 bg-amber-50 text-amber-900';
-    }
-    if (status === 'resolved') {
-        return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    }
-    return '';
 }
 
 export default function AnonymousFeedbackIndex({
@@ -168,9 +155,7 @@ export default function AnonymousFeedbackIndex({
                                         <p className="line-clamp-3 text-sm">{item.body}</p>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className={statusTone(item.status)}>
-                                            {statusLabel(item.status)}
-                                        </Badge>
+                                        <Badge variant={statusBadgeVariant(item.status)}>{statusLabel(item.status)}</Badge>
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap text-sm">
                                         {formatDate(item.createdAt)}

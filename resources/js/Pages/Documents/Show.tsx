@@ -17,7 +17,7 @@ import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -81,28 +81,11 @@ function money(value: unknown): string {
 
 function stateBadge(state?: string | null) {
     const isDraft = state === 'draft';
-    return (
-        <Badge
-            variant="outline"
-            className={cn(
-                isDraft
-                    ? 'border-muted-foreground/30 text-muted-foreground'
-                    : 'border-emerald-600/40 text-emerald-700',
-            )}
-        >
-            {isDraft ? 'Draft' : 'Submitted'}
-        </Badge>
-    );
+    return <Badge variant={isDraft ? 'warning' : 'success'}>{isDraft ? 'Draft' : 'Submitted'}</Badge>;
 }
 
 function targetBadge(label: string) {
-    const tone =
-        label === 'Completed'
-            ? 'bg-emerald-500/15 text-emerald-700'
-            : label === 'Partially completed'
-              ? 'bg-amber-500/15 text-amber-800'
-              : 'bg-rose-500/15 text-rose-700';
-    return <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', tone)}>{label}</span>;
+    return <Badge variant={statusBadgeVariant(label)}>{label}</Badge>;
 }
 
 function Section({

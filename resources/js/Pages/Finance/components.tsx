@@ -1,7 +1,7 @@
 import { router } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -82,8 +82,7 @@ export const shortDate = (value: string | null) =>
     value ? new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : '—';
 
 export function StatusBadge({ status }: { status: string }) {
-    const variant = status === 'approved' || status === 'paid' ? 'default' : status === 'rejected' ? 'destructive' : 'secondary';
-    return <Badge variant={variant}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>;
+    return <Badge variant={statusBadgeVariant(status)}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>;
 }
 
 export function FinanceTable({

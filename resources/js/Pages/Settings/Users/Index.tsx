@@ -5,9 +5,9 @@ import type { ReactNode } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PaginationLinks, PageHeader } from '@/lib/page-kit';
-import { cn } from '@/lib/utils';
 
 type UserRow = {
     id: string | number;
@@ -41,20 +41,6 @@ function initials(name: string): string {
         .join('');
 }
 
-function statusTone(status: string): string {
-    const key = status.toLowerCase();
-    if (key === 'active') {
-        return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
-    }
-    if (key === 'pending') {
-        return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-    }
-    if (key === 'inactive' || key === 'suspended') {
-        return 'bg-destructive/10 text-destructive';
-    }
-    return 'bg-muted text-muted-foreground';
-}
-
 function formatCount(value: number): string {
     if (value >= 1000) {
         return `${(value / 1000).toFixed(value >= 10000 ? 0 : 2).replace(/\.00$/, '')}k`;
@@ -86,9 +72,9 @@ function UserConnectionCard({ user }: { user: UserRow }) {
                 <p className="text-muted-foreground mt-0.5 line-clamp-1 text-sm">{subtitle}</p>
 
                 <div className="mt-3 flex min-h-7 flex-wrap items-center justify-center gap-1.5">
-                    <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-medium', statusTone(user.status))}>
+                    <Badge variant={statusBadgeVariant(user.status)} className="capitalize">
                         {user.status}
-                    </span>
+                    </Badge>
                 </div>
 
                 <div className="mt-5 grid w-full grid-cols-3">

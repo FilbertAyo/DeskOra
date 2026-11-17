@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
@@ -168,7 +168,9 @@ export default function MeetingMinutesIndex({
                                         </TableCell>
                                         <TableCell>{period.year}</TableCell>
                                         <TableCell>
-                                            <Badge variant="outline">{period.minute ? 'Available' : 'Not Available'}</Badge>
+                                            <Badge variant={statusBadgeVariant(period.minute ? 'available' : 'not available')}>
+                                                {period.minute ? 'Available' : 'Not Available'}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>{period.minute?.uploadedBy ?? '—'}</TableCell>
                                         <TableCell className="text-right">

@@ -2,7 +2,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -253,7 +253,7 @@ export default function WeeklyBudgetReview({
                                             <div className="flex items-center justify-between gap-2 border-b px-3 py-2 text-sm">
                                                 <span className="font-medium">{staffName}</span>
                                                 {pending > 0 && (
-                                                    <Badge variant="outline">{pending} pending</Badge>
+                                                    <Badge variant="warning">{pending} pending</Badge>
                                                 )}
                                             </div>
                                             <Table>
@@ -274,7 +274,13 @@ export default function WeeklyBudgetReview({
                                                             <TableCell>{item.description_purpose ?? '—'}</TableCell>
                                                             <TableCell>{Number(item.amount ?? 0).toLocaleString()}</TableCell>
                                                             <TableCell>
-                                                                <Badge variant="outline">{item.status_label ?? item.action_label ?? 'Pending'}</Badge>
+                                                                <Badge
+                                                                    variant={statusBadgeVariant(
+                                                                        item.status_label ?? item.action_label ?? 'Pending',
+                                                                    )}
+                                                                >
+                                                                    {item.status_label ?? item.action_label ?? 'Pending'}
+                                                                </Badge>
                                                             </TableCell>
                                                         </TableRow>
                                                     ))}

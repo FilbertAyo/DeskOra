@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,7 +17,6 @@ import {
     TimelineLine,
 } from '@/components/ui/timeline';
 import { PageHeader } from '@/lib/page-kit';
-import { cn } from '@/lib/utils';
 
 type ActivityItem = {
     id: string | number;
@@ -33,14 +32,6 @@ type DocumentRow = {
     updated?: string | null;
     href: string;
 };
-
-function statusTone(status: string): string {
-    const key = status.toLowerCase();
-    if (key === 'active') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
-    if (key === 'pending') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-    if (key === 'inactive' || key === 'suspended') return 'bg-destructive/10 text-destructive';
-    return 'bg-muted text-muted-foreground';
-}
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
     return (
@@ -124,7 +115,11 @@ export default function UsersShow({
                             <Detail label="Email" value={user.email} />
                             <Detail
                                 label="Status"
-                                value={<span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', statusTone(user.status))}>{user.status}</span>}
+                                value={
+                                    <Badge variant={statusBadgeVariant(user.status)} className="capitalize">
+                                        {user.status}
+                                    </Badge>
+                                }
                             />
                             <Detail label="Role" value={user.roles.join(', ') || '—'} />
                             <Detail label="Title" value={user.title || '—'} />

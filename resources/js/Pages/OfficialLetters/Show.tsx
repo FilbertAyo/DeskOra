@@ -172,8 +172,8 @@ export default function OfficialLettersShow({
                         <CardTitle>Letter Content</CardTitle>
                         <div className="flex items-center gap-2">
                             <code className="text-xs">{letter.reference_number}</code>
-                            {downloadStatus === 'pending' && <Badge>Pending</Badge>}
-                            {downloadStatus === 'authorized' && <Badge>Authorized</Badge>}
+                            {downloadStatus === 'pending' && <Badge variant="warning">Pending</Badge>}
+                            {downloadStatus === 'authorized' && <Badge variant="success">Authorized</Badge>}
                             {downloadStatus === 'rejected' && <Badge variant="destructive">Rejected</Badge>}
                         </div>
                     </CardHeader>
@@ -229,8 +229,8 @@ export default function OfficialLettersShow({
                                 <div className="text-muted-foreground text-xs">Download</div>
                                 <div className="flex flex-wrap gap-2">
                                     {downloadStatus === 'rejected' && <Badge variant="destructive">Rejected</Badge>}
-                                    {downloadStatus === 'pending' && <Badge>Pending</Badge>}
-                                    {downloadStatus === 'authorized' && <Badge>Authorized</Badge>}
+                                    {downloadStatus === 'pending' && <Badge variant="warning">Pending</Badge>}
+                                    {downloadStatus === 'authorized' && <Badge variant="success">Authorized</Badge>}
                                     {!downloadStatus && <span className="text-muted-foreground">Authorization required</span>}
                                 </div>
                             </div>

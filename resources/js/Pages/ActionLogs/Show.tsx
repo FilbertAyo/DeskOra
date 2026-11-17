@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,20 +23,6 @@ type Task = {
     assignee_label?: string | null;
     responsible_user_ids?: Array<string | number>;
 };
-
-function progressTone(progress: string): string {
-    const key = progress.toLowerCase();
-    if (key.includes('done') && !key.includes('partially') && !key.includes('carry')) {
-        return 'bg-emerald-500/15 text-emerald-700';
-    }
-    if (key.includes('progress') || key.includes('partially') || key.includes('carry')) {
-        return 'bg-amber-500/15 text-amber-700';
-    }
-    if (key.includes('not started') || key === '—') {
-        return 'bg-muted text-muted-foreground';
-    }
-    return 'bg-sky-500/15 text-sky-700';
-}
 
 export default function ActionLogsShow({
     document,
@@ -117,7 +103,7 @@ export default function ActionLogsShow({
                     <CardContent className="space-y-3 pt-6 text-sm">
                         <div className="flex items-center justify-between gap-2">
                             <span className="text-muted-foreground">State</span>
-                            <Badge variant={state === 'draft' ? 'outline' : 'default'}>
+                            <Badge variant={statusBadgeVariant(state || '')}>
                                 {state === 'draft' ? 'Draft' : state === 'submitted' ? 'Submitted' : state || '—'}
                             </Badge>
                         </div>
@@ -206,11 +192,9 @@ export default function ActionLogsShow({
                                                 </TableCell>
                                                 <TableCell>{names || task.assignee_label || '—'}</TableCell>
                                                 <TableCell>
-                                                    <span
-                                                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${progressTone(progress)}`}
-                                                    >
+                                                    <Badge variant={statusBadgeVariant(progress || 'not started')}>
                                                         {progress || '—'}
-                                                    </span>
+                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell>{task.due_date || '—'}</TableCell>
                                                 <TableCell>{task.compilation_date || '—'}</TableCell>

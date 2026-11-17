@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -97,7 +97,9 @@ export default function ActionLogsIndex({ documents, canManageActionLogs, stateF
                                         </TableCell>
                                         <TableCell>{log.taskCount}</TableCell>
                                         <TableCell>
-                                            <Badge variant="outline">{log.state}</Badge>
+                                            <Badge variant={statusBadgeVariant(log.state)} className="capitalize">
+                                                {log.state}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>{log.updatedAt}</TableCell>
                                         <TableCell className="text-right">

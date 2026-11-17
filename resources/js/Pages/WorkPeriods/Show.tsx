@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
-import { Badge } from '@/components/ui/badge';
+import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, PageShell } from '@/lib/page-kit';
@@ -40,7 +40,9 @@ export default function WorkPeriodsShow({
                 description={period.dateRange}
                 actions={
                     <>
-                        <Badge className="capitalize">{period.status}</Badge>
+                        <Badge variant={statusBadgeVariant(period.status)} className="capitalize">
+                            {period.status}
+                        </Badge>
                         <Button variant="outline" render={<Link href="/work-periods" />}>
                             Back
                         </Button>
