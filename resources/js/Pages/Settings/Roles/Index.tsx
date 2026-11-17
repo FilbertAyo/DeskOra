@@ -13,7 +13,7 @@ export default function RolesIndex({ roles, createUrl }: { roles: RoleRow[]; cre
     const demo = usePage<SharedProps>().props.auth.user?.isDemo;
     return <>
         <PageHeader title="Roles" description={demo ? 'Demo — view only.' : 'Manage permission groups.'} actions={!demo && <Button render={<Link href={createUrl} />}>Create role</Button>} />
-        <ResourceTable rows={roles} columns={[
+        <ResourceTable numbered rows={roles} columns={[
             { label: 'Role', render: (role) => role.name },
             { label: 'Permissions', render: (role) => role.permissions_count },
             { label: 'Users', render: (role) => role.users_count },
