@@ -1,6 +1,9 @@
+import './bootstrap';
+
 import { config, createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 
+import { bindHttpProgress } from '@/lib/http-progress';
 import { notify } from '@/lib/notify';
 
 config.extend({
@@ -32,8 +35,17 @@ createInertiaApp({
     setup({ el, App, props }) {
         createRoot(el).render(<App {...props} />);
     },
-    progress: false,
+    // GitHub-style slim top bar (Inertia wraps NProgress).
+    progress: {
+        delay: 120,
+        color: '#29d',
+        includeCSS: true,
+        showSpinner: false,
+    },
 });
+
+// Also animate the same bar for Axios / fetch API calls (not Inertia visits).
+bindHttpProgress(window.axios);
 
 router.on('httpException', (event) => {
     const status = event.detail?.response?.status;
