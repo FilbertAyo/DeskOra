@@ -54,6 +54,53 @@ fi
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
 
+# Frontend assets are gitignored (public/build). The Inertia app requires a Vite
+# manifest on every deploy or Laravel throws ViteManifestNotFoundException.
+echo "==> Building frontend assets..."
+NODE_BIN="${NODE_BIN:-}"
+NPM_BIN="${NPM_BIN:-}"
+if [ -z "$NODE_BIN" ] && command -v node >/dev/null 2>&1; then
+  NODE_BIN="$(command -v node)"
+fi
+if [ -z "$NPM_BIN" ] && command -v npm >/dev/null 2>&1; then
+  NPM_BIN="$(command -v npm)"
+fi
+# Common cPanel / nvm locations when PATH is stripped for non-interactive SSH.
+if [ -z "$NODE_BIN" ]; then
+  for candidate in \
+    "$HOME/.nvm/versions/node/"*/bin/node \
+    /opt/cpanel/ea-nodejs22/bin/node \
+    /opt/cpanel/ea-nodejs20/bin/node \
+    /opt/cpanel/ea-nodejs18/bin/node \
+    /usr/local/bin/node
+  do
+    if [ -x "$candidate" ]; then
+      NODE_BIN="$candidate"
+      break
+    fi
+  done
+fi
+if [ -z "$NPM_BIN" ] && [ -n "$NODE_BIN" ]; then
+  NPM_CANDIDATE="$(dirname "$NODE_BIN")/npm"
+  if [ -x "$NPM_CANDIDATE" ]; then
+    NPM_BIN="$NPM_CANDIDATE"
+  fi
+fi
+if [ -z "${NODE_BIN:-}" ] || [ ! -x "$NODE_BIN" ] || [ -z "${NPM_BIN:-}" ] || [ ! -x "$NPM_BIN" ]; then
+  echo "ERROR: Node.js/npm not found. Install Node 20+ on the host or set NODE_BIN/NPM_BIN."
+  echo "       Without npm run build, public/build/manifest.json is missing and the site 500s."
+  exit 1
+fi
+echo "    Using Node: $("$NODE_BIN" -v)"
+echo "    Using npm:  $("$NPM_BIN" -v)"
+"$NPM_BIN" ci --no-audit --no-fund
+"$NPM_BIN" run build
+if [ ! -f "$SCRIPT_DIR/public/build/manifest.json" ]; then
+  echo "ERROR: Vite build finished but public/build/manifest.json is still missing."
+  exit 1
+fi
+echo "    Vite manifest ready at public/build/manifest.json"
+
 # Clear compiled views early — removing packages (e.g. Livewire) leaves stale
 # Blade caches that cause 500s if migrate fails later in this script.
 echo "==> Clearing compiled views (pre-migrate)..."
