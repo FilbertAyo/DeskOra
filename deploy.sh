@@ -54,80 +54,19 @@ fi
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
 
-# The Inertia app 500s without public/build/manifest.json. That directory is
-# committed so a host without Node still serves the last build. When Node is
-# available, rebuild so production matches this checkout.
-echo "==> Building frontend assets..."
-NODE_BIN="${NODE_BIN:-}"
-NPM_BIN="${NPM_BIN:-}"
-if [ -z "$NODE_BIN" ] && command -v node >/dev/null 2>&1; then
-  NODE_BIN="$(command -v node)"
-fi
-if [ -z "$NPM_BIN" ] && command -v npm >/dev/null 2>&1; then
-  NPM_BIN="$(command -v npm)"
-fi
-# Common cPanel / nvm locations when PATH is stripped for non-interactive SSH.
-# Quote the nvm glob so a missing directory does not abort under `set -u`.
-if [ -z "$NODE_BIN" ] && [ -d "$HOME/.nvm/versions/node" ]; then
-  for candidate in "$HOME/.nvm/versions/node/"*/bin/node; do
-    if [ -x "$candidate" ]; then
-      NODE_BIN="$candidate"
-      break
-    fi
-  done
-fi
-if [ -z "$NODE_BIN" ]; then
-  for candidate in \
-    /opt/cpanel/ea-nodejs22/bin/node \
-    /opt/cpanel/ea-nodejs20/bin/node \
-    /opt/cpanel/ea-nodejs18/bin/node \
-    /usr/local/bin/node
-  do
-    if [ -x "$candidate" ]; then
-      NODE_BIN="$candidate"
-      break
-    fi
-  done
-fi
-if [ -z "$NPM_BIN" ] && [ -n "$NODE_BIN" ]; then
-  NPM_CANDIDATE="$(dirname "$NODE_BIN")/npm"
-  if [ -x "$NPM_CANDIDATE" ]; then
-    NPM_BIN="$NPM_CANDIDATE"
-  fi
-fi
-if [ -n "${NODE_BIN:-}" ] && [ -x "$NODE_BIN" ] && [ -n "${NPM_BIN:-}" ] && [ -x "$NPM_BIN" ]; then
-  export PATH="$(dirname "$NODE_BIN"):${PATH:-}"
-  echo "    Using Node: $("$NODE_BIN" -v)"
-  echo "    Using npm:  $("$NPM_BIN" -v)"
-  BUILD_BACKUP="$(mktemp -d)"
-  if [ -d "$SCRIPT_DIR/public/build" ]; then
-    cp -a "$SCRIPT_DIR/public/build/." "$BUILD_BACKUP/"
-  fi
-  set +e
-  "$NPM_BIN" ci --include=dev --no-audit --no-fund
-  NPM_STATUS=$?
-  if [ "$NPM_STATUS" -eq 0 ]; then
-    "$NPM_BIN" run build
-    NPM_STATUS=$?
-  fi
-  set -e
-  if [ "$NPM_STATUS" -ne 0 ]; then
-    echo "WARNING: npm build failed. Restoring the Vite build from before this deploy."
-    if [ -f "$BUILD_BACKUP/manifest.json" ]; then
-      rm -rf "$SCRIPT_DIR/public/build"
-      mkdir -p "$SCRIPT_DIR/public/build"
-      cp -a "$BUILD_BACKUP/." "$SCRIPT_DIR/public/build/"
-    fi
-  fi
-  rm -rf "$BUILD_BACKUP"
-else
-  echo "WARNING: Node.js/npm not found. Skipping npm run build."
+# Frontend assets are committed in public/build. Rebuilding them on this host
+# replaced that bundle and left every page blank, so deploy keeps the checkout.
+echo "==> Using the committed Vite build..."
+rm -f "$SCRIPT_DIR/public/hot"
+if [ -d "$SCRIPT_DIR/node_modules" ]; then
+  echo "    Removing node_modules left by the previous on-server build..."
+  rm -rf "$SCRIPT_DIR/node_modules"
 fi
 if [ ! -f "$SCRIPT_DIR/public/build/manifest.json" ]; then
-  echo "ERROR: public/build/manifest.json is missing."
-  echo "       Install Node 20+ on the host, or commit a Vite build before deploying."
+  echo "ERROR: public/build/manifest.json is missing from the git checkout."
   exit 1
 fi
+chmod -R a+rX "$SCRIPT_DIR/public/build" || true
 echo "    Vite manifest ready at public/build/manifest.json"
 
 # Clear compiled views early — removing packages (e.g. Livewire) leaves stale
