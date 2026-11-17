@@ -13,18 +13,23 @@ export function TruncateCell({
     children,
     className,
     title,
+    maxLength = 30,
 }: {
     children: ReactNode;
     className?: string;
     title?: string | null;
+    maxLength?: number;
 }) {
-    const tip =
+    const raw =
         title ??
-        (typeof children === 'string' || typeof children === 'number' ? String(children) : undefined);
+        (typeof children === 'string' || typeof children === 'number' ? String(children) : null);
+    const full = raw?.trim() ? raw : null;
+    const display =
+        full && full.length > maxLength ? `${full.slice(0, maxLength).trimEnd()}…` : (children ?? '—');
 
     return (
-        <TableCell className={cn('max-w-[16rem]', className)} title={tip || undefined}>
-            <span className="block truncate">{children ?? '—'}</span>
+        <TableCell className={cn('max-w-[12rem] overflow-hidden', className)} title={full || undefined}>
+            <span className="block truncate whitespace-nowrap">{display}</span>
         </TableCell>
     );
 }
