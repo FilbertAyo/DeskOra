@@ -256,7 +256,7 @@
         }
 
         // Keep form on one page: fewer blank rows when descriptions/title consume vertical space.
-        $baseMinRows = 9;
+        $baseMinRows = 7;
         $extraLines = max(0, $usedItemLines - $items->count());
         $extraLines += count($titleContinueLines);
         $minRows = max($items->count(), $baseMinRows - $extraLines);
