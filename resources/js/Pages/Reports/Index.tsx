@@ -89,7 +89,7 @@ export default function ReportsIndex({
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {organizationReports.data.map((report) => (
                     <Card key={report.id} className="shadow-none">
-                        <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 border-b bg-muted/20">
+                        <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
                             <div className="min-w-0">
                                 <CardTitle className="truncate text-sm" title={report.name}>
                                     {report.name}
@@ -106,11 +106,13 @@ export default function ReportsIndex({
                                         label: 'View',
                                         href: report.view_url,
                                         icon: <EyeIcon />,
+                                        external: true,
                                     },
                                     {
                                         label: 'Download',
                                         href: report.download_url,
                                         icon: <DownloadIcon />,
+                                        external: true,
                                     },
                                     {
                                         label: 'Delete',

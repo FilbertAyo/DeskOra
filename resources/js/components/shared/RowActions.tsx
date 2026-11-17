@@ -21,7 +21,22 @@ export type RowActionItem = {
     destructive?: boolean;
     disabled?: boolean;
     hidden?: boolean;
+    /** Bypass Inertia and use a normal browser request (file download / inline file). */
+    external?: boolean;
 };
+
+function isFileRequest(item: RowActionItem): boolean {
+    if (item.external) {
+        return true;
+    }
+    if (!item.href) {
+        return false;
+    }
+    if (/\b(download|export)\b/i.test(item.label)) {
+        return true;
+    }
+    return /\/(download|export)(\/|$|\?)|organization-documents\/[^/]+\/(view|preview|download)/i.test(item.href);
+}
 
 type Props = {
     items: RowActionItem[];
@@ -57,14 +72,22 @@ export default function RowActions({ items, align = 'end', label = 'Actions', cl
                         const previous = visible[index - 1];
                         const showSeparator = item.destructive && previous && !previous.destructive;
 
+                        const fileRequest = isFileRequest(item);
+
                         return (
                             <div key={`${item.label}-${index}`}>
                                 {showSeparator ? <DropdownMenuSeparator /> : null}
                                 <DropdownMenuItem
                                     variant={item.destructive ? 'destructive' : undefined}
                                     disabled={item.disabled}
-                                    render={item.href ? <AppLink href={item.href} /> : undefined}
-                                    onClick={item.href ? undefined : item.onClick}
+                                    render={
+                                        fileRequest && item.href ? (
+                                            <a href={item.href} />
+                                        ) : item.href ? (
+                                            <AppLink href={item.href} />
+                                        ) : undefined
+                                    }
+                                    onClick={fileRequest ? undefined : item.onClick}
                                 >
                                     {item.icon}
                                     <span>{item.label}</span>
