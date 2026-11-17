@@ -99,6 +99,7 @@ return [
         'documents.weekly-budget-review*' => ['module' => 'Activities', 'feature_key' => 'module.activities.weekly_budget_review'],
         'weekly-work-logs.*' => ['module' => 'Activities', 'feature_key' => 'module.activities.work_logs'],
         'action-logs.*' => ['module' => 'Activities', 'feature_key' => 'module.activities.action_logs'],
+        'meetings.*' => ['module' => 'Activities', 'feature_key' => 'module.activities.meetings'],
         'meeting-minutes.*' => ['module' => 'Activities', 'feature_key' => 'module.activities.meeting_minutes'],
 
         'official-letters.*' => ['module' => 'Official Letters', 'feature_key' => 'module.official_letters'],

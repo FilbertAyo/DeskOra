@@ -124,7 +124,7 @@
                     <i class="ti ti-calendar"></i>
                 </li>
 
-                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*', 'weekly-matrix.*') ? 'active pc-trigger' : '' }}">
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'weekly-matrix.*') ? 'active pc-trigger' : '' }}">
                     <a href="javascript:void(0);" class="pc-link">
                         <span class="pc-micon"><i class="ti ti-calendar"></i></span>
                         <span class="pc-mtext">Activities</span>
@@ -166,11 +166,6 @@
                                 <span class="pc-mtext">Action Board</span>
                             </a>
                         </li>
-                        <li class="{{ Request::routeIs('meeting-minutes.*') ? 'active' : '' }}">
-                            <a href="{{ route('meeting-minutes.index') }}" class="pc-link">
-                                <span class="pc-mtext">Minutes</span>
-                            </a>
-                        </li>
                         <li class="{{ Request::routeIs('documents.monthly-report') ? 'active' : '' }}">
                             <a href="{{ route('documents.monthly-report') }}" class="pc-link">
                                 <span class="pc-mtext">Monthly Reports </span>
@@ -203,6 +198,21 @@
                         <span class="pc-micon"><i class="ti ti-stack"></i></span>
                         <span class="pc-mtext">All Documents</span>
                     </a>
+                </li>
+
+                <li class="pc-item pc-hasmenu {{ Request::routeIs('meetings.*', 'meeting-minutes.*') ? 'active pc-trigger' : '' }}">
+                    <a href="javascript:void(0);" class="pc-link">
+                        <span class="pc-micon"><i class="ti ti-messages"></i></span>
+                        <span class="pc-mtext">Communications</span>
+                        <span class="pc-arrow"><i class="ti ti-chevron-down"></i></span>
+                    </a>
+                    <ul class="pc-submenu">
+                        <li class="{{ Request::routeIs('meetings.*', 'meeting-minutes.*') ? 'active' : '' }}">
+                            <a href="{{ route('meetings.index') }}" class="pc-link">
+                                <span class="pc-mtext">In-house meetings</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
 
                 @canany(['view inventory', 'view own inventory items'])

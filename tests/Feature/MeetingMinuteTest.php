@@ -31,13 +31,9 @@ class MeetingMinuteTest extends TestCase
         $user->assignRole('staff');
         $this->createPeriod(2026, 10, '2026-03-02', '2026-03-08');
 
-        $response = $this->actingAs($user)
-            ->get(route('meeting-minutes.index'));
-
-        $response->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('MeetingMinutes/Index')
-                ->where('periods.data.0.minute', null));
+        $this->actingAs($user)
+            ->get(route('meeting-minutes.index'))
+            ->assertRedirect(route('meetings.index', ['tab' => 'archive']));
     }
 
     public function test_authenticated_staff_can_view_existing_minutes(): void
@@ -266,7 +262,7 @@ class MeetingMinuteTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_index_uses_bootstrap_five_pagination(): void
+    public function test_archive_tab_uses_pagination(): void
     {
         /** @var User $user */
         $user = User::factory()->create(['status' => 'active']);
@@ -279,13 +275,14 @@ class MeetingMinuteTest extends TestCase
         }
 
         $this->actingAs($user)
-            ->get(route('meeting-minutes.index'))
+            ->get(route('meetings.index', ['tab' => 'archive']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('MeetingMinutes/Index')
-                ->has('periods.data')
-                ->has('periods.links')
-                ->has('storeUrl'));
+                ->component('Meetings/Index')
+                ->where('tab', 'archive')
+                ->has('archive.data')
+                ->has('archive.links')
+                ->has('urls.minutesStore'));
     }
 
     private function createPeriod(int $year, int $weekNumber, string $start, string $end): WorkPeriod

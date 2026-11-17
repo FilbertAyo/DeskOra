@@ -13,6 +13,7 @@ use App\Models\InventoryMaintenanceRecord;
 use App\Models\InventoryReceipt;
 use App\Models\InventoryStockItem;
 use App\Models\InventoryVerificationSession;
+use App\Models\InHouseMeeting;
 use App\Models\MeetingMinute;
 use App\Models\NominationPeriod;
 use App\Models\OfficialLetter;
@@ -21,6 +22,7 @@ use App\Policies\ActivityPolicy;
 use App\Policies\AnonymousFeedbackPolicy;
 use App\Policies\DocumentPolicy;
 use App\Policies\FeatureUsageEventPolicy;
+use App\Policies\InHouseMeetingPolicy;
 use App\Policies\InventoryAssetPolicy;
 use App\Policies\InventoryBorrowRequestPolicy;
 use App\Policies\InventoryDispatchPolicy;
@@ -48,6 +50,7 @@ class AuthServiceProvider extends ServiceProvider
         Document::class => DocumentPolicy::class,
         AnonymousFeedback::class => AnonymousFeedbackPolicy::class,
         FeatureUsageEvent::class => FeatureUsageEventPolicy::class,
+        InHouseMeeting::class => InHouseMeetingPolicy::class,
         MeetingMinute::class => MeetingMinutePolicy::class,
         NominationPeriod::class => NominationPeriodPolicy::class,
         OfficialLetter::class => OfficialLetterPolicy::class,

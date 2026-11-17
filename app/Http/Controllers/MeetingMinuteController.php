@@ -6,7 +6,6 @@ use App\Models\MeetingMinute;
 use App\Models\WorkPeriod;
 use App\Services\MeetingMinuteNotificationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -21,41 +20,10 @@ class MeetingMinuteController extends Controller
     {
         $this->authorize('viewAny', MeetingMinute::class);
 
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-        $canManageMinutes = $user->can('manage minutes');
-
-        $query = WorkPeriod::query()
-            ->with(['meetingMinute.uploader'])
-            ->orderByDesc('year')
-            ->orderByDesc('week_number');
-
-        if ($request->filled('year')) {
-            $query->where('year', $request->integer('year'));
-        }
-
-        $periods = $query->paginate(15)->withQueryString();
-        $years = WorkPeriod::select('year')->distinct()->orderByDesc('year')->pluck('year');
-        $currentPeriod = WorkPeriod::getCurrent();
-
-        return Inertia::render('MeetingMinutes/Index', [
-            'periods' => [
-                'data' => $periods->getCollection()->map(fn (WorkPeriod $period) => [
-                    'id' => $period->id,
-                    'weekNumber' => $period->week_number,
-                    'year' => $period->year,
-                    'dateRange' => $period->date_range,
-                    'isCurrent' => $currentPeriod?->id === $period->id,
-                    'minute' => $period->meetingMinute ? $this->minutePayload($period->meetingMinute) : null,
-                ])->values(),
-                'links' => $periods->linkCollection(),
-            ],
-            'years' => $years->values(),
-            'selectedYear' => $request->input('year'),
-            'canManageMinutes' => $canManageMinutes,
-            'indexUrl' => route('meeting-minutes.index'),
-            'storeUrl' => route('meeting-minutes.store'),
-        ]);
+        return redirect()->route('meetings.index', array_filter([
+            'tab' => 'archive',
+            'year' => $request->input('year'),
+        ]));
     }
 
     public function store(Request $request)
@@ -103,14 +71,14 @@ class MeetingMinuteController extends Controller
 
         if (! $meetingMinute->hasFile()) {
             return redirect()
-                ->route('meeting-minutes.index')
+                ->route('meetings.index', ['tab' => 'archive'])
                 ->with('error', 'The minutes file was not found in storage.');
         }
 
         return Inertia::render('MeetingMinutes/Show', [
             'meetingMinute' => $this->minutePayload($meetingMinute),
             'canManageMinutes' => request()->user()?->can('manage minutes') ?? false,
-            'backUrl' => route('meeting-minutes.index'),
+            'backUrl' => route('meetings.index', ['tab' => 'archive']),
         ]);
     }
 

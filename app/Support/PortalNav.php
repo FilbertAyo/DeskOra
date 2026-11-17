@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Document;
+use App\Models\InHouseMeetingParticipant;
 use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryDispatch;
 use App\Models\InventoryDisposalRequest;
@@ -131,7 +132,6 @@ class PortalNav
 
         $activities[] = self::link('Action Log', 'action-logs.index', [], null, request()->routeIs('action-logs.index', 'action-logs.show', 'action-logs.edit', 'action-logs.create'));
         $activities[] = self::link('Action Board', 'action-logs.board', [], null, request()->routeIs('action-logs.board'));
-        $activities[] = self::link('Minutes', 'meeting-minutes.index', [], null, request()->routeIs('meeting-minutes.*'));
         $activities[] = self::link('Monthly Reports', 'documents.monthly-report', [], null, request()->routeIs('documents.monthly-report'));
 
         $letterBadge = 0;
@@ -143,6 +143,21 @@ class PortalNav
             );
         }
 
+        $pendingMeetingRsvp = 0;
+        if (SchemaTables::has('in_house_meeting_participants')) {
+            $pendingMeetingRsvp = (int) Cache::remember(
+                'nav-meeting-rsvp-'.$user->id,
+                now()->addSeconds(30),
+                fn () => InHouseMeetingParticipant::query()
+                    ->where('user_id', $user->id)
+                    ->where('response', InHouseMeetingParticipant::RESPONSE_PENDING)
+                    ->whereHas('meeting', fn ($meeting) => $meeting
+                        ->where('status', 'scheduled')
+                        ->where('ends_at', '>=', now()))
+                    ->count()
+            );
+        }
+
         $groups[] = [
             'label' => 'Activities',
             'items' => [
@@ -150,10 +165,26 @@ class PortalNav
                     'Activities',
                     'CalendarDays',
                     $activities,
-                    request()->routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'meeting-minutes.*', 'weekly-matrix.*')
+                    request()->routeIs('documents.weekly-plans', 'documents.weekly-reports', 'documents.monthly-report', 'documents.weekly-budget-review', 'action-logs.*', 'weekly-matrix.*')
                 ),
                 self::link('Official Letters', 'official-letters.index', [], 'Mail', request()->routeIs('official-letters.*'), $letterBadge),
                 self::link('All Documents', 'documents.index', [], 'Layers', request()->routeIs('documents.index')),
+                self::group(
+                    'Communications',
+                    'MessagesSquare',
+                    [
+                        self::link(
+                            'In-house meetings',
+                            'meetings.index',
+                            [],
+                            null,
+                            request()->routeIs('meetings.*', 'meeting-minutes.*'),
+                            $pendingMeetingRsvp
+                        ),
+                    ],
+                    request()->routeIs('meetings.*', 'meeting-minutes.*'),
+                    $pendingMeetingRsvp
+                ),
             ],
         ];
 

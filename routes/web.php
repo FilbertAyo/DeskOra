@@ -34,6 +34,8 @@ use App\Http\Controllers\InventorySupplierController;
 use App\Http\Controllers\InventoryVerificationController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
 use App\Http\Controllers\ManageStaffAppreciationController;
+use App\Http\Controllers\InHouseMeetingController;
+use App\Http\Controllers\MeetingCallController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficialLetterController;
@@ -193,6 +195,27 @@ Route::middleware('auth')->group(function () {
         Route::get('/{document}/edit', [ActionLogController::class, 'edit'])->name('edit');
         Route::put('/{document}', [ActionLogController::class, 'update'])->name('update');
         Route::delete('/{document}', [ActionLogController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('meetings')->name('meetings.')->group(function () {
+        Route::get('/', [InHouseMeetingController::class, 'index'])->name('index');
+        Route::get('/create', [InHouseMeetingController::class, 'create'])->name('create');
+        Route::post('/', [InHouseMeetingController::class, 'store'])->name('store');
+        Route::get('/{meeting}/edit', [InHouseMeetingController::class, 'edit'])->name('edit');
+        Route::put('/{meeting}', [InHouseMeetingController::class, 'update'])->name('update');
+        Route::post('/{meeting}/cancel', [InHouseMeetingController::class, 'cancel'])->name('cancel');
+        Route::post('/{meeting}/complete', [InHouseMeetingController::class, 'complete'])->name('complete');
+        Route::post('/{meeting}/rsvp', [InHouseMeetingController::class, 'rsvp'])->name('rsvp');
+        Route::put('/{meeting}/records', [InHouseMeetingController::class, 'updateRecords'])->name('records');
+        Route::get('/{meeting}/call', [MeetingCallController::class, 'show'])->name('call');
+        Route::post('/{meeting}/call/heartbeat', [MeetingCallController::class, 'heartbeat'])->name('call.heartbeat');
+        Route::get('/{meeting}/call/peers', [MeetingCallController::class, 'peers'])->name('call.peers');
+        Route::post('/{meeting}/call/signal', [MeetingCallController::class, 'signal'])->name('call.signal');
+        Route::get('/{meeting}/call/signals', [MeetingCallController::class, 'signals'])->name('call.signals');
+        Route::post('/{meeting}/call/minutes', [MeetingCallController::class, 'saveMinutes'])->name('call.minutes');
+        Route::post('/{meeting}/call/actions', [MeetingCallController::class, 'saveActions'])->name('call.actions');
+        Route::post('/{meeting}/call/leave', [MeetingCallController::class, 'leave'])->name('call.leave');
+        Route::get('/{meeting}', [InHouseMeetingController::class, 'show'])->name('show');
     });
 
     Route::prefix('meeting-minutes')->name('meeting-minutes.')->group(function () {
