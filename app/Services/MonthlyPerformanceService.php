@@ -5,18 +5,22 @@ namespace App\Services;
 use App\Models\ActionLogTaskHistory;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WeeklyPlan;
 use App\Models\WeeklyPlanBudgetReview;
+use App\Models\WeeklyReport;
 use App\Models\WeeklyWorkLog;
 use App\Models\WorkPeriod;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Support\ActionLogTaskSupport;
+use App\Support\SchemaTables;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class MonthlyPerformanceService
 {
+    private ?int $pendingReviewMemo = null;
+
     public function __construct(
         private readonly ActionLogProgressService $actionLogProgressService,
         private readonly RequestApprovalNavService $requestApprovalNavService,
@@ -50,15 +54,42 @@ class MonthlyPerformanceService
         $reviewRates = [];
 
         $currentMonthKey = now()->format('Y-m');
+        $rangeStart = now()->startOfMonth()->subMonths($months - 1)->startOfMonth();
+        $rangeEnd = now()->endOfMonth();
+        $allPeriods = WorkPeriod::query()
+            ->whereDate('week_start_date', '<=', $rangeEnd->toDateString())
+            ->whereDate('week_end_date', '>=', $rangeStart->toDateString())
+            ->orderBy('week_start_date')
+            ->get();
+        $periodIds = $allPeriods->pluck('id')->map(static fn ($id) => (string) $id)->all();
+        $ownedPlans = $periodIds === []
+            ? collect()
+            : $this->preferredByPeriod(
+                WeeklyPlan::query()->where('user_id', $user->id)->whereIn('period_id', $periodIds)->get(['id', 'period_id', 'state'])
+            );
+        $ownedReports = $periodIds === []
+            ? collect()
+            : $this->preferredByPeriod(
+                WeeklyReport::query()->where('user_id', $user->id)->whereIn('period_id', $periodIds)->get(['id', 'period_id', 'state'])
+            );
 
         for ($i = $months - 1; $i >= 0; $i--) {
             $monthStart = now()->startOfMonth()->subMonths($i)->startOfMonth();
             $monthEnd = $monthStart->copy()->endOfMonth();
             $label = $monthStart->format('M');
             $categories[] = $label;
+            $monthStartDate = $monthStart->toDateString();
+            $monthEndDate = $monthEnd->toDateString();
 
-            $periods = $this->periodsOverlapping($monthStart, $monthEnd);
-            $detail = $this->scoreMonth($user, $periods, $monthStart, $monthEnd, $canPlan, $canReport, $canReview);
+            $periods = $allPeriods
+                ->filter(function (WorkPeriod $period) use ($monthStartDate, $monthEndDate) {
+                    $start = Carbon::parse($period->week_start_date)->toDateString();
+                    $end = Carbon::parse($period->week_end_date)->toDateString();
+
+                    return $start <= $monthEndDate && $end >= $monthStartDate;
+                })
+                ->values();
+            $detail = $this->scoreMonth($user, $periods, $monthStart, $monthEnd, $canPlan, $canReport, $canReview, $ownedPlans, $ownedReports);
             $detail['label'] = $label;
             $detail['month_key'] = $monthStart->format('Y-m');
             $detail['is_current'] = $detail['month_key'] === $currentMonthKey;
@@ -106,19 +137,44 @@ class MonthlyPerformanceService
     }
 
     /**
-     * @return Collection<int, WorkPeriod>
+     * @param  Collection<int, WeeklyPlan|WeeklyReport>  $rows
+     * @return Collection<string, WeeklyPlan|WeeklyReport>
      */
-    private function periodsOverlapping(Carbon $monthStart, Carbon $monthEnd): Collection
+    private function preferredByPeriod(Collection $rows): Collection
     {
-        return WorkPeriod::query()
-            ->whereDate('week_start_date', '<=', $monthEnd->toDateString())
-            ->whereDate('week_end_date', '>=', $monthStart->toDateString())
-            ->orderBy('week_start_date')
-            ->get();
+        return $rows
+            ->groupBy(fn ($row) => (string) $row->period_id)
+            ->map(function (Collection $group) {
+                return $group->sort(function ($left, $right) {
+                    $leftRank = (string) $left->state === Document::STATE_SUBMITTED ? 0 : 1;
+                    $rightRank = (string) $right->state === Document::STATE_SUBMITTED ? 0 : 1;
+
+                    if ($leftRank !== $rightRank) {
+                        return $leftRank <=> $rightRank;
+                    }
+
+                    return strcmp((string) $right->id, (string) $left->id);
+                })->first();
+            });
+    }
+
+    private function periodDocumentSubmitted(mixed $owned, string $periodId, string $userId, bool $plan): bool
+    {
+        if ($owned !== null) {
+            return (string) $owned->state === Document::STATE_SUBMITTED;
+        }
+
+        $found = $plan
+            ? Document::findWeeklyPlanForUserAndPeriod($periodId, $userId)
+            : Document::findWeeklyReportForUserAndPeriod($periodId, $userId);
+
+        return (bool) $found?->isSubmitted();
     }
 
     /**
      * @param  Collection<int, WorkPeriod>  $periods
+     * @param  Collection<string, WeeklyPlan>  $ownedPlans
+     * @param  Collection<string, WeeklyReport>  $ownedReports
      * @return array<string, mixed>
      */
     private function scoreMonth(
@@ -129,6 +185,8 @@ class MonthlyPerformanceService
         bool $canPlan,
         bool $canReport,
         bool $canReview,
+        Collection $ownedPlans,
+        Collection $ownedReports,
     ): array {
         $weeks = $periods->count();
         $plansSubmitted = 0;
@@ -137,27 +195,22 @@ class MonthlyPerformanceService
         $periodIds = [];
 
         foreach ($periods as $period) {
-            $periodIds[] = (string) $period->id;
+            $periodId = (string) $period->id;
+            $periodIds[] = $periodId;
 
-            if ($canPlan) {
-                $plan = Document::findWeeklyPlanForUserAndPeriod((string) $period->id, (string) $user->id);
-                if ($plan?->isSubmitted()) {
-                    $plansSubmitted++;
-                }
+            if ($canPlan && $this->periodDocumentSubmitted($ownedPlans->get($periodId), $periodId, (string) $user->id, true)) {
+                $plansSubmitted++;
             }
 
-            if ($canReport) {
-                $report = Document::findWeeklyReportForUserAndPeriod((string) $period->id, (string) $user->id);
-                if ($report?->isSubmitted()) {
-                    $reportsSubmitted++;
-                }
+            if ($canReport && $this->periodDocumentSubmitted($ownedReports->get($periodId), $periodId, (string) $user->id, false)) {
+                $reportsSubmitted++;
             }
 
             $expectedWeekdays += $this->weekdayCountInPeriodWithinMonth($period, $monthStart, $monthEnd);
         }
 
         $logDays = 0;
-        if ($periodIds !== [] && Schema::hasTable('weekly_work_logs')) {
+        if ($periodIds !== [] && SchemaTables::has('weekly_work_logs')) {
             $logDays = (int) WeeklyWorkLog::query()
                 ->where('user_id', $user->id)
                 ->whereIn('period_id', $periodIds)
@@ -210,16 +263,15 @@ class MonthlyPerformanceService
     private function actionClosureRate(User $user, Carbon $monthStart, Carbon $monthEnd, bool $isCurrentMonth): ?int
     {
         $doneInMonth = 0;
-        if (Schema::hasTable('action_log_task_history') && Schema::hasTable('action_log_task_assignees')) {
-            $doneInMonth = ActionLogTaskHistory::query()
+        if (SchemaTables::has('action_log_task_history') && SchemaTables::has('action_log_task_assignees')) {
+            $doneInMonth = (int) ActionLogTaskHistory::query()
                 ->where('to_progress', ActionLogTaskSupport::PROGRESS_DONE)
                 ->whereBetween('changed_at', [$monthStart->copy()->startOfDay(), $monthEnd->copy()->endOfDay()])
                 ->whereHas('task.assignees', function ($query) use ($user) {
                     $query->where('users.id', $user->id);
                 })
-                ->pluck('action_log_task_id')
-                ->unique()
-                ->count();
+                ->distinct()
+                ->count('action_log_task_id');
         }
 
         $actionProgress = $this->actionLogProgressService->buildForUser($user);
@@ -254,7 +306,7 @@ class MonthlyPerformanceService
     {
         $acted = 0;
 
-        if (Schema::hasTable('request_approvals')) {
+        if (SchemaTables::has('request_approvals')) {
             $acted += (int) DB::table('request_approvals')
                 ->where('actor_id', $user->id)
                 ->whereIn('action', ['approved', 'rejected', 'resubmission'])
@@ -262,7 +314,7 @@ class MonthlyPerformanceService
                 ->count();
         }
 
-        if (Schema::hasTable('weekly_plan_budget_reviews')) {
+        if (SchemaTables::has('weekly_plan_budget_reviews')) {
             $acted += (int) WeeklyPlanBudgetReview::query()
                 ->where(function ($query) use ($user, $monthStart, $monthEnd) {
                     $query->where(function ($inner) use ($user, $monthStart, $monthEnd) {
@@ -298,11 +350,15 @@ class MonthlyPerformanceService
 
     private function pendingReviewCount(User $user): int
     {
+        if ($this->pendingReviewMemo !== null) {
+            return $this->pendingReviewMemo;
+        }
+
         $finance = $this->requestApprovalNavService->countsFor($user)['total'] ?? 0;
         $budget = $this->weeklyBudgetReviewService->actionableStageCountsFor($user);
         $budgetTotal = (int) ($budget['review'] ?? 0) + (int) ($budget['approve'] ?? 0) + (int) ($budget['authorize'] ?? 0);
 
-        return (int) $finance + $budgetTotal;
+        return $this->pendingReviewMemo = (int) $finance + $budgetTotal;
     }
 
     private function userCanReview(User $user): bool

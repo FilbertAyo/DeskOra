@@ -51,7 +51,7 @@ export default function NotificationMenu() {
                     <p className="text-muted-foreground px-3 py-6 text-center text-sm">No new notifications.</p>
                 ) : (
                     notifications.items.map((item) => (
-                        <DropdownMenuItem key={item.id} className="items-start" render={<a href={item.href} />}>
+                        <DropdownMenuItem key={item.id} className="items-start" render={<Link href={item.href} prefetch cacheFor="60s" />}>
                             <span className="flex min-w-0 flex-col gap-0.5">
                                 <span className="truncate font-medium">{item.title}</span>
                                 <span className="text-muted-foreground line-clamp-2 text-xs">{item.message}</span>

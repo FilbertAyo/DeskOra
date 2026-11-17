@@ -1,4 +1,6 @@
 import { useForm } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -22,7 +24,7 @@ export default function ActionLogForm({ mode, defaultPeriodId, tasks, teamUsers,
         const options = { onSuccess: () => notify('success', action === 'submit' ? 'Action log submitted.' : 'Draft saved.') };
         if (mode === 'create') form.post(submitUrl, options); else form.put(submitUrl, options);
     };
-    return <div className="flex flex-col gap-6"><div><h1 className="text-2xl font-semibold">{mode === 'create' ? 'Create' : 'Edit'} Action Log</h1><p className="text-muted-foreground text-sm">Add and assign weekly action tasks.</p></div>
+    return <div className="flex flex-col gap-6"><div><h1 className="text-lg font-semibold">{mode === 'create' ? 'Create' : 'Edit'} Action Log</h1><p className="text-muted-foreground text-sm">Add and assign weekly action tasks.</p></div>
         <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Action Log Tasks</CardTitle><Button type="button" size="sm" onClick={() => form.setData('content', { tasks: [...form.data.content.tasks, blankTask(form.data.content.tasks.length + 1)] })}>Add task</Button></CardHeader><CardContent className="space-y-4">
             {form.data.content.tasks.map((task, index) => <div key={task.task_uid} className="grid gap-3 rounded-lg border p-4 md:grid-cols-2">
                 <Textarea name={`content[tasks][${index}][task]`} value={task.task} placeholder="Task" required onChange={(event) => update(index, { task: event.target.value })} />
@@ -33,7 +35,7 @@ export default function ActionLogForm({ mode, defaultPeriodId, tasks, teamUsers,
                 <Textarea name={`content[tasks][${index}][notes_progress]`} value={task.notes_progress} placeholder="Notes / progress" onChange={(event) => update(index, { notes_progress: event.target.value })} />
                 <Button type="button" variant="destructive" size="sm" className="w-fit" onClick={() => form.setData('content', { tasks: form.data.content.tasks.filter((_, taskIndex) => taskIndex !== index) })}>Remove</Button>
             </div>)}
-            <div className="flex justify-between gap-2"><Button type="button" variant="outline" render={<a href={backUrl} />}>Cancel</Button><div className="flex gap-2"><Button type="button" variant="outline" disabled={form.processing} data-action="draft" onClick={() => submit('draft')}>Save draft</Button><Button type="button" disabled={form.processing} data-action="submit" onClick={() => submit('submit')}>Submit</Button></div></div>
+            <div className="flex justify-between gap-2"><Button type="button" variant="outline" render={<AppLink href={backUrl} />}>Cancel</Button><div className="flex gap-2"><Button type="button" variant="outline" disabled={form.processing} data-action="draft" onClick={() => submit('draft')}>Save draft</Button><Button type="button" disabled={form.processing} data-action="submit" onClick={() => submit('submit')}>Submit</Button></div></div>
         </CardContent></Card>
     </div>;
 }

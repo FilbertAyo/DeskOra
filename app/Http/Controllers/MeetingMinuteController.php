@@ -47,7 +47,6 @@ class MeetingMinuteController extends Controller
                     'dateRange' => $period->date_range,
                     'isCurrent' => $currentPeriod?->id === $period->id,
                     'minute' => $period->meetingMinute ? $this->minutePayload($period->meetingMinute) : null,
-                    'uploadUrl' => route('meeting-minutes.create', ['period_id' => $period->id]),
                 ])->values(),
                 'links' => $periods->linkCollection(),
             ],
@@ -55,31 +54,7 @@ class MeetingMinuteController extends Controller
             'selectedYear' => $request->input('year'),
             'canManageMinutes' => $canManageMinutes,
             'indexUrl' => route('meeting-minutes.index'),
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $this->authorize('create', MeetingMinute::class);
-
-        $request->validate([
-            'period_id' => ['required', 'string', 'short_id', 'exists:work_periods,id'],
-        ]);
-
-        $period = WorkPeriod::findOrFail($request->period_id);
-
-        if ($period->meetingMinute) {
-            return redirect()
-                ->route('meeting-minutes.edit', $period->meetingMinute)
-                ->with('info', 'Minutes already exist for this work period. You can replace the file below.');
-        }
-
-        return Inertia::render('MeetingMinutes/Form', [
-            'mode' => 'create',
-            'period' => $this->periodPayload($period),
-            'meetingMinute' => null,
-            'submitUrl' => route('meeting-minutes.store'),
-            'backUrl' => route('meeting-minutes.index'),
+            'storeUrl' => route('meeting-minutes.store'),
         ]);
     }
 
@@ -145,7 +120,6 @@ class MeetingMinuteController extends Controller
         $meetingMinute->load(['period', 'uploader']);
 
         return Inertia::render('MeetingMinutes/Form', [
-            'mode' => 'edit',
             'period' => $this->periodPayload($meetingMinute->period),
             'meetingMinute' => $this->minutePayload($meetingMinute),
             'submitUrl' => route('meeting-minutes.update', $meetingMinute),

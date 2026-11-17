@@ -1,5 +1,18 @@
 import { Link, router } from '@inertiajs/react';
-import { DownloadIcon, EyeIcon, PencilIcon } from 'lucide-react';
+import {
+    AlertTriangleIcon,
+    CalendarDaysIcon,
+    DownloadIcon,
+    EyeIcon,
+    FileTextIcon,
+    Link2Icon,
+    ListChecksIcon,
+    PencilIcon,
+    TargetIcon,
+    TrophyIcon,
+    UsersIcon,
+    WalletIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -7,8 +20,11 @@ import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 
+type NamedUser = { id?: string | number; name: string };
 
 type Doc = {
     id?: string;
@@ -19,6 +35,8 @@ type Doc = {
     userName?: string | null;
     period?: { weekNumber?: number; year?: number; dateRange?: string } | null;
     mainTarget?: string | null;
+    targetAccomplished?: boolean | null;
+    targetExplanation?: string | null;
     content?: Record<string, unknown>;
     createdAt?: string | null;
     canEdit?: boolean;
@@ -28,39 +46,212 @@ type Doc = {
     returnToDraftUrl?: string;
 };
 
+type MeetingRow = {
+    date?: string;
+    meeting?: string;
+    location?: string;
+    status?: string;
+    reactions_notes?: string;
+    participant_user_ids?: Array<string | number>;
+    participants?: string;
+    incoming_source_user_name?: string;
+    is_readonly_for_current_user?: boolean;
+};
+
+function asRows<T>(value: unknown): T[] {
+    return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function namesForIds(ids: Array<string | number> | undefined, users: NamedUser[]): string {
+    if (!ids?.length) {
+        return '—';
+    }
+    const map = new Map(users.map((user) => [String(user.id), user.name]));
+    const names = ids.map((id) => map.get(String(id))).filter(Boolean);
+    return names.length > 0 ? names.join(', ') : '—';
+}
+
+function money(value: unknown): string {
+    const amount = Number(value ?? 0);
+    if (!Number.isFinite(amount)) {
+        return String(value ?? '—');
+    }
+    return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function stateBadge(state?: string | null) {
+    const isDraft = state === 'draft';
+    return (
+        <Badge
+            variant="outline"
+            className={cn(
+                isDraft
+                    ? 'border-muted-foreground/30 text-muted-foreground'
+                    : 'border-emerald-600/40 text-emerald-700',
+            )}
+        >
+            {isDraft ? 'Draft' : 'Submitted'}
+        </Badge>
+    );
+}
+
+function targetBadge(label: string) {
+    const tone =
+        label === 'Completed'
+            ? 'bg-emerald-500/15 text-emerald-700'
+            : label === 'Partially completed'
+              ? 'bg-amber-500/15 text-amber-800'
+              : 'bg-rose-500/15 text-rose-700';
+    return <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', tone)}>{label}</span>;
+}
+
+function Section({
+    title,
+    icon,
+    children,
+    className,
+}: {
+    title: string;
+    icon?: ReactNode;
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <div className={cn('overflow-hidden rounded-lg border bg-card', className)}>
+            <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
+                {icon}
+                <h3 className="text-sm font-semibold">{title}</h3>
+            </div>
+            <div className="p-4">{children}</div>
+        </div>
+    );
+}
+
+function EmptyNote({ children }: { children: ReactNode }) {
+    return <p className="text-muted-foreground text-sm">{children}</p>;
+}
+
+function DataTable({ children }: { children: ReactNode }) {
+    return (
+        <div className="overflow-x-auto rounded-md border">
+            <Table>{children}</Table>
+        </div>
+    );
+}
+
+function groupActivitiesByDay(rows: Array<Record<string, unknown>>) {
+    const groups: Array<{ day: string; rows: Array<Record<string, unknown>> }> = [];
+    for (const row of rows) {
+        const day = String(row.day ?? '—');
+        const last = groups[groups.length - 1];
+        if (last && last.day === day) {
+            last.rows.push(row);
+        } else {
+            groups.push({ day, rows: [row] });
+        }
+    }
+    return groups;
+}
+
 export default function DocumentsShow({
     document,
     relatedDocument,
     relatedAction,
     showWeeklyRelatedPanel,
     reviewerPresentation,
+    teamUsers = [],
+    reportMeetingRows = [],
+    incomingMeetings = [],
+    assignedWeeklyActivities = [],
+    carriedActivities = [],
     indexUrl = '/documents',
 }: {
     document: Doc;
     relatedDocument?: Doc | null;
-    relatedAction?: string | null;
+    relatedAction?: string | { type?: string; label?: string; route?: string; description?: string } | null;
     showWeeklyRelatedPanel?: boolean;
     reviewerPresentation?: boolean;
+    teamUsers?: NamedUser[];
+    reportMeetingRows?: MeetingRow[];
+    incomingMeetings?: MeetingRow[];
+    assignedWeeklyActivities?: Array<Record<string, unknown>>;
+    carriedActivities?: Array<Record<string, unknown>>;
     indexUrl?: string;
     [key: string]: unknown;
 }) {
     const title = document.title ?? 'Document';
     const typeLabel = document.typeName ?? document.type ?? '';
-    const relatedIsReport = relatedAction === 'report' || String(relatedDocument?.type ?? '').includes('report');
-    const relatedTitle = relatedIsReport ? 'Related Weekly Report' : 'Related Weekly Plan';
+    const isPlan = document.type === 'weekly_plan';
+    const isReport = document.type === 'weekly_report';
     const content = document.content ?? {};
-    const activities = Array.isArray(content.planned_activities) ? content.planned_activities : [];
-    const summary = typeof content.summary === 'string' ? content.summary : null;
+    const createRelated =
+        relatedAction && typeof relatedAction === 'object' && !Array.isArray(relatedAction)
+            ? (relatedAction as { type?: string; label?: string; route?: string; description?: string })
+            : null;
+    const relatedIsReport =
+        createRelated?.type === 'weekly_report' || String(relatedDocument?.type ?? '').includes('report');
+    const relatedTitle = relatedIsReport ? 'Related Weekly Report' : 'Related Weekly Plan';
+
+    const objective = (content.objective as { reflection_progress?: string } | undefined) ?? {};
+    const plannedActivities = asRows<Record<string, unknown>>(content.planned_activities);
+    const activityRows = [...carriedActivities, ...plannedActivities];
+    const activityGroups = groupActivitiesByDay(activityRows);
+    const keyMeetings = asRows<MeetingRow>(content.key_meetings);
+    const budget = asRows<Record<string, unknown>>(content.budget).filter(
+        (row) =>
+            String(row.item ?? '').trim() !== '' ||
+            String(row.description_purpose ?? '').trim() !== '' ||
+            String(row.amount ?? '').trim() !== '',
+    );
+    const activityProgress = asRows<Record<string, unknown>>(content.activity_progress).filter((row) => {
+        return ['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'].some(
+            (key) => String(row[key] ?? '').trim() !== '',
+        );
+    });
+    const keyAchievements = asRows<unknown>(content.key_achievements)
+        .map((item) => (typeof item === 'string' ? item : String((item as { achievement?: string })?.achievement ?? '')))
+        .filter((item) => item.trim() !== '');
+    const challenges = asRows<Record<string, unknown>>(content.challenges_mitigation).filter(
+        (row) => String(row.challenge ?? '').trim() !== '' || String(row.action_taken_planned ?? '').trim() !== '',
+    );
+    const budgetStatuses = asRows<Record<string, unknown>>(content.budget_statuses);
+    const meetings = reportMeetingRows.length > 0 ? reportMeetingRows : keyMeetings;
+    const targetStatus = String(content.target_accomplished_status ?? '').trim();
+    const targetLabel =
+        targetStatus === 'completed'
+            ? 'Completed'
+            : targetStatus === 'partially_completed'
+              ? 'Partially completed'
+              : targetStatus === 'not_completed'
+                ? 'Not completed'
+                : document.targetAccomplished === true
+                  ? 'Completed'
+                  : document.targetAccomplished === false
+                    ? 'Not completed'
+                    : null;
+    const periodLine = document.period
+        ? `Week ${document.period.weekNumber} of ${document.period.year}`
+        : null;
+    const budgetTotal = budget.reduce((sum, row) => {
+        const amount = Number(row.amount ?? 0);
+        return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+    const planBudget = asRows<Record<string, unknown>>(relatedDocument?.content?.budget).filter(
+        (row) =>
+            String(row.item ?? '').trim() !== '' ||
+            String(row.description_purpose ?? '').trim() !== '' ||
+            String(row.amount ?? '').trim() !== '',
+    );
 
     return (
         <PageShell>
             <PageHeader
-                title="Document Details"
-                description="Home › Documents › Details"
+                title={title}
+                description={`${typeLabel}${periodLine ? ` · ${periodLine}` : ''}`}
                 actions={
                     <div className="flex items-center gap-2">
                         <Button variant="outline" render={<Link href={indexUrl} />}>
-                            ← Back to Documents
+                            Back
                         </Button>
                         <RowActions
                             items={[
@@ -69,12 +260,6 @@ export default function DocumentsShow({
                                     href: document.editUrl,
                                     icon: <PencilIcon />,
                                     hidden: !(document.canEdit && document.editUrl),
-                                },
-                                {
-                                    label: 'Download PDF',
-                                    href: document.downloadUrl ?? undefined,
-                                    icon: <DownloadIcon />,
-                                    hidden: !document.downloadUrl,
                                 },
                                 {
                                     label: 'Return to Draft',
@@ -87,118 +272,557 @@ export default function DocumentsShow({
                 }
             />
 
-            <div className="grid gap-4 lg:grid-cols-2">
-                {showWeeklyRelatedPanel && (
-                    <Card className="shadow-none">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20">
-                            <CardTitle className="text-base">{relatedTitle}</CardTitle>
-                            {relatedDocument ? (
-                                <Badge variant={relatedDocument.state === 'draft' ? 'outline' : 'default'}>
-                                    {relatedDocument.state === 'draft' ? 'Draft' : 'Submitted'}
-                                </Badge>
-                            ) : (
-                                <Badge variant="outline">Not created</Badge>
-                            )}
+            {(isPlan || isReport) && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {showWeeklyRelatedPanel && (
+                        <Card className="shadow-none">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20 py-3">
+                                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                                    <Link2Icon className="text-muted-foreground size-4" />
+                                    {relatedTitle}
+                                </CardTitle>
+                                {relatedDocument ? stateBadge(relatedDocument.state) : <Badge variant="outline">Not created</Badge>}
+                            </CardHeader>
+                            <CardContent className="flex items-start justify-between gap-3 pt-4 text-sm">
+                                {relatedDocument ? (
+                                    <>
+                                        <div className="min-w-0 space-y-1">
+                                            <div className="font-semibold">{relatedDocument.title}</div>
+                                            <p className="text-muted-foreground text-xs">
+                                                {[relatedDocument.userName, relatedDocument.createdAt].filter(Boolean).join(' · ') ||
+                                                    '—'}
+                                            </p>
+                                        </div>
+                                        {relatedDocument.showUrl && (
+                                            <Button size="sm" render={<Link href={relatedDocument.showUrl} />}>
+                                                <EyeIcon className="size-4" />
+                                                View
+                                            </Button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <EmptyNote>Not created yet for this period.</EmptyNote>
+                                        {createRelated?.route && (
+                                            <Button size="sm" render={<Link href={createRelated.route} />}>
+                                                {createRelated.label ?? 'Create related document'}
+                                            </Button>
+                                        )}
+                                        {createRelated?.description && (
+                                            <p className="text-muted-foreground text-xs">{createRelated.description}</p>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <Card className={cn('shadow-none', !showWeeklyRelatedPanel && 'lg:col-span-2')}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20 py-3">
+                            <CardTitle className="text-sm font-semibold">Document Information & Actions</CardTitle>
+                            {stateBadge(document.state)}
                         </CardHeader>
-                        <CardContent className="space-y-3 pt-6 text-sm">
-                            {relatedDocument ? (
-                                <>
-                                    <div className="font-medium">{relatedDocument.title}</div>
-                                    <p className="text-muted-foreground">
-                                        {relatedDocument.userName ? `Created by ${relatedDocument.userName}` : ''}
-                                        {relatedDocument.createdAt ? ` on ${relatedDocument.createdAt}` : ''}
-                                    </p>
-                                    <RowActions
-                                        items={[
-                                            {
-                                                label: 'View',
-                                                href: relatedDocument.showUrl,
-                                                icon: <EyeIcon />,
-                                                hidden: !relatedDocument.showUrl,
-                                            },
-                                            {
-                                                label: 'Edit',
-                                                href: relatedDocument.editUrl,
-                                                icon: <PencilIcon />,
-                                                hidden: !(relatedDocument.canEdit && relatedDocument.editUrl),
-                                            },
-                                        ]}
-                                    />
-                                </>
-                            ) : (
-                                <p className="text-muted-foreground">Not created yet for this period.</p>
-                            )}
+                        <CardContent className="pt-4 text-sm">
+                            <p className="text-muted-foreground">
+                                Created by: {document.userName ?? '—'}
+                                {periodLine ? ` | ${periodLine}` : ''}
+                            </p>
                         </CardContent>
                     </Card>
-                )}
+                </div>
+            )}
 
+            {(isPlan || isReport) && (
                 <Card className="shadow-none">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20">
-                        <CardTitle className="text-base">Document Information</CardTitle>
-                        <Badge variant={document.state === 'draft' ? 'outline' : 'default'}>
-                            {document.state === 'draft' ? 'Draft' : 'Submitted'}
-                        </Badge>
+                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b bg-muted/20">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <FileTextIcon className="text-muted-foreground size-4" />
+                            {title}
+                        </CardTitle>
+                        {document.downloadUrl && (
+                            <Button variant="outline" size="sm" render={<a href={document.downloadUrl} />}>
+                                <DownloadIcon className="size-4" />
+                                Download PDF
+                            </Button>
+                        )}
                     </CardHeader>
-                    <CardContent className="space-y-3 pt-6 text-sm">
-                        <p>
-                            Created by: {document.userName ?? '—'}
-                            {document.period
-                                ? ` | Week ${document.period.weekNumber} of ${document.period.year}`
-                                : ''}
-                        </p>
+                    <CardContent className="space-y-4 pt-6">
+                        {isReport && (
+                            <div className="rounded-lg border border-sky-200 bg-sky-50/40 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+                                <div className="mb-4 flex items-center gap-2">
+                                    <TargetIcon className="size-4 text-sky-700 dark:text-sky-400" />
+                                    <h3 className="text-sm font-semibold">Main Target Accomplishment Status</h3>
+                                </div>
+                                <div className="space-y-4 text-sm">
+                                    <div>
+                                        <p className="text-muted-foreground mb-1 text-xs">Main Target from Weekly Plan:</p>
+                                        <div className="rounded-md border bg-background/80 p-3 whitespace-pre-wrap">
+                                            {relatedDocument?.mainTarget || document.mainTarget || 'No main target recorded.'}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-muted-foreground text-xs">Accomplishment Status:</span>
+                                        {targetLabel ? targetBadge(targetLabel) : <EmptyNote>Not set yet.</EmptyNote>}
+                                    </div>
+                                    {document.targetExplanation && (
+                                        <div>
+                                            <p className="text-muted-foreground mb-1 text-xs">Explanation:</p>
+                                            <div className="rounded-md border border-amber-300/70 bg-amber-50/70 p-3 whitespace-pre-wrap dark:border-amber-900 dark:bg-amber-950/30">
+                                                {document.targetExplanation}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {isPlan && (
+                            <div className="rounded-lg border border-sky-200 bg-sky-50/30 dark:border-sky-900 dark:bg-sky-950/20">
+                                <div className="flex items-center gap-2 border-b border-sky-200/70 px-4 py-3 dark:border-sky-900">
+                                    <TargetIcon className="size-4 text-sky-700 dark:text-sky-400" />
+                                    <h3 className="text-sm font-semibold">Objective / Main Target</h3>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                <TableHead className="w-1/2">Main Target</TableHead>
+                                                <TableHead className="w-1/2">Reflection / Progress</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            <TableRow>
+                                                <TableCell className="align-top whitespace-pre-wrap text-sm">
+                                                    {document.mainTarget || '—'}
+                                                </TableCell>
+                                                <TableCell className="align-top whitespace-pre-wrap text-sm">
+                                                    {objective.reflection_progress || '—'}
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+
+                        {isPlan && (
+                            <>
+                                <Section title="Planned Activities" icon={<CalendarDaysIcon className="text-muted-foreground size-4" />}>
+                                    {activityRows.length === 0 ? (
+                                        <EmptyNote>No planned activities.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead className="w-28 text-center">Day</TableHead>
+                                                    <TableHead>Activity</TableHead>
+                                                    <TableHead>Location</TableHead>
+                                                    <TableHead>Lead Staff/Team</TableHead>
+                                                    <TableHead>Notes</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {activityGroups.map((group) =>
+                                                    group.rows.map((row, index) => (
+                                                        <TableRow key={`${group.day}-${index}`}>
+                                                            {index === 0 && (
+                                                                <TableCell
+                                                                    rowSpan={group.rows.length}
+                                                                    className="bg-muted/10 align-middle text-center font-semibold"
+                                                                >
+                                                                    {group.day}
+                                                                </TableCell>
+                                                            )}
+                                                            <TableCell className="align-top">{String(row.activity ?? '—')}</TableCell>
+                                                            <TableCell className="align-top">{String(row.location ?? '—')}</TableCell>
+                                                            <TableCell className="align-top">
+                                                                {namesForIds(
+                                                                    Array.isArray(row.team_member_ids)
+                                                                        ? (row.team_member_ids as Array<string | number>)
+                                                                        : [],
+                                                                    teamUsers,
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="align-top whitespace-pre-wrap">
+                                                                {String(row.notes_inclusion ?? '—')}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )),
+                                                )}
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+
+                                {(assignedWeeklyActivities.length > 0 || incomingMeetings.length > 0) && (
+                                    <Section title="Assigned by others" icon={<UsersIcon className="text-muted-foreground size-4" />}>
+                                        {assignedWeeklyActivities.length > 0 && (
+                                            <div className="mb-4 space-y-2">
+                                                <h4 className="text-sm font-medium">Assigned activities</h4>
+                                                {assignedWeeklyActivities.map((row, index) => {
+                                                    const payload =
+                                                        (row.activity_payload as Record<string, unknown> | undefined) ?? row;
+                                                    return (
+                                                        <div key={index} className="rounded-md border p-3 text-sm">
+                                                            <div className="font-medium">{String(payload.activity ?? 'Activity')}</div>
+                                                            <div className="text-muted-foreground text-xs">
+                                                                {[payload.day, payload.location].filter(Boolean).join(' · ')}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {incomingMeetings.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h4 className="text-sm font-medium">Assigned meetings</h4>
+                                                {incomingMeetings.map((row, index) => (
+                                                    <div key={index} className="rounded-md border p-3 text-sm">
+                                                        <div className="font-medium">{row.meeting || 'Meeting'}</div>
+                                                        <div className="text-muted-foreground text-xs">
+                                                            {[row.date, row.location, row.incoming_source_user_name]
+                                                                .filter(Boolean)
+                                                                .join(' · ')}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </Section>
+                                )}
+
+                                <Section
+                                    title="Key Meetings / Engagements"
+                                    icon={<UsersIcon className="text-muted-foreground size-4" />}
+                                >
+                                    {keyMeetings.length === 0 ? (
+                                        <EmptyNote>No meetings planned.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Meeting</TableHead>
+                                                    <TableHead>Participants</TableHead>
+                                                    <TableHead>Location</TableHead>
+                                                    <TableHead>Notes</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {keyMeetings.map((row, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell>{row.date || '—'}</TableCell>
+                                                        <TableCell>{row.meeting || '—'}</TableCell>
+                                                        <TableCell>
+                                                            {row.participants || namesForIds(row.participant_user_ids, teamUsers)}
+                                                        </TableCell>
+                                                        <TableCell>{row.location || '—'}</TableCell>
+                                                        <TableCell className="whitespace-pre-wrap">
+                                                            {row.reactions_notes || ''}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+
+                                <Section title="Budget" icon={<WalletIcon className="text-muted-foreground size-4" />}>
+                                    {budget.length === 0 ? (
+                                        <EmptyNote>No budget items.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead>Budget Item / Activity</TableHead>
+                                                    <TableHead>Description / Purpose</TableHead>
+                                                    <TableHead className="text-right">Amount (TZS)</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {budget.map((row, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell>{String(row.item ?? '—')}</TableCell>
+                                                        <TableCell className="whitespace-pre-wrap">
+                                                            {String(row.description_purpose ?? '—')}
+                                                        </TableCell>
+                                                        <TableCell className="text-right tabular-nums">
+                                                            {money(row.amount)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                                <TableRow className="bg-muted/20 font-semibold">
+                                                    <TableCell />
+                                                    <TableCell className="text-right">Total</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{money(budgetTotal)}</TableCell>
+                                                </TableRow>
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+                            </>
+                        )}
+
+                        {isReport && (
+                            <>
+                                <Section title="Summary of the Week" icon={<FileTextIcon className="text-muted-foreground size-4" />}>
+                                    {typeof content.summary === 'string' && content.summary.trim() !== '' ? (
+                                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{content.summary}</p>
+                                    ) : (
+                                        <EmptyNote>No summary provided.</EmptyNote>
+                                    )}
+                                </Section>
+
+                                <Section
+                                    title="Weekly Activity Progress"
+                                    icon={<ListChecksIcon className="text-muted-foreground size-4" />}
+                                >
+                                    {activityProgress.length === 0 ? (
+                                        <EmptyNote>No activity progress recorded.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead className="w-12 text-center">No.</TableHead>
+                                                    <TableHead>Activity/Output</TableHead>
+                                                    <TableHead>Progress</TableHead>
+                                                    <TableHead>Remarks/Challenges</TableHead>
+                                                    <TableHead>Next Step</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {activityProgress.map((row, index) => {
+                                                    const progress = String(row.progress ?? '');
+                                                    const carry =
+                                                        progress === 'Partially done' ||
+                                                        progress === 'Done and carry' ||
+                                                        Boolean(row.carry_to_next_plan);
+                                                    return (
+                                                        <TableRow key={index}>
+                                                            <TableCell className="text-center tabular-nums">{index + 1}</TableCell>
+                                                            <TableCell className="align-top">
+                                                                {String(row.activity_output) === '__off_plan__'
+                                                                    ? String(row.off_plan_activity ?? 'Off-plan activity')
+                                                                    : String(row.activity_output ?? '—')}
+                                                            </TableCell>
+                                                            <TableCell className="align-top">{progress || '—'}</TableCell>
+                                                            <TableCell className="align-top whitespace-pre-wrap">
+                                                                {String(row.remarks_challenges ?? '') || '—'}
+                                                            </TableCell>
+                                                            <TableCell className="align-top whitespace-pre-wrap">
+                                                                <div>{String(row.next_step ?? '') || '—'}</div>
+                                                                {carry && (
+                                                                    <div className="text-sky-700 dark:text-sky-400 mt-1 text-xs font-medium">
+                                                                        Will be carried to next weekly plan
+                                                                    </div>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+
+                                <Section title="Key Achievements" icon={<TrophyIcon className="text-muted-foreground size-4" />}>
+                                    {keyAchievements.length === 0 ? (
+                                        <EmptyNote>No achievements listed.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead className="w-12 text-center">No.</TableHead>
+                                                    <TableHead>Achievement</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {keyAchievements.map((item, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell className="text-center tabular-nums">{index + 1}</TableCell>
+                                                        <TableCell className="whitespace-pre-wrap">{item}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+
+                                <Section
+                                    title="Meetings Progress"
+                                    icon={<UsersIcon className="text-muted-foreground size-4" />}
+                                >
+                                    {meetings.length === 0 ? (
+                                        <EmptyNote>No meetings recorded.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Meeting / Engagement</TableHead>
+                                                    <TableHead>Participant(s)</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead>Location</TableHead>
+                                                    <TableHead>Reactions / Notes</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {meetings.map((row, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell>{row.date || '—'}</TableCell>
+                                                        <TableCell>
+                                                            {row.meeting || '—'}
+                                                            {row.is_readonly_for_current_user && (
+                                                                <Badge variant="outline" className="ml-2">
+                                                                    Assigned
+                                                                </Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {row.participants || namesForIds(row.participant_user_ids, teamUsers)}
+                                                        </TableCell>
+                                                        <TableCell>{row.status || '—'}</TableCell>
+                                                        <TableCell>{row.location || '—'}</TableCell>
+                                                        <TableCell className="whitespace-pre-wrap">
+                                                            {row.reactions_notes || ''}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+
+                                <Section
+                                    title="Challenges & Mitigation"
+                                    icon={<AlertTriangleIcon className="text-muted-foreground size-4" />}
+                                >
+                                    {challenges.length === 0 ? (
+                                        <EmptyNote>No challenges recorded.</EmptyNote>
+                                    ) : (
+                                        <DataTable>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableHead>Challenge(s)</TableHead>
+                                                    <TableHead>Action Taken/Planned</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {challenges.map((row, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell className="align-top whitespace-pre-wrap">
+                                                            {String(row.challenge ?? '—')}
+                                                        </TableCell>
+                                                        <TableCell className="align-top whitespace-pre-wrap">
+                                                            {String(row.action_taken_planned ?? '—')}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </DataTable>
+                                    )}
+                                </Section>
+
+                                {(planBudget.length > 0 || budgetStatuses.length > 0) && (
+                                    <Section
+                                        title="Budget Status (from weekly plan)"
+                                        icon={<WalletIcon className="text-muted-foreground size-4" />}
+                                    >
+                                        {(() => {
+                                            const statusByUid = new Map(
+                                                budgetStatuses
+                                                    .filter((row) => String(row.budget_uid ?? '').trim() !== '')
+                                                    .map((row) => [String(row.budget_uid), row]),
+                                            );
+                                            const rows =
+                                                planBudget.length > 0
+                                                    ? planBudget.map((planRow, index) => {
+                                                          const uid = String(planRow.budget_uid ?? '').trim();
+                                                          const status =
+                                                              (uid && statusByUid.get(uid)) || budgetStatuses[index] || {};
+                                                          return {
+                                                              item: String(planRow.item ?? status.item ?? '—'),
+                                                              purpose: String(planRow.description_purpose ?? '—'),
+                                                              amount: planRow.amount,
+                                                              status: String(status.status ?? '—'),
+                                                              notes: String(status.notes ?? ''),
+                                                          };
+                                                      })
+                                                    : budgetStatuses.map((row) => ({
+                                                          item: String(row.item ?? row.budget_uid ?? '—'),
+                                                          purpose: '—',
+                                                          amount: '',
+                                                          status: String(row.status ?? '—'),
+                                                          notes: String(row.notes ?? ''),
+                                                      }));
+                                            const total = rows.reduce((sum, row) => {
+                                                const amount = Number(row.amount ?? 0);
+                                                return sum + (Number.isFinite(amount) ? amount : 0);
+                                            }, 0);
+
+                                            return (
+                                                <DataTable>
+                                                    <TableHeader>
+                                                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                            <TableHead>Budget Item</TableHead>
+                                                            <TableHead>Description / Purpose</TableHead>
+                                                            <TableHead className="text-right">Amount</TableHead>
+                                                            <TableHead>Status</TableHead>
+                                                            <TableHead>Notes</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {rows.map((row, index) => (
+                                                            <TableRow key={index}>
+                                                                <TableCell>{row.item}</TableCell>
+                                                                <TableCell className="whitespace-pre-wrap">
+                                                                    {row.purpose}
+                                                                </TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {row.amount === '' ? '—' : money(row.amount)}
+                                                                </TableCell>
+                                                                <TableCell>{row.status}</TableCell>
+                                                                <TableCell className="whitespace-pre-wrap">
+                                                                    {row.notes || ''}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                        {planBudget.length > 0 && (
+                                                            <TableRow className="bg-muted/20 font-semibold">
+                                                                <TableCell />
+                                                                <TableCell className="text-right">Total</TableCell>
+                                                                <TableCell className="text-right tabular-nums">
+                                                                    {money(total)}
+                                                                </TableCell>
+                                                                <TableCell colSpan={2} />
+                                                            </TableRow>
+                                                        )}
+                                                    </TableBody>
+                                                </DataTable>
+                                            );
+                                        })()}
+                                    </Section>
+                                )}
+                            </>
+                        )}
                     </CardContent>
                 </Card>
-            </div>
+            )}
 
-            <Card className="shadow-none">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20">
-                    <div>
-                        <CardTitle>{title}</CardTitle>
-                        <p className="text-muted-foreground mt-1 text-sm">{typeLabel}</p>
-                    </div>
-                    {document.downloadUrl && (
-                        <Button variant="outline" render={<a href={document.downloadUrl} />}>
-                            <DownloadIcon className="size-4" /> Download PDF
-                        </Button>
-                    )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {document.mainTarget && (
-                        <div className="rounded-lg border border-sky-200 bg-sky-50 p-4">
-                            <h3 className="mb-2 font-medium text-sky-950">Objective / Main Target</h3>
-                            <p className="text-sm whitespace-pre-wrap text-sky-950">{document.mainTarget}</p>
-                        </div>
-                    )}
-                    {summary && (
-                        <div className="rounded-lg border p-4">
-                            <h3 className="mb-2 font-medium">Summary</h3>
-                            <p className="text-sm whitespace-pre-wrap">{summary}</p>
-                        </div>
-                    )}
-                    {activities.length > 0 && (
-                        <div className="rounded-lg border p-4">
-                            <h3 className="mb-3 font-medium">Planned Activities</h3>
-                            <div className="space-y-2">
-                                {activities.map((row, index) => {
-                                    const item = row as { day?: string; activity?: string; location?: string };
-                                    return (
-                                        <div key={index} className="rounded-md border p-3 text-sm">
-                                            <div className="font-medium">
-                                                {item.day ? `${item.day} · ` : ''}
-                                                {item.activity || '—'}
-                                            </div>
-                                            {item.location && <div className="text-muted-foreground text-xs">{item.location}</div>}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    {!document.mainTarget && !summary && activities.length === 0 && (
-                        <p className="text-muted-foreground text-sm">No additional content to display.</p>
-                    )}
-                </CardContent>
-            </Card>
+            {!isPlan && !isReport && (
+                <Card className="shadow-none">
+                    <CardHeader className="border-b bg-muted/20">
+                        <CardTitle className="text-base">Content</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        {typeof content.summary === 'string' && content.summary.trim() !== '' ? (
+                            <p className="whitespace-pre-wrap text-sm">{content.summary}</p>
+                        ) : (
+                            <EmptyNote>No additional content to display.</EmptyNote>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </PageShell>
     );
 }

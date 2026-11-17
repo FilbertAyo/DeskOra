@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import AppLink from '@/components/shared/AppLink';
+
 import AppLayout from '@/Layouts/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +30,7 @@ export default function ExecutivePulseIndex({
         <div className="flex flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-semibold">Executive Pulse</h1>
+                    <h1 className="text-lg font-semibold">Executive Pulse</h1>
                     <p className="text-muted-foreground text-sm">Generated {snapshot.generated_at}</p>
                 </div>
                 <Button variant="outline" render={<a href={downloadUrl} />}>Download PDF</Button>
@@ -58,7 +60,7 @@ export default function ExecutivePulseIndex({
                         <Deadline label="Plan deadline" value={snapshot.deadlines.plan_text ?? 'No active deadline info'} />
                         <Deadline label="Report deadline" value={snapshot.deadlines.report_text ?? 'No active deadline info'} />
                         <Deadline label="Your pending finance approvals" value={`${snapshot.approvals.viewer_pending_total} pending for you`} />
-                        {snapshot.approvals.viewer_pending_total > 0 && <Button variant="outline" render={<a href={approvalsUrl} />}>Open Approvals</Button>}
+                        {snapshot.approvals.viewer_pending_total > 0 && <Button variant="outline" render={<AppLink href={approvalsUrl} />}>Open Approvals</Button>}
                     </CardContent>
                 </Card>
             </div>
@@ -67,7 +69,7 @@ export default function ExecutivePulseIndex({
 }
 
 function MetricCard({ title, value, children }: { title: string; value: string; children: ReactNode }) {
-    return <Card><CardContent className="pt-6"><p className="text-muted-foreground text-sm">{title}</p><p className="text-3xl font-semibold">{value}</p><p className="text-muted-foreground mt-1 text-sm">{children}</p></CardContent></Card>;
+    return <Card><CardContent className="pt-6"><p className="text-muted-foreground text-sm">{title}</p><p className="text-xl font-semibold">{value}</p><p className="text-muted-foreground mt-1 text-sm">{children}</p></CardContent></Card>;
 }
 
 function Deadline({ label, value }: { label: string; value: string }) {

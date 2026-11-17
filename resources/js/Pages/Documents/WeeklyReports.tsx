@@ -1,4 +1,6 @@
 import { router } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { Activity, EyeIcon, PencilIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -9,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { DocumentRow } from '@/Pages/Documents/DocumentList';
-import { PageHeader, PageShell } from '@/lib/page-kit';
+import { PageHeader, PageShell, PaginationLinks } from '@/lib/page-kit';
 
 type Period = { id: string; weekNumber: number; year: number; dateRange: string };
 
@@ -157,7 +159,7 @@ export default function WeeklyReports({
                                 )}
                             </div>
                             {canCreateType && weeklyReportSlot?.showAction && weeklyReportSlot.actionUrl && (
-                                <Button render={<a href={weeklyReportSlot.actionUrl} />}>
+                                <Button render={<AppLink href={weeklyReportSlot.actionUrl} />}>
                                     {weeklyReportSlot.actionLabel ?? 'Create weekly report'}
                                 </Button>
                             )}
@@ -230,18 +232,7 @@ export default function WeeklyReports({
                                 </TableBody>
                             </Table>
                             {documents.links && documents.links.length > 3 && (
-                                <div className="flex flex-wrap gap-2">
-                                    {documents.links.map((link, index) => (
-                                        <Button
-                                            key={`${link.label}-${index}`}
-                                            size="sm"
-                                            variant={link.active ? 'default' : 'outline'}
-                                            disabled={!link.url}
-                                            onClick={() => link.url && router.visit(link.url)}
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
-                                        />
-                                    ))}
-                                </div>
+                                <PaginationLinks links={documents.links} />
                             )}
                         </>
                     )}

@@ -1,10 +1,12 @@
 ﻿import { Link, router } from '@inertiajs/react';
-import type { FormEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader, PageShell, PaginationLinks } from '@/lib/page-kit';
 
 type Feedback = { id: string; category: string; body: string; status: string; updateUrl: string };
 type Paginated<T> = { data: T[]; links: Array<{ url: string | null; label: string; active: boolean }> };
@@ -36,48 +38,40 @@ export default function AnonymousFeedbackIndex({
         router.patch(url, { status }, { preserveScroll: true });
     };
 
-    const onFormSubmit = (event: FormEvent<HTMLFormElement>, item: Feedback) => {
-        event.preventDefault();
-        const status = String(new FormData(event.currentTarget).get('status') ?? item.status);
-        updateStatus(item.updateUrl, status);
-    };
-
     return (
-        <div className="flex flex-col gap-6">
-            <div>
-                <h1 className="text-2xl font-semibold">Anonymous feedback</h1>
-                <p className="text-muted-foreground text-sm">Review and track confidential submissions.</p>
-            </div>
+        <PageShell>
+            <PageHeader
+                title="Anonymous feedback"
+                description="Review and track confidential submissions."
+                actions={
+                    <Button variant="outline" render={<a href={qrDownloadUrl} />}>
+                        Download QR code
+                    </Button>
+                }
+            />
 
             <div className="grid gap-3 sm:grid-cols-3">
                 {statuses.map((status) => (
                     <Link key={status} href={`${indexUrl}?status=${status}`}>
-                        <Card className={activeStatus === status ? 'border-primary' : ''}>
+                        <Card className={activeStatus === status ? 'border-primary shadow-none' : 'shadow-none'}>
                             <CardContent className="pt-6">
-                                <p className="capitalize">{statusLabel(status)}</p>
-                                <p className="text-2xl font-semibold">
-                                    {statusLabel(status)} ({statusCounts[status] ?? 0})
-                                </p>
+                                <p className="text-muted-foreground text-sm capitalize">{statusLabel(status)}</p>
+                                <p className="text-2xl font-semibold">{statusCounts[status] ?? 0}</p>
                             </CardContent>
                         </Card>
                     </Link>
                 ))}
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Public feedback link</CardTitle>
+            <Card className="shadow-none">
+                <CardHeader className="border-b bg-muted/20">
+                    <CardTitle className="text-base">Public feedback link</CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-wrap items-center gap-5">
+                <CardContent className="flex flex-wrap items-center gap-5 pt-6">
                     <div className="rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-                    <div className="space-y-3">
-                        <a className="block break-all" href={feedbackUrl}>
-                            {feedbackUrl}
-                        </a>
-                        <Button variant="outline" render={<a href={qrDownloadUrl} />}>
-                            Download QR code
-                        </Button>
-                    </div>
+                    <a className="block break-all text-sm" href={feedbackUrl}>
+                        {feedbackUrl}
+                    </a>
                 </CardContent>
             </Card>
 
@@ -98,47 +92,23 @@ export default function AnonymousFeedbackIndex({
 
             <div className="grid gap-4">
                 {items.data.map((item) => (
-                    <Card key={item.id}>
-                        <CardHeader>
-                            <CardTitle className="flex justify-between gap-3">
-                                <span className="capitalize">{item.category}</span>
+                    <Card key={item.id} className="shadow-none">
+                        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b bg-muted/20">
+                            <CardTitle className="text-base capitalize">{item.category}</CardTitle>
+                            <div className="flex items-center gap-2">
                                 <Badge variant="outline">{statusLabel(item.status)}</Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="whitespace-pre-wrap">{item.body}</p>
-                            <div className="flex flex-wrap gap-2">
-                                {item.status !== 'in_progress' && (
-                                    <Button size="sm" variant="outline" onClick={() => updateStatus(item.updateUrl, 'in_progress')}>
-                                        Mark in progress
-                                    </Button>
-                                )}
-                                {item.status !== 'resolved' && (
-                                    <Button size="sm" variant="outline" onClick={() => updateStatus(item.updateUrl, 'resolved')}>
-                                        Mark resolved
-                                    </Button>
-                                )}
+                                <RowActions
+                                    items={statuses
+                                        .filter((status) => status !== item.status)
+                                        .map((status) => ({
+                                            label: `Mark ${statusLabel(status)}`,
+                                            onClick: () => updateStatus(item.updateUrl, status),
+                                        }))}
+                                />
                             </div>
-                            <form
-                                action={item.updateUrl}
-                                method="post"
-                                className="anonymous-feedback-status-form mt-2 flex flex-wrap items-center gap-2"
-                                onSubmit={(event) => onFormSubmit(event, item)}
-                            >
-                                <label className="text-sm">Status</label>
-                                <select
-                                    name="status"
-                                    defaultValue={item.status}
-                                    className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-                                >
-                                    {statuses.map((status) => (
-                                        <option key={status} value={status}>
-                                            {statusLabel(status)}
-                                        </option>
-                                    ))}
-                                </select>
-                                <Button type="submit">Update</Button>
-                            </form>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <p className="whitespace-pre-wrap text-sm">{item.body}</p>
                         </CardContent>
                     </Card>
                 ))}
@@ -148,19 +118,8 @@ export default function AnonymousFeedbackIndex({
                 <p className="text-muted-foreground py-10 text-center">No feedback matches this filter.</p>
             )}
 
-            <div className="flex flex-wrap gap-2">
-                {items.links.map((link, index) => (
-                    <Button
-                        key={index}
-                        size="sm"
-                        variant={link.active ? 'default' : 'outline'}
-                        disabled={!link.url}
-                        onClick={() => link.url && router.get(link.url)}
-                        dangerouslySetInnerHTML={{ __html: link.label }}
-                    />
-                ))}
-            </div>
-        </div>
+            <PaginationLinks links={items.links} />
+        </PageShell>
     );
 }
 

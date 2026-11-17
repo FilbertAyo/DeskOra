@@ -1,8 +1,10 @@
 import { useForm } from '@inertiajs/react';
+import { EyeIcon } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -29,7 +31,26 @@ export default function Deposits({ deposits, remaining, cashFlowForecast, formCo
             <div className="mb-6"><Forecast value={cashFlowForecast} /></div>
             <p className={`mb-4 text-lg font-semibold ${remaining < 0 ? 'text-destructive' : ''}`}>Remaining Amount: {money(remaining)}/=</p>
             <FinanceTable headers={['No.', 'Deposit Amount', 'Remaining Balance', 'Date Deposited', 'Deposited By', 'Action']} empty={deposits.length === 0}>
-                {deposits.map((deposit, index) => <TableRow key={deposit.id}><TableCell>{index + 1}</TableCell><TableCell>{money(deposit.deposit)}/=</TableCell><TableCell className={deposit.remaining < 0 ? 'text-destructive' : ''}>{money(deposit.remaining)}/=</TableCell><TableCell>{shortDate(deposit.createdAt)}</TableCell><TableCell>{deposit.depositedBy}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => setSelected(deposit)}>View</Button></TableCell></TableRow>)}
+                {deposits.map((deposit, index) => (
+                    <TableRow key={deposit.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>{money(deposit.deposit)}/=</TableCell>
+                        <TableCell className={deposit.remaining < 0 ? 'text-destructive' : ''}>{money(deposit.remaining)}/=</TableCell>
+                        <TableCell>{shortDate(deposit.createdAt)}</TableCell>
+                        <TableCell>{deposit.depositedBy}</TableCell>
+                        <TableCell className="text-right">
+                            <RowActions
+                                items={[
+                                    {
+                                        label: 'View',
+                                        icon: <EyeIcon />,
+                                        onClick: () => setSelected(deposit),
+                                    },
+                                ]}
+                            />
+                        </TableCell>
+                    </TableRow>
+                ))}
             </FinanceTable>
             <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}><DialogContent><DialogHeader><DialogTitle>Deposit Details</DialogTitle><DialogDescription>Deposit transaction information.</DialogDescription></DialogHeader>{selected && <div className="grid gap-3 sm:grid-cols-2"><p><span className="text-muted-foreground">Amount:</span> {money(selected.deposit)}/=</p><p><span className="text-muted-foreground">Remaining:</span> {money(selected.remaining)}/=</p><p><span className="text-muted-foreground">Date:</span> {shortDate(selected.createdAt)}</p><p><span className="text-muted-foreground">Deposited by:</span> {selected.depositedBy}</p><p className="sm:col-span-2"><span className="text-muted-foreground">Description:</span> {selected.description ?? 'No description provided'}</p></div>}</DialogContent></Dialog>
         </>

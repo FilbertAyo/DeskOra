@@ -204,7 +204,7 @@ input[type='number']::-webkit-outer-spin-button {
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    @apply font-sans text-[14px];
   }
 }
 

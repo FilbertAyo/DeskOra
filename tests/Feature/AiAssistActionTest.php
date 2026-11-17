@@ -333,34 +333,6 @@ class AiAssistActionTest extends TestCase
             ->assertJsonPath('available', true);
     }
 
-    public function test_weekly_report_fields_no_longer_offer_draft_with_ai(): void
-    {
-        $user = User::factory()->create(['status' => 'active']);
-        $this->actingAs($user);
-        \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
-
-        $html = view('documents.partials.create.weekly-report-fields', [
-            'relatedPlan' => null,
-            'reportMeetingRows' => [],
-            'teamUsers' => collect(),
-        ])->render();
-
-        $this->assertStringNotContainsString('Draft with AI', $html);
-        $this->assertStringNotContainsString('data-ai-draft-weekly-report', $html);
-    }
-
-    public function test_submit_scan_modal_is_advisory_and_covers_all_sections(): void
-    {
-        $html = view('documents.partials.weekly-submit-scan-modal')->render();
-
-        $this->assertStringContainsString('id="weeklySubmitScanModal"', $html);
-        $this->assertStringContainsString('Checking writing style across all sections', $html);
-        $this->assertStringContainsString('data-check-panel="smart"', $html);
-        $this->assertStringContainsString('data-check-panel="writing"', $html);
-        $this->assertStringContainsString('SMART check', $html);
-        $this->assertStringContainsString('weeklySubmitScanConfirmBtn', $html);
-    }
-
     public function test_evaluate_smart_target_fails_open_without_api_key(): void
     {
         config(['services.groq.api_key' => '']);

@@ -1,11 +1,13 @@
 import { Link } from '@inertiajs/react';
+import { EyeIcon, PencilIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHeader } from '@/lib/page-kit';
+import { PageHeader, PageShell } from '@/lib/page-kit';
 
 export default function WorkPeriodsShow({
     period,
@@ -32,19 +34,19 @@ export default function WorkPeriodsShow({
     stats: Record<string, number>;
 }) {
     return (
-        <div className="flex flex-col gap-6">
+        <PageShell>
             <PageHeader
                 title={`Week ${period.weekNumber}, ${period.year}`}
                 description={period.dateRange}
                 actions={
                     <>
                         <Badge className="capitalize">{period.status}</Badge>
-                        <Button variant="outline" render={<Link href={period.editUrl} />}>
-                            Edit
-                        </Button>
                         <Button variant="outline" render={<Link href="/work-periods" />}>
                             Back
                         </Button>
+                        <RowActions
+                            items={[{ label: 'Edit', href: period.editUrl, icon: <PencilIcon /> }]}
+                        />
                     </>
                 }
             />
@@ -92,15 +94,15 @@ export default function WorkPeriodsShow({
                                         {document.typeName} · {document.userName} · {document.state}
                                     </div>
                                 </div>
-                                <Button size="sm" variant="outline" render={<Link href={document.showUrl} />}>
-                                    Open
-                                </Button>
+                                <RowActions
+                                    items={[{ label: 'Open', href: document.showUrl, icon: <EyeIcon /> }]}
+                                />
                             </div>
                         ))
                     )}
                 </CardContent>
             </Card>
-        </div>
+        </PageShell>
     );
 }
 

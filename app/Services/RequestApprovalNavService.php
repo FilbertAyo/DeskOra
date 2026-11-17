@@ -16,6 +16,7 @@ class RequestApprovalNavService
     public function forgetCountsFor(User $user): void
     {
         Cache::forget(self::cacheKeyFor($user));
+        Cache::forget(self::cacheKeyFor($user).'-stages');
     }
 
     /**
@@ -28,56 +29,73 @@ class RequestApprovalNavService
      */
     public function countsFor(User $user): array
     {
+        $breakdown = $this->stageBreakdown($user);
+        $counts = [
+            'review' => array_sum($breakdown['review'] ?? []),
+            'approve' => array_sum($breakdown['approve'] ?? []),
+            'authorize' => array_sum($breakdown['authorize'] ?? []),
+        ];
+        $counts['total'] = $counts['review'] + $counts['approve'] + $counts['authorize'];
+
+        return $counts;
+    }
+
+    public function countForStageAndTypes(User $user, string $stage, ?array $types = null): int
+    {
+        $stageCounts = $this->stageBreakdown($user)[$stage] ?? [];
+
+        if ($types === null) {
+            return array_sum($stageCounts);
+        }
+
+        $total = 0;
+        foreach ($types as $type) {
+            $total += (int) ($stageCounts[$type] ?? 0);
+        }
+
+        return $total;
+    }
+
+    /**
+     * One grouped count per approval stage, shared by the sidebar, dashboard, and approval gate.
+     *
+     * @return array<string, array<string, int>>
+     */
+    private function stageBreakdown(User $user): array
+    {
         return Cache::remember(
-            self::cacheKeyFor($user),
+            self::cacheKeyFor($user).'-stages',
             now()->addSeconds(45),
             function () use ($user) {
-                $counts = [
-                    'review' => 0,
-                    'approve' => 0,
-                    'authorize' => 0,
-                ];
+                $breakdown = [];
 
                 foreach (FinanceRequest::APPROVAL_STAGES as $stage) {
                     if (! FinanceRequest::userCanAccessStage($user, $stage)) {
+                        $breakdown[$stage] = [];
+
                         continue;
                     }
 
                     $types = FinanceRequest::requestTypesUserCanActOnAtStage($user, $stage);
                     if ($types === []) {
+                        $breakdown[$stage] = [];
+
                         continue;
                     }
 
-                    $counts[$stage] = FinanceRequest::query()
+                    $rows = FinanceRequest::query()
                         ->actionableForUserAtStage($user, $stage)
-                        ->count();
+                        ->selectRaw('request_type, COUNT(*) as total')
+                        ->groupBy('request_type')
+                        ->pluck('total', 'request_type');
+
+                    $breakdown[$stage] = $rows
+                        ->map(fn ($total) => (int) $total)
+                        ->all();
                 }
 
-                $counts['total'] = $counts['review'] + $counts['approve'] + $counts['authorize'];
-
-                return $counts;
+                return $breakdown;
             }
         );
-    }
-
-    public function countForStageAndTypes(User $user, string $stage, ?array $types = null): int
-    {
-        if (! FinanceRequest::userCanAccessStage($user, $stage)) {
-            return 0;
-        }
-
-        $actionableTypes = FinanceRequest::requestTypesUserCanActOnAtStage($user, $stage);
-        if ($types !== null) {
-            $actionableTypes = array_values(array_intersect($actionableTypes, $types));
-        }
-
-        if ($actionableTypes === []) {
-            return 0;
-        }
-
-        return FinanceRequest::query()
-            ->actionableForUserAtStage($user, $stage)
-            ->whereIn('request_type', $actionableTypes)
-            ->count();
     }
 }

@@ -990,13 +990,8 @@ class DocumentController extends Controller
 
     protected function assertWeeklyReportActionTasksUpdated(User $user): void
     {
-        if (! $this->actionLogProgressService->hasPendingUpdates($user)) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'action_tasks' => 'Please update all assigned action tasks before submitting your weekly report.',
-        ]);
+        // Action-task updates live on the Action Logs / dashboard panels.
+        // Weekly report submission only requires the review (target) step.
     }
 
     protected function normalizeDocumentAction(Request $request): string
@@ -1015,11 +1010,7 @@ class DocumentController extends Controller
 
     protected function redirectToWeeklyReportWizardNextStep(Document $document, User $user, string $successMessage = ''): RedirectResponse
     {
-        $route = $this->actionLogProgressService->hasPendingUpdates($user)
-            ? 'documents.weekly-report.action-tasks'
-            : 'documents.weekly-report.review';
-
-        $redirect = redirect()->route($route, $document);
+        $redirect = redirect()->route('documents.weekly-report.review', $document);
         if ($successMessage !== '') {
             $redirect->with('success', $successMessage);
         }

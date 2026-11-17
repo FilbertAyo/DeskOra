@@ -18,6 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarGroupLabel,
@@ -68,7 +69,7 @@ function Leaf({ item, nested = false }: { item: NavItem; nested?: boolean }) {
     if (nested) {
         return (
             <SidebarMenuSubItem>
-                <SidebarMenuSubButton className={className} render={<Link href={item.href} />} isActive={item.active}>
+                <SidebarMenuSubButton className={className} render={<Link href={item.href} prefetch cacheFor="60s" />} isActive={item.active}>
                     <span className={cn('min-w-0 flex-1 truncate', item.badge && 'pr-14')}>{item.label}</span>
                     {item.badge && (
                         <SidebarMenuBadge className="bg-primary/10 max-w-24 truncate rounded-full px-1.5 font-normal">
@@ -85,7 +86,7 @@ function Leaf({ item, nested = false }: { item: NavItem; nested?: boolean }) {
             <SidebarMenuButton
                 tooltip={item.label}
                 className="data-active:bg-primary/10!"
-                render={<Link href={item.href} />}
+                render={<Link href={item.href} prefetch cacheFor="60s" />}
                 isActive={item.active}
             >
                 <NavIcon name={item.icon} />
@@ -172,7 +173,7 @@ export default function AppSidebar() {
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" className="gap-2.5" render={<Link href={route('dashboard')} />}>
+                        <SidebarMenuButton size="lg" className="gap-2.5" render={<Link href={route('dashboard')} prefetch cacheFor="60s" />}>
                             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white p-1 shadow-sm ring-1 ring-black/10">
                                 <img src={branding.logoIcon} alt="" className="size-5 object-contain" />
                             </span>
@@ -206,6 +207,11 @@ export default function AppSidebar() {
                     </SidebarGroup>
                 ))}
             </SidebarContent>
+            <SidebarFooter className="border-sidebar-border border-t">
+                <p className="text-muted-foreground px-2 text-xs group-data-[collapsible=icon]:hidden">
+                    Powered by {branding.productName}
+                </p>
+            </SidebarFooter>
         </Sidebar>
     );
 }

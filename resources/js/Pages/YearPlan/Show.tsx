@@ -1,4 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { DownloadIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
@@ -39,9 +41,9 @@ export default function YearPlanShow({ yearPlan, sections, grandTotal, subDepart
     return (
         <PageShell>
             <div>
-                <a href={yearPlan.indexUrl} className="text-muted-foreground text-sm hover:text-foreground">
+                <AppLink href={yearPlan.indexUrl} className="text-muted-foreground text-sm hover:text-foreground">
                     ← Year plans
-                </a>
+                </AppLink>
                 <PageHeader
                     className="mb-0 mt-2"
                     title={`Year Plan ${yearPlan.year}`}

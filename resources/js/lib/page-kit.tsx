@@ -1,9 +1,12 @@
+import { Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+type PaginationLink = { url: string | null; label: string; active: boolean };
 
 /** Shared layout helper for migrated Inertia pages. */
 export function withAppLayout(title: string) {
@@ -22,10 +25,10 @@ export function PageHeader({
     className?: string;
 }) {
     return (
-        <div className={cn('mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}>
-            <div className="min-w-0 space-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
-                {description && <p className="text-muted-foreground max-w-2xl text-sm text-pretty">{description}</p>}
+        <div className={cn('mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between', className)}>
+            <div className="min-w-0 space-y-0.5">
+                <h1 className="text-lg font-semibold tracking-tight text-balance">{title}</h1>
+                {description && <p className="text-muted-foreground max-w-2xl text-xs text-pretty">{description}</p>}
             </div>
             {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
@@ -79,6 +82,29 @@ export function EmptyState({ title, description, action }: { title: string; desc
 
 export function PrimaryLinkButton({ href, children }: { href: string; children: ReactNode }) {
     return (
-        <Button render={<a href={href} />}>{children}</Button>
+        <Button render={<Link href={href} prefetch cacheFor="60s" />}>{children}</Button>
+    );
+}
+
+/** Safe Laravel pagination controls (avoids Button children + dangerouslySetInnerHTML crash). */
+export function PaginationLinks({ links, className }: { links: PaginationLink[]; className?: string }) {
+    if (!links?.length) {
+        return null;
+    }
+
+    return (
+        <div className={cn('flex flex-wrap gap-1', className)}>
+            {links.map((link, index) => (
+                <Button
+                    key={`${link.label}-${index}`}
+                    size="sm"
+                    variant={link.active ? 'default' : 'outline'}
+                    disabled={!link.url}
+                    render={link.url ? <Link href={link.url} prefetch cacheFor="30s" /> : <button type="button" />}
+                >
+                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                </Button>
+            ))}
+        </div>
     );
 }

@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+
 export type NoticeKind = 'success' | 'error' | 'info' | 'warning';
 
 export type Notice = {
@@ -6,10 +8,9 @@ export type Notice = {
     message: string;
 };
 
-const listeners = new Set<(notice: Notice) => void>();
-let nextId = 1;
 let lastNotice: { message: string; at: number } | null = null;
 
+/** App-wide notices via Sonner (template-style, bottom-right). */
 export function notify(kind: NoticeKind, message: string): void {
     const now = Date.now();
     if (lastNotice && lastNotice.message === message && now - lastNotice.at < 800) {
@@ -17,15 +18,29 @@ export function notify(kind: NoticeKind, message: string): void {
     }
 
     lastNotice = { message, at: now };
-    const notice = { id: nextId, kind, message };
-    nextId += 1;
-    listeners.forEach((listener) => listener(notice));
+
+    switch (kind) {
+        case 'success':
+            toast.success(message);
+            return;
+        case 'error':
+            toast.error(message);
+            return;
+        case 'warning':
+            toast.warning(message);
+            return;
+        case 'info':
+            toast.info(message);
+            return;
+        default: {
+            const _exhaustive: never = kind;
+            void _exhaustive;
+            toast(message);
+        }
+    }
 }
 
-export function subscribeNotices(listener: (notice: Notice) => void): () => void {
-    listeners.add(listener);
-
-    return () => {
-        listeners.delete(listener);
-    };
+/** @deprecated Kept for older callers; Sonner does not need subscriptions. */
+export function subscribeNotices(_listener: (notice: Notice) => void): () => void {
+    return () => undefined;
 }

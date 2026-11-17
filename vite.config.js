@@ -23,4 +23,43 @@ export default defineConfig({
             ignored: ['**/storage/framework/views/**'],
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) {
+                        return;
+                    }
+
+                    if (id.includes('recharts') || id.includes('victory-vendor') || id.includes('d3-')) {
+                        return 'charts';
+                    }
+
+                    if (
+                        id.includes(`${path.sep}react${path.sep}`) ||
+                        id.includes(`${path.sep}react-dom${path.sep}`) ||
+                        id.includes('@inertiajs')
+                    ) {
+                        return 'react-vendor';
+                    }
+
+                    if (id.includes('lucide-react')) {
+                        return 'icons';
+                    }
+
+                    if (
+                        id.includes('@base-ui') ||
+                        id.includes('@tanstack') ||
+                        id.includes('cmdk') ||
+                        id.includes('sonner') ||
+                        id.includes('next-themes')
+                    ) {
+                        return 'ui-vendor';
+                    }
+
+                    return 'vendor';
+                },
+            },
+        },
+    },
 });

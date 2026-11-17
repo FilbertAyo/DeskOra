@@ -42,6 +42,7 @@ export default function PasswordField({
                     required
                     aria-invalid={error ? true : undefined}
                     onChange={(event) => onChange(event.target.value)}
+                    onInput={(event) => onChange(event.currentTarget.value)}
                 />
                 <InputGroupAddon align="inline-end" className="pr-1.5">
                     <Button

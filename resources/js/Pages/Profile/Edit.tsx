@@ -117,9 +117,9 @@ export default function ProfileEdit({ profile, activities = [], tab = 'profile',
 
     return (
         <div>
-            <div className="mb-4 md:mb-6 lg:mb-10">
-                <Card className="py-0 pb-6">
-                    <div className="bg-muted relative h-44 overflow-hidden">
+            <div className="mb-4">
+                <Card className="py-0 pb-4">
+                    <div className="bg-muted relative h-24 overflow-hidden">
                         <div className="absolute inset-0">
                             <BackgroundRippleEffect cellSize={45} rows={8} activeSquares={18} cols={45} />
                         </div>
@@ -127,14 +127,14 @@ export default function ProfileEdit({ profile, activities = [], tab = 'profile',
 
                     <CardContent>
                         <div className="flex items-end gap-4 pb-1 max-md:flex-col max-md:items-center md:flex-nowrap md:gap-6">
-                            <Avatar className="ring-card z-3 -mt-12 size-28 rounded-md ring-4 after:rounded-[inherit] md:-mt-14">
+                            <Avatar className="ring-card z-3 -mt-8 size-16 rounded-md ring-4 after:rounded-[inherit]">
                                 <AvatarImage src={profile.avatar} alt={profile.name} className="rounded-[inherit]" />
-                                <AvatarFallback className="rounded-[inherit] text-2xl">{profile.initials}</AvatarFallback>
+                                <AvatarFallback className="rounded-[inherit] text-sm">{profile.initials}</AvatarFallback>
                             </Avatar>
 
-                            <div className="min-w-0 flex-1 space-y-2 text-center md:text-left">
-                                <h2 className="text-2xl font-medium">{profile.name}</h2>
-                                <div className="text-muted-foreground flex flex-wrap items-center gap-x-6 gap-y-2 max-md:justify-center">
+                            <div className="min-w-0 flex-1 space-y-1 text-center md:text-left">
+                                <h2 className="text-base font-medium">{profile.name}</h2>
+                                <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs max-md:justify-center">
                                     <span className="inline-flex items-center gap-2">
                                         <BriefcaseBusinessIcon className="size-4.5" />
                                         {profile.role}
@@ -152,6 +152,7 @@ export default function ProfileEdit({ profile, activities = [], tab = 'profile',
 
                             <Button
                                 className="md:ml-auto md:self-end"
+                                size="sm"
                                 variant={profile.status.toLowerCase() === 'active' ? 'default' : 'outline'}
                                 onClick={() => switchTab('settings')}
                             >

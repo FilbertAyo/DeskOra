@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-
+import { PaginationLinks } from '@/lib/page-kit';
 
 type Link = { url: string | null; label: string; active: boolean };
 type PeriodRow = Period & { documentsCount: number };
@@ -67,7 +67,7 @@ export default function WorkPeriodsIndex({
         <div className="flex flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-semibold">Work Periods Management</h1>
+                    <h1 className="text-lg font-semibold">Work Periods Management</h1>
                     <p className="text-muted-foreground text-sm">Manage weekly submission periods and deadlines.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -229,18 +229,7 @@ export default function WorkPeriodsIndex({
                         </TableBody>
                     </Table>
 
-                    <div className="flex flex-wrap gap-1">
-                        {periods.links.map((link, index) => (
-                            <Button
-                                key={`${link.label}-${index}`}
-                                size="sm"
-                                variant={link.active ? 'default' : 'outline'}
-                                disabled={!link.url}
-                                onClick={() => link.url && router.visit(link.url)}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
+                    <PaginationLinks links={periods.links} />
                 </CardContent>
             </Card>
 

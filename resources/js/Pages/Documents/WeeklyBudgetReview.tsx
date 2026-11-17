@@ -1,11 +1,23 @@
-import { router } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { router, useForm } from '@inertiajs/react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { notify } from '@/lib/notify';
 import { PageHeader } from '@/lib/page-kit';
 
 type Period = { id: string; weekNumber?: number; year?: number; dateRange?: string };
@@ -83,8 +95,30 @@ export default function WeeklyBudgetReview({
     [key: string]: unknown;
 }) {
     const groups = Array.isArray(grouped) ? grouped : Object.values(grouped);
+    const [midweekOpen, setMidweekOpen] = useState(false);
+    const midweekForm = useForm({
+        user_id: '',
+        period_id: activePeriodId ?? filters.period_id ?? '',
+        amount: '',
+        reason: '',
+    });
     const apply = (patch: Record<string, string | undefined>) =>
         router.get(indexUrl, { ...filters, ...patch }, { preserveState: true });
+
+    const submitMidweek = (event: FormEvent) => {
+        event.preventDefault();
+        if (!addMidweekUrl) {
+            return;
+        }
+        midweekForm.post(addMidweekUrl, {
+            preserveScroll: true,
+            onSuccess: () => {
+                notify('success', 'Mid-week budget added.');
+                setMidweekOpen(false);
+                midweekForm.reset();
+            },
+        });
+    };
 
     return (
         <div className="flex flex-col gap-6">
@@ -94,7 +128,9 @@ export default function WeeklyBudgetReview({
                 actions={
                     <>
                         {addMidweekUrl && (
-                            <Button render={<a href={addMidweekUrl} />}>+ Add Mid-Week Budget</Button>
+                            <Button type="button" onClick={() => setMidweekOpen(true)}>
+                                + Add Mid-Week Budget
+                            </Button>
                         )}
                         {exportPdfUrl && (
                             <Button variant="outline" render={<a href={exportPdfUrl} />}>
@@ -248,6 +284,89 @@ export default function WeeklyBudgetReview({
                         </CardContent>
                     </Card>
                 ))
+            )}
+
+            {addMidweekUrl && (
+                <Dialog open={midweekOpen} onOpenChange={setMidweekOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Add mid-week budget</DialogTitle>
+                            <DialogDescription>
+                                Add an authorized mid-week budget line to a submitted weekly plan.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form className="space-y-4" onSubmit={submitMidweek}>
+                            <Field>
+                                <FieldLabel htmlFor="midweek-user">Staff</FieldLabel>
+                                <select
+                                    id="midweek-user"
+                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                    value={midweekForm.data.user_id}
+                                    onChange={(event) => midweekForm.setData('user_id', event.target.value)}
+                                    required
+                                >
+                                    <option value="">Select staff</option>
+                                    {usersWithBudgets.map((user) => (
+                                        <option key={user.id} value={user.id}>
+                                            {user.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <FieldError>{midweekForm.errors.user_id}</FieldError>
+                            </Field>
+                            <Field>
+                                <FieldLabel htmlFor="midweek-period">Work period</FieldLabel>
+                                <select
+                                    id="midweek-period"
+                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                    value={midweekForm.data.period_id}
+                                    onChange={(event) => midweekForm.setData('period_id', event.target.value)}
+                                    required
+                                >
+                                    <option value="">Select week</option>
+                                    {periodOptions.map((period) => (
+                                        <option key={period.id} value={period.id}>
+                                            Week {period.weekNumber} · {period.year}
+                                        </option>
+                                    ))}
+                                </select>
+                                <FieldError>{midweekForm.errors.period_id}</FieldError>
+                            </Field>
+                            <Field>
+                                <FieldLabel htmlFor="midweek-amount">Amount</FieldLabel>
+                                <Input
+                                    id="midweek-amount"
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={midweekForm.data.amount}
+                                    onChange={(event) => midweekForm.setData('amount', event.target.value)}
+                                    required
+                                />
+                                <FieldError>{midweekForm.errors.amount}</FieldError>
+                            </Field>
+                            <Field>
+                                <FieldLabel htmlFor="midweek-reason">Reason</FieldLabel>
+                                <Textarea
+                                    id="midweek-reason"
+                                    rows={3}
+                                    value={midweekForm.data.reason}
+                                    onChange={(event) => midweekForm.setData('reason', event.target.value)}
+                                    required
+                                />
+                                <FieldError>{midweekForm.errors.reason}</FieldError>
+                            </Field>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setMidweekOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={midweekForm.processing} loading={midweekForm.processing}>
+                                    Add budget
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );

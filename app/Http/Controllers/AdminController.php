@@ -6,6 +6,7 @@ use App\Http\Requests\StoreAdminUserRequest;
 use App\Http\Requests\UpdateAdminUserRequest;
 use App\Mail\NotificationMail;
 use App\Models\Department;
+use App\Models\Document;
 use App\Models\User;
 use App\Services\WorkflowUserNotificationDefaults;
 use Illuminate\Auth\Events\Registered;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 
 class AdminController extends Controller
@@ -24,10 +26,31 @@ class AdminController extends Controller
     {
         abort_unless($request->user()?->can('users management settings'), 403);
 
-        $user = User::with(['department.head', 'subDepartments', 'roles'])->latest()->paginate(20);
+        $users = User::query()
+            ->with(['department'])
+            ->withCount(['documents', 'subDepartments', 'roles'])
+            ->latest()
+            ->paginate(24)
+            ->through(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'title' => $user->title,
+                'status' => $user->status,
+                'avatar' => asset($user->file ?: 'assets/images/profile.png'),
+                'department' => $user->department?->only(['id', 'name']),
+                'stats' => [
+                    'documents' => (int) $user->documents_count,
+                    'roles' => (int) $user->roles_count,
+                    'units' => (int) $user->sub_departments_count,
+                ],
+                'showUrl' => route('admin.show', $user),
+                'editUrl' => route('admin.edit', $user),
+            ]);
 
         return Inertia::render('Settings/Users/Index', [
-            'users' => $user,
+            'users' => $users,
             'urls' => [
                 'create' => route('admin.create'),
             ],
@@ -125,6 +148,34 @@ class AdminController extends Controller
 
         $user = $admin->load(['department', 'subDepartments', 'roles', 'permissions']);
 
+        $activities = Activity::query()
+            ->causedBy($user)
+            ->latest()
+            ->limit(8)
+            ->get()
+            ->map(fn (Activity $activity) => [
+                'id' => $activity->id,
+                'title' => $activity->description ?: ucfirst((string) $activity->event),
+                'description' => filled($activity->log_name)
+                    ? ucfirst(str_replace(['-', '_'], ' ', (string) $activity->log_name))
+                    : null,
+                'time' => $activity->created_at?->diffForHumans(),
+            ])
+            ->values();
+
+        $documents = $user->documents()
+            ->latest('updated_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (Document $document) => [
+                'id' => $document->id,
+                'title' => $document->title ?: ucfirst(str_replace('_', ' ', (string) $document->type)),
+                'type' => $document->type,
+                'updated' => $document->updated_at?->diffForHumans(),
+                'href' => route('documents.show', $document),
+            ])
+            ->values();
+
         return Inertia::render('Settings/Users/Show', [
             'user' => [
                 'id' => $user->id,
@@ -138,6 +189,8 @@ class AdminController extends Controller
                 'roles' => $user->roles->pluck('name')->values(),
                 'permissions' => $user->getAllPermissions()->pluck('name')->values(),
             ],
+            'activities' => $activities,
+            'documents' => $documents,
             'editUrl' => route('admin.edit', $user),
             'indexUrl' => route('admin.index'),
         ]);

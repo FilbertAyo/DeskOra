@@ -9,9 +9,9 @@ use App\Models\WorkPeriod;
 use App\Services\PendingApprovalGate;
 use App\Services\StaffAppreciationService;
 use App\Support\PortalNav;
+use App\Support\SchemaTables;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -20,6 +20,12 @@ class HandleInertiaRequests extends Middleware
 
     public function version(Request $request): ?string
     {
+        // Local Vite rebuilds change the asset hash and cause Inertia 409 hard
+        // reloads on the next form submit (login looks like it "does nothing").
+        if (app()->isLocal()) {
+            return null;
+        }
+
         return parent::version($request);
     }
 
@@ -86,7 +92,7 @@ class HandleInertiaRequests extends Middleware
                 }
             }
 
-            if ($approvalGate === null && Schema::hasTable('nomination_periods')) {
+            if ($approvalGate === null && SchemaTables::has('nomination_periods')) {
                 $service = app(StaffAppreciationService::class);
                 $period = $service->currentOpenPeriod();
 
@@ -106,7 +112,7 @@ class HandleInertiaRequests extends Middleware
         if (
             ($user->status ?? '') === 'active'
             && $user->can('manage anonymous feedback')
-            && Schema::hasTable('anonymous_feedback')
+            && SchemaTables::has('anonymous_feedback')
         ) {
             $count = (int) Cache::remember(
                 'anonymous-feedback-new-count',
@@ -174,7 +180,9 @@ class HandleInertiaRequests extends Middleware
      */
     private function notifications(User $user): array
     {
-        $items = $user->unreadNotifications()->latest()->limit(5)->get()->map(function ($notification) {
+        $unread = $user->unreadNotifications()->latest()->limit(6)->get();
+        $needsExactCount = $unread->count() > 5;
+        $items = $unread->take(5)->map(function ($notification) {
             $data = is_array($notification->data ?? null) ? $notification->data : [];
 
             return [
@@ -187,7 +195,7 @@ class HandleInertiaRequests extends Middleware
         })->all();
 
         return [
-            'unread' => $user->unreadNotifications()->count(),
+            'unread' => $needsExactCount ? $user->unreadNotifications()->count() : $unread->count(),
             'canManage' => $user->can('view notification settings'),
             'items' => $items,
         ];

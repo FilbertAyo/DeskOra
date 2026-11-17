@@ -1,4 +1,6 @@
 import { useForm } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import type { FormEvent, ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -81,7 +83,7 @@ export default function Form({
     };
 
     if (!hasSignature) {
-        return <Alert><AlertTitle>Signature required</AlertTitle><AlertDescription className="space-y-3"><p>You must upload your signature in Profile Settings before you can create a requisition.</p><Button render={<a href={route('profile.edit')} />}>Upload Signature</Button></AlertDescription></Alert>;
+        return <Alert><AlertTitle>Signature required</AlertTitle><AlertDescription className="space-y-3"><p>You must upload your signature in Profile Settings before you can create a requisition.</p><Button render={<AppLink href={route('profile.edit')} />}>Upload Signature</Button></AlertDescription></Alert>;
     }
 
     const total = form.data.items.reduce((sum, item) => sum + Number(item.cost || 0), 0);
@@ -112,8 +114,8 @@ export default function Form({
                         </div>
                         <div>
                             <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">Line Items</h3><Button type="button" variant="outline" onClick={() => form.setData('items', [...form.data.items, { description: '', unit: '', cost: '' }])}>Add Row</Button></div>
-                            <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>S/N</TableHead><TableHead>Description</TableHead><TableHead>Unit</TableHead><TableHead>Cost</TableHead><TableHead /></TableRow></TableHeader><TableBody>
-                                {form.data.items.map((item, index) => <TableRow key={index}><TableCell>{index + 1}</TableCell><TableCell><Textarea name={`items[${index}][description]`} value={item.description} onChange={(event) => updateItem(index, 'description', event.target.value)} required={!canDraft} /></TableCell><TableCell><Input name={`items[${index}][unit]`} value={item.unit} onChange={(event) => updateItem(index, 'unit', event.target.value)} /></TableCell><TableCell><Input type="number" min="0" step="0.01" name={`items[${index}][cost]`} value={item.cost} onChange={(event) => updateItem(index, 'cost', event.target.value)} required={!canDraft} /></TableCell><TableCell><Button type="button" variant="destructive" size="sm" onClick={() => form.setData('items', form.data.items.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></TableCell></TableRow>)}
+                            <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-12">S/N</TableHead><TableHead>Description</TableHead><TableHead className="w-28">Unit</TableHead><TableHead className="w-36">Cost</TableHead><TableHead className="w-20" /></TableRow></TableHeader><TableBody>
+                                {form.data.items.map((item, index) => <TableRow key={index}><TableCell className="align-top">{index + 1}</TableCell><TableCell><Textarea className="min-h-20" name={`items[${index}][description]`} value={item.description} onChange={(event) => updateItem(index, 'description', event.target.value)} required={!canDraft} /></TableCell><TableCell className="align-top"><Input className="w-28" name={`items[${index}][unit]`} value={item.unit} placeholder="e.g. 2 days" onChange={(event) => updateItem(index, 'unit', event.target.value)} /></TableCell><TableCell className="align-top"><Input className="w-36" type="number" min="0" step="0.01" name={`items[${index}][cost]`} value={item.cost} placeholder="5,000,000" onChange={(event) => updateItem(index, 'cost', event.target.value)} required={!canDraft} /></TableCell><TableCell className="align-top"><Button type="button" variant="destructive" size="sm" onClick={() => form.setData('items', form.data.items.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></TableCell></TableRow>)}
                                 <TableRow><TableCell colSpan={3} className="text-right font-medium">Total</TableCell><TableCell className="font-medium">{money(total)}</TableCell><TableCell /></TableRow>
                             </TableBody></Table></div>
                             {form.errors.items && <p className="mt-2 text-sm text-destructive">{form.errors.items}</p>}

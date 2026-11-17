@@ -34,7 +34,7 @@ export default function AuthCard({
                         <Logo className="gap-3" wordmark />
                     </Link>
                     <div>
-                        <CardTitle className="mb-1.5 text-2xl font-semibold">{title}</CardTitle>
+                        <CardTitle className="mb-1.5 text-lg font-semibold">{title}</CardTitle>
                         {description && <CardDescription className="text-sm">{description}</CardDescription>}
                     </div>
                 </CardHeader>

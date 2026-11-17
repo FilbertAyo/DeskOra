@@ -1,10 +1,18 @@
 import { Link, useForm } from '@inertiajs/react';
-import { PlusIcon, Target, Trash2Icon } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { PlusIcon, Target, Trash2Icon, UsersIcon } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/lib/page-kit';
@@ -37,6 +45,7 @@ type MeetingRow = {
 };
 
 type BudgetRow = { item: string; description_purpose: string; amount: string; budget_uid?: string };
+type BudgetStatusRow = { budget_uid?: string; item?: string; status?: string; notes?: string };
 type ProgressRow = {
     activity_output: string;
     off_plan_activity?: string;
@@ -45,6 +54,8 @@ type ProgressRow = {
     next_step: string;
 };
 type ChallengeRow = { challenge: string; action_taken_planned: string };
+
+const BUDGET_STATUS_OPTIONS = ['Not started', 'Pending', 'Received', 'Paid'] as const;
 
 type DocumentPayload = {
     id?: string;
@@ -144,6 +155,116 @@ function StaffMultiSelect({
                     );
                 })
             )}
+        </div>
+    );
+}
+
+function staffSummary(users: StaffUser[], value: string[]): string {
+    if (value.length === 0) {
+        return 'Select participants…';
+    }
+    const names = value
+        .map((id) => users.find((user) => user.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+    if (names.length === 0) {
+        return `${value.length} selected`;
+    }
+    if (names.length <= 2) {
+        return names.join(', ');
+    }
+    return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+}
+
+function StaffPickerField({
+    users,
+    value,
+    onChange,
+    label = 'Participant(s)',
+    disabled = false,
+}: {
+    users: StaffUser[];
+    value: string[];
+    onChange: (ids: string[]) => void;
+    label?: string;
+    disabled?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState<string[]>(value);
+
+    useEffect(() => {
+        if (open) {
+            setDraft(value);
+        }
+    }, [open, value]);
+
+    const toggle = (id: string) => {
+        setDraft((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    };
+
+    return (
+        <div className="space-y-1 text-sm">
+            <span className="font-medium">{label}</span>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setOpen(true)}
+                className="border-input bg-background hover:bg-muted/40 flex h-9 w-full items-center gap-2 rounded-md border px-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-70"
+            >
+                <UsersIcon className="text-muted-foreground size-4 shrink-0" />
+                <span className={`min-w-0 flex-1 truncate ${value.length === 0 ? 'text-muted-foreground' : ''}`}>
+                    {staffSummary(users, value)}
+                </span>
+                {value.length > 0 && (
+                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                        {value.length}
+                    </span>
+                )}
+            </button>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Select {label.toLowerCase()}</DialogTitle>
+                        <DialogDescription>Choose one or more people, then apply.</DialogDescription>
+                    </DialogHeader>
+                    <div className="border-input max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
+                        {users.length === 0 ? (
+                            <p className="text-muted-foreground px-1 py-2 text-xs">No staff available</p>
+                        ) : (
+                            users.map((user) => {
+                                const checked = draft.includes(user.id);
+                                return (
+                                    <label
+                                        key={user.id}
+                                        className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggle(user.id)}
+                                        />
+                                        <span className="truncate">{user.name}</span>
+                                    </label>
+                                );
+                            })
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                onChange(draft);
+                                setOpen(false);
+                            }}
+                        >
+                            Apply ({draft.length})
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -276,6 +397,47 @@ export default function DocumentsForm({
         return existing.length > 0 ? existing : [{ challenge: '', action_taken_planned: '' }];
     }, [isReport, content.challenges_mitigation]);
 
+    const planBudgetRows = useMemo(() => {
+        if (!isReport) {
+            return [] as BudgetRow[];
+        }
+        const planContent = (relatedPlan?.content ?? {}) as Record<string, unknown>;
+        const rows = Array.isArray(planContent.budget) ? (planContent.budget as BudgetRow[]) : [];
+        return rows.filter(
+            (row) =>
+                String(row.item ?? '').trim() !== '' ||
+                String(row.description_purpose ?? '').trim() !== '' ||
+                String(row.amount ?? '').trim() !== '',
+        );
+    }, [isReport, relatedPlan]);
+
+    const initialBudgetStatuses: BudgetStatusRow[] = useMemo(() => {
+        if (!isReport) {
+            return [];
+        }
+        const existing = Array.isArray(content.budget_statuses)
+            ? (content.budget_statuses as BudgetStatusRow[])
+            : [];
+        const byUid = new Map(
+            existing
+                .filter((row) => String(row.budget_uid ?? '').trim() !== '')
+                .map((row) => [String(row.budget_uid), row]),
+        );
+        if (planBudgetRows.length === 0) {
+            return existing;
+        }
+        return planBudgetRows.map((row, index) => {
+            const uid = String(row.budget_uid ?? '').trim() || `plan-budget-${index}`;
+            const prior = byUid.get(uid) ?? existing[index] ?? {};
+            return {
+                budget_uid: uid,
+                item: String(row.item ?? prior.item ?? ''),
+                status: String(prior.status ?? 'Not started'),
+                notes: String(prior.notes ?? ''),
+            };
+        });
+    }, [isReport, content.budget_statuses, planBudgetRows]);
+
     const form = useForm({
         type,
         period_id: String(document?.periodId ?? defaultPeriodId ?? ''),
@@ -293,7 +455,7 @@ export default function DocumentsForm({
             activity_progress: initialProgress,
             key_achievements: initialAchievements,
             challenges_mitigation: initialChallenges,
-            budget_statuses: Array.isArray(content.budget_statuses) ? content.budget_statuses : [],
+            budget_statuses: initialBudgetStatuses,
         },
     });
 
@@ -356,7 +518,7 @@ export default function DocumentsForm({
                     isPlan
                         ? 'Fill the form below and save draft or submit.'
                         : isReport
-                          ? 'Complete your weekly report, then continue to review.'
+                          ? 'Report what you did this week, then continue to set target status and submit.'
                           : 'Document information'
                 }
                 actions={
@@ -478,7 +640,7 @@ export default function DocumentsForm({
                                 </div>
                                 <div className="space-y-4">
                                     {form.data.content.planned_activities.map((row, index) => (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
+                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
                                             <label className="space-y-1 text-sm">
                                                 <span className="font-medium">Day</span>
                                                 <select
@@ -509,7 +671,13 @@ export default function DocumentsForm({
                                                     ))}
                                                 </select>
                                             </label>
-                                            <label className="space-y-1 text-sm md:col-span-2">
+                                            <StaffPickerField
+                                                label="Staff / Team"
+                                                users={teamUsers}
+                                                value={row.team_member_ids}
+                                                onChange={(ids) => updateActivity(index, { team_member_ids: ids })}
+                                            />
+                                            <label className="space-y-1 text-sm md:col-span-3">
                                                 <span className="font-medium">Activity</span>
                                                 <Textarea
                                                     rows={4}
@@ -517,23 +685,15 @@ export default function DocumentsForm({
                                                     onChange={(event) => updateActivity(index, { activity: event.target.value })}
                                                 />
                                             </label>
-                                            <div className="space-y-1 text-sm">
-                                                <span className="font-medium">Staff / Team</span>
-                                                <StaffMultiSelect
-                                                    users={teamUsers}
-                                                    value={row.team_member_ids}
-                                                    onChange={(ids) => updateActivity(index, { team_member_ids: ids })}
-                                                />
-                                            </div>
-                                            <label className="space-y-1 text-sm">
+                                            <label className="space-y-1 text-sm md:col-span-3">
                                                 <span className="font-medium">Notes / Inclusion</span>
                                                 <Textarea
-                                                    rows={4}
+                                                    rows={3}
                                                     value={row.notes_inclusion}
                                                     onChange={(event) => updateActivity(index, { notes_inclusion: event.target.value })}
                                                 />
                                             </label>
-                                            <div className="md:col-span-2 flex justify-end">
+                                            <div className="flex justify-end md:col-span-3">
                                                 <Button
                                                     type="button"
                                                     size="sm"
@@ -573,7 +733,7 @@ export default function DocumentsForm({
                                 </div>
                                 <div className="space-y-4">
                                     {form.data.content.key_meetings.map((row, index) => (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
+                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
                                             <label className="space-y-1 text-sm">
                                                 <span className="font-medium">Date</span>
                                                 <Input
@@ -597,7 +757,12 @@ export default function DocumentsForm({
                                                     ))}
                                                 </select>
                                             </label>
-                                            <label className="space-y-1 text-sm md:col-span-2">
+                                            <StaffPickerField
+                                                users={teamUsers}
+                                                value={row.participant_user_ids}
+                                                onChange={(ids) => updateMeeting(index, { participant_user_ids: ids })}
+                                            />
+                                            <label className="space-y-1 text-sm md:col-span-3">
                                                 <span className="font-medium">Meeting / Engagement</span>
                                                 <Input
                                                     value={row.meeting}
@@ -605,23 +770,15 @@ export default function DocumentsForm({
                                                     onChange={(event) => updateMeeting(index, { meeting: event.target.value })}
                                                 />
                                             </label>
-                                            <div className="space-y-1 text-sm">
-                                                <span className="font-medium">Participant(s)</span>
-                                                <StaffMultiSelect
-                                                    users={teamUsers}
-                                                    value={row.participant_user_ids}
-                                                    onChange={(ids) => updateMeeting(index, { participant_user_ids: ids })}
-                                                />
-                                            </div>
-                                            <label className="space-y-1 text-sm">
+                                            <label className="space-y-1 text-sm md:col-span-3">
                                                 <span className="font-medium">Reactions / Notes</span>
                                                 <Textarea
-                                                    rows={4}
+                                                    rows={3}
                                                     value={row.reactions_notes}
                                                     onChange={(event) => updateMeeting(index, { reactions_notes: event.target.value })}
                                                 />
                                             </label>
-                                            <div className="md:col-span-2 flex justify-end">
+                                            <div className="flex justify-end md:col-span-3">
                                                 <Button
                                                     type="button"
                                                     size="sm"
@@ -713,13 +870,24 @@ export default function DocumentsForm({
                         <>
                             <section className="space-y-3 rounded-lg border p-4">
                                 <h3 className="font-medium">Main Target (from weekly plan)</h3>
-                                {relatedPlan?.mainTarget ? (
-                                    <div className="bg-muted rounded-md border p-3 text-sm">
-                                        <strong>{relatedPlan.mainTarget}</strong>
+                                {relatedPlan ? (
+                                    <div className="bg-muted space-y-2 rounded-md border p-3 text-sm">
+                                        {relatedPlan.mainTarget ? (
+                                            <strong className="block whitespace-pre-wrap">{relatedPlan.mainTarget}</strong>
+                                        ) : (
+                                            <p className="text-muted-foreground">
+                                                Weekly plan found ({relatedPlan.state ?? 'draft'}) but no main target is set yet.
+                                            </p>
+                                        )}
+                                        {relatedPlan.state === 'draft' && (
+                                            <p className="text-muted-foreground text-xs">
+                                                This plan is still a draft — you can report against it anyway.
+                                            </p>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                                        No weekly plan found for the selected work period. Create a weekly plan first.
+                                        No weekly plan found for the selected work period. Create a weekly plan for this same week first.
                                     </div>
                                 )}
                             </section>
@@ -833,49 +1001,81 @@ export default function DocumentsForm({
                                     </Button>
                                 </div>
                                 <div className="space-y-4">
-                                    {form.data.content.key_meetings.map((row, index) => (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
-                                            <label className="space-y-1 text-sm">
-                                                <span className="font-medium">Date</span>
-                                                <Input
-                                                    type="date"
-                                                    value={row.date}
-                                                    disabled={Boolean(row.is_readonly_for_current_user)}
-                                                    onChange={(event) => updateMeeting(index, { date: event.target.value })}
+                                    {form.data.content.key_meetings.map((row, index) => {
+                                        const readonly = Boolean(row.is_readonly_for_current_user);
+                                        return (
+                                            <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
+                                                <label className="space-y-1 text-sm">
+                                                    <span className="font-medium">Date</span>
+                                                    <Input
+                                                        type="date"
+                                                        value={row.date}
+                                                        disabled={readonly}
+                                                        onChange={(event) => updateMeeting(index, { date: event.target.value })}
+                                                    />
+                                                </label>
+                                                <label className="space-y-1 text-sm">
+                                                    <span className="font-medium">Location</span>
+                                                    <select
+                                                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-70"
+                                                        value={row.location}
+                                                        disabled={readonly}
+                                                        onChange={(event) => updateMeeting(index, { location: event.target.value })}
+                                                    >
+                                                        <option value="">-- Select --</option>
+                                                        {LOCATIONS.map((location) => (
+                                                            <option key={location} value={location}>
+                                                                {location}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                <StaffPickerField
+                                                    users={teamUsers}
+                                                    value={row.participant_user_ids}
+                                                    disabled={readonly}
+                                                    onChange={(ids) => updateMeeting(index, { participant_user_ids: ids })}
                                                 />
-                                            </label>
-                                            <label className="space-y-1 text-sm">
-                                                <span className="font-medium">Status</span>
-                                                <select
-                                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                                                    value={row.status ?? ''}
-                                                    disabled={Boolean(row.is_readonly_for_current_user)}
-                                                    onChange={(event) => updateMeeting(index, { status: event.target.value })}
-                                                >
-                                                    <option value="">-- Select --</option>
-                                                    <option value="Done">Done</option>
-                                                    <option value="Not done">Not done</option>
-                                                </select>
-                                            </label>
-                                            <label className="space-y-1 text-sm md:col-span-2">
-                                                <span className="font-medium">Meeting</span>
-                                                <Input
-                                                    value={row.meeting}
-                                                    disabled={Boolean(row.is_readonly_for_current_user)}
-                                                    onChange={(event) => updateMeeting(index, { meeting: event.target.value })}
-                                                />
-                                            </label>
-                                            <label className="space-y-1 text-sm md:col-span-2">
-                                                <span className="font-medium">Reactions / Notes</span>
-                                                <Textarea
-                                                    rows={3}
-                                                    value={row.reactions_notes}
-                                                    disabled={Boolean(row.is_readonly_for_current_user)}
-                                                    onChange={(event) => updateMeeting(index, { reactions_notes: event.target.value })}
-                                                />
-                                            </label>
-                                        </div>
-                                    ))}
+                                                <label className="space-y-1 text-sm md:col-span-2">
+                                                    <span className="font-medium">Meeting</span>
+                                                    <Input
+                                                        value={row.meeting}
+                                                        disabled={readonly}
+                                                        onChange={(event) => updateMeeting(index, { meeting: event.target.value })}
+                                                    />
+                                                    {readonly && (
+                                                        <span className="text-amber-700 dark:text-amber-400 mt-1 inline-block text-xs">
+                                                            Assigned (view only)
+                                                        </span>
+                                                    )}
+                                                </label>
+                                                <label className="space-y-1 text-sm">
+                                                    <span className="font-medium">Status</span>
+                                                    <select
+                                                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-70"
+                                                        value={row.status ?? ''}
+                                                        disabled={readonly}
+                                                        onChange={(event) => updateMeeting(index, { status: event.target.value })}
+                                                    >
+                                                        <option value="">-- Select --</option>
+                                                        <option value="Done">Done</option>
+                                                        <option value="Not done">Not done</option>
+                                                    </select>
+                                                </label>
+                                                <label className="space-y-1 text-sm md:col-span-3">
+                                                    <span className="font-medium">Reactions / Notes</span>
+                                                    <Textarea
+                                                        rows={3}
+                                                        value={row.reactions_notes}
+                                                        disabled={readonly}
+                                                        onChange={(event) =>
+                                                            updateMeeting(index, { reactions_notes: event.target.value })
+                                                        }
+                                                    />
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </section>
 
@@ -949,6 +1149,85 @@ export default function DocumentsForm({
                                     <PlusIcon className="size-4" /> Add challenge
                                 </Button>
                             </section>
+
+                            <section className="space-y-3 rounded-lg border p-4">
+                                <h3 className="font-medium">6. Budget status (from weekly plan)</h3>
+                                {planBudgetRows.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">
+                                        No budget items found on the related weekly plan for this period.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {planBudgetRows.map((planRow, index) => {
+                                            const statusRow = form.data.content.budget_statuses[index] ?? {
+                                                budget_uid: String(planRow.budget_uid ?? `plan-budget-${index}`),
+                                                item: planRow.item,
+                                                status: 'Not started',
+                                                notes: '',
+                                            };
+                                            return (
+                                                <div key={statusRow.budget_uid ?? index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1.2fr_0.7fr_1fr]">
+                                                    <div className="text-sm">
+                                                        <p className="font-medium">{planRow.item || 'Budget item'}</p>
+                                                        <p className="text-muted-foreground text-xs whitespace-pre-wrap">
+                                                            {planRow.description_purpose || '—'}
+                                                        </p>
+                                                        <p className="mt-1 text-xs tabular-nums">
+                                                            Amount: {planRow.amount || '—'}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-muted-foreground mb-1 block text-xs">Status</label>
+                                                        <select
+                                                            className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+                                                            value={String(statusRow.status ?? 'Not started')}
+                                                            onChange={(event) => {
+                                                                const rows = [...form.data.content.budget_statuses] as BudgetStatusRow[];
+                                                                rows[index] = {
+                                                                    ...statusRow,
+                                                                    budget_uid: String(planRow.budget_uid ?? statusRow.budget_uid ?? `plan-budget-${index}`),
+                                                                    item: String(planRow.item ?? ''),
+                                                                    status: event.target.value,
+                                                                };
+                                                                form.setData('content', {
+                                                                    ...form.data.content,
+                                                                    budget_statuses: rows,
+                                                                });
+                                                            }}
+                                                        >
+                                                            {BUDGET_STATUS_OPTIONS.map((option) => (
+                                                                <option key={option} value={option}>
+                                                                    {option}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-muted-foreground mb-1 block text-xs">Notes</label>
+                                                        <Input
+                                                            value={String(statusRow.notes ?? '')}
+                                                            placeholder="Notes"
+                                                            onChange={(event) => {
+                                                                const rows = [...form.data.content.budget_statuses] as BudgetStatusRow[];
+                                                                rows[index] = {
+                                                                    ...statusRow,
+                                                                    budget_uid: String(planRow.budget_uid ?? statusRow.budget_uid ?? `plan-budget-${index}`),
+                                                                    item: String(planRow.item ?? ''),
+                                                                    notes: event.target.value,
+                                                                };
+                                                                form.setData('content', {
+                                                                    ...form.data.content,
+                                                                    budget_statuses: rows,
+                                                                });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </section>
                         </>
                     )}
 
@@ -979,7 +1258,7 @@ export default function DocumentsForm({
                                 data-action="continue"
                                 onClick={() => submit('continue')}
                             >
-                                Continue
+                                Continue to target status
                             </Button>
                         ) : (
                             <Button

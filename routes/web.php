@@ -197,9 +197,6 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('meeting-minutes')->name('meeting-minutes.')->group(function () {
         Route::get('/', [MeetingMinuteController::class, 'index'])->name('index');
-        Route::get('/create', [MeetingMinuteController::class, 'create'])
-            ->middleware('permission:manage minutes')
-            ->name('create');
         Route::post('/', [MeetingMinuteController::class, 'store'])
             ->middleware('permission:manage minutes')
             ->name('store');

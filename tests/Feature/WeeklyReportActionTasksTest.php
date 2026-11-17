@@ -95,7 +95,7 @@ class WeeklyReportActionTasksTest extends TestCase
         ]);
     }
 
-    public function test_continue_with_pending_tasks_redirects_to_action_tasks_page(): void
+    public function test_continue_with_pending_tasks_goes_straight_to_review_page(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
 
@@ -113,10 +113,10 @@ class WeeklyReportActionTasksTest extends TestCase
             ->where('type', Document::TYPE_WEEKLY_REPORT)
             ->firstOrFail();
 
-        $response->assertRedirect(route('documents.weekly-report.action-tasks', $report));
+        $response->assertRedirect(route('documents.weekly-report.review', $report));
     }
 
-    public function test_continue_with_no_assigned_tasks_skips_to_review_page(): void
+    public function test_continue_with_no_assigned_tasks_goes_to_review_page(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
 
@@ -161,7 +161,7 @@ class WeeklyReportActionTasksTest extends TestCase
         ]);
     }
 
-    public function test_submit_blocked_on_review_when_action_tasks_pending(): void
+    public function test_submit_succeeds_from_review_even_when_action_tasks_pending(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
 
@@ -177,43 +177,7 @@ class WeeklyReportActionTasksTest extends TestCase
             'content' => [],
         ]);
 
-        $this->actingAs($staff)->get(route('documents.weekly-report.review', $report))
-            ->assertRedirect(route('documents.weekly-report.action-tasks', $report));
-
-        $response = $this->actingAs($staff)->put(route('documents.update', $report), [
-            'action' => 'submit',
-            'wizard_review' => '1',
-            'target_accomplished_status' => 'completed',
-        ]);
-
-        $response->assertSessionHasErrors('action_tasks');
-        $report->refresh();
-        $this->assertSame(Document::STATE_DRAFT, $report->state);
-    }
-
-    public function test_submit_succeeds_from_review_after_action_task_quick_update(): void
-    {
-        Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
-
-        [$staff, $period, $actionLog] = $this->seedStaffWithPendingActionTask();
-        $staff->givePermissionTo('create weekly report');
-
-        $report = Document::create([
-            'user_id' => $staff->id,
-            'period_id' => $period->id,
-            'type' => Document::TYPE_WEEKLY_REPORT,
-            'title' => 'Weekly Report',
-            'state' => Document::STATE_DRAFT,
-            'content' => [],
-        ]);
-
-        $this->actingAs($staff)->put(route('action-logs.quick-update', $actionLog), [
-            'task_uid' => 'task_a',
-            'progress' => 'In Progress',
-            'notes_progress' => 'Updated from weekly report flow',
-        ])->assertSessionHas('success');
-
-        $this->assertFalse(app(\App\Services\ActionLogProgressService::class)->hasPendingUpdates($staff));
+        $this->assertTrue(app(\App\Services\ActionLogProgressService::class)->hasPendingUpdates($staff));
 
         $reviewPage = $this->actingAs($staff)->get(route('documents.weekly-report.review', $report));
         $reviewPage->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page

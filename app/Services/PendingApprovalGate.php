@@ -7,7 +7,7 @@ use App\Models\Request as FinanceRequest;
 use App\Models\User;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use Illuminate\Contracts\Session\Session;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaTables;
 
 class PendingApprovalGate
 {
@@ -125,7 +125,7 @@ class PendingApprovalGate
      */
     public function pendingRequisitionsFor(User $user)
     {
-        if (! Schema::hasTable('requests')) {
+        if (! SchemaTables::has('requests')) {
             return collect();
         }
 

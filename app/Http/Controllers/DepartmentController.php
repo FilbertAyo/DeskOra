@@ -106,6 +106,7 @@ class DepartmentController extends Controller
                 'id' => $department->id,
                 'name' => $department->name,
                 'status' => $department->status,
+                'plan_section_number' => $department->plan_section_number,
                 'users_count' => $department->users_count,
                 'children_count' => $department->children_count,
                 'parent' => $department->parent?->only(['id', 'name']),
@@ -113,6 +114,9 @@ class DepartmentController extends Controller
                 'children' => $department->children->map(fn ($child) => [
                     'id' => $child->id,
                     'name' => $child->name,
+                    'status' => $child->status,
+                    'plan_section_number' => $child->plan_section_number,
+                    'head_user_id' => $child->head_user_id,
                     'users_count' => $child->users_count,
                     'children_count' => $child->children_count,
                 ])->values(),
@@ -121,11 +125,13 @@ class DepartmentController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
                 'status' => $user->status,
             ])->values(),
             'departmentHeads' => $departmentHeads,
-            'indexUrl' => route('departments.index'),
-            'updateUrl' => route('departments.update', $department),
+            'indexUrl' => route('departments'),
+            'storeUrl' => route('department.store'),
+            'updateUrl' => route('department.update', $department),
         ]);
     }
 

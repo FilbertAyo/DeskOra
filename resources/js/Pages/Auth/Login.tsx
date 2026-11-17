@@ -1,6 +1,5 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { CircleAlertIcon } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AuthCard from '@/components/auth/AuthCard';
 import PasswordField from '@/components/auth/PasswordField';
@@ -23,6 +22,23 @@ function firstFormError(errors: Record<string, string | undefined>): string | nu
     return null;
 }
 
+function fieldValue(form: HTMLFormElement, name: string): string {
+    const field = form.elements.namedItem(name);
+
+    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+        return field.value;
+    }
+
+    if (field instanceof RadioNodeList && field.length > 0) {
+        const first = field[0];
+        if (first instanceof HTMLInputElement) {
+            return first.value;
+        }
+    }
+
+    return '';
+}
+
 export default function Login() {
     const { branding } = usePage<SharedProps>().props;
     const form = useForm({
@@ -31,34 +47,53 @@ export default function Login() {
         remember: false,
     });
     const [formNotice, setFormNotice] = useState<string | null>(null);
-    const validationMessage = formNotice ?? firstFormError(form.errors);
+    const emailError = form.errors.email ?? formNotice;
+
+    const submit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setFormNotice(null);
+
+        // Chrome autofill often paints values without firing React onChange.
+        // Always read the live DOM values at submit time.
+        const email = fieldValue(event.currentTarget, 'email').trim() || form.data.email.trim();
+        const password = fieldValue(event.currentTarget, 'password') || form.data.password;
+
+        if (!email || !password) {
+            setFormNotice('Enter your work email and password to sign in.');
+            return;
+        }
+
+        form.transform(() => ({
+            email,
+            password,
+            remember: form.data.remember,
+        }));
+
+        form.post(route('login'), {
+            preserveScroll: true,
+            onError: (errors) => {
+                if (!firstFormError(errors)) {
+                    setFormNotice('These credentials do not match our records.');
+                }
+            },
+            onCancel: () => {
+                const message = 'Sign-in was interrupted. Please try again.';
+                setFormNotice(message);
+                notify('error', message);
+            },
+            onFinish: () => {
+                form.transform((data) => data);
+            },
+        });
+    };
 
     return (
         <AuthCard title="Welcome back" description={`Sign in to your ${branding.appName} workspace`}>
-            <form
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    setFormNotice(null);
-                    form.post(route('login'), {
-                        preserveScroll: true,
-                        onError: (errors) => {
-                            const message = firstFormError(errors) ?? 'These credentials do not match our records.';
-                            setFormNotice(message);
-                            notify('error', message);
-                        },
-                    });
-                }}
-            >
+            <form onSubmit={submit}>
                 <FieldGroup className="gap-4">
                     <Button type="button" variant="outline" className="pointer-events-none w-full" aria-disabled="true" tabIndex={-1}>
                         Login as staff
                     </Button>
-                    {validationMessage && (
-                        <div role="alert" className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-lg border px-3 py-2 text-sm">
-                            <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
-                            <span>{validationMessage}</span>
-                        </div>
-                    )}
                     <Field className="gap-2">
                         <FieldLabel htmlFor="email" className="leading-5">
                             Work email
@@ -72,10 +107,14 @@ export default function Login() {
                             autoComplete="username"
                             autoFocus
                             required
-                            aria-invalid={form.errors.email ? true : undefined}
-                            onChange={(event) => form.setData('email', event.target.value)}
+                            aria-invalid={emailError ? true : undefined}
+                            onChange={(event) => {
+                                setFormNotice(null);
+                                form.setData('email', event.target.value);
+                            }}
+                            onInput={(event) => form.setData('email', event.currentTarget.value)}
                         />
-                        <FieldError>{form.errors.email}</FieldError>
+                        <FieldError>{emailError}</FieldError>
                     </Field>
                     <PasswordField
                         id="password"
@@ -101,9 +140,16 @@ export default function Login() {
                         </Link>
                     </div>
                     <Field>
-                        <Button className="w-full" type="submit" disabled={form.processing} loading={form.processing}>
+                        <button
+                            className="bg-primary text-primary-foreground inline-flex h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-medium disabled:opacity-50"
+                            type="submit"
+                            disabled={form.processing}
+                        >
+                            {form.processing ? (
+                                <span className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                            ) : null}
                             Sign in
-                        </Button>
+                        </button>
                     </Field>
                 </FieldGroup>
             </form>

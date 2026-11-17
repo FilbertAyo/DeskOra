@@ -1,4 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { LogOutIcon, SettingsIcon, UserIcon } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -54,11 +56,11 @@ export default function ProfileDropdown() {
                 <DropdownMenuSeparator />
 
                 <DropdownMenuGroup>
-                    <DropdownMenuItem render={<a href={route('profile.edit')} />}>
+                    <DropdownMenuItem render={<AppLink href={route('profile.edit')} />}>
                         <UserIcon />
                         <span>My profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem render={<a href={`${route('profile.edit')}?tab=settings`} />}>
+                    <DropdownMenuItem render={<AppLink href={`${route('profile.edit')}?tab=settings`} />}>
                         <SettingsIcon />
                         <span>Settings</span>
                     </DropdownMenuItem>

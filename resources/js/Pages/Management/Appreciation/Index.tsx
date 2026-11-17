@@ -1,5 +1,7 @@
 ﻿import type { ReactNode } from 'react';
 
+import AppLink from '@/components/shared/AppLink';
+
 import AppLayout from '@/Layouts/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +15,11 @@ type Props = { periods: Array<Period & { stats: Stats }>; currentPeriod: Period 
 
 export default function AppreciationIndex({ periods, currentPeriod, previousPeriod, currentDetail, previousStats }: Props) {
     return <div className="flex flex-col gap-6">
-        <div><h1 className="text-2xl font-semibold">Staff appreciation</h1><p className="text-muted-foreground text-sm">Participation and nomination results.</p></div>
+        <div><h1 className="text-lg font-semibold">Staff appreciation</h1><p className="text-muted-foreground text-sm">Participation and nomination results.</p></div>
         {currentPeriod && currentDetail && <><div><h2 className="text-lg font-semibold">{currentPeriod.label} {currentPeriod.isWindowOpen && <Badge className="ml-2">Open</Badge>}</h2><p className="text-muted-foreground text-sm">{currentPeriod.opensAt} – {currentPeriod.closesAt}</p></div><StatsGrid stats={currentDetail.stats} />
             <div className="grid gap-6 lg:grid-cols-2"><TalliesCard tallies={currentDetail.tallies} /><ReasonsCard reasons={currentDetail.reasons} /></div></>}
-        {previousPeriod && previousStats && <Card><CardHeader><CardTitle>Previous period: <a href={previousPeriod.showUrl}>{previousPeriod.label}</a></CardTitle></CardHeader><CardContent><p>{previousStats.rate}% participation · {previousStats.responded} of {previousStats.eligible} responded</p></CardContent></Card>}
-        <Card><CardHeader><CardTitle>Period history</CardTitle></CardHeader><CardContent className="divide-y">{periods.map((period) => <a key={period.id} href={period.showUrl} className="flex items-center justify-between gap-3 py-3"><span><span className="font-medium">{period.label}</span><span className="text-muted-foreground block text-sm">{period.opensAt} – {period.closesAt}</span></span><span>{period.stats.rate}%</span></a>)}</CardContent></Card>
+        {previousPeriod && previousStats && <Card><CardHeader><CardTitle>Previous period: <AppLink href={previousPeriod.showUrl}>{previousPeriod.label}</AppLink></CardTitle></CardHeader><CardContent><p>{previousStats.rate}% participation · {previousStats.responded} of {previousStats.eligible} responded</p></CardContent></Card>}
+        <Card><CardHeader><CardTitle>Period history</CardTitle></CardHeader><CardContent className="divide-y">{periods.map((period) => <AppLink key={period.id} href={period.showUrl} className="flex items-center justify-between gap-3 py-3"><span><span className="font-medium">{period.label}</span><span className="text-muted-foreground block text-sm">{period.opensAt} – {period.closesAt}</span></span><span>{period.stats.rate}%</span></AppLink>)}</CardContent></Card>
     </div>;
 }
 

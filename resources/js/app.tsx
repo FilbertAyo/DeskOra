@@ -1,28 +1,46 @@
-import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react';
+import { config, createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 
-import { inventoryPageConfig, makeInventoryPage } from '@/Pages/Inventory/InventoryPage';
+import { notify } from '@/lib/notify';
+
+config.extend({
+    prefetch: {
+        cacheFor: '60s',
+        hoverDelay: 75,
+    },
+});
+
+const pages = import.meta.glob('./Pages/**/*.tsx');
 
 createInertiaApp({
     title: (title) => (title ? `${title} — Adilisha Portal` : 'Adilisha Portal — DeskOra'),
-    resolve: (name) => {
-        const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true });
-        const page = pages[`./Pages/${name}.tsx`] as ResolvedComponent | undefined;
+    resolve: async (name) => {
+        const importer = pages[`./Pages/${name}.tsx`];
 
-        if (!page && name.startsWith('Inventory/')) {
+        if (!importer && name.startsWith('Inventory/')) {
+            const { inventoryPageConfig, makeInventoryPage } = await import('@/Pages/Inventory/InventoryPage');
+
             return makeInventoryPage(inventoryPageConfig(name));
         }
 
-        if (!page) {
+        if (!importer) {
             throw new Error(`Inertia page not found: ${name}`);
         }
 
-        return page;
+        return importer();
     },
     setup({ el, App, props }) {
         createRoot(el).render(<App {...props} />);
     },
-    progress: {
-        color: '#0077b6',
-    },
+    progress: false,
+});
+
+router.on('httpException', (event) => {
+    const status = event.detail?.response?.status;
+
+    if (status === 419) {
+        notify('error', 'Your session expired. Refresh the page and try again.');
+        event.preventDefault();
+        window.location.reload();
+    }
 });

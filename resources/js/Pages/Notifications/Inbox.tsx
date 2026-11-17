@@ -1,8 +1,11 @@
 import { router, usePage } from '@inertiajs/react';
-import { BellOffIcon } from 'lucide-react';
+
+import AppLink from '@/components/shared/AppLink';
+import { BellOffIcon, CheckIcon, EyeIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,9 +68,9 @@ export default function Inbox({
                                 <div className="flex items-start justify-between gap-4 px-6 py-4">
                                     <div className="min-w-0">
                                         <div className="mb-1 flex items-center gap-2">
-                                            <a href={item.href} className="font-medium hover:underline">
+                                            <AppLink href={item.href} className="font-medium hover:underline">
                                                 {item.title}
-                                            </a>
+                                            </AppLink>
                                             {item.isUnread && <Badge>New</Badge>}
                                         </div>
                                         <p className="text-muted-foreground text-sm">{item.message}</p>
@@ -76,22 +79,18 @@ export default function Inbox({
                                             {item.relative ? ` (${item.relative})` : ''}
                                         </p>
                                     </div>
-                                    <div className="flex shrink-0 flex-col gap-2">
-                                        <Button variant="outline" size="sm" render={<a href={item.href} />}>
-                                            Open
-                                        </Button>
-                                        {item.isUnread && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                type="button"
-                                                data-action="mark-read"
-                                                onClick={() => router.post(route('notifications.read', { notification: item.id }))}
-                                            >
-                                                Mark read
-                                            </Button>
-                                        )}
-                                    </div>
+                                    <RowActions
+                                        items={[
+                                            { label: 'Open', href: item.href, icon: <EyeIcon /> },
+                                            {
+                                                label: 'Mark read',
+                                                icon: <CheckIcon />,
+                                                hidden: !item.isUnread,
+                                                onClick: () =>
+                                                    router.post(route('notifications.read', { notification: item.id })),
+                                            },
+                                        ]}
+                                    />
                                 </div>
                             </li>
                         ))}
@@ -103,10 +102,10 @@ export default function Inbox({
                             Page {pagination.current} of {pagination.last}
                         </p>
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={!pagination.prev} render={pagination.prev ? <a href={pagination.prev} /> : undefined}>
+                            <Button variant="outline" size="sm" disabled={!pagination.prev} render={pagination.prev ? <AppLink href={pagination.prev} /> : undefined}>
                                 Previous
                             </Button>
-                            <Button variant="outline" size="sm" disabled={!pagination.next} render={pagination.next ? <a href={pagination.next} /> : undefined}>
+                            <Button variant="outline" size="sm" disabled={!pagination.next} render={pagination.next ? <AppLink href={pagination.next} /> : undefined}>
                                 Next
                             </Button>
                         </div>
@@ -114,9 +113,9 @@ export default function Inbox({
                 )}
                 {notifications.canManage && (
                     <div className="px-6 pt-4 text-right">
-                        <a href={route('notification.index')} className="text-muted-foreground text-sm hover:underline">
+                        <AppLink href={route('notification.index')} className="text-muted-foreground text-sm hover:underline">
                             Notification settings
-                        </a>
+                        </AppLink>
                     </div>
                 )}
             </CardContent>

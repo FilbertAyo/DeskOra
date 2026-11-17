@@ -59,7 +59,7 @@ class MeetingMinuteTest extends TestCase
                 ->where('meetingMinute.period.year', 2026));
     }
 
-    public function test_user_without_manage_minutes_cannot_access_create_or_store(): void
+    public function test_user_without_manage_minutes_cannot_store(): void
     {
         Storage::fake('public');
 
@@ -68,10 +68,6 @@ class MeetingMinuteTest extends TestCase
         $user->assignRole('staff');
         $period = $this->createPeriod(2026, 10, '2026-03-02', '2026-03-08');
         $file = UploadedFile::fake()->create('minutes.pdf', 100, 'application/pdf');
-
-        $this->actingAs($user)
-            ->get(route('meeting-minutes.create', ['period_id' => $period->id]))
-            ->assertForbidden();
 
         $this->actingAs($user)
             ->post(route('meeting-minutes.store'), [
@@ -288,7 +284,8 @@ class MeetingMinuteTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('MeetingMinutes/Index')
                 ->has('periods.data')
-                ->has('periods.links'));
+                ->has('periods.links')
+                ->has('storeUrl'));
     }
 
     private function createPeriod(int $year, int $weekNumber, string $start, string $end): WorkPeriod

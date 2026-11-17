@@ -1,4 +1,6 @@
 import { router } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { EyeIcon, PencilIcon } from 'lucide-react';
 
 import RowActions from '@/components/shared/RowActions';
@@ -6,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PageHeader, PageShell } from '@/lib/page-kit';
+import { PageHeader, PageShell, PaginationLinks } from '@/lib/page-kit';
 
 export type DocumentRow = {
     id: string;
@@ -39,7 +41,7 @@ export default function DocumentList({ title, documents, createUrl, filters }: P
             <PageHeader
                 title={title}
                 description={`Create, review, and track your ${title.toLowerCase()}.`}
-                actions={createUrl ? <Button render={<a href={createUrl} />}>New {title.replace(/s$/, '').toLowerCase()}</Button> : null}
+                actions={createUrl ? <Button render={<AppLink href={createUrl} />}>New {title.replace(/s$/, '').toLowerCase()}</Button> : null}
             />
             {filters}
             <Card className="shadow-none">
@@ -105,18 +107,7 @@ export default function DocumentList({ title, documents, createUrl, filters }: P
                         </TableBody>
                     </Table>
                     {documents.links && documents.links.length > 3 && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            {documents.links.map((link, index) => (
-                                <Button
-                                    key={`${link.label}-${index}`}
-                                    size="sm"
-                                    variant={link.active ? 'default' : 'outline'}
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.visit(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        <PaginationLinks className="mt-4" links={documents.links} />
                     )}
                 </CardContent>
             </Card>

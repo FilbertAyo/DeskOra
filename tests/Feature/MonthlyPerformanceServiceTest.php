@@ -74,22 +74,4 @@ class MonthlyPerformanceServiceTest extends TestCase
         $this->assertNotEmpty($result['tips']);
         $this->assertContains('Aug', $result['categories']);
     }
-
-    public function test_performance_chart_partial_renders_for_user_payload(): void
-    {
-        $user = User::factory()->create(['status' => 'active']);
-        $user->givePermissionTo(['create weekly plan', 'create weekly report']);
-
-        $monthlyPerformance = app(MonthlyPerformanceService::class)->forUser($user, 1);
-
-        $html = view('dashboard.partials.performance-chart', [
-            'monthlyPerformance' => $monthlyPerformance,
-        ])->render();
-
-        $this->assertStringContainsString('My monthly performance', $html);
-        $this->assertStringContainsString('staffPerformanceChart', $html);
-        $this->assertStringContainsString('staffPerformanceDetailsModal', $html);
-        $this->assertStringContainsString('Coach tips', $html);
-        $this->assertStringContainsString('Details', $html);
-    }
 }

@@ -12,6 +12,8 @@ use App\Support\WeeklyBudgetApprovalFlow;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use App\Support\SchemaTables;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -23,32 +25,34 @@ class WeeklyBudgetReviewService
 
     public function countPendingForPeriod(?string $periodId = null): int
     {
-        if (! Schema::hasTable('weekly_plans') || ! Schema::hasTable('weekly_plan_budget_items')) {
+        if (! SchemaTables::has('weekly_plans') || ! SchemaTables::has('weekly_plan_budget_items')) {
             return 0;
         }
 
-        $query = WeeklyPlan::query()
-            ->with('budgetItems')
-            ->where('state', WeeklyPlan::STATE_SUBMITTED)
-            ->where(function ($statusQuery) {
-                $statusQuery
-                    ->whereNull('budget_review_status')
-                    ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
-            });
+        $cacheKey = 'weekly-budget-pending-count-'.($periodId !== null && $periodId !== '' ? $periodId : 'all');
 
-        if ($periodId !== null && $periodId !== '') {
-            $query->where('period_id', $periodId);
-        }
-
-        return $query->get()
-            ->filter(function (WeeklyPlan $plan): bool {
-                return $plan->budgetItems->contains(function (WeeklyPlanBudgetItem $item): bool {
-                    return trim((string) $item->item) !== ''
-                        || trim((string) $item->description_purpose) !== ''
-                        || trim((string) ($item->amount_raw ?? $item->amount ?? '')) !== '';
+        return (int) Cache::remember($cacheKey, now()->addSeconds(30), function () use ($periodId) {
+            $query = WeeklyPlan::query()
+                ->where('state', WeeklyPlan::STATE_SUBMITTED)
+                ->where(function ($statusQuery) {
+                    $statusQuery
+                        ->whereNull('budget_review_status')
+                        ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
+                })
+                ->whereHas('budgetItems', function ($items) {
+                    $items->where(function ($row) {
+                        $row->whereRaw("TRIM(COALESCE(item, '')) <> ''")
+                            ->orWhereRaw("TRIM(COALESCE(description_purpose, '')) <> ''")
+                            ->orWhereRaw("TRIM(COALESCE(amount_raw, '')) <> ''");
+                    });
                 });
-            })
-            ->count();
+
+            if ($periodId !== null && $periodId !== '') {
+                $query->where('period_id', $periodId);
+            }
+
+            return $query->count();
+        });
     }
 
     /**
@@ -58,13 +62,25 @@ class WeeklyBudgetReviewService
      */
     public function actionableStageCountsFor(User $user): array
     {
+        return Cache::remember(
+            'weekly-budget-stage-counts-'.$user->id,
+            now()->addSeconds(30),
+            fn () => $this->freshActionableStageCounts($user),
+        );
+    }
+
+    /**
+     * @return array{review: int, approve: int, authorize: int}
+     */
+    private function freshActionableStageCounts(User $user): array
+    {
         $counts = [
             'review' => 0,
             'approve' => 0,
             'authorize' => 0,
         ];
 
-        if (! Schema::hasTable('weekly_plan_budget_reviews') || ! Schema::hasTable('weekly_plan_budget_items')) {
+        if (! SchemaTables::has('weekly_plan_budget_reviews') || ! SchemaTables::has('weekly_plan_budget_items')) {
             return $counts;
         }
 
@@ -88,7 +104,7 @@ class WeeklyBudgetReviewService
         }
 
         // Items with no review row yet still sit at pending for reviewers.
-        if ($user->can('review weekly budgets') && Schema::hasTable('weekly_plan_budget_items')) {
+        if ($user->can('review weekly budgets') && SchemaTables::has('weekly_plan_budget_items')) {
             $pendingWithoutReview = (int) \App\Models\WeeklyPlanBudgetItem::query()
                 ->whereDoesntHave('review')
                 ->whereHas('weeklyPlan', function ($planQuery) {

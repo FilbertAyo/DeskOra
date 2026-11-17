@@ -1,18 +1,10 @@
 import { router, usePage } from '@inertiajs/react';
-import { CircleAlertIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { notify, subscribeNotices, type Notice, type NoticeKind } from '@/lib/notify';
+import { notify } from '@/lib/notify';
 import type { SharedProps } from '@/types/inertia';
 
 type ErrorBag = Record<string, string | string[] | undefined>;
-
-const icons: Record<NoticeKind, typeof CircleAlertIcon> = {
-    success: CircleCheckIcon,
-    error: CircleAlertIcon,
-    info: InfoIcon,
-    warning: TriangleAlertIcon,
-};
 
 function firstError(errors: ErrorBag | undefined): string | null {
     if (!errors) {
@@ -35,19 +27,9 @@ function firstError(errors: ErrorBag | undefined): string | null {
     return null;
 }
 
+/** Bridges Inertia flash/errors into Sonner toasts (bottom-right). */
 export default function FlashToaster() {
     const { flash, errors } = usePage<SharedProps & { errors?: ErrorBag }>().props;
-    const [notices, setNotices] = useState<Notice[]>([]);
-
-    useEffect(() => {
-        return subscribeNotices((notice) => {
-            setNotices((current) => [...current, notice].slice(-3));
-            window.setTimeout(() => {
-                setNotices((current) => current.filter((item) => item.id !== notice.id));
-            }, 4500);
-        });
-    }, []);
-
     const errorKey = JSON.stringify(errors ?? {});
 
     useEffect(() => {
@@ -98,26 +80,5 @@ export default function FlashToaster() {
         }
     }, [flash]);
 
-    if (notices.length === 0) {
-        return null;
-    }
-
-    return (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[2000] flex flex-col items-center gap-2 px-4">
-            {notices.map((notice) => {
-                const Icon = icons[notice.kind];
-
-                return (
-                    <div
-                        key={notice.id}
-                        role="status"
-                        className="pointer-events-auto flex max-w-md items-center gap-2 rounded-full border border-white/10 bg-neutral-900 px-3.5 py-2.5 text-sm text-white shadow-2xl"
-                    >
-                        <Icon className="size-4 shrink-0" />
-                        <span>{notice.message}</span>
-                    </div>
-                );
-            })}
-        </div>
-    );
+    return null;
 }

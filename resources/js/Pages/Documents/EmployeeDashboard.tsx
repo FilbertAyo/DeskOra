@@ -1,8 +1,8 @@
-import { Link } from '@inertiajs/react';
+import { EyeIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
-import { Button } from '@/components/ui/button';
+import RowActions from '@/components/shared/RowActions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/lib/page-kit';
 
@@ -38,11 +38,9 @@ export default function EmployeeDashboard(props: Record<string, unknown>) {
                             return (
                                 <div key={String(row.id ?? index)} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
                                     <span>{String(row.title ?? row.display_title ?? `Document ${index + 1}`)}</span>
-                                    {href && (
-                                        <Button size="sm" variant="outline" render={<Link href={href} />}>
-                                            Open
-                                        </Button>
-                                    )}
+                                    {href ? (
+                                        <RowActions items={[{ label: 'Open', href, icon: <EyeIcon /> }]} />
+                                    ) : null}
                                 </div>
                             );
                         })

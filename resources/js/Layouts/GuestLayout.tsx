@@ -11,7 +11,7 @@ export default function GuestLayout({ title, children }: { title: string; childr
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <TooltipProvider>
                 <Head title={title} />
-                {children}
+                <div className="min-h-svh">{children}</div>
                 <FlashToaster />
                 <Toaster />
             </TooltipProvider>

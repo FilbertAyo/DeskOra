@@ -1,4 +1,6 @@
 import { router } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { EyeIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -19,7 +21,7 @@ export default function Index({ requests }: { requests: FinanceItem[] }) {
         <PageShell>
             <PageHeader
                 title="Staff Requisitions"
-                actions={<Button render={<a href={route('requisition.create')} />}>New Requisition</Button>}
+                actions={<Button render={<AppLink href={route('requisition.create')} />}>New Requisition</Button>}
             />
             <FinanceTable
                 headers={['No.', 'Activity', 'Amount', 'Date Requested', 'Status', 'Actions']}

@@ -29,7 +29,7 @@ export default function FeatureUsageIndex(props: { from: string; to: string; act
 }
 
 function Metric({ title, value }: { title: string; value: number }) {
-    return <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">{title}</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{value}</CardContent></Card>;
+    return <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">{title}</CardTitle></CardHeader><CardContent className="text-xl font-semibold">{value}</CardContent></Card>;
 }
 
 FeatureUsageIndex.layout = (page: ReactNode) => <AppLayout title="Feature usage">{page}</AppLayout>;

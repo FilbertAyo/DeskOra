@@ -14,7 +14,7 @@ use App\Models\WeeklyPlan;
 use App\Models\WeeklyReport;
 use App\Models\WorkPeriod;
 use App\Services\RequestApprovalNavService;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 
 class PortalNav
 {
@@ -29,21 +29,31 @@ class PortalNav
         $pendingBudgetCount = 0;
 
         if ($canReviewSubmissions || $canWeeklyBudget) {
-            $currentPeriod = WorkPeriod::getCurrent();
+            $currentPeriod = Cache::remember('current-work-period-nav', now()->addSeconds(60), function () {
+                return WorkPeriod::getCurrent();
+            });
             $nextPeriod = $currentPeriod?->getNextPeriod();
 
-            if ($canReviewSubmissions && Schema::hasTable('weekly_reports') && $currentPeriod) {
-                $submittedCount += WeeklyReport::query()
-                    ->where('state', 'submitted')
-                    ->where('period_id', (string) $currentPeriod->id)
-                    ->count();
+            if ($canReviewSubmissions && SchemaTables::has('weekly_reports') && $currentPeriod) {
+                $submittedCount += (int) Cache::remember(
+                    'nav-submitted-reports-'.$currentPeriod->id,
+                    now()->addSeconds(30),
+                    fn () => WeeklyReport::query()
+                        ->where('state', 'submitted')
+                        ->where('period_id', (string) $currentPeriod->id)
+                        ->count()
+                );
             }
 
-            if ($canReviewSubmissions && Schema::hasTable('weekly_plans') && $nextPeriod) {
-                $submittedCount += WeeklyPlan::query()
-                    ->where('state', WeeklyPlan::STATE_SUBMITTED)
-                    ->where('period_id', (string) $nextPeriod->id)
-                    ->count();
+            if ($canReviewSubmissions && SchemaTables::has('weekly_plans') && $nextPeriod) {
+                $submittedCount += (int) Cache::remember(
+                    'nav-submitted-plans-'.$nextPeriod->id,
+                    now()->addSeconds(30),
+                    fn () => WeeklyPlan::query()
+                        ->where('state', WeeklyPlan::STATE_SUBMITTED)
+                        ->where('period_id', (string) $nextPeriod->id)
+                        ->count()
+                );
             }
 
             if ($canWeeklyBudget) {
@@ -126,7 +136,11 @@ class PortalNav
 
         $letterBadge = 0;
         if ($user->can(OfficialLetter::PERMISSION_AUTHORIZE_DOWNLOADS)) {
-            $letterBadge = OfficialLetter::pendingDownloadAuthorizationCount();
+            $letterBadge = (int) Cache::remember(
+                'nav-letter-download-auth-count',
+                now()->addSeconds(30),
+                fn () => OfficialLetter::pendingDownloadAuthorizationCount()
+            );
         }
 
         $groups[] = [
@@ -180,7 +194,7 @@ class PortalNav
                     continue;
                 }
 
-                $count = Schema::hasTable('requests')
+                $count = SchemaTables::has('requests')
                     ? $approvalService->countForStageAndTypes($user, $stage, $types)
                     : 0;
 
@@ -194,7 +208,7 @@ class PortalNav
                 );
             }
 
-            $total = Schema::hasTable('requests')
+            $total = SchemaTables::has('requests')
                 ? (int) ($approvalService->countsFor($user)['total'] ?? 0)
                 : 0;
 
@@ -214,12 +228,17 @@ class PortalNav
 
             if ($user->can('view cashflow movements')) {
                 $approvedCount = 0;
-                if (Schema::hasTable('requests')) {
-                    $approvedCount = (int) \App\Models\Request::query()
-                        ->whereIn('department_id', $user->departmentScopeIds())
-                        ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
-                        ->where('status', 'approved')
-                        ->count();
+                if (SchemaTables::has('requests')) {
+                    $scopeKey = md5(implode(',', $user->departmentScopeIds()));
+                    $approvedCount = (int) Cache::remember(
+                        'petty-nav-count-approved-'.$user->id.'-'.$scopeKey,
+                        now()->addSeconds(45),
+                        fn () => \App\Models\Request::query()
+                            ->whereIn('department_id', $user->departmentScopeIds())
+                            ->whereIn('request_type', ['Petty Cash', 'Reimbursement'])
+                            ->where('status', 'approved')
+                            ->count()
+                    );
                 }
 
                 $financeItems[] = self::link('Petty Cash Payments', 'petty.cashier', [], null, request()->routeIs('petty.cashier'), $approvedCount);
@@ -290,13 +309,15 @@ class PortalNav
     {
         $opsAttention = 0;
         if ($user->can('view inventory')) {
-            $opsAttention = InventoryBorrowRequest::overdueCount()
-                + InventoryBorrowRequest::pendingReviewCount()
-                + InventoryMaintenanceRecord::openCount()
-                + InventoryDisposalRequest::pendingReviewCount()
-                + InventoryVerificationSession::openCount()
-                + InventoryDispatch::overdueCount()
-                + InventoryDispatch::openMovementCount();
+            $opsAttention = (int) Cache::remember('nav-inventory-ops-attention', now()->addSeconds(30), function () {
+                return InventoryBorrowRequest::overdueCount()
+                    + InventoryBorrowRequest::pendingReviewCount()
+                    + InventoryMaintenanceRecord::openCount()
+                    + InventoryDisposalRequest::pendingReviewCount()
+                    + InventoryVerificationSession::openCount()
+                    + InventoryDispatch::overdueCount()
+                    + InventoryDispatch::openMovementCount();
+            });
         }
 
         $children = [];

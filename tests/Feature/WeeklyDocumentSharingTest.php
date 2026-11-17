@@ -148,13 +148,13 @@ class WeeklyDocumentSharingTest extends TestCase
         $this->assertSame(Document::STATE_DRAFT, $report->state);
         $this->assertTrue($collaborator->can('update', $report));
 
-        $response = $this->actingAs($collaborator)->view('documents.partials.edit.weekly-report-fields', [
-            'document' => $report->load('sharedUsers'),
-            'shareableUsers' => collect(),
-            'errors' => new \Illuminate\Support\ViewErrorBag,
-        ]);
-        $response->assertDontSeeText('No weekly plan found for this work period.');
-        $response->assertSeeText('Shared target for collaborators');
+        $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
+            (string) $report->period_id,
+            (string) $report->user_id
+        );
+
+        $this->assertNotNull($relatedPlan);
+        $this->assertSame('Shared target for collaborators', $relatedPlan->main_target);
     }
 
     public function test_cross_department_share_is_rejected(): void
@@ -625,17 +625,11 @@ class WeeklyDocumentSharingTest extends TestCase
         $assignedRows = WeeklyActivityAssignment::query()
             ->where('assignee_user_id', $member->id)
             ->where('period_id', $nextPeriod->id)
-            ->with(['sourceUser:id,name'])
             ->get();
 
-        $this->actingAs($member)
-            ->view('documents.partials.weekly-assigned-activities-card', [
-                'assignedWeeklyActivities' => $assignedRows,
-                'errors' => new \Illuminate\Support\ViewErrorBag,
-            ])
-            ->assertSeeText('Assigned by Others')
-            ->assertSeeText('Tasks from weekly plans where another staff member assigned you')
-            ->assertSeeText('Assigned partner activity');
+        $this->assertTrue($assignedRows->contains(
+            fn (WeeklyActivityAssignment $row) => ($row->activity_payload['activity'] ?? null) === 'Assigned partner activity'
+        ));
     }
 
     public function test_assignments_for_user_excludes_self_assigned_rows(): void
@@ -815,17 +809,10 @@ class WeeklyDocumentSharingTest extends TestCase
         );
 
         $this->assertTrue(collect($incomingRows)->contains(
-            fn ($row) => is_array($row) && ($row['meeting'] ?? '') === 'Joint field engagement'
+            fn ($row) => is_array($row)
+                && ($row['meeting'] ?? '') === 'Joint field engagement'
+                && ($row['incoming_source_user_name'] ?? '') === $owner->name
         ));
-
-        $this->actingAs($member)
-            ->view('documents.partials.weekly-assigned-meetings-card', [
-                'incomingMeetings' => $incomingRows,
-                'errors' => new \Illuminate\Support\ViewErrorBag,
-            ])
-            ->assertSeeText('Assigned Meetings')
-            ->assertSeeText('Joint field engagement')
-            ->assertSeeText($owner->name);
     }
 
     public function test_planned_meeting_appears_as_assigned_on_selected_staff_report(): void
@@ -918,20 +905,14 @@ class WeeklyDocumentSharingTest extends TestCase
         $department = Department::create(['name' => 'Programs']);
         $owner = $this->createUserInDepartment($department, ['create weekly plan']);
 
-        $this->actingAs($owner);
-        \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
-
-        $html = view('documents.partials.create.weekly-plan-fields', [
-            'teamUsers' => collect([$owner]),
-            'shareableUsers' => collect(),
-            'carriedActivities' => [],
-            'incomingMeetings' => [],
-            'assignedWeeklyActivities' => collect(),
-        ])->render();
-
-        $this->assertStringContainsString('name="content[planned_activities][0][team_member_ids][]"', $html);
-        $this->assertStringContainsString('value="'.$owner->id.'"', $html);
-        $this->assertStringContainsString('name="content[key_meetings][0][participant_user_ids][]"', $html);
+        $this->actingAs($owner)
+            ->get(route('documents.create', ['type' => 'weekly_plan']))
+            ->assertOk()
+            ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+                ->component('Documents/Form')
+                ->where('selectedType', Document::TYPE_WEEKLY_PLAN)
+                ->where('currentUserId', (string) $owner->id)
+            );
     }
 
     private function createCurrentAndNextPeriods(): array

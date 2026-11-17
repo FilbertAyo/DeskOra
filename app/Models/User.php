@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Concerns\HasShortId;
+use App\Support\SchemaTables;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\CausesActivity;
@@ -17,6 +17,12 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use CausesActivity, HasApiTokens, HasFactory, HasRoles, HasShortId, LogsActivity, Notifiable;
+
+    /** @var list<string>|null */
+    private ?array $departmentScopeMemo = null;
+
+    /** @var list<string>|null */
+    private ?array $inventoryCustodyScopeMemo = null;
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -92,6 +98,10 @@ class User extends Authenticatable
      */
     public function inventoryCustodyScopeIds(): array
     {
+        if ($this->inventoryCustodyScopeMemo !== null) {
+            return $this->inventoryCustodyScopeMemo;
+        }
+
         $ids = [];
 
         if ($this->department_id) {
@@ -103,7 +113,7 @@ class User extends Authenticatable
             }
         }
 
-        if (Schema::hasTable('sub_department_user')) {
+        if (SchemaTables::has('sub_department_user')) {
             $subDepartments = $this->relationLoaded('subDepartments')
                 ? $this->subDepartments
                 : $this->subDepartments()->get();
@@ -113,7 +123,7 @@ class User extends Authenticatable
             }
         }
 
-        return array_values(array_unique(array_map('strval', $ids)));
+        return $this->inventoryCustodyScopeMemo = array_values(array_unique(array_map('strval', $ids)));
     }
 
     public function hasInventoryCustodyOf(InventoryAsset $asset): bool
@@ -126,7 +136,11 @@ class User extends Authenticatable
 
     public function departmentScopeIds(): array
     {
-        if (Schema::hasTable('sub_department_user')) {
+        if ($this->departmentScopeMemo !== null) {
+            return $this->departmentScopeMemo;
+        }
+
+        if (SchemaTables::has('sub_department_user')) {
             $subDepartmentIds = $this->subDepartments()->pluck('departments.id')->all();
         } else {
             $subDepartmentIds = [];
@@ -139,18 +153,18 @@ class User extends Authenticatable
                 $scoped = array_merge($scoped, $subDepartment->selfAndDescendantIds());
             }
 
-            return array_values(array_unique($scoped));
+            return $this->departmentScopeMemo = array_values(array_unique($scoped));
         }
 
         if ($this->department_id) {
             $department = $this->department;
             if ($department) {
-                return $department->selfAndDescendantIds();
+                return $this->departmentScopeMemo = $department->selfAndDescendantIds();
             }
         }
 
         // No explicit department/sub-department assignment means global visibility.
-        return Department::pluck('id')->all();
+        return $this->departmentScopeMemo = Department::pluck('id')->all();
     }
 
     public function receivesEmailNotifications(): bool

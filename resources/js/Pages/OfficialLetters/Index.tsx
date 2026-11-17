@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { DownloadIcon, EyeIcon, PencilIcon } from 'lucide-react';
+import { DownloadIcon, EyeIcon, FileTextIcon, PencilIcon, ShieldCheckIcon, ShieldXIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -7,6 +7,8 @@ import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { notify } from '@/lib/notify';
+import { cn } from '@/lib/utils';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 
 type Letter = {
@@ -54,11 +56,13 @@ export default function OfficialLettersIndex({
     filters,
     urls,
 }: Props) {
+    const isAuthorizations = tab === 'authorizations';
+
     const applyFilters = (patch: Record<string, string | undefined>) => {
         router.get(
             urls.index,
             {
-                tab: tab === 'authorizations' ? 'authorizations' : undefined,
+                tab: isAuthorizations ? 'authorizations' : undefined,
                 department_code: filters.department_code || undefined,
                 year: filters.year || undefined,
                 month: filters.month || undefined,
@@ -78,124 +82,205 @@ export default function OfficialLettersIndex({
                 }
             />
 
-            {canAuthorizeDownloads && pendingAuthorizationCount > 0 && tab !== 'authorizations' && (
-                <Card>
-                    <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm">
-                        <div>
-                            <strong>{pendingAuthorizationCount}</strong> letter
-                            {pendingAuthorizationCount === 1 ? '' : 's'} waiting for download authorization.
-                        </div>
-                        <Button size="sm" render={<Link href={`${urls.index}?tab=authorizations`} />}>
-                            Review now
-                        </Button>
+            <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <Card className="h-fit shadow-none">
+                    <CardHeader className="border-b bg-muted/20">
+                        <CardTitle className="text-base">Browse</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1 p-2">
+                        <Link
+                            href={urls.index}
+                            className={cn(
+                                'hover:bg-muted flex items-center gap-2 rounded-md px-3 py-2 text-sm',
+                                !isAuthorizations && 'bg-muted font-medium',
+                            )}
+                        >
+                            <FileTextIcon className="size-4" />
+                            My letters
+                        </Link>
+                        {canAuthorizeDownloads && (
+                            <Link
+                                href={`${urls.index}?tab=authorizations`}
+                                className={cn(
+                                    'hover:bg-muted flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm',
+                                    isAuthorizations && 'bg-muted font-medium',
+                                )}
+                            >
+                                <span className="inline-flex items-center gap-2">
+                                    <ShieldCheckIcon className="size-4" />
+                                    Download authorization
+                                </span>
+                                {pendingAuthorizationCount > 0 && (
+                                    <Badge variant="secondary">{pendingAuthorizationCount}</Badge>
+                                )}
+                            </Link>
+                        )}
                     </CardContent>
                 </Card>
-            )}
 
-            <Card>
-                <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-wrap gap-2">
-                        {canAuthorizeDownloads ? (
-                            <>
-                                <Button
-                                    size="sm"
-                                    variant={tab !== 'authorizations' ? 'default' : 'outline'}
-                                    render={<Link href={urls.index} />}
-                                >
-                                    My Letters
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant={tab === 'authorizations' ? 'default' : 'outline'}
-                                    render={<Link href={`${urls.index}?tab=authorizations`} />}
-                                >
-                                    Download authorizations
-                                    {pendingAuthorizationCount > 0 ? ` (${pendingAuthorizationCount})` : ''}
-                                </Button>
-                            </>
-                        ) : (
-                            <CardTitle>My Official Letters</CardTitle>
-                        )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <select
-                            className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                            value={filters.department_code ?? ''}
-                            onChange={(e) => applyFilters({ department_code: e.target.value || undefined })}
-                        >
-                            <option value="">All Departments</option>
-                            {Object.entries(departments).map(([code, label]) => (
-                                <option key={code} value={code}>
-                                    {code} — {label}
-                                </option>
-                            ))}
-                        </select>
-                        <select
-                            className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                            value={String(filters.year ?? '')}
-                            onChange={(e) => applyFilters({ year: e.target.value || undefined })}
-                        >
-                            <option value="">All Years</option>
-                            {years.map((year) => (
-                                <option key={year} value={year}>
-                                    {year}
-                                </option>
-                            ))}
-                        </select>
-                        <select
-                            className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                            value={String(filters.month ?? '')}
-                            onChange={(e) => applyFilters({ month: e.target.value || undefined })}
-                        >
-                            <option value="">All Months</option>
-                            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                                <option key={month} value={month}>
-                                    {month}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                    {letters.data.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">No letters found.</p>
-                    ) : (
-                        letters.data.map((letter) => (
-                            <div key={letter.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
-                                <div className="min-w-0 space-y-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <code className="text-xs">{letter.reference_number}</code>
-                                        {letter.is_shared && <Badge variant="secondary">Shared</Badge>}
-                                    </div>
-                                    <div className="font-medium">{letter.name || letter.subject || 'Official letter'}</div>
-                                    <div className="text-muted-foreground text-xs">
-                                        {letter.subject}
-                                        {letter.creator ? ` · ${letter.creator}` : ''}
-                                        {tab === 'authorizations' && letter.requested_by ? ` · Requested by ${letter.requested_by}` : ''}
-                                    </div>
+                <div className="space-y-4">
+                    {canAuthorizeDownloads && pendingAuthorizationCount > 0 && !isAuthorizations && (
+                        <Card className="shadow-none">
+                            <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm">
+                                <div>
+                                    <strong>{pendingAuthorizationCount}</strong> letter
+                                    {pendingAuthorizationCount === 1 ? '' : 's'} waiting for download authorization.
                                 </div>
-                                <RowActions
-                                    items={[
-                                        { label: 'Open', href: letter.show_url, icon: <EyeIcon /> },
-                                        {
-                                            label: 'Edit',
-                                            href: letter.edit_url,
-                                            icon: <PencilIcon />,
-                                            hidden: !(letter.can_edit && letter.edit_url),
-                                        },
-                                        {
-                                            label: 'Download PDF',
-                                            href: letter.download_url,
-                                            icon: <DownloadIcon />,
-                                            hidden: !(letter.can_download && letter.download_url),
-                                        },
-                                    ]}
-                                />
-                            </div>
-                        ))
+                                <Button size="sm" render={<Link href={`${urls.index}?tab=authorizations`} />}>
+                                    Review now
+                                </Button>
+                            </CardContent>
+                        </Card>
                     )}
-                </CardContent>
-            </Card>
+
+                    <Card className="shadow-none">
+                        <CardHeader className="flex flex-col gap-3 border-b bg-muted/20 lg:flex-row lg:items-center lg:justify-between">
+                            <CardTitle className="text-base">
+                                {isAuthorizations ? 'Download authorizations' : 'My official letters'}
+                            </CardTitle>
+                            <div className="flex flex-wrap gap-2">
+                                <select
+                                    className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+                                    value={filters.department_code ?? ''}
+                                    onChange={(e) => applyFilters({ department_code: e.target.value || undefined })}
+                                >
+                                    <option value="">All Departments</option>
+                                    {Object.entries(departments).map(([code, label]) => (
+                                        <option key={code} value={code}>
+                                            {code} — {label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+                                    value={String(filters.year ?? '')}
+                                    onChange={(e) => applyFilters({ year: e.target.value || undefined })}
+                                >
+                                    <option value="">All Years</option>
+                                    {years.map((year) => (
+                                        <option key={year} value={year}>
+                                            {year}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+                                    value={String(filters.month ?? '')}
+                                    onChange={(e) => applyFilters({ month: e.target.value || undefined })}
+                                >
+                                    <option value="">All Months</option>
+                                    {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                                        <option key={month} value={month}>
+                                            {month}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2 pt-4">
+                            {letters.data.length === 0 ? (
+                                <p className="text-muted-foreground py-8 text-center text-sm">No letters found.</p>
+                            ) : (
+                                letters.data.map((letter) => (
+                                    <div
+                                        key={letter.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+                                    >
+                                        <div className="min-w-0 space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <code className="text-xs">{letter.reference_number}</code>
+                                                {letter.is_shared && <Badge variant="secondary">Shared</Badge>}
+                                            </div>
+                                            <div className="font-medium">{letter.name || letter.subject || 'Official letter'}</div>
+                                            <div className="text-muted-foreground text-xs">
+                                                {letter.subject}
+                                                {letter.creator ? ` · ${letter.creator}` : ''}
+                                                {isAuthorizations && letter.requested_by
+                                                    ? ` · Requested by ${letter.requested_by}`
+                                                    : ''}
+                                            </div>
+                                        </div>
+                                        <RowActions
+                                            items={[
+                                                { label: 'Open', href: letter.show_url, icon: <EyeIcon /> },
+                                                {
+                                                    label: 'Edit',
+                                                    href: letter.edit_url,
+                                                    icon: <PencilIcon />,
+                                                    hidden: !(letter.can_edit && letter.edit_url),
+                                                },
+                                                {
+                                                    label: 'Authorize',
+                                                    icon: <ShieldCheckIcon />,
+                                                    hidden: !(
+                                                        isAuthorizations &&
+                                                        letter.can_authorize_download &&
+                                                        letter.authorize_download_url
+                                                    ),
+                                                    onClick: () =>
+                                                        router.post(
+                                                            letter.authorize_download_url!,
+                                                            {},
+                                                            {
+                                                                onSuccess: () =>
+                                                                    notify('success', 'Download authorized.'),
+                                                            },
+                                                        ),
+                                                },
+                                                {
+                                                    label: 'Reject',
+                                                    icon: <ShieldXIcon />,
+                                                    destructive: true,
+                                                    hidden: !(
+                                                        isAuthorizations &&
+                                                        letter.can_authorize_download &&
+                                                        letter.reject_download_url
+                                                    ),
+                                                    onClick: () =>
+                                                        router.post(
+                                                            letter.reject_download_url!,
+                                                            {},
+                                                            {
+                                                                onSuccess: () =>
+                                                                    notify('success', 'Request rejected.'),
+                                                            },
+                                                        ),
+                                                },
+                                                {
+                                                    label: 'Request download',
+                                                    hidden: !(
+                                                        !isAuthorizations &&
+                                                        letter.can_request_download &&
+                                                        letter.request_download_url
+                                                    ),
+                                                    onClick: () =>
+                                                        router.post(
+                                                            letter.request_download_url!,
+                                                            {},
+                                                            {
+                                                                onSuccess: () =>
+                                                                    notify(
+                                                                        'success',
+                                                                        'Download authorization requested.',
+                                                                    ),
+                                                            },
+                                                        ),
+                                                },
+                                                {
+                                                    label: 'Download PDF',
+                                                    href: letter.download_url,
+                                                    icon: <DownloadIcon />,
+                                                    hidden: !(letter.can_download && letter.download_url),
+                                                },
+                                            ]}
+                                        />
+                                    </div>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </PageShell>
     );
 }

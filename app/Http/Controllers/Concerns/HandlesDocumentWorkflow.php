@@ -77,36 +77,19 @@ trait HandlesDocumentWorkflow
     }
 
     /**
-     * Weekly report wizard — step 2: update assigned action tasks.
+     * Legacy weekly-report action-tasks step — always continue to review.
+     * Action tasks are updated from Action Logs / dashboard instead.
      */
     public function weeklyReportActionTasks(Document $document)
     {
         $this->ensureWeeklyReportWizardDocument($document);
         $this->authorize('update', $document);
 
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-        $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
-
-        if (! $this->actionLogProgressService->hasPendingUpdates($user)) {
-            return redirect()->route('documents.weekly-report.review', $document);
-        }
-
-        $document->loadMissing(['user', 'period']);
-        $teamUsers = $this->teamUsersForSelection();
-
-        return Inertia::render('Documents/WeeklyReportActionTasks', [
-            'document' => $this->documentPayload($document),
-            'actionLogProgress' => $actionLogProgress,
-            'teamUsers' => $teamUsers->map(fn ($teamUser) => [
-                'id' => (string) $teamUser->id,
-                'name' => $teamUser->name,
-            ])->values(),
-        ]);
+        return redirect()->route('documents.weekly-report.review', $document);
     }
 
     /**
-     * Weekly report wizard — step 3: review and submit.
+     * Weekly report wizard — step 2: target status and submit.
      */
     public function weeklyReportReview(Document $document)
     {
@@ -116,27 +99,20 @@ trait HandlesDocumentWorkflow
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if ($this->actionLogProgressService->hasPendingUpdates($user)) {
-            return redirect()->route('documents.weekly-report.action-tasks', $document)
-                ->with('error', 'Please update all assigned action tasks before reviewing your report.');
-        }
-
         $document->loadMissing(['user', 'period', 'sharedUsers']);
         $relatedPlan = Document::findWeeklyPlanForUserAndPeriod(
             (string) $document->period_id,
             (string) $document->user_id
         );
         $content = is_array($document->content) ? $document->content : [];
-        $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
-        $hasActionTasksStep = ! empty($actionLogProgress['activeTasks'] ?? []);
 
         return Inertia::render('Documents/WeeklyReportReview', [
             'document' => $this->documentPayload($document),
             'relatedPlan' => $relatedPlan ? $this->documentPayload($relatedPlan) : null,
             'content' => $content,
-            'actionLogProgress' => $actionLogProgress,
-            'hasActionTasksStep' => $hasActionTasksStep,
             'submitUrl' => route('documents.update', $document),
+            'editUrl' => route('documents.edit', $document),
+            'indexUrl' => session('documents.last_listing_url') ?: route('documents.index'),
         ]);
     }
 

@@ -1,4 +1,6 @@
 import { router } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { EyeIcon, FileText } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -7,7 +9,7 @@ import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PageShell } from '@/lib/page-kit';
+import { PageShell, PaginationLinks } from '@/lib/page-kit';
 
 type Period = { id?: string; weekNumber?: number | string; year?: number | string; dateRange?: string };
 type DocLink = { id?: string; title?: string; showUrl: string; userName?: string | null };
@@ -48,7 +50,7 @@ export default function DocumentsIndex({
     return (
         <PageShell>
             <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
+                <h1 className="text-lg font-semibold tracking-tight">Documents</h1>
                 <p className="text-muted-foreground text-sm">Home › Documents</p>
             </div>
 
@@ -149,18 +151,18 @@ export default function DocumentsIndex({
                                             </TableCell>
                                             <TableCell>
                                                 {row.plan ? (
-                                                    <a href={row.plan.showUrl} className="text-sky-700 hover:underline">
+                                                    <AppLink href={row.plan.showUrl} className="text-sky-700 hover:underline">
                                                         {row.plan.title}
-                                                    </a>
+                                                    </AppLink>
                                                 ) : (
                                                     <span className="text-muted-foreground">Not created</span>
                                                 )}
                                             </TableCell>
                                             <TableCell>
                                                 {row.report ? (
-                                                    <a href={row.report.showUrl} className="text-sky-700 hover:underline">
+                                                    <AppLink href={row.report.showUrl} className="text-sky-700 hover:underline">
                                                         {row.report.title}
-                                                    </a>
+                                                    </AppLink>
                                                 ) : (
                                                     <span className="text-muted-foreground">Not created</span>
                                                 )}
@@ -189,18 +191,7 @@ export default function DocumentsIndex({
                                 </TableBody>
                             </Table>
                             {links && links.length > 3 && (
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {links.map((link, index) => (
-                                        <Button
-                                            key={`${link.label}-${index}`}
-                                            size="sm"
-                                            variant={link.active ? 'default' : 'outline'}
-                                            disabled={!link.url}
-                                            onClick={() => link.url && router.visit(link.url)}
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
-                                        />
-                                    ))}
-                                </div>
+                                <PaginationLinks className="mt-4" links={links} />
                             )}
                         </>
                     )}

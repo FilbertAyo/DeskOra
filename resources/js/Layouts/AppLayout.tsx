@@ -38,7 +38,7 @@ export default function AppLayout({ title, children }: { title: string; children
                     <AppSidebar />
                     <SidebarInset className="flex min-w-0 flex-1 flex-col">
                         <Header />
-                        <main className="relative mx-auto size-full max-w-360 flex-1 px-4 py-6 sm:px-6">
+                        <main className="relative mx-auto size-full max-w-360 min-h-0 flex-1 px-4 py-4 sm:px-5">
                             <div
                                 aria-hidden
                                 className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_8%,transparent),transparent_55%)]"
@@ -46,12 +46,12 @@ export default function AppLayout({ title, children }: { title: string; children
                             <ShellOverlays />
                             {children}
                         </main>
-                        <Toaster />
-                        <FlashToaster />
                         <Footer />
                     </SidebarInset>
                     <AnonymousFeedbackFab />
                 </SidebarProvider>
+                <Toaster />
+                <FlashToaster />
             </TooltipProvider>
         </ThemeProvider>
     );

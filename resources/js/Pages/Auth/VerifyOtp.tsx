@@ -1,4 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import type { ReactNode } from 'react';
 
 import AuthCard from '@/components/auth/AuthCard';
@@ -59,9 +61,9 @@ export default function VerifyOtp({ maskedEmail }: { maskedEmail: string }) {
                 >
                     Resend code
                 </Button>
-                <a href={route('login.verify-otp.cancel')} className="text-muted-foreground hover:text-foreground">
+                <AppLink href={route('login.verify-otp.cancel')} className="text-muted-foreground hover:text-foreground">
                     Back to login
-                </a>
+                </AppLink>
             </div>
         </AuthCard>
     );

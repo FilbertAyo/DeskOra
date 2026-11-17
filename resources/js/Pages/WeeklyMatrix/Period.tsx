@@ -1,4 +1,6 @@
 import { EyeIcon, PencilIcon } from 'lucide-react';
+
+import AppLink from '@/components/shared/AppLink';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -33,13 +35,13 @@ export default function WeeklyMatrixPeriod({ period, matrices, canCreate, indexU
                 description={`${period.dateRange} · ${period.status}`}
                 actions={
                     <>
-                        <Button variant="outline" render={<a href={indexUrl} />}>
+                        <Button variant="outline" render={<AppLink href={indexUrl} />}>
                             All weeks
                         </Button>
                         <Button variant="outline" render={<a href={downloadUrl} />}>
                             Download PDF
                         </Button>
-                        {canCreate && <Button render={<a href={createUrl} />}>Create</Button>}
+                        {canCreate && <Button render={<AppLink href={createUrl} />}>Create</Button>}
                     </>
                 }
             />

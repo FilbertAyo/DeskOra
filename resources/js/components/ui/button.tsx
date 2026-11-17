@@ -106,15 +106,23 @@ function Button({
       aria-busy={pending || undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       onClick={(event) => {
+        // Disable only after the click's default action. Setting disabled
+        // inside this handler cancels a native form submit in Chrome, so
+        // Sign in spins and never reaches the server.
         if (tracksAction && !disabled && !pending && !loading) {
-          setPendingId(id)
+          const actionId = id
           window.setTimeout(() => {
-            if (getPendingId() === id && activeRequests === 0) {
+            if (getPendingId() === null && activeRequests > 0) {
+              setPendingId(actionId)
+            }
+          }, 0)
+          window.setTimeout(() => {
+            if (getPendingId() === actionId && activeRequests === 0) {
               setPendingId(null)
             }
           }, 700)
           window.setTimeout(() => {
-            if (getPendingId() === id) {
+            if (getPendingId() === actionId) {
               clearPending()
             }
           }, 12000)

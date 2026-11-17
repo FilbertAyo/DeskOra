@@ -1,4 +1,6 @@
 import { router } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { DownloadIcon, EyeIcon, PencilIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -39,10 +41,10 @@ export default function ActionLogsIndex({ documents, canManageActionLogs, stateF
                 description="Weekly action tasks and progress."
                 actions={
                     <>
-                        <Button variant="outline" render={<a href={boardUrl} />}>
+                        <Button variant="outline" render={<AppLink href={boardUrl} />}>
                             Board
                         </Button>
-                        {canManageActionLogs && <Button render={<a href={createUrl} />}>Open Current Week Log</Button>}
+                        {canManageActionLogs && <Button render={<AppLink href={createUrl} />}>Open Current Week Log</Button>}
                     </>
                 }
             />

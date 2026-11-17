@@ -1,10 +1,17 @@
 import { Form, Link, usePage } from '@inertiajs/react';
-import { EyeIcon, PencilIcon } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { EyeIcon, PencilIcon, PlusIcon } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -95,19 +102,19 @@ function DataGrid({
 
     return (
         <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
                 <thead>
                     <tr className="border-b text-left">
-                        {columns.map((column) => <th className="px-3 py-2 font-medium" key={column}>{humanize(column)}</th>)}
+                        {columns.map((column) => <th className="text-muted-foreground px-2 py-1.5 text-xs font-medium" key={column}>{humanize(column)}</th>)}
                         {(showRoute || editRoute) && <th className="px-3 py-2 text-right font-medium">Actions</th>}
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map((row, index) => (
                         <tr className="border-b last:border-0" key={String(row.id ?? index)}>
-                            {columns.map((column) => <td className="max-w-64 px-3 py-3" key={column}>{displayValue(row[column])}</td>)}
+                            {columns.map((column) => <td className="max-w-64 px-2 py-1.5" key={column}>{displayValue(row[column])}</td>)}
                             {(showRoute || editRoute) && (
-                                <td className="whitespace-nowrap px-3 py-3 text-right">
+                                <td className="whitespace-nowrap px-2 py-1.5 text-right">
                                     <RowActions
                                         items={[
                                             {
@@ -166,6 +173,8 @@ function InventoryScreen({ config }: { config: InventoryPageConfig }) {
             formParam?.id === undefined ? {} : { [config.form.routeParam ?? config.form.param ?? 'id']: formParam.id },
         )
         : '';
+    const isInlineCreateForm = Boolean(config.form && (config.form.method ?? 'post') === 'post' && !formParam);
+    const [formOpen, setFormOpen] = useState(!isInlineCreateForm && Boolean(config.form));
 
     return (
         <>
@@ -175,14 +184,20 @@ function InventoryScreen({ config }: { config: InventoryPageConfig }) {
                 actions={
                     <>
                         {config.exportRoutes?.map((item) => (
-                            <Button key={`${item.name}-${item.label}`} variant="outline" render={<a href={route(item.name, item.params)} />}>{item.label}</Button>
+                            <Button key={`${item.name}-${item.label}`} variant="outline" render={<Link href={route(item.name, item.params)} prefetch cacheFor="60s" />}>{item.label}</Button>
                         ))}
                         {config.createRoute && <Button render={<Link href={route(config.createRoute)} />}>New</Button>}
+                        {isInlineCreateForm && (
+                            <Button type="button" onClick={() => setFormOpen(true)}>
+                                <PlusIcon className="size-4" />
+                                Add
+                            </Button>
+                        )}
                     </>
                 }
             />
 
-            {config.form && (
+            {config.form && !isInlineCreateForm && (
                 <Card className="mb-6">
                     <CardHeader><CardTitle>{config.form.submitLabel ?? config.title}</CardTitle></CardHeader>
                     <CardContent>
@@ -217,6 +232,50 @@ function InventoryScreen({ config }: { config: InventoryPageConfig }) {
                         </Form>
                     </CardContent>
                 </Card>
+            )}
+
+            {config.form && isInlineCreateForm && (
+                <Dialog open={formOpen} onOpenChange={setFormOpen}>
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>{config.form.submitLabel ?? `Add ${config.title}`}</DialogTitle>
+                        </DialogHeader>
+                        <Form
+                            action={formAction}
+                            method={config.form.method ?? 'post'}
+                            onError={() => notify('error', 'Please correct the highlighted fields.')}
+                            onSuccess={() => {
+                                notify('success', 'Inventory record saved.');
+                                setFormOpen(false);
+                            }}
+                            className="grid gap-4 sm:grid-cols-2"
+                        >
+                            {({ errors, processing }) => (
+                                <>
+                                    {config.form?.fields.map((field) => (
+                                        <div className={field.type === 'textarea' ? 'sm:col-span-2' : ''} key={field.name}>
+                                            <Label htmlFor={`modal-${field.name}`}>{field.label ?? humanize(field.name)}</Label>
+                                            {field.type === 'textarea' ? (
+                                                <Textarea id={`modal-${field.name}`} name={field.name} required={field.required} />
+                                            ) : (
+                                                <Input id={`modal-${field.name}`} name={field.name} type={field.type ?? 'text'} required={field.required} />
+                                            )}
+                                            {errors[field.name] && <p className="text-destructive mt-1 text-xs">{errors[field.name]}</p>}
+                                        </div>
+                                    ))}
+                                    <DialogFooter className="sm:col-span-2">
+                                        <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button disabled={processing} loading={processing} type="submit">
+                                            {config.form?.submitLabel ?? 'Save'}
+                                        </Button>
+                                    </DialogFooter>
+                                </>
+                            )}
+                        </Form>
+                    </DialogContent>
+                </Dialog>
             )}
 
             {record && <Card className="mb-6"><CardContent className="pt-6"><DetailGrid record={record} /></CardContent></Card>}
@@ -339,7 +398,6 @@ const pageMeta: Record<string, Partial<InventoryPageConfig>> = {
         { label: 'Assets Excel', name: 'inventory.my-items.export', params: { type: 'assets', format: 'xlsx' } },
         { label: 'Assets PDF', name: 'inventory.my-items.export', params: { type: 'assets', format: 'pdf' } },
     ] },
-    Index: {},
     'Assets/Index': { collection: 'assets', createRoute: 'inventory.assets.create', showRoute: 'inventory.assets.show', editRoute: 'inventory.assets.edit', routeParam: 'asset', exportRoutes: [
         { label: 'Export Excel', name: 'inventory.assets.export', params: { format: 'xlsx' } },
         { label: 'Export PDF', name: 'inventory.assets.export', params: { format: 'pdf' } },

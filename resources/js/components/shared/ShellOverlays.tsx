@@ -1,4 +1,6 @@
 import { usePage } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -143,14 +145,14 @@ export default function ShellOverlays() {
                                     {gate.requisition_count} requisition{gate.requisition_count === 1 ? '' : 's'} waiting
                                 </span>
                                 {gate.requisition_action_url && (
-                                    <Button size="sm" render={<a href={gate.requisition_action_url} />}>
+                                    <Button size="sm" render={<AppLink href={gate.requisition_action_url} />}>
                                         Open requisitions
                                     </Button>
                                 )}
                             </div>
                             <div className="flex flex-col gap-2">
                                 {gate.requisitions.map((item) => (
-                                    <a key={item.url} href={item.url} className="hover:bg-muted flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
+                                    <AppLink key={item.url} href={item.url} className="hover:bg-muted flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
                                         <span>
                                             <span className="block font-medium">{item.summary}</span>
                                             <span className="text-muted-foreground text-xs">
@@ -163,7 +165,7 @@ export default function ShellOverlays() {
                                             <span className="block font-medium">TZS {item.amount}</span>
                                             <span className="text-muted-foreground text-xs">{item.stage_label}</span>
                                         </span>
-                                    </a>
+                                    </AppLink>
                                 ))}
                             </div>
                         </div>
@@ -177,7 +179,7 @@ export default function ShellOverlays() {
                                 </p>
                             </div>
                             {gate.budget_action_url && (
-                                <Button render={<a href={gate.budget_action_url} />}>Open weekly budgets</Button>
+                                <Button render={<AppLink href={gate.budget_action_url} />}>Open weekly budgets</Button>
                             )}
                         </div>
                     )}

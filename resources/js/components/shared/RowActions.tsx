@@ -1,6 +1,7 @@
 import { MoreHorizontalIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import AppLink from '@/components/shared/AppLink';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -62,7 +63,7 @@ export default function RowActions({ items, align = 'end', label = 'Actions', cl
                                 <DropdownMenuItem
                                     variant={item.destructive ? 'destructive' : undefined}
                                     disabled={item.disabled}
-                                    render={item.href ? <a href={item.href} /> : undefined}
+                                    render={item.href ? <AppLink href={item.href} /> : undefined}
                                     onClick={item.href ? undefined : item.onClick}
                                 >
                                     {item.icon}

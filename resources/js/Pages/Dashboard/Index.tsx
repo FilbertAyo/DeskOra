@@ -1,11 +1,16 @@
 import { useForm } from '@inertiajs/react';
+
+import AppLink from '@/components/shared/AppLink';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+import { EyeIcon, PencilIcon } from 'lucide-react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CircularProgress } from '@/components/ui/circular-progress';
 import {
     Dialog,
     DialogContent,
@@ -15,10 +20,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { saveOfflineWorkLog } from '@/lib/offline-work-logs';
 import { notify } from '@/lib/notify';
 import { route } from '@/lib/route';
+import { cn } from '@/lib/utils';
 
 type Greeting = { salutation: string; firstName: string; message: string };
 
@@ -149,9 +156,16 @@ type PageProps = {
     teamUsers: TeamUser[];
 };
 
-const chartColors = ['#0077b6', '#0caf60', '#faad14', '#dc2626', '#7c3aed'];
-
 const progressOptions = ['Not Started', 'In Progress', 'Done', 'Cancelled', 'Reassign'] as const;
+
+function averageScore(values: Array<number | null>): number | null {
+    const numbers = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (numbers.length === 0) {
+        return null;
+    }
+
+    return Math.round(numbers.reduce((sum, value) => sum + value, 0) / numbers.length);
+}
 
 type Progress = (typeof progressOptions)[number];
 
@@ -365,14 +379,17 @@ export default function DashboardIndex({
         });
     };
 
-    const chartRows = performance.categories.map((category, index) => {
-        const row: Record<string, string | number | null> = { category };
+    const seriesAverages = performance.series.map((series) => ({
+        name: series.name,
+        score: averageScore(series.data),
+    }));
 
-        performance.series.forEach((series) => {
-            row[series.name] = series.data[index] ?? null;
-        });
-
-        return row;
+    const categoryScores = performance.categories.map((category, index) => {
+        const values = performance.series.map((series) => series.data[index] ?? null);
+        return {
+            category,
+            score: averageScore(values),
+        };
     });
 
     const weeklyPlan = reminder.showToast ? reminder.plan : null;
@@ -386,7 +403,7 @@ export default function DashboardIndex({
         <div className="flex flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+                    <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
                     <p className="text-muted-foreground mt-1 text-sm">
                         <span className="text-foreground font-medium">
                             {greeting.salutation}, {greeting.firstName}!
@@ -414,7 +431,7 @@ export default function DashboardIndex({
                         </p>
                     </div>
                     {coverage.actionUrl && (
-                        <Button render={<a href={coverage.actionUrl} />} variant="destructive">
+                        <Button render={<AppLink href={coverage.actionUrl} />} variant="destructive">
                             Update Year Plan Months
                         </Button>
                     )}
@@ -428,8 +445,8 @@ export default function DashboardIndex({
                         <Stat label="Shared" value={stats.shared}>
                             {stats.shared > 0 && (
                                 <div className="mt-2 flex flex-col gap-1 text-sm">
-                                    {stats.weeklyPlansUrl && <a href={stats.weeklyPlansUrl}>Weekly plans</a>}
-                                    {stats.weeklyReportsUrl && <a href={stats.weeklyReportsUrl}>Weekly reports</a>}
+                                    {stats.weeklyPlansUrl && <AppLink href={stats.weeklyPlansUrl}>Weekly plans</AppLink>}
+                                    {stats.weeklyReportsUrl && <AppLink href={stats.weeklyReportsUrl}>Weekly reports</AppLink>}
                                 </div>
                             )}
                         </Stat>
@@ -469,7 +486,7 @@ export default function DashboardIndex({
                             )}
                             {workLog.reportReady && (
                                 <p className="bg-muted rounded-lg px-3 py-2 text-sm">
-                                    You have work logs for this week. <a href={workLog.reportUrl}>Start your weekly report</a>.
+                                    You have work logs for this week. <AppLink href={workLog.reportUrl}>Start your weekly report</AppLink>.
                                 </p>
                             )}
                         </CardContent>
@@ -493,22 +510,75 @@ export default function DashboardIndex({
                                 </Button>
                             </CardAction>
                         </CardHeader>
-                        <CardContent className="h-72">
+                        <CardContent>
                             {performance.series.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">No performance series available for your role yet.</p>
                             ) : (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartRows}>
-                                        <CartesianGrid strokeDasharray="4 4" vertical={false} />
-                                        <XAxis dataKey="category" tick={{ fontSize: 12 }} />
-                                        <YAxis domain={[0, 100]} tickFormatter={(value: number) => `${Math.round(value)}%`} tick={{ fontSize: 12 }} />
-                                        <Tooltip formatter={(value) => (value === null || value === undefined ? 'n/a' : `${value}%`)} />
-                                        <Legend />
-                                        {performance.series.map((series, index) => (
-                                            <Bar key={series.name} dataKey={series.name} fill={chartColors[index % chartColors.length]} radius={2} />
-                                        ))}
-                                    </BarChart>
-                                </ResponsiveContainer>
+                                <div className="grid gap-6 lg:grid-cols-[11rem_minmax(0,1fr)]">
+                                    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border bg-muted/20 p-4">
+                                        <CircularProgress
+                                            value={performance.overallScore}
+                                            size={128}
+                                            strokeWidth={10}
+                                            showLabel
+                                            renderLabel={(value) => (
+                                                <span className="flex flex-col items-center leading-none">
+                                                    <span className="text-2xl font-semibold tabular-nums">{Math.round(value)}%</span>
+                                                    <span className="text-muted-foreground mt-1 text-[11px]">Overall</span>
+                                                </span>
+                                            )}
+                                            className="text-primary"
+                                            progressBgClassName="text-primary/15"
+                                        />
+                                        <p className="text-muted-foreground text-center text-xs">Plan completed this month</p>
+                                    </div>
+
+                                    <div className="flex flex-col gap-5">
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {seriesAverages.map((series) => (
+                                                <div
+                                                    key={series.name}
+                                                    className="ring-foreground/10 flex flex-col gap-2 rounded-xl p-3 shadow-none ring-1"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-muted-foreground text-sm font-medium">{series.name}</span>
+                                                        <span className="text-sm font-semibold tabular-nums">
+                                                            {series.score === null ? 'n/a' : `${series.score}%`}
+                                                        </span>
+                                                    </div>
+                                                    <Progress value={series.score ?? 0} className="**:data-[slot=progress-track]:h-1.5" />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {categoryScores.length > 0 && (
+                                            <div className="space-y-3">
+                                                <p className="text-sm font-medium">By focus area</p>
+                                                <div className="space-y-3">
+                                                    {categoryScores.map((item) => (
+                                                        <div key={item.category} className="space-y-1.5">
+                                                            <div className="flex items-center justify-between gap-3 text-sm">
+                                                                <span className="text-muted-foreground">{item.category}</span>
+                                                                <span
+                                                                    className={cn(
+                                                                        'font-medium tabular-nums',
+                                                                        item.score === null && 'text-muted-foreground',
+                                                                    )}
+                                                                >
+                                                                    {item.score === null ? 'n/a' : `${item.score}%`}
+                                                                </span>
+                                                            </div>
+                                                            <Progress
+                                                                value={item.score ?? 0}
+                                                                className="**:data-[slot=progress-track]:h-1.5"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -581,7 +651,7 @@ export default function DashboardIndex({
                                             <div key={`${event.message}-${index}`} className="flex items-start gap-2">
                                                 <Badge variant="outline">{event.badge}</Badge>
                                                 <div className="min-w-0 flex-1 text-sm">
-                                                    {event.href ? <a href={event.href}>{event.message}</a> : <span>{event.message}</span>}
+                                                    {event.href ? <AppLink href={event.href}>{event.message}</AppLink> : <span>{event.message}</span>}
                                                 </div>
                                                 <span className="text-muted-foreground text-xs whitespace-nowrap">{event.when}</span>
                                             </div>
@@ -607,7 +677,7 @@ export default function DashboardIndex({
                         <CardContent className="flex flex-col gap-2 px-3">
                             {actionCount === 0 && <p className="text-muted-foreground py-6 text-center">No action needed right now.</p>}
                             {actions.map((action) => (
-                                <a
+                                <AppLink
                                     key={action.label}
                                     href={action.url}
                                     data-feature="feature.dashboard.action_needed"
@@ -618,7 +688,7 @@ export default function DashboardIndex({
                                         <span className="text-muted-foreground text-sm">{plural(action.count, 'item')} waiting</span>
                                     </span>
                                     <Badge className={actionTone(action.label)}>{actionCta(action.label)}</Badge>
-                                </a>
+                                </AppLink>
                             ))}
                             {weeklyPlan?.showCta && weeklyPlan.url && <WeeklyAction kind="plan" segment={weeklyPlan} />}
                             {weeklyReport?.showCta && weeklyReport.url && <WeeklyAction kind="report" segment={weeklyReport} />}
@@ -658,9 +728,9 @@ export default function DashboardIndex({
                                 )}
                             </CardTitle>
                             <CardAction>
-                                <a href={actionLogsUrl} className="text-sm" data-feature="feature.dashboard.action_tasks">
+                                <AppLink href={actionLogsUrl} className="text-sm" data-feature="feature.dashboard.action_tasks">
                                     View all
-                                </a>
+                                </AppLink>
                             </CardAction>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-3">
@@ -682,17 +752,22 @@ export default function DashboardIndex({
                                                     <p className="text-muted-foreground mt-1 text-xs">From {task.carriedFrom} — no update this week yet.</p>
                                                 )}
                                             </div>
-                                            {task.editable ? (
-                                                <Button type="button" size="sm" data-feature="feature.dashboard.action_tasks" onClick={() => openTask(task)}>
-                                                    Update
-                                                </Button>
-                                            ) : (
-                                                task.showUrl && (
-                                                    <Button variant="outline" size="sm" render={<a href={task.showUrl} />}>
-                                                        View
-                                                    </Button>
-                                                )
-                                            )}
+                                            <RowActions
+                                                items={[
+                                                    {
+                                                        label: 'Update',
+                                                        icon: <PencilIcon />,
+                                                        hidden: !task.editable,
+                                                        onClick: () => openTask(task),
+                                                    },
+                                                    {
+                                                        label: 'View',
+                                                        href: task.showUrl,
+                                                        icon: <EyeIcon />,
+                                                        hidden: task.editable || !task.showUrl,
+                                                    },
+                                                ]}
+                                            />
                                         </div>
                                     ))}
                                 </>
@@ -811,7 +886,7 @@ export default function DashboardIndex({
                     )}
                     {matrix && (
                         <DialogFooter>
-                            <Button variant="outline" render={<a href={matrix.openUrl} />}>
+                            <Button variant="outline" render={<AppLink href={matrix.openUrl} />}>
                                 Open period
                             </Button>
                             <Button variant="outline" render={<a href={matrix.downloadUrl} />}>
@@ -935,7 +1010,7 @@ function GraceRow({ kind, entry }: { kind: string; entry: GraceEntry }) {
                 {entry.until ? ` You can still submit until ${entry.until}.` : ''}
             </span>
             {entry.actionUrl && entry.actionLabel && (
-                <Button className="mt-1" size="sm" variant="outline" render={<a href={entry.actionUrl} />}>
+                <Button className="mt-1" size="sm" variant="outline" render={<AppLink href={entry.actionUrl} />}>
                     {entry.actionLabel}
                 </Button>
             )}
@@ -953,7 +1028,7 @@ function WeeklyAction({ kind, segment }: { kind: 'plan' | 'report'; segment: Rem
           : 'Not started yet';
 
     return (
-        <a
+        <AppLink
             href={segment.url ?? '#'}
             data-feature="feature.dashboard.action_needed"
             className="hover:bg-muted flex items-center justify-between gap-3 rounded-lg px-2 py-2"
@@ -965,7 +1040,7 @@ function WeeklyAction({ kind, segment }: { kind: 'plan' | 'report'; segment: Rem
                 </span>
             </span>
             <Badge>{cta}</Badge>
-        </a>
+        </AppLink>
     );
 }
 
