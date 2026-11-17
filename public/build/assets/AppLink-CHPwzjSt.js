@@ -1,0 +1,1 @@
+import{r as s,p as n}from"./vendor-8QZznn41.js";import{L as a}from"./react-vendor-Bg2-Em9y.js";const m=s.forwardRef(function({prefetch:r=!0,cacheFor:t="60s",...o},p){return n.jsx(a,{ref:p,prefetch:r,cacheFor:t,...o})});export{m as A};
