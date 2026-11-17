@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\AnonymousFeedback;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
-use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,13 +15,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ManageAnonymousFeedbackController extends Controller
 {
-    public function index(Request $request): InertiaResponse
+    public function index(Request $request): InertiaResponse|RedirectResponse
     {
         $this->authorize('viewAny', AnonymousFeedback::class);
 
+        $status = $request->query('status');
+
+        if (! $request->has('status')) {
+            return redirect()->route('anonymous-feedback.index', ['status' => AnonymousFeedback::STATUS_NEW]);
+        }
+
         $query = AnonymousFeedback::query()->latest();
 
-        $status = $request->query('status');
         if (is_string($status) && $status !== '' && in_array($status, AnonymousFeedback::statuses(), true)) {
             $query->status($status);
         }
@@ -37,26 +41,19 @@ class ManageAnonymousFeedbackController extends Controller
 
         $feedbackUrl = url('/feedback/'.config('anonymous_feedback.public_token'));
 
-        $writer = new SvgWriter;
-        $qrSvg = $writer->write(new QrCode(
-            data: $feedbackUrl,
-            size: 180,
-            margin: 8,
-        ))->getString();
-
         return Inertia::render('AnonymousFeedback/Index', [
             'items' => $items->through(fn (AnonymousFeedback $item) => [
                 'id' => $item->id,
                 'category' => $item->category,
                 'body' => $item->body,
                 'status' => $item->status,
+                'createdAt' => optional($item->created_at)?->toIso8601String(),
                 'updateUrl' => route('anonymous-feedback.update', $item),
             ]),
             'statuses' => AnonymousFeedback::statuses(),
             'statusCounts' => $statusCounts,
             'feedbackUrl' => $feedbackUrl,
-            'qrSvg' => $qrSvg,
-            'activeStatus' => is_string($status) ? $status : null,
+            'activeStatus' => is_string($status) && $status !== '' ? $status : null,
             'indexUrl' => route('anonymous-feedback.index'),
             'qrDownloadUrl' => route('anonymous-feedback.qr-download'),
         ]);

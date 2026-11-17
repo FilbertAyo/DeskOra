@@ -84,7 +84,7 @@
                          
                             @can('manage anonymous feedback')
                                 <li class="{{ Request::routeIs('anonymous-feedback.*') ? 'active' : '' }}">
-                                    <a href="{{ route('anonymous-feedback.index') }}" class="pc-link">
+                                    <a href="{{ route('anonymous-feedback.index', ['status' => 'new']) }}" class="pc-link">
                                         <span class="pc-mtext">Anonymous Feedback</span>
                                     </a>
                                 </li>

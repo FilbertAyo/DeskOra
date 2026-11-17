@@ -89,7 +89,7 @@ class PortalNav
             }
 
             if ($user->can('manage anonymous feedback')) {
-                $management[] = self::link('Anonymous Feedback', 'anonymous-feedback.index', [], null, request()->routeIs('anonymous-feedback.*'));
+                $management[] = self::link('Anonymous Feedback', 'anonymous-feedback.index', ['status' => 'new'], null, request()->routeIs('anonymous-feedback.*'));
             }
 
             if ($user->can('view appreciation nominations')) {

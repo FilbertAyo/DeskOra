@@ -1,18 +1,53 @@
 ﻿import { Link, router } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { DownloadIcon, LinkIcon } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { notify } from '@/lib/notify';
 import { PageHeader, PageShell, PaginationLinks } from '@/lib/page-kit';
+import { cn } from '@/lib/utils';
 
-type Feedback = { id: string; category: string; body: string; status: string; updateUrl: string };
+type Feedback = {
+    id: string;
+    category: string;
+    body: string;
+    status: string;
+    createdAt?: string | null;
+    updateUrl: string;
+};
 type Paginated<T> = { data: T[]; links: Array<{ url: string | null; label: string; active: boolean }> };
 
 function statusLabel(status: string): string {
     return status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '—';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '—';
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function statusTone(status: string): string {
+    if (status === 'new') {
+        return 'border-sky-200 bg-sky-50 text-sky-800';
+    }
+    if (status === 'in_progress') {
+        return 'border-amber-200 bg-amber-50 text-amber-900';
+    }
+    if (status === 'resolved') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    }
+    return '';
 }
 
 export default function AnonymousFeedbackIndex({
@@ -20,7 +55,6 @@ export default function AnonymousFeedbackIndex({
     statuses,
     statusCounts,
     feedbackUrl,
-    qrSvg,
     activeStatus,
     indexUrl,
     qrDownloadUrl,
@@ -29,94 +63,141 @@ export default function AnonymousFeedbackIndex({
     statuses: string[];
     statusCounts: Record<string, number>;
     feedbackUrl: string;
-    qrSvg: string;
     activeStatus: string | null;
     indexUrl: string;
     qrDownloadUrl: string;
 }) {
+    const [copied, setCopied] = useState(false);
+
     const updateStatus = (url: string, status: string) => {
         router.patch(url, { status }, { preserveScroll: true });
+    };
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(feedbackUrl);
+            setCopied(true);
+            notify('success', 'Feedback link copied.');
+            window.setTimeout(() => setCopied(false), 1500);
+        } catch {
+            notify('error', 'Could not copy link.');
+        }
     };
 
     return (
         <PageShell>
             <PageHeader
                 title="Anonymous feedback"
-                description="Review and track confidential submissions."
+                description="Review confidential submissions and keep status moving."
                 actions={
-                    <Button variant="outline" render={<a href={qrDownloadUrl} />}>
-                        Download QR code
-                    </Button>
+                    <>
+                        <Button type="button" variant="outline" onClick={copyLink}>
+                            <LinkIcon />
+                            {copied ? 'Copied' : 'Copy link'}
+                        </Button>
+                        <Button variant="outline" render={<a href={qrDownloadUrl} />}>
+                            <DownloadIcon />
+                            Download QR
+                        </Button>
+                    </>
                 }
             />
 
-            <div className="grid gap-3 sm:grid-cols-3">
-                {statuses.map((status) => (
-                    <Link key={status} href={`${indexUrl}?status=${status}`}>
-                        <Card className={activeStatus === status ? 'border-primary shadow-none' : 'shadow-none'}>
-                            <CardContent className="pt-6">
-                                <p className="text-muted-foreground text-sm capitalize">{statusLabel(status)}</p>
-                                <p className="text-2xl font-semibold">{statusCounts[status] ?? 0}</p>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                ))}
-            </div>
-
             <Card className="shadow-none">
-                <CardHeader className="border-b bg-muted/20">
-                    <CardTitle className="text-base">Public feedback link</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap items-center gap-5 pt-6">
-                    <div className="rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-                    <a className="block break-all text-sm" href={feedbackUrl}>
-                        {feedbackUrl}
-                    </a>
+                <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Public feedback link</p>
+                        <p className="text-muted-foreground mt-0.5 truncate text-xs">{feedbackUrl}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {statuses.map((status) => {
+                            const href = `${indexUrl}?status=${status}`;
+                            const active = activeStatus === status;
+                            return (
+                                <Link
+                                    key={status}
+                                    href={href}
+                                    className={cn(
+                                        'rounded-md border px-3 py-1.5 text-sm transition-colors',
+                                        active
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'hover:bg-muted/60',
+                                    )}
+                                >
+                                    {statusLabel(status)}{' '}
+                                    <span className={cn('tabular-nums', active ? 'opacity-90' : 'text-muted-foreground')}>
+                                        {statusCounts[status] ?? 0}
+                                    </span>
+                                </Link>
+                            );
+                        })}
+                        <Link
+                            href={indexUrl + '?status='}
+                            className={cn(
+                                'rounded-md border px-3 py-1.5 text-sm transition-colors',
+                                activeStatus === null || activeStatus === ''
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'hover:bg-muted/60',
+                            )}
+                        >
+                            All
+                        </Link>
+                    </div>
                 </CardContent>
             </Card>
 
-            <div className="flex flex-wrap items-center gap-2">
-                <Button variant={!activeStatus ? 'default' : 'outline'} render={<Link href={indexUrl} />}>
-                    All
-                </Button>
-                {statuses.map((status) => (
-                    <Button
-                        key={status}
-                        variant={activeStatus === status ? 'default' : 'outline'}
-                        render={<Link href={`${indexUrl}?status=${status}`} />}
-                    >
-                        {statusLabel(status)} ({statusCounts[status] ?? 0})
-                    </Button>
-                ))}
-            </div>
-
-            <div className="grid gap-4">
-                {items.data.map((item) => (
-                    <Card key={item.id} className="shadow-none">
-                        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b bg-muted/20">
-                            <CardTitle className="text-base capitalize">{item.category}</CardTitle>
-                            <div className="flex items-center gap-2">
-                                <Badge variant="outline">{statusLabel(item.status)}</Badge>
-                                <RowActions
-                                    items={statuses
-                                        .filter((status) => status !== item.status)
-                                        .map((status) => ({
-                                            label: `Mark ${statusLabel(status)}`,
-                                            onClick: () => updateStatus(item.updateUrl, status),
-                                        }))}
-                                />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                            <p className="whitespace-pre-wrap text-sm">{item.body}</p>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {items.data.length === 0 && (
-                <p className="text-muted-foreground py-10 text-center">No feedback matches this filter.</p>
-            )}
+            <Card className="shadow-none">
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12">#</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Feedback</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Submitted</TableHead>
+                                <TableHead className="w-12 text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {items.data.map((item, index) => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
+                                    <TableCell className="capitalize">{item.category}</TableCell>
+                                    <TableCell className="max-w-xl whitespace-normal">
+                                        <p className="line-clamp-3 text-sm">{item.body}</p>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={statusTone(item.status)}>
+                                            {statusLabel(item.status)}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap text-sm">
+                                        {formatDate(item.createdAt)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <RowActions
+                                            items={statuses
+                                                .filter((status) => status !== item.status)
+                                                .map((status) => ({
+                                                    label: `Mark ${statusLabel(status)}`,
+                                                    onClick: () => updateStatus(item.updateUrl, status),
+                                                }))}
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {items.data.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-muted-foreground py-10 text-center">
+                                        No feedback matches this filter.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
 
             <PaginationLinks links={items.links} />
         </PageShell>

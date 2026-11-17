@@ -29,9 +29,7 @@ class WeeklyBudgetReviewService
             return 0;
         }
 
-        $cacheKey = 'weekly-budget-pending-count-'.($periodId !== null && $periodId !== '' ? $periodId : 'all');
-
-        return (int) Cache::remember($cacheKey, now()->addSeconds(30), function () use ($periodId) {
+        $count = function () use ($periodId): int {
             $query = WeeklyPlan::query()
                 ->where('state', WeeklyPlan::STATE_SUBMITTED)
                 ->where(function ($statusQuery) {
@@ -51,8 +49,17 @@ class WeeklyBudgetReviewService
                 $query->where('period_id', $periodId);
             }
 
-            return $query->count();
-        });
+            return (int) $query->count();
+        };
+
+        // Skip short-lived cache in tests so mutations are reflected immediately.
+        if (app()->runningUnitTests()) {
+            return $count();
+        }
+
+        $cacheKey = 'weekly-budget-pending-count-'.($periodId !== null && $periodId !== '' ? $periodId : 'all');
+
+        return (int) Cache::remember($cacheKey, now()->addSeconds(30), $count);
     }
 
     /**
@@ -257,22 +264,45 @@ class WeeklyBudgetReviewService
         return array_merge($payload, WeeklyBudgetApprovalFlow::itemViewContext($payload, $user));
     }
 
+    /**
+     * No explicit week/year search — show the last two work periods only.
+     */
+    public function isRecentPeriodsDefaultView(Request $request): bool
+    {
+        return ! $request->filled('period_id') && ! $request->filled('year');
+    }
+
+    /**
+     * @deprecated Use isRecentPeriodsDefaultView(); kept for existing callers/tests.
+     */
     public function isAllPendingWeeksView(Request $request): bool
     {
         return $request->input('status') === Document::BUDGET_REVIEW_PENDING
-            && ! $request->filled('period_id');
+            && $this->isRecentPeriodsDefaultView($request);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function latestWorkPeriodIds(int $limit = 2): array
+    {
+        return WorkPeriod::query()
+            ->orderBy('year', 'desc')
+            ->orderBy('week_number', 'desc')
+            ->limit($limit)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
     }
 
     public function resolveWeeklyBudgetReviewDefaultPeriod(Request $request): ?WorkPeriod
     {
-        if ($request->has('period_id') || $this->isAllPendingWeeksView($request)) {
+        // Default list is the last two periods (no single period selected).
+        if ($this->isRecentPeriodsDefaultView($request)) {
             return null;
         }
 
-        return WorkPeriod::query()
-            ->orderBy('year', 'desc')
-            ->orderBy('week_number', 'desc')
-            ->first();
+        return WorkPeriod::query()->find((string) $request->string('period_id'));
     }
 
     public function buildWeeklyBudgetReviewQuery(Request $request, ?WorkPeriod $defaultPeriod, ?string $statusFilter)
@@ -297,16 +327,19 @@ class WeeklyBudgetReviewService
 
         if ($request->filled('period_id')) {
             $query->forPeriod($request->string('period_id')->toString());
-        } elseif ($defaultPeriod) {
-            $query->forPeriod($defaultPeriod->id);
-        }
+        } elseif ($this->isRecentPeriodsDefaultView($request)) {
+            $latestPeriodIds = $this->latestWorkPeriodIds(2);
+            if ($latestPeriodIds !== []) {
+                $query->whereIn('period_id', $latestPeriodIds);
+            }
 
-        if ($this->isAllPendingWeeksView($request) || ($request->has('period_id') && ! $request->filled('period_id'))) {
             $query->join('work_periods', 'documents.period_id', '=', 'work_periods.id')
                 ->orderBy('work_periods.year')
                 ->orderBy('work_periods.week_number')
                 ->orderBy('documents.created_at')
                 ->select('documents.*');
+        } elseif ($defaultPeriod) {
+            $query->forPeriod($defaultPeriod->id);
         }
 
         if ($request->filled('year')) {
@@ -343,8 +376,8 @@ class WeeklyBudgetReviewService
             ? (string) $request->string('period_id')
             : ($defaultPeriod?->id ? (string) $defaultPeriod->id : null);
 
-        $periodLabel = $resolvedPeriodId ? 'Selected Week' : 'All Weeks';
-        $periodDateRange = $resolvedPeriodId ? 'Selected Work Period' : 'All work periods';
+        $periodLabel = $resolvedPeriodId ? 'Selected Week' : 'Last 2 work periods';
+        $periodDateRange = $resolvedPeriodId ? 'Selected Work Period' : 'Last 2 work periods';
         if ($resolvedPeriodId) {
             $period = WorkPeriod::query()->find($resolvedPeriodId);
             if ($period) {

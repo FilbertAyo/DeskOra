@@ -50,8 +50,7 @@ trait HandlesDocumentBudgetReview
         $statusFilter = $request->input('status');
         $query = $this->buildWeeklyBudgetReviewQuery($request, $defaultPeriod, $statusFilter);
 
-        if (! $this->weeklyBudgetReviewService->isAllPendingWeeksView($request)
-            && ! ($request->has('period_id') && ! $request->filled('period_id'))) {
+        if (! $this->weeklyBudgetReviewService->isRecentPeriodsDefaultView($request)) {
             $query->latest();
         }
 
@@ -139,8 +138,8 @@ trait HandlesDocumentBudgetReview
             'activePeriodId' => $activePeriodId,
             'approvalFlowSteps' => \App\Support\WeeklyBudgetApprovalFlow::steps(),
             'userApprovalActions' => \App\Support\WeeklyBudgetApprovalFlow::userActionSummary($user),
-            'showingAllPendingWeeks' => $this->weeklyBudgetReviewService->isAllPendingWeeksView($request)
-                || ($request->has('period_id') && ! $request->filled('period_id')),
+            'showingAllPendingWeeks' => false,
+            'showingRecentPeriods' => $this->weeklyBudgetReviewService->isRecentPeriodsDefaultView($request),
             'filters' => $request->only(['period_id', 'status', 'user_id', 'year']),
             'indexUrl' => route('documents.weekly-budget-review'),
             'exportPdfUrl' => route('documents.weekly-budget-review.export.pdf', $request->query()),

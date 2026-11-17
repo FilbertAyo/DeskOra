@@ -147,27 +147,23 @@ class WeeklyBudgetReviewTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 1. Default next-week filtering
+    // 1. Default last-two work period filtering
     // ------------------------------------------------------------------
 
-    public function test_budget_review_defaults_to_next_week_period(): void
+    public function test_budget_review_defaults_to_last_two_work_periods(): void
     {
         [$current, $next] = $this->createPeriods();
         $dept = $this->createDepartment();
         $staff = $this->createStaffUser($dept);
         $viewer = $this->createViewer();
 
-        // Plan for next week (the default) with budget
         $this->createPlanWithBudget($staff, $next, [
             ['item' => 'Laptop', 'description_purpose' => 'Dev', 'amount' => '1000'],
         ]);
-
-        // Plan for current week (should NOT appear by default)
         $this->createPlanWithBudget($staff, $current, [
             ['item' => 'Desk', 'description_purpose' => 'Office', 'amount' => '500'],
         ]);
 
-        // Verify period resolution works correctly
         $svc = app(\App\Services\WorkPeriodService::class);
         $resolvedCurrent = $svc->getCurrentPeriod();
         $resolvedNext = $svc->periodForWeeklyPlanSubmission();
@@ -175,12 +171,12 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertNotNull($resolvedNext, 'Next period should be found');
         $this->assertEquals($next->id, $resolvedNext->id, 'Next period should be week 17');
 
-        // Default view (no filters) should show only next-week plans
         $response = $this->actingAs($viewer)->get(route('documents.weekly-budget-review'));
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Documents/WeeklyBudgetReview')
             ->where('showingAllPendingWeeks', false)
+            ->where('showingRecentPeriods', true)
             ->has('periodOptions')
             ->has('documents'));
     }
@@ -226,13 +222,25 @@ class WeeklyBudgetReviewTest extends TestCase
             )));
     }
 
-    public function test_pending_status_without_period_shows_older_weeks_oldest_first(): void
+    public function test_pending_status_without_period_shows_last_two_work_periods_only(): void
     {
         [$current, $next] = $this->createPeriods();
+        $older = WorkPeriod::create([
+            'year' => 2026,
+            'week_number' => 15,
+            'week_start_date' => '2026-04-06',
+            'week_end_date' => '2026-04-12',
+            'plan_deadline' => '2026-04-10',
+            'report_deadline' => '2026-04-11',
+            'status' => WorkPeriod::STATUS_OPEN,
+        ]);
         $dept = $this->createDepartment();
         $staff = $this->createStaffUser($dept);
         $reviewer = $this->createReviewer();
 
+        $this->createPlanWithBudget($staff, $older, [
+            ['item' => 'Printer', 'description_purpose' => 'Ops', 'amount' => '200'],
+        ]);
         $this->createPlanWithBudget($staff, $current, [
             ['item' => 'Desk', 'description_purpose' => 'Office', 'amount' => '500'],
         ]);
@@ -243,15 +251,35 @@ class WeeklyBudgetReviewTest extends TestCase
         $items = app(\App\Services\Documents\WeeklyBudgetReviewService::class)
             ->actionableItemsFor($reviewer, 10);
 
-        $this->assertSame(['Desk', 'Laptop'], $items->pluck('item')->all());
+        $this->assertSame(['Printer', 'Desk', 'Laptop'], $items->pluck('item')->all());
 
         $this->actingAs($reviewer)
             ->get(route('documents.weekly-budget-review', ['status' => 'pending']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Documents/WeeklyBudgetReview')
-                ->where('showingAllPendingWeeks', true)
-                ->where('statusFilter', 'pending'));
+                ->where('showingAllPendingWeeks', false)
+                ->where('showingRecentPeriods', true)
+                ->where('statusFilter', 'pending')
+                ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Desk')
+                ) && collect($rows)->contains(fn ($row) =>
+                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Laptop')
+                ) && ! collect($rows)->contains(fn ($row) =>
+                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Printer')
+                )));
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.weekly-budget-review', [
+                'status' => 'pending',
+                'period_id' => $older->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('showingRecentPeriods', false)
+                ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
+                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Printer')
+                )));
     }
 
     public function test_pending_view_keeps_each_staff_budget_under_its_own_work_period(): void

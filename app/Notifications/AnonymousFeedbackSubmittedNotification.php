@@ -35,7 +35,7 @@ class AnonymousFeedbackSubmittedNotification extends Notification
             ->line('Type: '.$categoryLabel)
             ->line('Status: New')
             ->line('Message: '.$preview)
-            ->action('Open feedback inbox', route('anonymous-feedback.index'))
+            ->action('Open feedback inbox', route('anonymous-feedback.index', ['status' => 'new']))
             ->line('You are receiving this because you can manage anonymous feedback.');
     }
 }

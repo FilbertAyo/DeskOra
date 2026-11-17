@@ -67,7 +67,7 @@ function asList<T>(value: T[] | Record<string, T> | undefined | null): T[] {
 export default function WeeklyBudgetReview({
     grouped = {},
     stats,
-    showingAllPendingWeeks,
+    showingRecentPeriods,
     statusFilter,
     periodOptions = [],
     usersWithBudgets = [],
@@ -81,7 +81,7 @@ export default function WeeklyBudgetReview({
 }: {
     grouped?: Record<string, PeriodGroup> | PeriodGroup[];
     stats?: { pending?: number; approved?: number; rejected?: number; requested_total?: number; provided_total?: number };
-    showingAllPendingWeeks?: boolean;
+    showingRecentPeriods?: boolean;
     statusFilter?: string | null;
     periodOptions?: Period[];
     usersWithBudgets?: Array<{ id: string; name: string }>;
@@ -124,7 +124,11 @@ export default function WeeklyBudgetReview({
         <div className="flex flex-col gap-6">
             <PageHeader
                 title="Weekly Budget"
-                description={showingAllPendingWeeks ? 'Pending budgets across weeks' : 'Review weekly budget submissions.'}
+                description={
+                    showingRecentPeriods
+                        ? 'Showing the last two work periods. Pick a week to open older budgets.'
+                        : 'Review weekly budget submissions.'
+                }
                 actions={
                     <>
                         {addMidweekUrl && (
@@ -165,7 +169,7 @@ export default function WeeklyBudgetReview({
                         value={activePeriodId ?? filters.period_id ?? ''}
                         onChange={(event) => apply({ period_id: event.target.value || undefined })}
                     >
-                        <option value="">All Weeks</option>
+                        <option value="">Last 2 work periods</option>
                         {periodOptions.map((period) => (
                             <option key={period.id} value={period.id}>
                                 Week {period.weekNumber} · {period.year}
@@ -200,9 +204,9 @@ export default function WeeklyBudgetReview({
                 </CardContent>
             </Card>
 
-            {showingAllPendingWeeks && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                    Showing all pending weekly budgets across weeks, oldest first. Finish older items before the current week piles up again.
+            {showingRecentPeriods && (
+                <div className="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+                    Showing budgets from the last two work periods. Use the week filter to open an older period.
                 </div>
             )}
 

@@ -266,7 +266,9 @@ class AnonymousFeedbackTest extends TestCase
             'status' => AnonymousFeedback::STATUS_NEW,
         ]);
 
-        $response = $this->actingAs($manager)->get(route('anonymous-feedback.index'));
+        $response = $this->actingAs($manager)->get(route('anonymous-feedback.index', [
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]));
 
         $response->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -293,14 +295,22 @@ class AnonymousFeedbackTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('anonymous-feedback.index'));
 
-        $response->assertOk();
-        $response->assertInertia(fn (Assert $page) => $page
+        $response->assertRedirect(route('anonymous-feedback.index', ['status' => AnonymousFeedback::STATUS_NEW]));
+
+        $filtered = $this->actingAs($manager)->get(route('anonymous-feedback.index', [
+            'status' => AnonymousFeedback::STATUS_NEW,
+        ]));
+
+        $filtered->assertOk();
+        $filtered->assertInertia(fn (Assert $page) => $page
             ->component('AnonymousFeedback/Index')
             ->where('statusCounts.new', 1)
             ->where('statusCounts.in_progress', 1)
-            ->has('items.data', 2)
-            ->has('qrSvg')
-            ->has('feedbackUrl'));
+            ->where('activeStatus', AnonymousFeedback::STATUS_NEW)
+            ->has('items.data', 1)
+            ->missing('qrSvg')
+            ->has('feedbackUrl')
+            ->has('qrDownloadUrl'));
     }
 
     public function test_marking_feedback_resolved_clears_fab_new_count(): void
