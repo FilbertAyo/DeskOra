@@ -110,42 +110,52 @@ class DashboardController extends Controller
         ];
 
         if ($currentYearPlan) {
-            $userSubDepartmentIds = $user->subDepartments()
-                ->pluck('departments.id')
-                ->filter()
-                ->values()
-                ->all();
+            $yearPlanMonthCoverageAlert = Cache::remember(
+                'dashboard-year-plan-coverage:'.$user->id.':'.$currentYearPlan->id,
+                now()->addMinutes(10),
+                function () use ($user, $currentYearPlan) {
+                    $userSubDepartmentIds = $user->subDepartments()
+                        ->pluck('departments.id')
+                        ->filter()
+                        ->values()
+                        ->all();
 
-            if (empty($userSubDepartmentIds) && $user->department && $user->department->parent_id !== null) {
-                $userSubDepartmentIds = [(string) $user->department_id];
-            }
+                    if (empty($userSubDepartmentIds) && $user->department && $user->department->parent_id !== null) {
+                        $userSubDepartmentIds = [(string) $user->department_id];
+                    }
 
-            $scopeDepartmentIds = ! empty($userSubDepartmentIds)
-                ? $userSubDepartmentIds
-                : $user->departmentScopeIds();
-            $scopedYearPlanActivities = YearPlanActivity::query()
-                ->where('year_plan_id', $currentYearPlan->id)
-                ->whereIn('department_id', $scopeDepartmentIds);
+                    $scopeDepartmentIds = ! empty($userSubDepartmentIds)
+                        ? $userSubDepartmentIds
+                        : $user->departmentScopeIds();
+                    $scopedYearPlanActivities = YearPlanActivity::query()
+                        ->where('year_plan_id', $currentYearPlan->id)
+                        ->whereIn('department_id', $scopeDepartmentIds);
 
-            $totalScopedActivities = (clone $scopedYearPlanActivities)->count();
-            $missingPlannedMonthCount = (clone $scopedYearPlanActivities)
-                ->where(function ($query) {
-                    $query
-                        ->whereNull('planned_months')
-                        ->orWhereJsonLength('planned_months', '=', 0);
-                })
-                ->count();
+                    $totalScopedActivities = (clone $scopedYearPlanActivities)->count();
+                    $missingPlannedMonthCount = (clone $scopedYearPlanActivities)
+                        ->where(function ($query) {
+                            $query
+                                ->whereNull('planned_months')
+                                ->orWhereJsonLength('planned_months', '=', 0);
+                        })
+                        ->count();
 
-            $yearPlanMonthCoverageAlert = [
-                'show' => $totalScopedActivities > 0 && $missingPlannedMonthCount > 0,
-                'year' => $currentYearPlan->year,
-                'totalActivities' => $totalScopedActivities,
-                'missingMonthCount' => $missingPlannedMonthCount,
-                'actionUrl' => route('year-plan.show', $currentYearPlan->year),
-            ];
+                    return [
+                        'show' => $totalScopedActivities > 0 && $missingPlannedMonthCount > 0,
+                        'year' => $currentYearPlan->year,
+                        'totalActivities' => $totalScopedActivities,
+                        'missingMonthCount' => $missingPlannedMonthCount,
+                        'actionUrl' => route('year-plan.show', $currentYearPlan->year),
+                    ];
+                },
+            );
         }
 
-        $approvalActions = $this->approvalActionsFor($user);
+        $approvalActions = Cache::remember(
+            'dashboard-approval-actions:'.$user->id,
+            now()->addSeconds(45),
+            fn () => $this->approvalActionsFor($user),
+        );
 
         $todayWorkLog = $currentPeriod
             ? WeeklyWorkLog::query()
@@ -160,7 +170,11 @@ class DashboardController extends Controller
             && $weeklyScorecard['work_log_days'] > 0
             && ! $weeklyScorecard['report_submitted']
             && Document::canUserCreateType($user, Document::TYPE_WEEKLY_REPORT);
-        $monthlyPerformance = $this->monthlyPerformanceService->forUser($user, 6);
+        $monthlyPerformance = Cache::remember(
+            'dashboard-monthly-performance:'.$user->id,
+            now()->addMinutes(10),
+            fn () => $this->monthlyPerformanceService->forUser($user, 6),
+        );
 
         return Inertia::render('Dashboard/Index', $this->dashboardProps(
             $user,

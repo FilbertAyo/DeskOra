@@ -7,6 +7,7 @@ use App\Database\DocumentsUnionView;
 use App\Models\AnonymousFeedback;
 use App\Models\Request as FinanceRequest;
 use App\Models\WorkPeriod;
+use App\Services\ActionLogProgressService;
 use App\Services\RequestApprovalNavService;
 use App\Support\ShortId;
 use Illuminate\Http\RedirectResponse;
@@ -27,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ActionLogProgressService::class);
     }
 
     /**

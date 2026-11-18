@@ -72,6 +72,7 @@ class MonthlyPerformanceService
             : $this->preferredByPeriod(
                 WeeklyReport::query()->where('user_id', $user->id)->whereIn('period_id', $periodIds)->get(['id', 'period_id', 'state'])
             );
+        $logDaysByMonth = $this->workLogDaysByMonth($user, $periodIds, $rangeStart, $rangeEnd);
 
         for ($i = $months - 1; $i >= 0; $i--) {
             $monthStart = now()->startOfMonth()->subMonths($i)->startOfMonth();
@@ -89,7 +90,18 @@ class MonthlyPerformanceService
                     return $start <= $monthEndDate && $end >= $monthStartDate;
                 })
                 ->values();
-            $detail = $this->scoreMonth($user, $periods, $monthStart, $monthEnd, $canPlan, $canReport, $canReview, $ownedPlans, $ownedReports);
+            $detail = $this->scoreMonth(
+                $user,
+                $periods,
+                $monthStart,
+                $monthEnd,
+                $canPlan,
+                $canReport,
+                $canReview,
+                $ownedPlans,
+                $ownedReports,
+                (int) ($logDaysByMonth[$monthStart->format('Y-m')] ?? 0),
+            );
             $detail['label'] = $label;
             $detail['month_key'] = $monthStart->format('Y-m');
             $detail['is_current'] = $detail['month_key'] === $currentMonthKey;
@@ -187,16 +199,15 @@ class MonthlyPerformanceService
         bool $canReview,
         Collection $ownedPlans,
         Collection $ownedReports,
+        int $logDays,
     ): array {
         $weeks = $periods->count();
         $plansSubmitted = 0;
         $reportsSubmitted = 0;
         $expectedWeekdays = 0;
-        $periodIds = [];
 
         foreach ($periods as $period) {
             $periodId = (string) $period->id;
-            $periodIds[] = $periodId;
 
             if ($canPlan && $this->periodDocumentSubmitted($ownedPlans->get($periodId), $periodId, (string) $user->id, true)) {
                 $plansSubmitted++;
@@ -207,16 +218,6 @@ class MonthlyPerformanceService
             }
 
             $expectedWeekdays += $this->weekdayCountInPeriodWithinMonth($period, $monthStart, $monthEnd);
-        }
-
-        $logDays = 0;
-        if ($periodIds !== [] && SchemaTables::has('weekly_work_logs')) {
-            $logDays = (int) WeeklyWorkLog::query()
-                ->where('user_id', $user->id)
-                ->whereIn('period_id', $periodIds)
-                ->whereDate('log_date', '>=', $monthStart->toDateString())
-                ->whereDate('log_date', '<=', $monthEnd->toDateString())
-                ->count();
         }
 
         $actionsRate = $this->actionClosureRate($user, $monthStart, $monthEnd, $weeks > 0 && $monthStart->isSameMonth(now()));
@@ -240,6 +241,32 @@ class MonthlyPerformanceService
             'missed_plans' => $canPlan ? max(0, $weeks - $plansSubmitted) : 0,
             'missed_reports' => $canReport ? max(0, $weeks - $reportsSubmitted) : 0,
         ];
+    }
+
+    /**
+     * @param  list<string>  $periodIds
+     * @return array<string, int>
+     */
+    private function workLogDaysByMonth(User $user, array $periodIds, Carbon $rangeStart, Carbon $rangeEnd): array
+    {
+        if ($periodIds === [] || ! SchemaTables::has('weekly_work_logs')) {
+            return [];
+        }
+
+        $counts = [];
+        $rows = WeeklyWorkLog::query()
+            ->where('user_id', $user->id)
+            ->whereIn('period_id', $periodIds)
+            ->whereDate('log_date', '>=', $rangeStart->toDateString())
+            ->whereDate('log_date', '<=', $rangeEnd->toDateString())
+            ->get(['log_date']);
+
+        foreach ($rows as $row) {
+            $key = Carbon::parse($row->log_date)->format('Y-m');
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+        }
+
+        return $counts;
     }
 
     private function weekdayCountInPeriodWithinMonth(WorkPeriod $period, Carbon $monthStart, Carbon $monthEnd): int

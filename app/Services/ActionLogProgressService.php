@@ -6,6 +6,7 @@ use App\Models\ActionLog;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\Documents\DocumentContentAssembler;
 use App\Support\ActionLogTaskSupport;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -32,7 +33,7 @@ class ActionLogProgressService
         $currentPeriod = WorkPeriod::getCurrent();
 
         $actionLogQuery = ActionLog::query()
-            ->with(['period', 'tasks.assignees'])
+            ->with(['period', 'tasks.assignees', 'tasks.history'])
             ->whereNull('superseded_by_action_log_id')
             ->whereNotNull('period_id');
 
@@ -52,9 +53,15 @@ class ActionLogProgressService
                 ->whereHas('tasks.assignees', fn (Builder $query) => $query->where('users.id', $user->id));
         }
 
+        $assembler = app(DocumentContentAssembler::class);
         $documents = $actionLogQuery->get()
-            ->map(fn (ActionLog $log) => Document::fromDomainId((string) $log->id))
-            ->filter()
+            ->map(function (ActionLog $log) use ($assembler) {
+                $document = Document::fromActionLogModel($log);
+                $document->setRelation('period', $log->period);
+                $document->setAttribute('content', $assembler->assembleActionLogContent($log));
+
+                return $document;
+            })
             ->values();
 
         if ($documents->isEmpty()) {

@@ -475,12 +475,7 @@ export default function DashboardIndex({
                                     </Button>
                                 </>
                             ) : workLog.canLog ? (
-                                <>
-                                    <p className="text-muted-foreground">Capture what you did today — it helps fill your weekly report later.</p>
-                                    <Button type="button" className="w-fit" data-feature="feature.dashboard.work_log_open" onClick={openLog}>
-                                        Add work log
-                                    </Button>
-                                </>
+                                <p className="text-muted-foreground">Capture what you did today — it helps fill your weekly report later.</p>
                             ) : (
                                 <p className="text-muted-foreground">No work period is available yet.</p>
                             )}
