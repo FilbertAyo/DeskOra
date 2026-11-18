@@ -266,9 +266,30 @@ class MeetingCallController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'seq' => ['required', 'integer', 'min:1', 'max:10000000'],
-            'audio' => ['required', 'string', 'max:30000'],
+            'seq' => ['nullable', 'integer', 'min:1', 'max:10000000'],
+            'audio' => ['nullable', 'string', 'max:30000'],
+            'chunks' => ['nullable', 'array', 'max:8'],
+            'chunks.*.seq' => ['required_with:chunks', 'integer', 'min:1', 'max:10000000'],
+            'chunks.*.audio' => ['required_with:chunks', 'string', 'max:30000'],
         ]);
+
+        $incoming = [];
+        foreach ($validated['chunks'] ?? [] as $chunk) {
+            $incoming[] = [
+                'seq' => (int) $chunk['seq'],
+                'audio' => (string) $chunk['audio'],
+            ];
+        }
+        if (isset($validated['seq'], $validated['audio'])) {
+            $incoming[] = [
+                'seq' => (int) $validated['seq'],
+                'audio' => (string) $validated['audio'],
+            ];
+        }
+
+        if ($incoming === []) {
+            return response()->json(['message' => 'No audio frames provided.'], 422);
+        }
 
         if (Cache::add('meeting-call-audio-presence:'.$meeting->id.':'.$user->id, true, 3)) {
             MeetingCallPeer::query()->updateOrCreate(
@@ -283,15 +304,19 @@ class MeetingCallController extends Controller
         }
 
         $key = $this->audioCacheKey($meeting, (string) $user->id);
-        $chunks = (int) $validated['seq'] === 1 ? [] : Cache::get($key, []);
-        $chunks[] = [
-            'seq' => (int) $validated['seq'],
-            'audio' => $validated['audio'],
-            'at' => (int) round(microtime(true) * 1000),
-        ];
-        $cutoff = (int) round(microtime(true) * 1000) - 8000;
+        $minSeq = min(array_column($incoming, 'seq'));
+        $chunks = $minSeq === 1 ? [] : Cache::get($key, []);
+        $nowMs = (int) round(microtime(true) * 1000);
+        foreach ($incoming as $frame) {
+            $chunks[] = [
+                'seq' => $frame['seq'],
+                'audio' => $frame['audio'],
+                'at' => $nowMs,
+            ];
+        }
+        $cutoff = $nowMs - 6000;
         $chunks = array_values(array_filter($chunks, fn (array $chunk) => (int) ($chunk['at'] ?? 0) >= $cutoff));
-        $chunks = array_slice($chunks, -16);
+        $chunks = array_slice($chunks, -24);
 
         Cache::put($key, $chunks, now()->addSeconds(20));
 

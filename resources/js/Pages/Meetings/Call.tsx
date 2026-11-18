@@ -326,23 +326,19 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 }
             };
 
-            const noteDirect = () => {
-                if (!isDirectLive(pc)) {
-                    return;
-                }
-                relayRef.current?.preferDirect(peerId, true);
-                markLive(peerId);
-            };
-
             pc.onconnectionstatechange = () => {
-                noteDirect();
+                if (isDirectLive(pc)) {
+                    markLive(peerId);
+                }
                 if (pc.connectionState === 'failed') {
                     relayRef.current?.preferDirect(peerId, false);
                     cleanupPeer(peerId);
                 }
             };
             pc.oniceconnectionstatechange = () => {
-                noteDirect();
+                if (isDirectLive(pc)) {
+                    markLive(peerId);
+                }
             };
 
             pc.ontrack = (event) => {
@@ -356,9 +352,14 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 const remoteStream = event.streams[0] ?? new MediaStream([event.track]);
                 audio.srcObject = remoteStream;
                 void audio.play().catch(() => undefined);
-                relayRef.current?.preferDirect(peerId, true);
                 markLive(peerId);
                 setStatus(`Connected with ${peerName}`);
+                // Keep portal audio until the direct track is actually playing.
+                window.setTimeout(() => {
+                    if (peersRef.current.get(peerId) === pc && !audio.paused) {
+                        relayRef.current?.preferDirect(peerId, true);
+                    }
+                }, 1200);
             };
 
             const restartTimer = window.setTimeout(() => {
@@ -679,15 +680,8 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         hangUpRef.current = null;
         fireLeave(urls.leave);
         notify('success', 'You left the voice call.');
-        router.visit(urls.show, {
-            replace: true,
-            prefetch: true,
-            onFinish: () => setLeaving(false),
-            onError: () => {
-                setLeaving(false);
-                notify('error', 'Left the call, but the meeting page was slow to open. Try again from Meetings.');
-            },
-        });
+        // Hard navigate — Inertia visit to Show was leaving the button spinning.
+        window.location.replace(urls.show);
     };
 
     const saveMinutes = async () => {

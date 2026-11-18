@@ -352,8 +352,9 @@ class InHouseMeetingTest extends TestCase
 
         $this->actingAs($organizer)
             ->postJson(route('meetings.call.audio.push', $meeting), [
-                'seq' => 1,
-                'audio' => $frame,
+                'chunks' => [
+                    ['seq' => 1, 'audio' => $frame],
+                ],
             ])
             ->assertOk();
 
