@@ -58,6 +58,7 @@ type MeetingCard = {
     rsvp: { accepted: number; declined: number; pending: number; total: number };
     show_url: string;
     call_url?: string;
+    end_call_url?: string | null;
 };
 
 type ArchivePeriod = {
@@ -435,6 +436,28 @@ export default function MeetingsIndex({
                                                         ) : (
                                                             responseBadge(meeting.my_response)
                                                         )}
+                                                        {meeting.is_live && meeting.is_organizer && meeting.end_call_url ? (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={(event) => {
+                                                                    event.preventDefault();
+                                                                    event.stopPropagation();
+                                                                    router.post(
+                                                                        meeting.end_call_url!,
+                                                                        {},
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                            onSuccess: () => notify('success', 'Call ended for everyone.'),
+                                                                            onError: () => notify('error', 'Could not end the call.'),
+                                                                        },
+                                                                    );
+                                                                }}
+                                                            >
+                                                                End call
+                                                            </Button>
+                                                        ) : null}
                                                     </div>
                                                 </div>
                                             </Link>

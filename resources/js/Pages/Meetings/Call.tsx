@@ -53,8 +53,10 @@ type Props = {
     me: { id: string; name: string };
     canEditMinutes: boolean;
     canManageRecords: boolean;
+    canEndCall: boolean;
     staffUsers: Array<{ id: string; name: string }>;
     urls: {
+        index: string;
         show: string;
         saveMinutes: string;
         saveActions: string;
@@ -65,6 +67,7 @@ type Props = {
         pushAudio: string;
         pullAudio: string;
         leave: string;
+        end: string;
     };
     iceServers?: RTCIceServer[];
 };
@@ -190,7 +193,16 @@ function fireLeave(url: string) {
         .finally(() => window.clearTimeout(timer));
 }
 
-export default function MeetingCall({ meeting, me, canEditMinutes, canManageRecords, staffUsers, urls, iceServers = DEFAULT_ICE_SERVERS }: Props) {
+export default function MeetingCall({
+    meeting,
+    me,
+    canEditMinutes,
+    canManageRecords,
+    canEndCall,
+    staffUsers,
+    urls,
+    iceServers = DEFAULT_ICE_SERVERS,
+}: Props) {
     const [muted, setMuted] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
     const [peers, setPeers] = useState<PeerInfo[]>([]);
@@ -211,6 +223,7 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
     const [savingMinutes, setSavingMinutes] = useState(false);
     const [savingActions, setSavingActions] = useState(false);
     const [leaving, setLeaving] = useState(false);
+    const [ending, setEnding] = useState(false);
 
     const localStreamRef = useRef<MediaStream | null>(null);
     const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -228,8 +241,8 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
     const hangUpRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
-        router.prefetch(urls.show);
-    }, [urls.show]);
+        router.prefetch(urls.index);
+    }, [urls.index]);
 
     useEffect(() => {
         aliveRef.current = true;
@@ -471,12 +484,28 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
             }
         };
 
+        const exitBecauseEnded = () => {
+            if (leftRef.current) {
+                return;
+            }
+            leftRef.current = true;
+            setLeaving(true);
+            setStatus('Call ended…');
+            hangUp(true);
+            notify('info', 'This voice call has ended.');
+            window.location.replace(urls.index);
+        };
+
         const syncPeers = async () => {
             if (leftRef.current || !aliveRef.current) {
                 return;
             }
             const data = await getJson(urls.peers, 4000);
             if (leftRef.current || !aliveRef.current) {
+                return;
+            }
+            if (data.ended) {
+                exitBecauseEnded();
                 return;
             }
             const nextPeers = (data.peers ?? []) as PeerInfo[];
@@ -624,7 +653,13 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
             if (leftRef.current || !aliveRef.current) {
                 return;
             }
-            void postJson(urls.heartbeat, undefined, 3000).catch(() => undefined);
+            void postJson(urls.heartbeat, undefined, 3000)
+                .then((data) => {
+                    if (data?.ended) {
+                        exitBecauseEnded();
+                    }
+                })
+                .catch(() => undefined);
         }, 8000);
 
         peersTimer = window.setInterval(() => {
@@ -657,7 +692,7 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- room lifecycle binds once per mount
-    }, [me.id, urls.heartbeat, urls.leave, urls.peers, urls.signal, urls.signals]);
+    }, [me.id, urls.heartbeat, urls.index, urls.leave, urls.peers, urls.signal, urls.signals]);
 
     const toggleMute = () => {
         const next = !muted;
@@ -668,7 +703,7 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         setMuted(next);
     };
 
-    const leaveCall = () => {
+    const exitToMeetings = (message: string) => {
         if (leaving || leftRef.current) {
             return;
         }
@@ -679,9 +714,35 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         hangUpRef.current?.();
         hangUpRef.current = null;
         fireLeave(urls.leave);
-        notify('success', 'You left the voice call.');
-        // Hard navigate — Inertia visit to Show was leaving the button spinning.
-        window.location.replace(urls.show);
+        notify('success', message);
+        // Hard navigate — Inertia visits were leaving the button spinning on this page.
+        window.location.replace(urls.index);
+    };
+
+    const leaveCall = () => {
+        exitToMeetings('You left the voice call.');
+    };
+
+    const endCall = () => {
+        if (ending || leaving || leftRef.current || !canEndCall) {
+            return;
+        }
+        setEnding(true);
+        setStatus('Ending call…');
+        void postJson(urls.end, undefined, 8000)
+            .then(() => {
+                leftRef.current = true;
+                setLeaving(true);
+                hangUpRef.current?.();
+                hangUpRef.current = null;
+                notify('success', 'Call ended for everyone.');
+                window.location.replace(urls.index);
+            })
+            .catch(() => {
+                setEnding(false);
+                setStatus('In call');
+                notify('error', 'Could not end the call. Try again.');
+            });
     };
 
     const saveMinutes = async () => {
@@ -732,10 +793,21 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 {muted ? <MicOffIcon className="size-4" /> : <MicIcon className="size-4" />}
                 {muted ? 'Unmute' : 'Mute'}
             </Button>
-            <Button type="button" variant="destructive" onClick={leaveCall} disabled={leaving} loading={leaving}>
+            <Button
+                type="button"
+                variant="destructive"
+                onClick={leaveCall}
+                disabled={leaving || ending}
+                loading={leaving && !ending}
+            >
                 <PhoneOffIcon className="size-4" />
                 Leave call
             </Button>
+            {canEndCall ? (
+                <Button type="button" variant="outline" onClick={endCall} disabled={leaving || ending} loading={ending}>
+                    End call for all
+                </Button>
+            ) : null}
             {workspace === 'call' ? (
                 <>
                     <Button type="button" variant="outline" onClick={() => setDetailsOpen(true)}>

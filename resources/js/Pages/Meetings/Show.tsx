@@ -208,7 +208,7 @@ export default function MeetingsShow({
                         <Button variant="outline" render={<Link href={urls.index} />}>
                             Back
                         </Button>
-                        {meeting.status !== 'cancelled' ? (
+                        {meeting.status !== 'cancelled' && meeting.status !== 'completed' ? (
                             <Button render={<Link href={urls.call} />}>
                                 <VideoIcon className="size-4" />
                                 Join voice call

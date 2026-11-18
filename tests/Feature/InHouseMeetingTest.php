@@ -238,7 +238,67 @@ class InHouseMeetingTest extends TestCase
         $this->actingAs($invitee)
             ->get(route('meetings.call', $meeting))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Meetings/Call'));
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Meetings/Call')
+                ->where('urls.index', route('meetings.index'))
+                ->where('canEndCall', false));
+
+        $this->actingAs($organizer)
+            ->get(route('meetings.call', $meeting))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Meetings/Call')
+                ->where('canEndCall', true)
+                ->where('urls.end', route('meetings.call.end', $meeting)));
+    }
+
+    public function test_organizer_can_end_voice_call_for_everyone(): void
+    {
+        /** @var User $organizer */
+        $organizer = User::factory()->create(['status' => 'active']);
+        /** @var User $invitee */
+        $invitee = User::factory()->create(['status' => 'active']);
+
+        $meeting = $this->createMeeting($organizer, [$invitee->id], live: true);
+
+        $this->actingAs($organizer)
+            ->postJson(route('meetings.call.heartbeat', $meeting))
+            ->assertOk();
+
+        $this->actingAs($invitee)
+            ->postJson(route('meetings.call.heartbeat', $meeting))
+            ->assertOk();
+
+        $this->actingAs($invitee)
+            ->getJson(route('meetings.call.peers', $meeting))
+            ->assertOk()
+            ->assertJsonPath('ended', false);
+
+        $this->actingAs($invitee)
+            ->postJson(route('meetings.call.end', $meeting))
+            ->assertForbidden();
+
+        $this->actingAs($organizer)
+            ->postJson(route('meetings.call.end', $meeting))
+            ->assertOk()
+            ->assertJson(['ok' => true, 'ended' => true]);
+
+        $meeting->refresh();
+        $this->assertSame(InHouseMeeting::STATUS_COMPLETED, $meeting->status);
+        $this->assertTrue($meeting->ends_at->lte(now()));
+
+        $this->actingAs($invitee)
+            ->getJson(route('meetings.call.peers', $meeting))
+            ->assertOk()
+            ->assertJson(['ended' => true, 'peers' => []]);
+
+        $this->actingAs($invitee)
+            ->get(route('meetings.call', $meeting))
+            ->assertRedirect(route('meetings.index'));
+
+        $this->actingAs($invitee)
+            ->postJson(route('meetings.call.leave', $meeting))
+            ->assertOk();
     }
 
     public function test_outsider_cannot_join_voice_call(): void
@@ -382,10 +442,10 @@ class InHouseMeetingTest extends TestCase
     /**
      * @param  list<string>  $participantIds
      */
-    private function createMeeting(User $organizer, array $participantIds): InHouseMeeting
+    private function createMeeting(User $organizer, array $participantIds, bool $live = false): InHouseMeeting
     {
-        $starts = now()->addDay()->setTime(10, 0);
-        $ends = (clone $starts)->setTime(11, 0);
+        $starts = $live ? now()->subMinute() : now()->addDay()->setTime(10, 0);
+        $ends = $live ? now()->addHour() : (clone $starts)->setTime(11, 0);
 
         $meeting = InHouseMeeting::create([
             'organizer_id' => $organizer->id,

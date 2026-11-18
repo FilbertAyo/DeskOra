@@ -57,7 +57,7 @@ class InHouseMeetingPolicy
 
     public function joinCall(User $user, InHouseMeeting $meeting): bool
     {
-        if ($meeting->isCancelled()) {
+        if ($meeting->isCancelled() || $meeting->isCompleted()) {
             return false;
         }
 

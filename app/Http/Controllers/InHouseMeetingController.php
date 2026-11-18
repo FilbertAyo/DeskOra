@@ -303,7 +303,7 @@ class InHouseMeetingController extends Controller
     {
         $this->authorize('complete', $meeting);
 
-        $meeting->update(['status' => InHouseMeeting::STATUS_COMPLETED]);
+        app(MeetingCallController::class)->forceEndCall($meeting);
 
         return redirect()
             ->route('meetings.show', $meeting)
@@ -641,6 +641,10 @@ class InHouseMeetingController extends Controller
             'rsvp' => $rsvp,
             'show_url' => route('meetings.show', $meeting),
             'call_url' => route('meetings.call', $meeting),
+            'end_call_url' => $meeting->isOrganizer($user)
+                && $meeting->status === InHouseMeeting::STATUS_SCHEDULED
+                    ? route('meetings.call.end', $meeting)
+                    : null,
         ];
     }
 

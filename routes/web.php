@@ -217,6 +217,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{meeting}/call/minutes', [MeetingCallController::class, 'saveMinutes'])->name('call.minutes');
         Route::post('/{meeting}/call/actions', [MeetingCallController::class, 'saveActions'])->name('call.actions');
         Route::post('/{meeting}/call/leave', [MeetingCallController::class, 'leave'])->name('call.leave');
+        Route::post('/{meeting}/call/end', [MeetingCallController::class, 'end'])->name('call.end');
         Route::get('/{meeting}', [InHouseMeetingController::class, 'show'])->name('show');
     });
 

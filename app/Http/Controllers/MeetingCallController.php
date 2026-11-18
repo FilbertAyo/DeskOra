@@ -20,6 +20,12 @@ class MeetingCallController extends Controller
 
     public function show(InHouseMeeting $meeting)
     {
+        if ($meeting->isCancelled() || $meeting->isCompleted()) {
+            return redirect()
+                ->route('meetings.index')
+                ->with('info', 'This voice call has ended.');
+        }
+
         $this->authorize('joinCall', $meeting);
 
         /** @var User $user */
@@ -30,6 +36,7 @@ class MeetingCallController extends Controller
         $this->clearUserCallState($meeting, $user, wipePeer: true);
 
         $canManageRecords = $user->can('manageRecords', $meeting);
+        $canEndCall = $user->can('complete', $meeting);
 
         return Inertia::render('Meetings/Call', [
             'meeting' => [
@@ -62,11 +69,13 @@ class MeetingCallController extends Controller
                 'id' => (string) $user->id,
                 'name' => $user->name,
             ],
-            'canEditMinutes' => $user->can('joinCall', $meeting),
+            'canEditMinutes' => true,
             'canManageRecords' => $canManageRecords,
+            'canEndCall' => $canEndCall,
             // Avoid loading every active staff user on join; assignees = people already on the meeting.
             'staffUsers' => $canManageRecords ? $this->assigneeOptions($meeting) : [],
             'urls' => [
+                'index' => route('meetings.index'),
                 'show' => route('meetings.show', $meeting),
                 'saveMinutes' => route('meetings.call.minutes', $meeting),
                 'saveActions' => route('meetings.call.actions', $meeting),
@@ -77,6 +86,7 @@ class MeetingCallController extends Controller
                 'pushAudio' => route('meetings.call.audio.push', $meeting),
                 'pullAudio' => route('meetings.call.audio.pull', $meeting),
                 'leave' => route('meetings.call.leave', $meeting),
+                'end' => route('meetings.call.end', $meeting),
             ],
             'iceServers' => $this->iceServers(),
         ]);
@@ -146,6 +156,10 @@ class MeetingCallController extends Controller
 
     public function heartbeat(InHouseMeeting $meeting)
     {
+        if ($response = $this->endedCallResponse($meeting)) {
+            return $response;
+        }
+
         $this->authorize('joinCall', $meeting);
 
         /** @var User $user */
@@ -169,6 +183,10 @@ class MeetingCallController extends Controller
 
     public function peers(InHouseMeeting $meeting)
     {
+        if ($response = $this->endedCallResponse($meeting)) {
+            return $response;
+        }
+
         $this->authorize('joinCall', $meeting);
 
         $peers = MeetingCallPeer::query()
@@ -183,11 +201,15 @@ class MeetingCallController extends Controller
             ])
             ->values();
 
-        return response()->json(['peers' => $peers]);
+        return response()->json(['peers' => $peers, 'ended' => false]);
     }
 
     public function signal(Request $request, InHouseMeeting $meeting)
     {
+        if ($response = $this->endedCallResponse($meeting)) {
+            return $response;
+        }
+
         $this->authorize('joinCall', $meeting);
 
         /** @var User $user */
@@ -224,6 +246,10 @@ class MeetingCallController extends Controller
 
     public function signals(InHouseMeeting $meeting)
     {
+        if ($response = $this->endedCallResponse($meeting)) {
+            return $response;
+        }
+
         $this->authorize('joinCall', $meeting);
 
         /** @var User $user */
@@ -260,6 +286,10 @@ class MeetingCallController extends Controller
 
     public function pushAudio(Request $request, InHouseMeeting $meeting)
     {
+        if ($response = $this->endedCallResponse($meeting)) {
+            return $response;
+        }
+
         $this->authorize('joinCall', $meeting);
 
         /** @var User $user */
@@ -325,6 +355,10 @@ class MeetingCallController extends Controller
 
     public function pullAudio(Request $request, InHouseMeeting $meeting)
     {
+        if ($response = $this->endedCallResponse($meeting)) {
+            return $response;
+        }
+
         $this->authorize('joinCall', $meeting);
 
         /** @var User $user */
@@ -364,14 +398,30 @@ class MeetingCallController extends Controller
 
     public function leave(InHouseMeeting $meeting)
     {
-        $this->authorize('joinCall', $meeting);
-
         /** @var User $user */
         $user = Auth::user();
 
-        $this->clearUserCallState($meeting, $user, wipePeer: true);
+        // Allow leave even after the organizer ends the call.
+        if ($user->can('view', $meeting)) {
+            $this->clearUserCallState($meeting, $user, wipePeer: true);
+        }
 
         return response()->json(['ok' => true]);
+    }
+
+    public function end(Request $request, InHouseMeeting $meeting)
+    {
+        $this->authorize('complete', $meeting);
+
+        $this->forceEndCall($meeting);
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'ended' => true]);
+        }
+
+        return redirect()
+            ->route('meetings.index')
+            ->with('success', 'Voice call ended.');
     }
 
     /**
@@ -451,6 +501,40 @@ class MeetingCallController extends Controller
     private function audioCacheKey(InHouseMeeting $meeting, string $userId): string
     {
         return 'meeting-call-audio:'.$meeting->id.':'.$userId;
+    }
+
+    private function endedCallResponse(InHouseMeeting $meeting): ?\Illuminate\Http\JsonResponse
+    {
+        if (! $meeting->isCancelled() && ! $meeting->isCompleted()) {
+            return null;
+        }
+
+        return response()->json([
+            'ok' => false,
+            'ended' => true,
+            'peers' => [],
+            'chunks' => [],
+            'signals' => [],
+        ]);
+    }
+
+    public function forceEndCall(InHouseMeeting $meeting): void
+    {
+        $meeting->update([
+            'status' => InHouseMeeting::STATUS_COMPLETED,
+            'ends_at' => now(),
+        ]);
+
+        $peerUserIds = MeetingCallPeer::query()
+            ->where('meeting_id', $meeting->id)
+            ->pluck('user_id');
+
+        MeetingCallPeer::query()->where('meeting_id', $meeting->id)->delete();
+        MeetingCallSignal::query()->where('meeting_id', $meeting->id)->delete();
+
+        foreach ($peerUserIds as $peerUserId) {
+            Cache::forget($this->audioCacheKey($meeting, (string) $peerUserId));
+        }
     }
 
     private function pruneStalePeers(InHouseMeeting $meeting): void
