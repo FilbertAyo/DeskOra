@@ -27,8 +27,44 @@ type Colleague = {
     avatar_url: string;
 };
 
+const APPROVAL_GATE_SNOOZE_PREFIX = 'deskora.approval_gate.snoozed.';
+
 function csrfToken(): string {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+}
+
+function approvalGateSnoozeKey(userId: string | number | null | undefined): string | null {
+    if (userId === null || userId === undefined || String(userId) === '') {
+        return null;
+    }
+
+    return `${APPROVAL_GATE_SNOOZE_PREFIX}${String(userId)}`;
+}
+
+function isApprovalGateLocallySnoozed(userId: string | number | null | undefined): boolean {
+    const key = approvalGateSnoozeKey(userId);
+    if (!key) {
+        return false;
+    }
+
+    try {
+        return window.sessionStorage.getItem(key) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function markApprovalGateLocallySnoozed(userId: string | number | null | undefined): void {
+    const key = approvalGateSnoozeKey(userId);
+    if (!key) {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(key, '1');
+    } catch {
+        // Ignore private-mode / storage quota failures; server snooze still applies.
+    }
 }
 
 async function postJson(url: string, body: Record<string, string> = {}): Promise<{ ok: boolean; body: { ok?: boolean; message?: string } }> {
@@ -50,8 +86,12 @@ async function postJson(url: string, body: Record<string, string> = {}): Promise
 
 export default function ShellOverlays() {
     const { overlays, auth } = usePage<SharedProps>().props;
-    const [gateOpen, setGateOpen] = useState(overlays.approvalGate !== null);
-    const [nominationOpen, setNominationOpen] = useState(overlays.approvalGate === null && overlays.nomination !== null);
+    const userId = auth.user?.id;
+    const gateLocallySnoozed = isApprovalGateLocallySnoozed(userId);
+    const [gateOpen, setGateOpen] = useState(overlays.approvalGate !== null && !gateLocallySnoozed);
+    const [nominationOpen, setNominationOpen] = useState(
+        overlays.approvalGate === null && !gateLocallySnoozed && overlays.nomination !== null,
+    );
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Colleague[]>([]);
     const [selected, setSelected] = useState<Colleague | null>(null);
@@ -59,9 +99,10 @@ export default function ShellOverlays() {
     const [pendingAction, setPendingAction] = useState<'snooze' | 'skip' | 'later' | 'nominate' | null>(null);
 
     useEffect(() => {
-        setGateOpen(overlays.approvalGate !== null);
-        setNominationOpen(overlays.approvalGate === null && overlays.nomination !== null);
-    }, [overlays.approvalGate, overlays.nomination]);
+        const snoozed = isApprovalGateLocallySnoozed(userId);
+        setGateOpen(overlays.approvalGate !== null && !snoozed);
+        setNominationOpen(overlays.approvalGate === null && !snoozed && overlays.nomination !== null);
+    }, [overlays.approvalGate, overlays.nomination, userId]);
 
     useEffect(() => {
         if (!nominationOpen || query.trim() === '') {
@@ -86,11 +127,19 @@ export default function ShellOverlays() {
     }, [nominationOpen, query]);
 
     const snoozeGate = () => {
+        // Persist immediately so navigation/refresh cannot reopen this session's prompt.
+        markApprovalGateLocallySnoozed(userId);
+        setGateOpen(false);
         setPendingAction('snooze');
-        void postJson(route('approval-gate.remind-later')).finally(() => {
-            setPendingAction(null);
-            setGateOpen(false);
-        });
+        void postJson(route('approval-gate.remind-later'))
+            .then((result) => {
+                if (!result.ok) {
+                    notify('error', result.body.message || 'Could not snooze the reminder. It may return after refresh.');
+                }
+            })
+            .finally(() => {
+                setPendingAction(null);
+            });
     };
 
     const closeNomination = (url: string, action: 'skip' | 'later') => {
@@ -135,7 +184,7 @@ export default function ShellOverlays() {
                     <DialogHeader>
                         <DialogTitle>Action needed</DialogTitle>
                         <DialogDescription>
-                            You have pending requisitions or weekly budgets. Open them now, or remind yourself later this session.
+                            You have pending requisitions or weekly budgets. Open them now, or choose Remind me later to hide this until your next browser session.
                         </DialogDescription>
                     </DialogHeader>
                     {gate && gate.requisition_count > 0 && (

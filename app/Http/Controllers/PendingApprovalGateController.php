@@ -21,6 +21,8 @@ class PendingApprovalGateController extends Controller
     public function remindLater(Request $request, PendingApprovalGate $gate): JsonResponse
     {
         $gate->snooze($request->session());
+        // Persist before the browser navigates away from this JSON request.
+        $request->session()->save();
 
         return response()->json(['ok' => true]);
     }
