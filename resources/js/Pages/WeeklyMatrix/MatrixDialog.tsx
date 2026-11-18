@@ -34,8 +34,9 @@ export type MatrixSubDepartment = {
 
 export type MatrixDialogMode = 'create' | 'edit' | 'view';
 
-const ENTRY_FIELDS = [
-    'key_activity',
+const PRIMARY_FIELD = 'key_activity' as const;
+
+const GRID_FIELDS = [
     'output',
     'outcome',
     'impact',
@@ -44,6 +45,8 @@ const ENTRY_FIELDS = [
     'target',
     'means_of_verification',
 ] as const;
+
+const ENTRY_FIELDS = [PRIMARY_FIELD, ...GRID_FIELDS] as const;
 
 const emptyEntry = (): MatrixEntry => ({
     key_activity: '',
@@ -147,9 +150,32 @@ export default function MatrixDialog({
         form.put(updateUrl, options);
     };
 
+    const renderField = (key: (typeof ENTRY_FIELDS)[number], rows: number) => (
+        <Field key={key}>
+            <FieldLabel htmlFor={key}>{fieldLabel(key)}</FieldLabel>
+            <Textarea
+                id={key}
+                name={isCreate ? `entry[${key}]` : `entries[0][${key}]`}
+                required={key === PRIMARY_FIELD}
+                rows={rows}
+                value={String(value[key] ?? '')}
+                disabled={isView}
+                className={isView ? 'whitespace-pre-wrap' : undefined}
+                onChange={(event) => setValue(key, event.target.value)}
+            />
+            <FieldError>
+                {
+                    (form.errors as Record<string, string | undefined>)[
+                        isCreate ? `entry.${key}` : `entries.0.${key}`
+                    ]
+                }
+            </FieldError>
+        </Field>
+    );
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl lg:max-w-6xl">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>
@@ -183,28 +209,11 @@ export default function MatrixDialog({
                         </Field>
                     )}
 
-                    {ENTRY_FIELDS.map((key) => (
-                        <Field key={key}>
-                            <FieldLabel htmlFor={key}>{fieldLabel(key)}</FieldLabel>
-                            <Textarea
-                                id={key}
-                                name={isCreate ? `entry[${key}]` : `entries[0][${key}]`}
-                                required={key === 'key_activity'}
-                                rows={key === 'key_activity' ? 5 : 3}
-                                value={String(value[key] ?? '')}
-                                disabled={isView}
-                                className={isView ? 'whitespace-pre-wrap' : undefined}
-                                onChange={(event) => setValue(key, event.target.value)}
-                            />
-                            <FieldError>
-                                {
-                                    (form.errors as Record<string, string | undefined>)[
-                                        isCreate ? `entry.${key}` : `entries.0.${key}`
-                                    ]
-                                }
-                            </FieldError>
-                        </Field>
-                    ))}
+                    {renderField(PRIMARY_FIELD, 4)}
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        {GRID_FIELDS.map((key) => renderField(key, 3))}
+                    </div>
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
