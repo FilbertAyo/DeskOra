@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkPeriod;
-use App\Services\MonthlyReportYearPlanActivities;
+use App\Models\YearPlan;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -293,23 +293,13 @@ trait HandlesDocumentCrud
             }
         }
 
-        $monthlyYearPlan = null;
-        $monthlyPlannedActivities = collect();
-        $monthlyHasSubDepartments = $user->subDepartments()->exists();
-        $ref = now()->startOfMonth()->subMonth();
-        $monthlyDefaultMonth = (int) $ref->month;
-        $monthlyDefaultYear = (int) $ref->year;
-        $monthlyYearChoices = collect(range((int) date('Y') + 1, (int) date('Y') - 5));
-
         if ($selectedType === Document::TYPE_MONTHLY_REPORT && isset($availableTypes[$selectedType])) {
-            $prefillMonth = $request->query('month');
-            $prefillYear = $request->query('year');
-            $monthlyDefaultMonth = (int) old('month', ($prefillMonth !== null && $prefillMonth !== '') ? (int) $prefillMonth : $ref->month);
-            $monthlyDefaultYear = (int) old('year', ($prefillYear !== null && $prefillYear !== '') ? (int) $prefillYear : $ref->year);
-            $monthlyYearPlan = MonthlyReportYearPlanActivities::yearPlanForCalendarYear($monthlyDefaultYear);
-            $monthlyPlannedActivities = MonthlyReportYearPlanActivities::plannedForUserMonth($user, $monthlyDefaultYear, $monthlyDefaultMonth);
-            $planYears = \App\Models\YearPlan::query()->orderByDesc('year')->pluck('year');
-            $monthlyYearChoices = $planYears->merge($monthlyYearChoices)->unique()->sortDesc()->values();
+            return Inertia::render('Documents/MonthlyReportForm', $this->monthlyReportFormProps(
+                $user,
+                $request,
+                mode: 'create',
+                document: null,
+            ));
         }
 
         if ($redirect = $this->redirectIfWeeklyDocumentAlreadyExists(
@@ -357,12 +347,6 @@ trait HandlesDocumentCrud
                 'id' => (string) $shareableUser->id,
                 'name' => $shareableUser->name,
             ])->values(),
-            'monthlyYearPlan' => $monthlyYearPlan,
-            'monthlyPlannedActivities' => $monthlyPlannedActivities,
-            'monthlyDefaultMonth' => $monthlyDefaultMonth,
-            'monthlyDefaultYear' => $monthlyDefaultYear,
-            'monthlyYearChoices' => $monthlyYearChoices,
-            'monthlyHasSubDepartments' => $monthlyHasSubDepartments,
             'assignedWeeklyActivities' => $assignedWeeklyActivities,
             'incomingMeetings' => $incomingMeetings,
             'currentUserId' => (string) $user->id,
@@ -383,7 +367,6 @@ trait HandlesDocumentCrud
         $validationRules = [
             'type' => ['required', 'string', 'in:weekly_plan,weekly_report,monthly_report,action_log'],
             // weekly_plan/weekly_report are filled online (no PDF upload).
-            // monthly_report: structured form; PDF and attachment are optional.
             'file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'], // Max 10MB
             'title' => ['nullable', 'string', 'max:255'],
         ];
@@ -399,12 +382,12 @@ trait HandlesDocumentCrud
             $validationRules['period_id'] = ['nullable', 'string', 'short_id', 'exists:work_periods,id'];
         }
 
-        // Add validation for monthly reports
+        // Monthly reports: pick an open month for the year plan and upload the PDF.
         if ($request->type === Document::TYPE_MONTHLY_REPORT) {
             $validationRules['month'] = ['required', 'integer', 'min:1', 'max:12'];
             $validationRules['year'] = ['required', 'integer', 'min:2000', 'max:2100'];
+            $validationRules['file'] = ['required', 'file', 'mimes:pdf', 'max:10240'];
             $validationRules['attachment'] = ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240'];
-            $validationRules['file'] = ['nullable', 'file', 'mimes:pdf', 'max:10240'];
             $validationRules['content'] = ['nullable', 'array'];
         }
 
@@ -551,13 +534,12 @@ trait HandlesDocumentCrud
 
         $monthlyContent = null;
         if ($request->type === Document::TYPE_MONTHLY_REPORT) {
-            $monthlyContent = $this->normalizeMonthlyReportContent(
-                $user,
-                (int) $request->year,
-                (int) $request->month,
-                is_array($request->input('content')) ? $request->input('content') : [],
-                $action
-            );
+            // PDF upload is the monthly report; keep empty structured content for domain sync.
+            $monthlyContent = [
+                'planned' => [],
+                'off_plan' => [],
+                'month_summary' => '',
+            ];
         }
 
         // Authorize create action
@@ -1102,22 +1084,18 @@ trait HandlesDocumentCrud
         // Authorize update action
         $this->authorize('update', $document);
 
+        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
+            return Inertia::render('Documents/MonthlyReportForm', $this->monthlyReportFormProps(
+                $document->user,
+                request(),
+                mode: 'edit',
+                document: $document,
+            ));
+        }
+
         $document->loadMissing(['user', 'sharedUsers', 'period']);
         $carriedActivities = $this->carriedActivitiesForWeeklyPlanDocument($document);
         $incomingMeetings = $this->incomingMeetingsForWeeklyPlanDocument($document);
-        $monthlyYearPlan = null;
-        $monthlyPlannedActivities = collect();
-        $monthlyHasSubDepartments = false;
-        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
-            $owner = $document->user;
-            $monthlyHasSubDepartments = $owner->subDepartments()->exists();
-            $monthlyYearPlan = MonthlyReportYearPlanActivities::yearPlanForCalendarYear((int) $document->year);
-            $monthlyPlannedActivities = MonthlyReportYearPlanActivities::plannedForUserMonth(
-                $owner,
-                (int) $document->year,
-                (int) $document->month
-            );
-        }
 
         $teamUsers = $this->teamUsersForSelection();
         $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
@@ -1161,9 +1139,6 @@ trait HandlesDocumentCrud
                 'id' => (string) $shareableUser->id,
                 'name' => $shareableUser->name,
             ])->values(),
-            'monthlyYearPlan' => $monthlyYearPlan,
-            'monthlyPlannedActivities' => $monthlyPlannedActivities,
-            'monthlyHasSubDepartments' => $monthlyHasSubDepartments,
             'assignedWeeklyActivities' => $assignedWeeklyActivities,
             'carriedActivities' => $carriedActivities,
             'incomingMeetings' => $incomingMeetings,
@@ -1279,6 +1254,13 @@ trait HandlesDocumentCrud
         if ($document->type === Document::TYPE_MONTHLY_REPORT) {
             $validationRules['month'] = ['nullable', 'integer', 'min:1', 'max:12'];
             $validationRules['year'] = ['nullable', 'integer', 'min:2000', 'max:2100'];
+            $validationRules['file'] = [
+                Rule::requiredIf($action === 'submit' && blank($document->file_path)),
+                'nullable',
+                'file',
+                'mimes:pdf',
+                'max:10240',
+            ];
             $validationRules['attachment'] = ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,xls', 'max:10240'];
         }
 
@@ -1354,15 +1336,8 @@ trait HandlesDocumentCrud
 
         $templateContent = null;
         $monthlyContent = null;
-        if ($document->type === Document::TYPE_MONTHLY_REPORT) {
-            $monthlyContent = $this->normalizeMonthlyReportContent(
-                $document->user,
-                (int) $document->year,
-                (int) $document->month,
-                is_array($request->input('content')) ? $request->input('content') : [],
-                $action
-            );
-        } elseif ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
+        // Monthly reports are PDF uploads; do not rewrite structured content on update.
+        if ($request->has('content') && is_array($request->input('content')) && in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT])) {
             $rawTemplateContent = $request->input('content');
             if ($document->type === Document::TYPE_WEEKLY_REPORT) {
                 $rawTemplateContent = $this->stripReadonlyAssignedMeetingsFromWeeklyReportContent(
@@ -1649,5 +1624,67 @@ trait HandlesDocumentCrud
         return str_contains($message, 'weekly_plans_user_period_unique')
             || str_contains($message, 'weekly_reports_user_period_unique')
             || (str_contains($message, 'duplicate entry') && str_contains($message, 'period_id'));
+    }
+
+    /**
+     * Props for the PDF-based monthly report create/edit form.
+     *
+     * @return array<string, mixed>
+     */
+    protected function monthlyReportFormProps(User $user, Request $request, string $mode, ?Document $document = null): array
+    {
+        $planYears = YearPlan::query()->orderByDesc('year')->pluck('year');
+        $fallbackYears = collect(range((int) date('Y') + 1, (int) date('Y') - 5));
+        $yearChoices = ($planYears->isNotEmpty() ? $planYears : $fallbackYears)
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $existingReportMonthsByYear = Document::query()
+            ->where('user_id', $user->id)
+            ->where('type', Document::TYPE_MONTHLY_REPORT)
+            ->get(['year', 'month'])
+            ->groupBy(fn (Document $row) => (string) $row->year)
+            ->map(fn ($rows) => $rows->pluck('month')->map(fn ($month) => (int) $month)->unique()->values()->all())
+            ->all();
+
+        $ref = now()->startOfMonth()->subMonth();
+        $requestedYear = $request->query('year');
+        $requestedMonth = $request->query('month');
+
+        $defaultYear = (int) old(
+            'year',
+            ($requestedYear !== null && $requestedYear !== '')
+                ? (int) $requestedYear
+                : ($document?->year ?? ($yearChoices->first() ?? $ref->year))
+        );
+
+        if ($yearChoices->isNotEmpty() && ! $yearChoices->contains($defaultYear)) {
+            $defaultYear = (int) $yearChoices->first();
+        }
+
+        $takenForDefaultYear = collect($existingReportMonthsByYear[(string) $defaultYear] ?? [])
+            ->map(fn ($month) => (int) $month)
+            ->all();
+        $firstOpenMonth = collect(range(1, 12))->first(fn (int $month) => ! in_array($month, $takenForDefaultYear, true));
+
+        $preferredMonth = ($requestedMonth !== null && $requestedMonth !== '')
+            ? (int) $requestedMonth
+            : (int) $ref->month;
+        $defaultMonth = $document?->month
+            ?? (in_array($preferredMonth, $takenForDefaultYear, true) ? $firstOpenMonth : $preferredMonth);
+
+        return [
+            'mode' => $mode,
+            'document' => $document ? $this->documentPayload($document) : null,
+            'yearChoices' => $yearChoices,
+            'existingReportMonthsByYear' => $existingReportMonthsByYear,
+            'defaultYear' => $defaultYear,
+            'defaultMonth' => $defaultMonth !== null ? (int) $defaultMonth : null,
+            'indexUrl' => session('documents.last_listing_url') ?: route('documents.monthly-report'),
+            'submitUrl' => $document
+                ? route('documents.update', $document)
+                : route('documents.store'),
+        ];
     }
 }

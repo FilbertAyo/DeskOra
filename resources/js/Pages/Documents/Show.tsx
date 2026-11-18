@@ -34,6 +34,8 @@ type Doc = {
     state?: string;
     userName?: string | null;
     period?: { weekNumber?: number; year?: number; dateRange?: string } | null;
+    month?: number | null;
+    year?: number | null;
     mainTarget?: string | null;
     targetAccomplished?: boolean | null;
     targetExplanation?: string | null;
@@ -42,9 +44,25 @@ type Doc = {
     canEdit?: boolean;
     showUrl?: string;
     editUrl?: string;
+    fileName?: string | null;
     downloadUrl?: string | null;
     returnToDraftUrl?: string;
 };
+
+const MONTH_NAMES = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+];
 
 type MeetingRow = {
     date?: string;
@@ -166,6 +184,7 @@ export default function DocumentsShow({
     const typeLabel = document.typeName ?? document.type ?? '';
     const isPlan = document.type === 'weekly_plan';
     const isReport = document.type === 'weekly_report';
+    const isMonthly = document.type === 'monthly_report';
     const content = document.content ?? {};
     const createRelated =
         relatedAction && typeof relatedAction === 'object' && !Array.isArray(relatedAction)
@@ -214,7 +233,9 @@ export default function DocumentsShow({
                     : null;
     const periodLine = document.period
         ? `Week ${document.period.weekNumber} of ${document.period.year}`
-        : null;
+        : document.month && document.year
+          ? `${MONTH_NAMES[document.month - 1] ?? `Month ${document.month}`} ${document.year}`
+          : null;
     const budgetTotal = budget.reduce((sum, row) => {
         const amount = Number(row.amount ?? 0);
         return sum + (Number.isFinite(amount) ? amount : 0);
@@ -792,7 +813,38 @@ export default function DocumentsShow({
                 </Card>
             )}
 
-            {!isPlan && !isReport && (
+            {isMonthly && (
+                <Card className="shadow-none">
+                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b bg-muted/20">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <FileTextIcon className="text-muted-foreground size-4" />
+                            {title}
+                        </CardTitle>
+                        {stateBadge(document.state)}
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        <p className="text-muted-foreground text-sm">
+                            Created by: {document.userName ?? '—'}
+                            {periodLine ? ` · ${periodLine}` : ''}
+                        </p>
+                        {document.downloadUrl ? (
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button render={<a href={document.downloadUrl} target="_blank" rel="noreferrer" />}>
+                                    <DownloadIcon className="size-4" />
+                                    Open PDF
+                                </Button>
+                                {document.fileName && (
+                                    <span className="text-muted-foreground text-sm">{document.fileName}</span>
+                                )}
+                            </div>
+                        ) : (
+                            <EmptyNote>No PDF uploaded for this monthly report.</EmptyNote>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {!isPlan && !isReport && !isMonthly && (
                 <Card className="shadow-none">
                     <CardHeader className="border-b bg-muted/20">
                         <CardTitle className="text-base">Content</CardTitle>

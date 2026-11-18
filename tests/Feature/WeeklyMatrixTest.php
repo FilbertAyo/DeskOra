@@ -158,11 +158,24 @@ class WeeklyMatrixTest extends TestCase
             route('weekly-matrix.edit', ['period' => $period, 'department' => $subDepartment, 'view' => 1])
         );
 
-        $view->assertOk();
-        $view->assertInertia(fn (Assert $page) => $page
-            ->component('WeeklyMatrix/Form')
-            ->where('viewMode', true)
-            ->where('entryDefaults.0.key_activity', $formattedText));
+        $view->assertRedirect(route('weekly-matrix.period', [
+            'period' => $period,
+            'modal' => 'view',
+            'department' => $subDepartment->id,
+        ]));
+
+        $this->actingAs($user)
+            ->get(route('weekly-matrix.period', [
+                'period' => $period,
+                'modal' => 'view',
+                'department' => $subDepartment->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('WeeklyMatrix/Period')
+                ->where('modal', 'view')
+                ->where('modalDepartmentId', (string) $subDepartment->id)
+                ->where('matrices.0.entry.key_activity', $formattedText));
     }
 
     public function test_suggestions_endpoint_returns_weekly_plan_activities(): void
@@ -245,7 +258,8 @@ class WeeklyMatrixTest extends TestCase
             ->component('WeeklyMatrix/Period')
             ->has('matrices', 0)
             ->where('canCreate', true)
-            ->has('createUrl'));
+            ->has('createSubmitUrl')
+            ->has('availableSubDepartments'));
     }
 
     public function test_period_table_endpoint_returns_matrix_html(): void

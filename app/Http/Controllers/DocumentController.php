@@ -2124,9 +2124,12 @@ class DocumentController extends Controller
             'canEdit' => $document->canBeEdited(),
             'showUrl' => route('documents.show', $document),
             'editUrl' => route('documents.edit', $document),
-            'downloadUrl' => in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true)
-                ? route('documents.download', $document)
-                : null,
+            'fileName' => $document->original_filename,
+            'downloadUrl' => match (true) {
+                in_array($document->type, [Document::TYPE_WEEKLY_PLAN, Document::TYPE_WEEKLY_REPORT], true) => route('documents.download', $document),
+                $document->type === Document::TYPE_MONTHLY_REPORT && filled($document->file_path) => $document->file_url,
+                default => null,
+            },
         ];
     }
 

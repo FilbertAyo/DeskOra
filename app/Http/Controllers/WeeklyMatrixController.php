@@ -53,30 +53,71 @@ class WeeklyMatrixController extends Controller
         ]);
     }
 
-    public function period(WorkPeriod $period)
+    public function period(Request $request, WorkPeriod $period)
     {
         $matrices = $this->weeklyMatrixService->matricesForPeriodTable($period);
-        $canCreate = $this->weeklyMatrixService->subDepartmentsWithoutMatrix($period)->isNotEmpty();
+        $availableSubDepartments = $this->weeklyMatrixService->subDepartmentsWithoutMatrix($period);
+        $canCreate = $availableSubDepartments->isNotEmpty();
+
+        $modal = (string) $request->query('modal', '');
+        if (! in_array($modal, ['create', 'edit', 'view'], true)) {
+            $modal = '';
+        }
+
+        $modalDepartmentId = (string) $request->query(
+            'department',
+            (string) $request->query('department_id', '')
+        );
+        if ($modal === 'create' && ! $canCreate) {
+            $modal = '';
+            $modalDepartmentId = '';
+        }
+        if ($modal === 'create' && $modalDepartmentId !== '') {
+            $hasOpenDepartment = $availableSubDepartments->contains(
+                fn (Department $department) => (string) $department->id === $modalDepartmentId
+            );
+            if (! $hasOpenDepartment) {
+                $modalDepartmentId = '';
+            }
+        }
+        if (in_array($modal, ['edit', 'view'], true)) {
+            $hasDepartment = $matrices->contains(
+                fn (array $row) => (string) ($row['department']?->id ?? '') === $modalDepartmentId
+            );
+            if (! $hasDepartment) {
+                $modal = '';
+                $modalDepartmentId = '';
+            }
+        }
 
         return Inertia::render('WeeklyMatrix/Period', [
             'period' => $this->periodPayload($period),
             'matrices' => $matrices->map(fn (array $row) => [
                 'department' => $row['department'] ? [
-                    'id' => $row['department']->id,
+                    'id' => (string) $row['department']->id,
                     'name' => $row['department']->name,
                     'parentName' => $row['department']->parent?->name,
                 ] : null,
-                'entry' => $row['entry'] ? [
-                    'keyActivity' => $row['entry']->key_activity,
-                ] : null,
+                'entry' => $this->entryPayload($row['entry']),
                 'yearPlanLinkCount' => $row['year_plan_link_count'],
                 'updatedAt' => $row['matrix']->updated_at?->diffForHumans(),
-                'viewUrl' => $row['department'] ? route('weekly-matrix.edit', [$period, $row['department'], 'view' => 1]) : null,
-                'editUrl' => $row['department'] ? route('weekly-matrix.edit', [$period, $row['department']]) : null,
+                'updateUrl' => $row['department']
+                    ? route('weekly-matrix.update', [$period, $row['department']])
+                    : null,
+                'destroyUrl' => $row['department']
+                    ? route('weekly-matrix.destroy', [$period, $row['department']])
+                    : null,
+            ])->values(),
+            'availableSubDepartments' => $availableSubDepartments->map(fn (Department $department) => [
+                'id' => (string) $department->id,
+                'name' => $department->name,
+                'parentName' => $department->parent?->name,
             ])->values(),
             'canCreate' => $canCreate,
+            'modal' => $modal !== '' ? $modal : null,
+            'modalDepartmentId' => $modalDepartmentId !== '' ? $modalDepartmentId : null,
             'indexUrl' => route('weekly-matrix.index', ['year' => $period->year]),
-            'createUrl' => route('weekly-matrix.create', $period),
+            'createSubmitUrl' => route('weekly-matrix.create.store', $period),
             'downloadUrl' => route('weekly-matrix.download', $period),
             'tableUrl' => route('weekly-matrix.period.table', $period),
         ]);
@@ -123,30 +164,10 @@ class WeeklyMatrixController extends Controller
                 ->with('error', 'All sub-departments already have a matrix for this work period.');
         }
 
-        $selectedDepartmentId = old('department_id', $request->query('department_id', $availableSubDepartments->first()?->id));
-        $selectedDepartment = $availableSubDepartments->firstWhere('id', $selectedDepartmentId)
-            ?? $availableSubDepartments->first();
-
-        $yearPlanOptions = $selectedDepartment
-            ? $this->weeklyMatrixService->yearPlanOptionsForSubDepartment($period, $selectedDepartment)
-            : collect();
-
-        $suggestions = $selectedDepartment
-            ? $this->weeklyMatrixService->suggestionsFromWeeklyPlans($period, $selectedDepartment)
-            : collect();
-
-        $entry = $this->singleEntryDefaults(old('entry'));
-
-        return Inertia::render('WeeklyMatrix/Form', [
-            'mode' => 'create',
-            'period' => $this->periodPayload($period),
-            'availableSubDepartments' => $availableSubDepartments,
-            'selectedDepartment' => $selectedDepartment,
-            'entry' => $entry,
-            'yearPlanOptions' => $yearPlanOptions,
-            'suggestions' => $suggestions,
-            'submitUrl' => route('weekly-matrix.create.store', $period),
-            'backUrl' => route('weekly-matrix.period', $period),
+        return redirect()->route('weekly-matrix.period', [
+            'period' => $period,
+            'modal' => 'create',
+            'department_id' => $request->query('department_id'),
         ]);
     }
 
@@ -202,54 +223,18 @@ class WeeklyMatrixController extends Controller
         $matrix = WeeklyMatrix::query()
             ->where('period_id', $period->id)
             ->where('department_id', $department->id)
-            ->with(['entries.yearPlanActivities.department'])
             ->first();
 
         if (! $matrix) {
             return redirect()
-                ->route('weekly-matrix.create', $period)
+                ->route('weekly-matrix.period', ['period' => $period, 'modal' => 'create'])
                 ->with('error', 'Create a matrix for this sub-department first.');
         }
 
-        $yearPlanOptions = $this->weeklyMatrixService->yearPlanOptionsForSubDepartment($period, $department);
-        $suggestions = $this->weeklyMatrixService->suggestionsFromWeeklyPlans($period, $department);
-
-        $entryDefaults = old('entries');
-        if (! is_array($entryDefaults)) {
-            $entryDefaults = $matrix
-                ? $matrix->entries->take(1)->map(fn ($entry) => [
-                    'key_activity' => $entry->key_activity,
-                    'output' => $entry->output ?? '',
-                    'outcome' => $entry->outcome ?? '',
-                    'impact' => $entry->impact ?? '',
-                    'indicators' => $entry->indicators ?? '',
-                    'baseline' => $entry->baseline ?? '',
-                    'target' => $entry->target ?? '',
-                    'means_of_verification' => $entry->means_of_verification ?? '',
-                    'year_plan_activity_ids' => $entry->yearPlanActivities->pluck('id')->all(),
-                ])->values()->all()
-                : [];
-        }
-
-        if ($entryDefaults === []) {
-            $entryDefaults = [$this->emptyEntry()];
-        }
-
-        $entryDefaults = [array_merge($this->emptyEntry(), $entryDefaults[0] ?? [])];
-
-        $viewMode = request()->boolean('view');
-
-        return Inertia::render('WeeklyMatrix/Form', [
-            'mode' => 'edit',
-            'period' => $this->periodPayload($period),
-            'department' => $department->load('parent'),
-            'matrix' => $matrix,
-            'entryDefaults' => $entryDefaults,
-            'yearPlanOptions' => $yearPlanOptions,
-            'suggestions' => $suggestions,
-            'viewMode' => $viewMode,
-            'submitUrl' => route('weekly-matrix.update', [$period, $department]),
-            'backUrl' => route('weekly-matrix.period', $period),
+        return redirect()->route('weekly-matrix.period', [
+            'period' => $period,
+            'modal' => request()->boolean('view') ? 'view' : 'edit',
+            'department' => $department->id,
         ]);
     }
 
@@ -362,15 +347,40 @@ class WeeklyMatrixController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
+     * @param  \App\Models\WeeklyMatrixEntry|null  $entry
+     * @return array{
+     *     key_activity: string,
+     *     output: string,
+     *     outcome: string,
+     *     impact: string,
+     *     indicators: string,
+     *     baseline: string,
+     *     target: string,
+     *     means_of_verification: string,
+     *     year_plan_activity_ids: list<string>
+     * }
      */
-    private function singleEntryDefaults(mixed $input): array
+    private function entryPayload($entry): array
     {
-        if (! is_array($input)) {
+        if (! $entry) {
             return $this->emptyEntry();
         }
 
-        return array_merge($this->emptyEntry(), $input);
+        return [
+            'key_activity' => (string) ($entry->key_activity ?? ''),
+            'output' => (string) ($entry->output ?? ''),
+            'outcome' => (string) ($entry->outcome ?? ''),
+            'impact' => (string) ($entry->impact ?? ''),
+            'indicators' => (string) ($entry->indicators ?? ''),
+            'baseline' => (string) ($entry->baseline ?? ''),
+            'target' => (string) ($entry->target ?? ''),
+            'means_of_verification' => (string) ($entry->means_of_verification ?? ''),
+            'year_plan_activity_ids' => $entry->yearPlanActivities
+                ->pluck('id')
+                ->map(fn ($id) => (string) $id)
+                ->values()
+                ->all(),
+        ];
     }
 
     private function periodPayload(WorkPeriod $period): array
