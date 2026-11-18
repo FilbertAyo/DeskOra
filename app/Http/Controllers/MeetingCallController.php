@@ -9,6 +9,7 @@ use App\Models\MeetingCallSignal;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -73,8 +74,11 @@ class MeetingCallController extends Controller
                 'peers' => route('meetings.call.peers', $meeting),
                 'signal' => route('meetings.call.signal', $meeting),
                 'signals' => route('meetings.call.signals', $meeting),
+                'pushAudio' => route('meetings.call.audio.push', $meeting),
+                'pullAudio' => route('meetings.call.audio.pull', $meeting),
                 'leave' => route('meetings.call.leave', $meeting),
             ],
+            'iceServers' => $this->iceServers(),
         ]);
     }
 
@@ -225,19 +229,24 @@ class MeetingCallController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $rows = MeetingCallSignal::query()
-            ->where('meeting_id', $meeting->id)
-            ->where('to_user_id', $user->id)
-            ->whereNull('consumed_at')
-            ->orderBy('id')
-            ->limit(50)
-            ->get();
+        $rows = DB::transaction(function () use ($meeting, $user) {
+            $pending = MeetingCallSignal::query()
+                ->where('meeting_id', $meeting->id)
+                ->where('to_user_id', $user->id)
+                ->whereNull('consumed_at')
+                ->orderBy('id')
+                ->limit(30)
+                ->lockForUpdate()
+                ->get();
 
-        if ($rows->isNotEmpty()) {
-            MeetingCallSignal::query()
-                ->whereIn('id', $rows->pluck('id'))
-                ->update(['consumed_at' => now()]);
-        }
+            if ($pending->isNotEmpty()) {
+                MeetingCallSignal::query()
+                    ->whereIn('id', $pending->pluck('id'))
+                    ->update(['consumed_at' => now()]);
+            }
+
+            return $pending;
+        });
 
         return response()->json([
             'signals' => $rows->map(fn (MeetingCallSignal $signal) => [
@@ -247,6 +256,85 @@ class MeetingCallController extends Controller
                 'payload' => $signal->payload,
             ])->values(),
         ]);
+    }
+
+    public function pushAudio(Request $request, InHouseMeeting $meeting)
+    {
+        $this->authorize('joinCall', $meeting);
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'seq' => ['required', 'integer', 'min:1', 'max:10000000'],
+            'audio' => ['required', 'string', 'max:30000'],
+        ]);
+
+        if (Cache::add('meeting-call-audio-presence:'.$meeting->id.':'.$user->id, true, 3)) {
+            MeetingCallPeer::query()->updateOrCreate(
+                [
+                    'meeting_id' => $meeting->id,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'last_seen_at' => now(),
+                ],
+            );
+        }
+
+        $key = $this->audioCacheKey($meeting, (string) $user->id);
+        $chunks = (int) $validated['seq'] === 1 ? [] : Cache::get($key, []);
+        $chunks[] = [
+            'seq' => (int) $validated['seq'],
+            'audio' => $validated['audio'],
+            'at' => (int) round(microtime(true) * 1000),
+        ];
+        $cutoff = (int) round(microtime(true) * 1000) - 8000;
+        $chunks = array_values(array_filter($chunks, fn (array $chunk) => (int) ($chunk['at'] ?? 0) >= $cutoff));
+        $chunks = array_slice($chunks, -16);
+
+        Cache::put($key, $chunks, now()->addSeconds(20));
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function pullAudio(Request $request, InHouseMeeting $meeting)
+    {
+        $this->authorize('joinCall', $meeting);
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'after' => ['nullable', 'array'],
+            'after.*' => ['integer', 'min:0'],
+        ]);
+        $after = $validated['after'] ?? [];
+
+        $peerIds = MeetingCallPeer::query()
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', '!=', $user->id)
+            ->pluck('user_id');
+
+        $chunks = [];
+        foreach ($peerIds as $peerId) {
+            $cursor = (int) ($after[(string) $peerId] ?? 0);
+            foreach (Cache::get($this->audioCacheKey($meeting, (string) $peerId), []) as $chunk) {
+                $seq = (int) ($chunk['seq'] ?? 0);
+                if ($seq <= $cursor || ! is_string($chunk['audio'] ?? null)) {
+                    continue;
+                }
+                $chunks[] = [
+                    'user_id' => (string) $peerId,
+                    'seq' => $seq,
+                    'audio' => $chunk['audio'],
+                ];
+            }
+        }
+
+        usort($chunks, fn (array $left, array $right) => $left['seq'] <=> $right['seq']);
+
+        return response()->json(['chunks' => $chunks]);
     }
 
     public function leave(InHouseMeeting $meeting)
@@ -307,6 +395,37 @@ class MeetingCallController extends Controller
                     ->orWhere('to_user_id', $user->id);
             })
             ->delete();
+
+        Cache::forget($this->audioCacheKey($meeting, (string) $user->id));
+    }
+
+    /**
+     * @return list<array{urls: string|list<string>, username?: string, credential?: string}>
+     */
+    private function iceServers(): array
+    {
+        $servers = [
+            ['urls' => 'stun:stun.l.google.com:19302'],
+            ['urls' => 'stun:stun.cloudflare.com:3478'],
+        ];
+
+        $turnUrls = array_values(array_filter(array_map('trim', explode(',', (string) config('services.meeting_call.turn_urls')))));
+        $username = (string) config('services.meeting_call.turn_username');
+        $credential = (string) config('services.meeting_call.turn_credential');
+        if ($turnUrls !== [] && $username !== '' && $credential !== '') {
+            $servers[] = [
+                'urls' => $turnUrls,
+                'username' => $username,
+                'credential' => $credential,
+            ];
+        }
+
+        return $servers;
+    }
+
+    private function audioCacheKey(InHouseMeeting $meeting, string $userId): string
+    {
+        return 'meeting-call-audio:'.$meeting->id.':'.$userId;
     }
 
     private function pruneStalePeers(InHouseMeeting $meeting): void

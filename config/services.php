@@ -31,6 +31,12 @@ return [
         ],
     ],
 
+    'meeting_call' => [
+        'turn_urls' => env('MEETING_TURN_URLS', ''),
+        'turn_username' => env('MEETING_TURN_USERNAME', ''),
+        'turn_credential' => env('MEETING_TURN_CREDENTIAL', ''),
+    ],
+
     'groq' => [
         'api_key' => trim(trim((string) env('GROQ_API_KEY', '')), '"\''),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),

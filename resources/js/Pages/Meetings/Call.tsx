@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { startAudioRelay, type AudioRelay } from '@/lib/call-audio-relay';
 import { notify } from '@/lib/notify';
 import { PageShell } from '@/lib/page-kit';
 import { cn } from '@/lib/utils';
@@ -61,8 +62,11 @@ type Props = {
         peers: string;
         signal: string;
         signals: string;
+        pushAudio: string;
+        pullAudio: string;
         leave: string;
     };
+    iceServers?: RTCIceServer[];
 };
 
 type SignalMessage = {
@@ -72,10 +76,40 @@ type SignalMessage = {
     payload: Record<string, unknown>;
 };
 
-const ICE_SERVERS: RTCIceServer[] = [
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
 ];
+
+function waitForIce(pc: RTCPeerConnection): Promise<void> {
+    if (pc.iceGatheringState === 'complete') {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        const finish = () => {
+            if (pc.iceGatheringState !== 'complete') {
+                return;
+            }
+            pc.removeEventListener('icegatheringstatechange', finish);
+            resolve();
+        };
+        pc.addEventListener('icegatheringstatechange', finish);
+        window.setTimeout(() => {
+            pc.removeEventListener('icegatheringstatechange', finish);
+            resolve();
+        }, 2500);
+    });
+}
+
+function localDescriptionPayload(pc: RTCPeerConnection): { type: RTCSdpType; sdp: string } | null {
+    const description = pc.localDescription;
+    if (!description?.sdp) {
+        return null;
+    }
+
+    return { type: description.type, sdp: description.sdp };
+}
 
 function csrfHeaders(): HeadersInit {
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
@@ -156,7 +190,7 @@ function fireLeave(url: string) {
         .finally(() => window.clearTimeout(timer));
 }
 
-export default function MeetingCall({ meeting, me, canEditMinutes, canManageRecords, staffUsers, urls }: Props) {
+export default function MeetingCall({ meeting, me, canEditMinutes, canManageRecords, staffUsers, urls, iceServers = DEFAULT_ICE_SERVERS }: Props) {
     const [muted, setMuted] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
     const [peers, setPeers] = useState<PeerInfo[]>([]);
@@ -184,6 +218,11 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
     const remoteAudioRef = useRef<Map<string, HTMLAudioElement>>(new Map());
     const offeredPeersRef = useRef<Set<string>>(new Set());
     const makingOfferRef = useRef<Set<string>>(new Set());
+    const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+    const earlySignalsRef = useRef<SignalMessage[]>([]);
+    const restartTimersRef = useRef<Map<string, number>>(new Map());
+    const relayRef = useRef<AudioRelay | null>(null);
+    const connectedRef = useRef<Set<string>>(new Set());
     const aliveRef = useRef(true);
     const leftRef = useRef(false);
     const hangUpRef = useRef<(() => void) | null>(null);
@@ -201,7 +240,26 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         let peersTimer = 0;
         let signalsTimer = 0;
 
+        const markLive = (peerId: string) => {
+            connectedRef.current.add(peerId);
+            setConnectedIds(Array.from(connectedRef.current));
+            setStatus('In call');
+        };
+
+        const markDown = (peerId: string) => {
+            if (!connectedRef.current.has(peerId)) {
+                return;
+            }
+            connectedRef.current.delete(peerId);
+            setConnectedIds(Array.from(connectedRef.current));
+        };
+
         const cleanupPeer = (peerId: string) => {
+            const timer = restartTimersRef.current.get(peerId);
+            if (timer) {
+                window.clearTimeout(timer);
+                restartTimersRef.current.delete(peerId);
+            }
             const pc = peersRef.current.get(peerId);
             if (pc) {
                 pc.onicecandidate = null;
@@ -212,13 +270,16 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
             }
             offeredPeersRef.current.delete(peerId);
             makingOfferRef.current.delete(peerId);
+            pendingIceRef.current.delete(peerId);
+            relayRef.current?.preferDirect(peerId, false);
             const audio = remoteAudioRef.current.get(peerId);
             if (audio) {
                 audio.pause();
                 audio.srcObject = null;
+                audio.remove();
                 remoteAudioRef.current.delete(peerId);
             }
-            setConnectedIds((current) => current.filter((id) => id !== peerId));
+            markDown(peerId);
         };
 
         const sendSignal = async (toUserId: string, type: string, payload: Record<string, unknown>) => {
@@ -232,19 +293,32 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
             }, 4000);
         };
 
+        const isDirectLive = (pc: RTCPeerConnection) =>
+            pc.connectionState === 'connected'
+            || pc.iceConnectionState === 'connected'
+            || pc.iceConnectionState === 'completed';
+
         const ensurePeerConnection = (peerId: string, peerName: string) => {
             const existing = peersRef.current.get(peerId);
             if (existing) {
+                const localStream = localStreamRef.current;
+                if (localStream && existing.getSenders().every((sender) => !sender.track)) {
+                    localStream.getAudioTracks().forEach((track) => existing.addTrack(track, localStream));
+                }
                 return existing;
             }
 
-            const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+            const pc = new RTCPeerConnection({ iceServers });
             peersRef.current.set(peerId, pc);
 
             const localStream = localStreamRef.current;
-            localStream?.getAudioTracks().forEach((track) => {
-                pc.addTrack(track, localStream);
-            });
+            if (localStream && localStream.getAudioTracks().length > 0) {
+                localStream.getAudioTracks().forEach((track) => {
+                    pc.addTrack(track, localStream);
+                });
+            } else {
+                pc.addTransceiver('audio', { direction: 'sendrecv' });
+            }
 
             pc.onicecandidate = (event) => {
                 if (event.candidate) {
@@ -252,18 +326,23 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 }
             };
 
-            pc.onconnectionstatechange = () => {
-                if (pc.connectionState === 'connected') {
-                    setConnectedIds((current) => (current.includes(peerId) ? current : [...current, peerId]));
-                    setStatus('In call');
-                }
-                if (pc.connectionState === 'failed') {
-                    cleanupPeer(peerId);
+            const noteDirect = () => {
+                if (!isDirectLive(pc)) {
                     return;
                 }
-                if (pc.connectionState === 'closed' || pc.connectionState === 'disconnected') {
-                    setConnectedIds((current) => current.filter((id) => id !== peerId));
+                relayRef.current?.preferDirect(peerId, true);
+                markLive(peerId);
+            };
+
+            pc.onconnectionstatechange = () => {
+                noteDirect();
+                if (pc.connectionState === 'failed') {
+                    relayRef.current?.preferDirect(peerId, false);
+                    cleanupPeer(peerId);
                 }
+            };
+            pc.oniceconnectionstatechange = () => {
+                noteDirect();
             };
 
             pc.ontrack = (event) => {
@@ -271,19 +350,40 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 if (!audio) {
                     audio = new Audio();
                     audio.autoplay = true;
+                    audio.setAttribute('playsinline', 'true');
                     remoteAudioRef.current.set(peerId, audio);
                 }
-                audio.srcObject = event.streams[0] ?? null;
+                const remoteStream = event.streams[0] ?? new MediaStream([event.track]);
+                audio.srcObject = remoteStream;
                 void audio.play().catch(() => undefined);
-                setConnectedIds((current) => (current.includes(peerId) ? current : [...current, peerId]));
+                relayRef.current?.preferDirect(peerId, true);
+                markLive(peerId);
                 setStatus(`Connected with ${peerName}`);
             };
+
+            const restartTimer = window.setTimeout(() => {
+                if (peersRef.current.get(peerId) !== pc || isDirectLive(pc)) {
+                    return;
+                }
+                relayRef.current?.preferDirect(peerId, false);
+                cleanupPeer(peerId);
+            }, 8000);
+            restartTimersRef.current.set(peerId, restartTimer);
 
             return pc;
         };
 
+        const publishDescription = async (peerId: string, type: 'offer' | 'answer', pc: RTCPeerConnection) => {
+            await waitForIce(pc);
+            const sdp = localDescriptionPayload(pc);
+            if (!sdp) {
+                return;
+            }
+            await sendSignal(peerId, type, { sdp });
+        };
+
         const createOfferFor = async (peerId: string, peerName: string) => {
-            if (offeredPeersRef.current.has(peerId) || makingOfferRef.current.has(peerId)) {
+            if (!localStreamRef.current || offeredPeersRef.current.has(peerId) || makingOfferRef.current.has(peerId)) {
                 return;
             }
 
@@ -293,43 +393,77 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 if (pc.signalingState !== 'stable') {
                     return;
                 }
-                const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+                const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                await sendSignal(peerId, 'offer', { sdp: pc.localDescription });
+                await publishDescription(peerId, 'offer', pc);
                 offeredPeersRef.current.add(peerId);
             } catch {
-                // Peer may have left while negotiating.
+                offeredPeersRef.current.delete(peerId);
             } finally {
                 makingOfferRef.current.delete(peerId);
             }
         };
 
+        const addIce = async (pc: RTCPeerConnection, peerId: string, candidate: RTCIceCandidateInit) => {
+            if (!pc.remoteDescription) {
+                const queued = pendingIceRef.current.get(peerId) ?? [];
+                queued.push(candidate);
+                pendingIceRef.current.set(peerId, queued);
+                return;
+            }
+            await pc.addIceCandidate(candidate);
+        };
+
+        const flushIce = async (pc: RTCPeerConnection, peerId: string) => {
+            const queued = pendingIceRef.current.get(peerId) ?? [];
+            pendingIceRef.current.delete(peerId);
+            for (const candidate of queued) {
+                try {
+                    await pc.addIceCandidate(candidate);
+                } catch {
+                    // Stale candidate.
+                }
+            }
+        };
+
         const handleSignal = async (signal: SignalMessage) => {
+            if (!localStreamRef.current) {
+                earlySignalsRef.current.push(signal);
+                return;
+            }
             const fromId = signal.from_user_id;
             const peerName = peerNamesRef.current.get(fromId) ?? 'Participant';
             const pc = ensurePeerConnection(fromId, peerName);
 
             try {
                 if (signal.type === 'offer') {
-                    if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
+                    const collision = pc.signalingState === 'have-local-offer';
+                    const polite = me.id > fromId;
+                    if (collision && !polite) {
                         return;
                     }
+                    if (collision) {
+                        await pc.setLocalDescription({ type: 'rollback' });
+                        offeredPeersRef.current.delete(fromId);
+                    }
                     await pc.setRemoteDescription(signal.payload.sdp as RTCSessionDescriptionInit);
+                    await flushIce(pc, fromId);
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
-                    await sendSignal(fromId, 'answer', { sdp: pc.localDescription });
+                    await publishDescription(fromId, 'answer', pc);
                     return;
                 }
 
                 if (signal.type === 'answer') {
-                    if (!pc.currentRemoteDescription) {
+                    if (!pc.currentRemoteDescription && pc.signalingState === 'have-local-offer') {
                         await pc.setRemoteDescription(signal.payload.sdp as RTCSessionDescriptionInit);
+                        await flushIce(pc, fromId);
                     }
                     return;
                 }
 
                 if (signal.type === 'ice' && signal.payload.candidate) {
-                    await pc.addIceCandidate(signal.payload.candidate as RTCIceCandidateInit);
+                    await addIce(pc, fromId, signal.payload.candidate as RTCIceCandidateInit);
                 }
             } catch {
                 // Ignore stale negotiation races.
@@ -357,19 +491,27 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                 }
             }
 
-            // Kick offers in parallel so join does not wait peer-by-peer.
-            await Promise.all(
-                remotePeers.map(async (peer) => {
-                    if (me.id < peer.id) {
-                        await createOfferFor(peer.id, peer.name);
-                        return;
-                    }
-                    ensurePeerConnection(peer.id, peer.name);
-                }),
-            );
+            if (localStreamRef.current) {
+                await Promise.all(
+                    remotePeers.map(async (peer) => {
+                        if (me.id < peer.id) {
+                            await createOfferFor(peer.id, peer.name);
+                            return;
+                        }
+                        ensurePeerConnection(peer.id, peer.name);
+                    }),
+                );
+            }
 
-            if (remotePeers.length === 0 && !leftRef.current) {
+            if (leftRef.current) {
+                return;
+            }
+            if (remotePeers.length === 0) {
                 setStatus('Waiting for participants to join…');
+            } else if (!remotePeers.every((peer) => connectedRef.current.has(peer.id))) {
+                setStatus('Connecting audio…');
+            } else {
+                setStatus('In call');
             }
         };
 
@@ -385,6 +527,8 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
             window.removeEventListener('pagehide', onPageHide);
             stopMicVisual?.();
             stopMicVisual = undefined;
+            relayRef.current?.stop();
+            relayRef.current = null;
             localStreamRef.current?.getTracks().forEach((track) => track.stop());
             localStreamRef.current = null;
             for (const peerId of Array.from(peersRef.current.keys())) {
@@ -417,6 +561,19 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                     return;
                 }
                 localStreamRef.current = stream;
+                const queuedSignals = earlySignalsRef.current.splice(0);
+                for (const signal of queuedSignals) {
+                    await handleSignal(signal);
+                }
+                relayRef.current?.stop();
+                relayRef.current = startAudioRelay({
+                    stream,
+                    pushUrl: urls.pushAudio,
+                    pullUrl: urls.pullAudio,
+                    post: postJson,
+                    onHeard: (userId) => markLive(userId),
+                    alive: () => aliveRef.current && !leftRef.current,
+                });
 
                 const audioContext = new AudioContext();
                 const source = audioContext.createMediaStreamSource(stream);
@@ -506,6 +663,7 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
         localStreamRef.current?.getAudioTracks().forEach((track) => {
             track.enabled = !next;
         });
+        relayRef.current?.setMuted(next);
         setMuted(next);
     };
 
@@ -664,7 +822,7 @@ export default function MeetingCall({ meeting, me, canEditMinutes, canManageReco
                                                 {isMe ? ' (you)' : ''}
                                             </span>
                                             <Badge variant={connected ? 'success' : 'warning'}>
-                                                {connected ? 'Connected' : 'Waiting'}
+                                                {isMe ? 'Connected' : connected ? 'Live' : 'Linking'}
                                             </Badge>
                                         </div>
                                     );

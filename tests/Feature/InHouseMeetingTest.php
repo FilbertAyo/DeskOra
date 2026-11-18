@@ -337,6 +337,47 @@ class InHouseMeetingTest extends TestCase
         $this->assertSame(1, $meeting->actionItems()->count());
     }
 
+    public function test_voice_is_relayed_to_the_other_participant(): void
+    {
+        /** @var User $organizer */
+        $organizer = User::factory()->create(['status' => 'active']);
+        /** @var User $invitee */
+        $invitee = User::factory()->create(['status' => 'active']);
+        /** @var User $outsider */
+        $outsider = User::factory()->create(['status' => 'active']);
+        $outsider->assignRole('staff');
+
+        $meeting = $this->createMeeting($organizer, [$invitee->id]);
+        $frame = base64_encode(random_bytes(320));
+
+        $this->actingAs($organizer)
+            ->postJson(route('meetings.call.audio.push', $meeting), [
+                'seq' => 1,
+                'audio' => $frame,
+            ])
+            ->assertOk();
+
+        $this->actingAs($invitee)
+            ->postJson(route('meetings.call.audio.pull', $meeting), [
+                'after' => [],
+            ])
+            ->assertOk()
+            ->assertJsonPath('chunks.0.user_id', (string) $organizer->id)
+            ->assertJsonPath('chunks.0.seq', 1)
+            ->assertJsonPath('chunks.0.audio', $frame);
+
+        $this->actingAs($invitee)
+            ->postJson(route('meetings.call.audio.pull', $meeting), [
+                'after' => [(string) $organizer->id => 1],
+            ])
+            ->assertOk()
+            ->assertJsonPath('chunks', []);
+
+        $this->actingAs($outsider)
+            ->postJson(route('meetings.call.audio.pull', $meeting), [])
+            ->assertForbidden();
+    }
+
     /**
      * @param  list<string>  $participantIds
      */

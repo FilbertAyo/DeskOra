@@ -212,6 +212,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/{meeting}/call/peers', [MeetingCallController::class, 'peers'])->name('call.peers');
         Route::post('/{meeting}/call/signal', [MeetingCallController::class, 'signal'])->name('call.signal');
         Route::get('/{meeting}/call/signals', [MeetingCallController::class, 'signals'])->name('call.signals');
+        Route::post('/{meeting}/call/audio', [MeetingCallController::class, 'pushAudio'])->name('call.audio.push');
+        Route::post('/{meeting}/call/audio/pull', [MeetingCallController::class, 'pullAudio'])->name('call.audio.pull');
         Route::post('/{meeting}/call/minutes', [MeetingCallController::class, 'saveMinutes'])->name('call.minutes');
         Route::post('/{meeting}/call/actions', [MeetingCallController::class, 'saveActions'])->name('call.actions');
         Route::post('/{meeting}/call/leave', [MeetingCallController::class, 'leave'])->name('call.leave');
