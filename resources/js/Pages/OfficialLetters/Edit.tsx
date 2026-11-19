@@ -1,25 +1,35 @@
-import { Link, useForm } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHeader } from '@/lib/page-kit';
+import { PageHeader, PageShell } from '@/lib/page-kit';
 
-export default function OfficialLettersEdit(props: Record<string, unknown>) {
-    const letter = (props.letter ?? {}) as Record<string, unknown>;
-    const updateUrl = String(props.updateUrl ?? letter.updateUrl ?? '');
-    const indexUrl = String(props.indexUrl ?? '/official-letters');
-    const form = useForm({
-        subject: String(letter.subject ?? ''),
-        body: String(letter.body ?? letter.content ?? ''),
-        recipient: String(letter.recipient ?? ''),
-    });
+import LetterForm, { type LetterSignatory, type OfficialLetterInput } from './Form';
+
+type Props = {
+    letter?: OfficialLetterInput & { id?: string | number; show_url?: string };
+    departments?: Record<string, string>;
+    salutations?: string[];
+    closings?: string[];
+    signatories?: LetterSignatory[] | Record<string, LetterSignatory>;
+    updateUrl?: string;
+    indexUrl?: string;
+};
+
+export default function OfficialLettersEdit({
+    letter = {},
+    departments = {},
+    salutations = [],
+    closings = [],
+    signatories = [],
+    updateUrl = '',
+    indexUrl = '/official-letters',
+}: Props) {
+    const cancelUrl = letter.show_url ?? (letter.id ? `/official-letters/${letter.id}` : indexUrl);
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <PageShell>
             <PageHeader
                 title="Edit Official Letter"
                 actions={
@@ -28,33 +38,17 @@ export default function OfficialLettersEdit(props: Record<string, unknown>) {
                     </Button>
                 }
             />
-            <Card>
-                <CardContent className="pt-6">
-                    <form
-                        className="space-y-3"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            form.put(updateUrl);
-                        }}
-                    >
-                        <label className="block text-sm">
-                            <span className="mb-1 block font-medium">Subject</span>
-                            <Input value={form.data.subject} onChange={(e) => form.setData('subject', e.target.value)} />
-                        </label>
-                        <label className="block text-sm">
-                            <span className="mb-1 block font-medium">Recipient</span>
-                            <Input value={form.data.recipient} onChange={(e) => form.setData('recipient', e.target.value)} />
-                        </label>
-                        <label className="block text-sm">
-                            <span className="mb-1 block font-medium">Body</span>
-                            <Textarea rows={8} value={form.data.body} onChange={(e) => form.setData('body', e.target.value)} />
-                        </label>
-                        <Button type="submit" disabled={form.processing} loading={form.processing}>Save
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
-        </div>
+            <LetterForm
+                letter={letter}
+                departments={departments}
+                salutations={salutations}
+                closings={closings}
+                signatories={Array.isArray(signatories) ? signatories : Object.values(signatories)}
+                actionUrl={updateUrl}
+                method="put"
+                cancelUrl={cancelUrl}
+            />
+        </PageShell>
     );
 }
 
