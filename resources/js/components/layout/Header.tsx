@@ -18,7 +18,7 @@ import type { SharedProps } from '@/types/inertia';
 
 export default function Header() {
     const page = usePage<SharedProps>();
-    const { currentPeriod } = page.props;
+    const { headerPeriod } = page.props;
     const segments = page.url.split('?')[0].split('/').filter(Boolean);
 
     return (
@@ -52,13 +52,13 @@ export default function Header() {
                     </Breadcrumb>
                 </div>
                 <div className="flex items-center gap-1.5">
-                    {currentPeriod && (
+                    {headerPeriod && (
                         <div className="text-muted-foreground mr-2 hidden items-center gap-2 text-sm lg:flex">
                             <span>
-                                Week {currentPeriod.week_number} · {currentPeriod.date_range}
+                                Week {headerPeriod.week_number} · {headerPeriod.date_range}
                             </span>
                             <Badge variant="secondary" className="capitalize">
-                                {currentPeriod.status}
+                                {headerPeriod.status}
                             </Badge>
                         </div>
                     )}

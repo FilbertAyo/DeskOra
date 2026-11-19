@@ -56,7 +56,7 @@ export type SharedProps = {
     branding: Branding;
     auth: { user: AuthUser | null };
     nav: { groups: NavGroup[] };
-    currentPeriod: CurrentPeriod | null;
+    headerPeriod: CurrentPeriod | null;
     notifications: {
         unread: number;
         canManage: boolean;

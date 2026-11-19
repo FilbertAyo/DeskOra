@@ -48,7 +48,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user instanceof User ? $this->userPayload($user) : null,
             ],
             'nav' => $user instanceof User ? PortalNav::forUser($user) : ['groups' => []],
-            'currentPeriod' => $user instanceof User ? $this->currentPeriod() : null,
+            // Dedicated header key so page props named `currentPeriod` cannot blank the shell week badge.
+            'headerPeriod' => $user instanceof User ? $this->currentPeriod() : null,
             'notifications' => $user instanceof User ? $this->notifications($user) : [
                 'unread' => 0,
                 'items' => [],

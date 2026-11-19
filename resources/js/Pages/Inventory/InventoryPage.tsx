@@ -284,7 +284,7 @@ function InventoryScreen({ config }: { config: InventoryPageConfig }) {
             {!config.form && !record && !config.collection && (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {Object.entries(props)
-                        .filter(([key, value]) => !['auth', 'branding', 'nav', 'flash', 'overlays', 'notifications', 'currentPeriod', 'errors'].includes(key) && (Array.isArray(value) || isRecord(value)))
+                        .filter(([key, value]) => !['auth', 'branding', 'nav', 'flash', 'overlays', 'notifications', 'headerPeriod', 'currentPeriod', 'errors'].includes(key) && (Array.isArray(value) || isRecord(value)))
                         .map(([key, value]) => (
                             <Card key={key}>
                                 <CardHeader><CardTitle>{humanize(key)}</CardTitle></CardHeader>

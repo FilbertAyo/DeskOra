@@ -33,6 +33,19 @@ function csrfToken(): string {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 }
 
+function xsrfTokenFromCookie(): string {
+    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+    if (!match?.[1]) {
+        return '';
+    }
+
+    try {
+        return decodeURIComponent(match[1]);
+    } catch {
+        return match[1];
+    }
+}
+
 function approvalGateSnoozeKey(userId: string | number | null | undefined): string | null {
     if (userId === null || userId === undefined || String(userId) === '') {
         return null;
@@ -68,16 +81,19 @@ function markApprovalGateLocallySnoozed(userId: string | number | null | undefin
 }
 
 async function postJson(url: string, body: Record<string, string> = {}): Promise<{ ok: boolean; body: { ok?: boolean; message?: string } }> {
+    const token = csrfToken();
+    const xsrf = xsrfTokenFromCookie();
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            'X-CSRF-TOKEN': csrfToken(),
+            ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+            ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
             'X-Requested-With': 'XMLHttpRequest',
         },
         credentials: 'same-origin',
-        body: JSON.stringify(body),
+        body: JSON.stringify(token ? { ...body, _token: token } : body),
     });
     const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
 
@@ -131,15 +147,10 @@ export default function ShellOverlays() {
         markApprovalGateLocallySnoozed(userId);
         setGateOpen(false);
         setPendingAction('snooze');
-        void postJson(route('approval-gate.remind-later'))
-            .then((result) => {
-                if (!result.ok) {
-                    notify('error', result.body.message || 'Could not snooze the reminder. It may return after refresh.');
-                }
-            })
-            .finally(() => {
-                setPendingAction(null);
-            });
+        // Local snooze already closed the dialog; sync server quietly so CSRF noise never blocks staff.
+        void postJson(route('approval-gate.remind-later')).finally(() => {
+            setPendingAction(null);
+        });
     };
 
     const closeNomination = (url: string, action: 'skip' | 'later') => {
