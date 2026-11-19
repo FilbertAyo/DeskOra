@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Services\PendingApprovalGate;
 use App\Services\StaffAppreciationService;
+use App\Services\SystemSettingService;
 use App\Support\PortalNav;
 use App\Support\SchemaTables;
 use Illuminate\Http\Request;
@@ -36,13 +37,16 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
+        $branding = app(SystemSettingService::class)->branding();
+
         return [
             ...parent::share($request),
             'branding' => [
-                'appName' => config('app.name', 'Adilisha Portal'),
-                'productName' => config('branding.product_name', 'DeskOra'),
-                'logo' => asset('assets/images/logo.png'),
-                'logoIcon' => asset('assets/images/logo-icon.png'),
+                'appName' => $branding['appName'],
+                'productName' => $branding['productName'],
+                'logo' => $branding['logo'],
+                'logoIcon' => $branding['logoIcon'],
+                'primaryColor' => $branding['primaryColor'],
             ],
             'auth' => [
                 'user' => $user instanceof User ? $this->userPayload($user) : null,

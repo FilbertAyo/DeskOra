@@ -39,26 +39,81 @@ class SystemSettingTest extends TestCase
         $admin->givePermissionTo('manage system settings');
 
         $this->actingAs($admin)
-            ->get(route('settings.system.edit'))
+            ->get(route('settings.system.edit', ['section' => 'forms']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Settings/System/Edit')
-                ->has('formsLogoUrl')
+                ->where('section', 'forms')
+                ->has('forms.formsLogoUrl')
                 ->has('updateUrl'));
 
         $file = UploadedFile::fake()->image('forms-logo.png', 200, 80);
 
         $this->actingAs($admin)
             ->put(route('settings.system.update'), [
+                'section' => 'forms',
                 'forms_logo' => $file,
             ])
-            ->assertRedirect(route('settings.system.edit'))
+            ->assertRedirect(route('settings.system.edit', ['section' => 'forms']))
             ->assertSessionHas('success');
 
         $path = app(SystemSettingService::class)->get(SystemSetting::KEY_FORMS_LOGO);
         $this->assertIsString($path);
         $this->assertStringStartsWith('storage/', $path);
         Storage::disk('public')->assertExists(substr($path, strlen('storage/')));
+    }
+
+    public function test_admin_can_update_identity_branding_and_appearance(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->givePermissionTo('manage system settings');
+
+        $this->actingAs($admin)
+            ->put(route('settings.system.update'), [
+                'section' => 'identity',
+                'app_name' => 'Adilisha Digital',
+            ])
+            ->assertRedirect(route('settings.system.edit', ['section' => 'identity']))
+            ->assertSessionHas('success');
+
+        $this->assertSame(
+            'Adilisha Digital',
+            app(SystemSettingService::class)->get(SystemSetting::KEY_APP_NAME)
+        );
+
+        $logo = UploadedFile::fake()->image('org-photo.png', 240, 120);
+        $icon = UploadedFile::fake()->image('org-icon.png', 64, 64);
+
+        $this->actingAs($admin)
+            ->put(route('settings.system.update'), [
+                'section' => 'branding',
+                'logo' => $logo,
+                'icon' => $icon,
+            ])
+            ->assertRedirect(route('settings.system.edit', ['section' => 'branding']))
+            ->assertSessionHas('success');
+
+        $branding = app(SystemSettingService::class)->branding();
+        $this->assertFalse($branding['usingDefaultLogo']);
+        $this->assertFalse($branding['usingDefaultIcon']);
+        $this->assertStringStartsWith('storage/', $branding['logoPath']);
+        $this->assertStringStartsWith('storage/', $branding['iconPath']);
+
+        $this->actingAs($admin)
+            ->put(route('settings.system.update'), [
+                'section' => 'appearance',
+                'primary_color' => '#112233',
+            ])
+            ->assertRedirect(route('settings.system.edit', ['section' => 'appearance']))
+            ->assertSessionHas('success');
+
+        $this->assertSame(
+            '#112233',
+            app(SystemSettingService::class)->get(SystemSetting::KEY_PRIMARY_COLOR)
+        );
+        $this->assertSame('#112233', app(SystemSettingService::class)->branding()['primaryColor']);
     }
 
     public function test_user_without_permission_cannot_access_system_settings(): void
@@ -143,4 +198,3 @@ class SystemSettingTest extends TestCase
         $this->assertGreaterThan(1000, strlen($response->getContent()));
     }
 }
-

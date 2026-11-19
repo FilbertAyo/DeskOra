@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header';
 import AppSidebar from '@/components/layout/Sidebar';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import AnonymousFeedbackFab from '@/components/shared/AnonymousFeedbackFab';
+import BrandingTheme from '@/components/shared/BrandingTheme';
 import FeatureTracker from '@/components/shared/FeatureTracker';
 import FlashToaster from '@/components/shared/FlashToaster';
 import ShellOverlays from '@/components/shared/ShellOverlays';
@@ -34,6 +35,7 @@ export default function AppLayout({ title, children }: { title: string; children
             <TooltipProvider>
                 <SidebarProvider>
                     <Head title={title} />
+                    <BrandingTheme />
                     <FeatureTracker />
                     <AppSidebar />
                     <SidebarInset className="flex min-w-0 flex-1 flex-col">

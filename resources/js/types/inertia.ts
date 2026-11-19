@@ -3,6 +3,7 @@ export type Branding = {
     productName: string;
     logo: string;
     logoIcon: string;
+    primaryColor: string;
 };
 
 export type AuthUser = {
