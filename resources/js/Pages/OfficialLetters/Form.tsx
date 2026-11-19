@@ -46,7 +46,7 @@ type LetterFormData = {
 };
 
 const selectClassName =
-    'border-input bg-transparent h-9 w-full rounded-md border px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:border-destructive';
+    'border-input bg-background text-foreground h-9 w-full rounded-md border px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:border-destructive [color-scheme:light] dark:[color-scheme:dark]';
 
 export default function LetterForm({
     letter,
