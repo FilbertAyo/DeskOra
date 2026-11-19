@@ -1,12 +1,34 @@
 import { router } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { HistoryIcon } from 'lucide-react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PaginationLinks } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 import { cn } from '@/lib/utils';
+
+export type PaginationLink = { url: string | null; label: string; active: boolean };
+
+export type Paginated<T> = {
+    data: T[];
+    links: PaginationLink[];
+    current_page?: number;
+    last_page?: number;
+    per_page?: number;
+    total?: number;
+    from?: number | null;
+    to?: number | null;
+};
+
+export type ListFilters = {
+    search?: string;
+    status?: string;
+};
 
 /** Keep list tables from growing wider than the page when activity/description text is long. */
 export function TruncateCell({
@@ -161,21 +183,134 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
     return <div><p className="text-xs font-medium uppercase text-muted-foreground">{label}</p><div className="mt-1">{value || '—'}</div></div>;
 }
 
-export function ApprovalTimeline({ logs }: { logs: ApprovalLog[] }) {
+export function ApprovalTimeline({ logs, className }: { logs: ApprovalLog[]; className?: string }) {
     return (
-        <Card>
-            <CardHeader><CardTitle>Approval Timeline</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-                {logs.length === 0 ? <p className="text-sm text-muted-foreground">No approval activity yet.</p> : logs.map((log) => (
+        <div className={cn('space-y-3', className)}>
+            {logs.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No approval activity yet.</p>
+            ) : (
+                logs.map((log) => (
                     <div key={log.id} className="border-l-2 pl-4">
-                        <p className="font-medium capitalize">{log.step}: {log.action}</p>
-                        <p className="text-sm text-muted-foreground">{log.actor?.name ?? 'System'} · {shortDate(log.actedAt)}</p>
+                        <p className="font-medium capitalize">
+                            {log.step}: {log.action}
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                            {log.actor?.name ?? 'System'} · {shortDate(log.actedAt)}
+                        </p>
                         {log.comment && <p className="mt-1 text-sm">{log.comment}</p>}
                     </div>
-                ))}
-            </CardContent>
-        </Card>
+                ))
+            )}
+        </div>
     );
+}
+
+export function ApprovalTimelineButton({ logs }: { logs: ApprovalLog[] }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <>
+            <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+                <HistoryIcon />
+                Timeline
+            </Button>
+            <Sheet open={open} onOpenChange={setOpen}>
+                <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+                    <SheetHeader className="border-b px-4 py-4">
+                        <SheetTitle>Approval Timeline</SheetTitle>
+                        <SheetDescription>Review, approval, and authorization history for this request.</SheetDescription>
+                    </SheetHeader>
+                    <div className="overflow-y-auto px-4 py-4">
+                        <ApprovalTimeline logs={logs} />
+                    </div>
+                </SheetContent>
+            </Sheet>
+        </>
+    );
+}
+
+export function FinanceListToolbar({
+    filters,
+    statusOptions,
+    actionUrl,
+    extraParams,
+    children,
+}: {
+    filters: ListFilters;
+    statusOptions?: Array<{ value: string; label: string }>;
+    actionUrl: string;
+    extraParams?: Record<string, string | undefined | null>;
+    children?: ReactNode;
+}) {
+    const apply = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const search = String(form.get('search') ?? '').trim();
+        const status = String(form.get('status') ?? '').trim();
+        const params: Record<string, string> = {};
+        for (const [key, value] of Object.entries(extraParams ?? {})) {
+            if (value) {
+                params[key] = value;
+            }
+        }
+        if (search) {
+            params.search = search;
+        }
+        if (status) {
+            params.status = status;
+        }
+        router.get(actionUrl, params, { preserveState: true, replace: true });
+    };
+
+    return (
+        <form onSubmit={apply} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-[12rem] flex-1 space-y-1">
+                <label htmlFor="finance-search" className="text-sm font-medium">
+                    Search
+                </label>
+                <Input
+                    id="finance-search"
+                    name="search"
+                    defaultValue={filters.search ?? ''}
+                    placeholder="Search by reference, activity, requester…"
+                />
+            </div>
+            {statusOptions && statusOptions.length > 0 && (
+                <div className="w-full space-y-1 sm:w-44">
+                    <label htmlFor="finance-status" className="text-sm font-medium">
+                        Status
+                    </label>
+                    <select
+                        id="finance-status"
+                        name="status"
+                        defaultValue={filters.status ?? ''}
+                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                    >
+                        <option value="">All statuses</option>
+                        {statusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="outline">
+                    Apply
+                </Button>
+                {children}
+            </div>
+        </form>
+    );
+}
+
+export function FinancePagination({ links }: { links?: PaginationLink[] }) {
+    if (!links || links.length <= 3) {
+        return null;
+    }
+
+    return <PaginationLinks links={links} className="mt-4" />;
 }
 
 export function PayButton({ id }: { id: string }) {

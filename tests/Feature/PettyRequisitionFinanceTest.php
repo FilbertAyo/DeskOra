@@ -203,10 +203,10 @@ class PettyRequisitionFinanceTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Finance/RequisitionRecords')
-            ->has('transactions', 1)
-            ->where('transactions.0.amount', 120000)
-            ->where('transactions.0.activity', 'Training Materials')
-            ->where('transactions.0.reference', (string) $authorized->code));
+            ->has('transactions.data', 1)
+            ->where('transactions.data.0.amount', 120000)
+            ->where('transactions.data.0.activity', 'Training Materials')
+            ->where('transactions.data.0.reference', (string) $authorized->code));
     }
 
     public function test_review_pettycash_permission_does_not_allow_staff_requisition_review(): void
@@ -261,8 +261,8 @@ class PettyRequisitionFinanceTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Finance/Approvals/Index')
             ->where('title', 'Review Requisitions')
-            ->has('requests', 1)
-            ->where('requests.0.amount', 90000)
-            ->where('requests.0.activityTitle', 'Training Materials'));
+            ->has('requests.data', 1)
+            ->where('requests.data.0.amount', 90000)
+            ->where('requests.data.0.activityTitle', 'Training Materials'));
     }
 }

@@ -23,6 +23,7 @@ use App\Services\RequestApprovalNavService;
 use App\Services\RequisitionNotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -182,22 +183,41 @@ class PettyController extends Controller
             abort(403, 'You are not allowed to access this approval stage.');
         }
 
+        $search = trim((string) $httpRequest->query('search', ''));
+        $status = trim((string) $httpRequest->query('status', ''));
+        $typeFilter = $httpRequest->query('type');
+
         $requests = FinanceRequest::with(['user', 'pettyDetails', 'requisitionDetails', 'approvals.actor'])
             ->visibleForUserAtStage($user, $stage)
             ->when(
-                is_string($typeFilter = $httpRequest->query('type')) && FinanceRequest::requestTypesForFilter($typeFilter) !== null,
+                is_string($typeFilter) && FinanceRequest::requestTypesForFilter($typeFilter) !== null,
                 fn ($query) => $query->whereIn('request_type', FinanceRequest::requestTypesForFilter($typeFilter))
             )
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->tap(fn ($query) => $this->applyFinanceRequestSearch($query, $search))
             ->orderByDesc('created_at')
             ->get()
             ->sortByDesc(fn (FinanceRequest $request) => $request->userCanActAtStage($user, $stage) ? 1 : 0)
             ->values();
 
         $stageLabel = FinanceRequest::stageLabel($stage);
-        $typeFilter = $httpRequest->query('type');
+        $perPage = 15;
+        $page = max(1, (int) $httpRequest->query('page', 1));
+        $paginator = new LengthAwarePaginator(
+            $requests->forPage($page, $perPage)->values()->map(
+                fn (FinanceRequest $request) => $this->requestPayload($request, $user, $stage)
+            ),
+            $requests->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $httpRequest->url(),
+                'query' => $httpRequest->query(),
+            ]
+        );
 
         return Inertia::render('Finance/Approvals/Index', [
-            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request, $user, $stage)),
+            'requests' => $paginator,
             'stage' => $stage,
             'stageLabel' => $stageLabel,
             'typeFilter' => is_string($typeFilter) ? $typeFilter : null,
@@ -205,6 +225,10 @@ class PettyController extends Controller
                 ? "{$stageLabel} Petty Cash"
                 : ($typeFilter === 'requisition' ? "{$stageLabel} Requisitions" : FinanceRequest::stageQueueTitle($stage)),
             'emptyMessage' => FinanceRequest::stageEmptyMessage($stage),
+            'filters' => [
+                'search' => $search !== '' ? $search : null,
+                'status' => $status !== '' ? $status : null,
+            ],
         ]);
     }
 
@@ -266,6 +290,7 @@ class PettyController extends Controller
         return Inertia::render('Finance/Requisition/Form', [
             'mode' => 'create',
             'planActivities' => $planActivities,
+            'nextOffPlanActivityCode' => $this->nextOffPlanActivityCode($user),
             'hasSignature' => $hasSignature,
             'formContext' => [
                 'userId' => (string) $user?->id,
@@ -341,7 +366,7 @@ class PettyController extends Controller
 
         if ($validated === null) {
             return redirect()->back()->withInput()->withErrors([
-                'activity_code' => 'Enter a valid activity code when the request is not on the year plan.',
+                'activity_code' => 'Unable to assign an activity code for this off-plan request.',
             ]);
         }
 
@@ -657,16 +682,27 @@ class PettyController extends Controller
         return redirect()->back()->with('success', 'Request updated and feedback sent successfully.');
     }
 
-    public function requisitionRequests()
+    public function requisitionRequests(Request $httpRequest)
     {
+        $search = trim((string) $httpRequest->query('search', ''));
+        $status = trim((string) $httpRequest->query('status', ''));
+
         $requests = FinanceRequest::with(['user', 'requisitionDetails'])
             ->where('user_id', Auth::id())
             ->where('request_type', 'Staff Requisition')
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->tap(fn ($query) => $this->applyFinanceRequestSearch($query, $search))
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(15)
+            ->withQueryString()
+            ->through(fn (FinanceRequest $request) => $this->requestPayload($request));
 
         return Inertia::render('Finance/Requisition/Index', [
-            'requests' => $requests->map(fn (FinanceRequest $request) => $this->requestPayload($request)),
+            'requests' => $requests,
+            'filters' => [
+                'search' => $search !== '' ? $search : null,
+                'status' => $status !== '' ? $status : null,
+            ],
         ]);
     }
 
@@ -708,6 +744,7 @@ class PettyController extends Controller
         return Inertia::render('Finance/Requisition/Form', [
             'mode' => 'edit',
             'planActivities' => $planActivities,
+            'nextOffPlanActivityCode' => $this->nextOffPlanActivityCode($user, (string) $petty->id),
             'hasSignature' => true,
             'formContext' => [
                 'userId' => (string) $user?->id,
@@ -747,11 +784,11 @@ class PettyController extends Controller
             'department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
             'action' => $actionRule,
         ], $rules));
-        $validated = $this->resolveRequisitionActivityFields($request, $validated, $saveAsDraft);
+        $validated = $this->resolveRequisitionActivityFields($request, $validated, $saveAsDraft, (string) $petty->id);
 
         if ($validated === null) {
             return redirect()->back()->withInput()->withErrors([
-                'activity_code' => 'Enter a valid activity code when the request is not on the year plan.',
+                'activity_code' => 'Unable to assign an activity code for this off-plan request.',
             ]);
         }
 
@@ -949,7 +986,7 @@ class PettyController extends Controller
             'activity_selection' => 'nullable|string|max:255',
             'is_off_plan' => 'nullable|boolean',
             'project_program' => 'nullable|string|max:255',
-            'activity_code' => 'nullable|string|max:255|not_in:__off_plan__',
+            'activity_code' => 'nullable|string|max:255',
             'activity_title' => 'nullable|string|max:255',
             'budget_code' => 'nullable|string|max:255',
             'date_of_request' => 'nullable|date',
@@ -971,7 +1008,7 @@ class PettyController extends Controller
             'activity_selection' => 'nullable|string|max:255',
             'is_off_plan' => 'nullable|boolean',
             'project_program' => 'required|string|max:255',
-            'activity_code' => 'nullable|string|max:255|not_in:__off_plan__',
+            'activity_code' => 'nullable|string|max:255',
             'activity_title' => 'required|string|max:255',
             'budget_code' => 'required|string|max:255',
             'date_of_request' => 'nullable|date',
@@ -985,13 +1022,17 @@ class PettyController extends Controller
     }
 
     /**
-     * Resolve activity_code / is_off_plan from activity_selection or manual entry.
+     * Resolve activity_code / is_off_plan from activity_selection or auto-assigned off-plan codes.
      *
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>|null Null when activity code cannot be resolved for submit.
      */
-    private function resolveRequisitionActivityFields(Request $request, array $validated, bool $isDraft): ?array
-    {
+    private function resolveRequisitionActivityFields(
+        Request $request,
+        array $validated,
+        bool $isDraft,
+        ?string $excludeRequestId = null
+    ): ?array {
         $selection = trim((string) ($validated['activity_selection'] ?? $request->input('activity_selection', '')));
         $isOffPlan = $selection === '__off_plan__'
             || filter_var($validated['is_off_plan'] ?? $request->input('is_off_plan'), FILTER_VALIDATE_BOOLEAN);
@@ -999,14 +1040,17 @@ class PettyController extends Controller
         if ($isOffPlan) {
             $activityCode = trim((string) ($validated['activity_code'] ?? ''));
             if ($activityCode === '' || $activityCode === '__off_plan__') {
-                if ($isDraft) {
-                    $validated['activity_code'] = null;
-                    $validated['is_off_plan'] = true;
+                /** @var User|null $user */
+                $user = Auth::user();
+                $activityCode = $this->nextOffPlanActivityCode($user, $excludeRequestId);
+            } elseif ($this->offPlanActivityCodeTaken($activityCode, $excludeRequestId)) {
+                /** @var User|null $user */
+                $user = Auth::user();
+                $activityCode = $this->nextOffPlanActivityCode($user, $excludeRequestId);
+            }
 
-                    return $validated;
-                }
-
-                return null;
+            if ($activityCode === '') {
+                return $isDraft ? array_merge($validated, ['activity_code' => null, 'is_off_plan' => true]) : null;
             }
 
             $validated['activity_code'] = $activityCode;
@@ -1032,6 +1076,104 @@ class PettyController extends Controller
         $validated['is_off_plan'] = false;
 
         return $validated;
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Request>  $query
+     */
+    private function applyFinanceRequestSearch($query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $like = '%'.$search.'%';
+        $query->where(function ($inner) use ($like) {
+            $inner->where('request_no', 'like', $like)
+                ->orWhereHas('user', fn ($userQuery) => $userQuery->where('name', 'like', $like))
+                ->orWhereHas('pettyDetails', function ($details) use ($like) {
+                    $details->where('request_for', 'like', $like)
+                        ->orWhere('reason', 'like', $like);
+                })
+                ->orWhereHas('requisitionDetails', function ($details) use ($like) {
+                    $details->where('activity_title', 'like', $like)
+                        ->orWhere('activity_code', 'like', $like)
+                        ->orWhere('project_program', 'like', $like)
+                        ->orWhere('budget_code', 'like', $like);
+                });
+        });
+    }
+
+    /**
+     * Next off-plan activity code after the highest year-plan major section for the user.
+     * Example: plan ends at 8.6 → first off-plan is 9.1, then 9.2, etc.
+     */
+    private function nextOffPlanActivityCode(?User $user, ?string $excludeRequestId = null): string
+    {
+        $planMaxMajor = 0;
+
+        foreach ($this->requisitionPlanActivitiesForUser($user) as $activity) {
+            $parsed = $this->parseActivityCodeParts((string) ($activity['code'] ?? ''));
+            if ($parsed !== null) {
+                $planMaxMajor = max($planMaxMajor, $parsed[0]);
+            }
+        }
+
+        $subDepartmentIds = $this->departmentSubDepartmentIdsForUser($user);
+        if ($subDepartmentIds !== []) {
+            $sectionNumbers = Department::query()
+                ->whereIn('id', $subDepartmentIds)
+                ->whereNotNull('plan_section_number')
+                ->pluck('plan_section_number');
+
+            foreach ($sectionNumbers as $sectionNumber) {
+                $planMaxMajor = max($planMaxMajor, (int) $sectionNumber);
+            }
+        }
+
+        $seriesMajor = $planMaxMajor + 1;
+        $maxMinor = 0;
+
+        $existingCodes = RequisitionRequest::query()
+            ->where('is_off_plan', true)
+            ->when(
+                $excludeRequestId !== null && $excludeRequestId !== '',
+                fn ($query) => $query->where('request_id', '!=', $excludeRequestId)
+            )
+            ->pluck('activity_code');
+
+        foreach ($existingCodes as $code) {
+            $parsed = $this->parseActivityCodeParts((string) $code);
+            if ($parsed !== null && $parsed[0] === $seriesMajor) {
+                $maxMinor = max($maxMinor, $parsed[1]);
+            }
+        }
+
+        return $seriesMajor.'.'.($maxMinor + 1);
+    }
+
+    private function offPlanActivityCodeTaken(string $activityCode, ?string $excludeRequestId = null): bool
+    {
+        return RequisitionRequest::query()
+            ->where('is_off_plan', true)
+            ->where('activity_code', $activityCode)
+            ->when(
+                $excludeRequestId !== null && $excludeRequestId !== '',
+                fn ($query) => $query->where('request_id', '!=', $excludeRequestId)
+            )
+            ->exists();
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null
+     */
+    private function parseActivityCodeParts(string $code): ?array
+    {
+        if (! preg_match('/^(\d+)\.(\d+)$/', trim($code), $matches)) {
+            return null;
+        }
+
+        return [(int) $matches[1], (int) $matches[2]];
     }
 
     /**

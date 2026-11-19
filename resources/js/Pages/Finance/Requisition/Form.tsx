@@ -22,12 +22,14 @@ type LineItem = { description: string; unit: string; cost: string | number };
 export default function Form({
     mode,
     planActivities,
+    nextOffPlanActivityCode,
     hasSignature,
     formContext,
     request,
 }: {
     mode: 'create' | 'edit';
     planActivities: Activity[];
+    nextOffPlanActivityCode: string;
     hasSignature: boolean;
     formContext: { userId: string; departmentId: string };
     request: FinanceItem | null;
@@ -46,13 +48,22 @@ export default function Form({
         budget_code: request?.budgetCode ?? '',
         date_of_request: request?.dateOfRequest ?? '',
         date_of_requirement: request?.dateOfRequirement ?? '',
-        reason: request?.reason ?? '',
-        items: request?.items.length ? request.items.map((item) => ({ description: item.description, unit: item.unit ?? '', cost: item.cost })) : [{ description: '', unit: '', cost: '' }],
+        items: request?.items.length
+            ? request.items.map((item) => ({ description: item.description, unit: item.unit ?? '', cost: item.cost }))
+            : [{ description: '', unit: '', cost: '' }],
     });
     const offPlan = form.data.activity_selection === '__off_plan__';
     const selectActivity = (code: string) => {
         if (code === '__off_plan__') {
-            form.setData((data) => ({ ...data, activity_selection: code, is_off_plan: '1', activity_code: '', activity_title: '', budget_code: '' }));
+            const keepExisting = Boolean(request?.isOffPlan && request.activityCode);
+            form.setData((data) => ({
+                ...data,
+                activity_selection: code,
+                is_off_plan: '1',
+                activity_code: keepExisting ? (request?.activityCode ?? nextOffPlanActivityCode) : nextOffPlanActivityCode,
+                activity_title: keepExisting ? data.activity_title : '',
+                budget_code: keepExisting ? data.budget_code : '',
+            }));
             return;
         }
         const activity = planActivities.find((item) => item.code === code);
@@ -73,9 +84,10 @@ export default function Form({
     };
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const action = (event.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement
-            ? ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement).value
-            : form.data.action;
+        const action =
+            (event.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement
+                ? ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement).value
+                : form.data.action;
         form.setData('action', action);
         const options = { onError: () => notify('error', 'Please correct the highlighted fields.') };
         if (mode === 'edit' && request) form.put(route('requisition.update', { petty: request.id }), options);
@@ -83,7 +95,15 @@ export default function Form({
     };
 
     if (!hasSignature) {
-        return <Alert><AlertTitle>Signature required</AlertTitle><AlertDescription className="space-y-3"><p>You must upload your signature in Profile Settings before you can create a requisition.</p><Button render={<AppLink href={route('profile.edit')} />}>Upload Signature</Button></AlertDescription></Alert>;
+        return (
+            <Alert>
+                <AlertTitle>Signature required</AlertTitle>
+                <AlertDescription className="space-y-3">
+                    <p>You must upload your signature in Profile Settings before you can create a requisition.</p>
+                    <Button render={<AppLink href={route('profile.edit')} />}>Upload Signature</Button>
+                </AlertDescription>
+            </Alert>
+        );
     }
 
     const total = form.data.items.reduce((sum, item) => sum + Number(item.cost || 0), 0);
@@ -93,32 +113,180 @@ export default function Form({
             <PageHeader title={mode === 'create' ? 'New Requisition' : 'Edit Requisition'} />
             <form onSubmit={submit}>
                 <Card>
-                    <CardHeader><CardTitle>Fund Requisition Details</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Fund Requisition Details</CardTitle>
+                    </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <Field label="Project / Program" error={form.errors.project_program}><Input name="project_program" value={form.data.project_program} onChange={(event) => form.setData('project_program', event.target.value)} required={!canDraft} /></Field>
+                            <Field label="Project / Program" error={form.errors.project_program}>
+                                <Input
+                                    name="project_program"
+                                    value={form.data.project_program}
+                                    onChange={(event) => form.setData('project_program', event.target.value)}
+                                    required={!canDraft}
+                                />
+                            </Field>
                             <Field label="Activity Code" error={form.errors.activity_selection ?? form.errors.activity_code}>
-                                <select name="activity_selection" className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm" value={form.data.activity_selection} onChange={(event) => selectActivity(event.target.value)} required={!canDraft}>
+                                <select
+                                    name="activity_selection"
+                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                    value={form.data.activity_selection}
+                                    onChange={(event) => selectActivity(event.target.value)}
+                                    required={!canDraft}
+                                >
                                     <option value="">Select activity code</option>
-                                    {planActivities.map((activity) => <option key={activity.id} value={activity.code}>{activity.code} - {activity.description}{activity.year ? ` (${activity.year})` : ''}</option>)}
+                                    {planActivities.map((activity) => (
+                                        <option key={activity.id} value={activity.code}>
+                                            {activity.code} - {activity.description}
+                                            {activity.year ? ` (${activity.year})` : ''}
+                                        </option>
+                                    ))}
                                     <option value="__off_plan__">Not on the year plan</option>
                                 </select>
-                                {offPlan && <Input name="activity_code" placeholder="Enter activity code e.g 19" value={form.data.activity_code} onChange={(event) => form.setData('activity_code', event.target.value)} required={!canDraft} />}
-                                {planActivities.length === 0 && <p className="text-xs text-muted-foreground">No year plan activities found for your department. Select “Not on the year plan” to enter codes manually.</p>}
+                                {offPlan && (
+                                    <Input
+                                        name="activity_code"
+                                        value={form.data.activity_code}
+                                        readOnly
+                                        className="bg-muted"
+                                    />
+                                )}
+                                {offPlan && (
+                                    <p className="text-muted-foreground text-xs">
+                                        Off-plan activity code is assigned automatically.
+                                    </p>
+                                )}
+                                {planActivities.length === 0 && (
+                                    <p className="text-muted-foreground text-xs">
+                                        No year plan activities found for your department. Select “Not on the year plan” to
+                                        continue.
+                                    </p>
+                                )}
                             </Field>
-                            <Field label="Budget Code" error={form.errors.budget_code}><Input name="budget_code" value={form.data.budget_code} readOnly={!offPlan} onChange={(event) => form.setData('budget_code', event.target.value)} required={!canDraft} /></Field>
-                            <Field label="Activity Title" error={form.errors.activity_title}><Input name="activity_title" value={form.data.activity_title} readOnly={!offPlan} onChange={(event) => form.setData('activity_title', event.target.value)} required={!canDraft} /></Field>
-                            <Field label="Date of Request" error={form.errors.date_of_request}><Input type="date" name="date_of_request" value={form.data.date_of_request} onChange={(event) => form.setData('date_of_request', event.target.value)} /></Field>
-                            <Field label="Date of Requirement" error={form.errors.date_of_requirement}><Input type="date" name="date_of_requirement" value={form.data.date_of_requirement} onChange={(event) => form.setData('date_of_requirement', event.target.value)} /></Field>
-                            <Field label="Reason" error={form.errors.reason}><Textarea name="reason" value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} /></Field>
+                            <Field label="Budget Code" error={form.errors.budget_code}>
+                                <Input
+                                    name="budget_code"
+                                    value={form.data.budget_code}
+                                    readOnly={!offPlan}
+                                    onChange={(event) => form.setData('budget_code', event.target.value)}
+                                    required={!canDraft}
+                                />
+                            </Field>
+                            <Field label="Activity Title" error={form.errors.activity_title}>
+                                <Input
+                                    name="activity_title"
+                                    value={form.data.activity_title}
+                                    readOnly={!offPlan}
+                                    onChange={(event) => form.setData('activity_title', event.target.value)}
+                                    required={!canDraft}
+                                />
+                            </Field>
+                            <Field label="Date of Request" error={form.errors.date_of_request}>
+                                <Input
+                                    type="date"
+                                    name="date_of_request"
+                                    value={form.data.date_of_request}
+                                    onChange={(event) => form.setData('date_of_request', event.target.value)}
+                                />
+                            </Field>
+                            <Field label="Date of Requirement" error={form.errors.date_of_requirement}>
+                                <Input
+                                    type="date"
+                                    name="date_of_requirement"
+                                    value={form.data.date_of_requirement}
+                                    onChange={(event) => form.setData('date_of_requirement', event.target.value)}
+                                />
+                            </Field>
                         </div>
                         <div>
-                            <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">Line Items</h3><Button type="button" variant="outline" onClick={() => form.setData('items', [...form.data.items, { description: '', unit: '', cost: '' }])}>Add Row</Button></div>
-                            <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-12">S/N</TableHead><TableHead>Description</TableHead><TableHead className="w-28">Unit</TableHead><TableHead className="w-36">Cost</TableHead><TableHead className="w-20" /></TableRow></TableHeader><TableBody>
-                                {form.data.items.map((item, index) => <TableRow key={index}><TableCell className="align-top">{index + 1}</TableCell><TableCell><Textarea className="min-h-20" name={`items[${index}][description]`} value={item.description} onChange={(event) => updateItem(index, 'description', event.target.value)} required={!canDraft} /></TableCell><TableCell className="align-top"><Input className="w-28" name={`items[${index}][unit]`} value={item.unit} placeholder="e.g. 2 days" onChange={(event) => updateItem(index, 'unit', event.target.value)} /></TableCell><TableCell className="align-top"><Input className="w-36" type="number" min="0" step="0.01" name={`items[${index}][cost]`} value={item.cost} placeholder="5,000,000" onChange={(event) => updateItem(index, 'cost', event.target.value)} required={!canDraft} /></TableCell><TableCell className="align-top"><Button type="button" variant="destructive" size="sm" onClick={() => form.setData('items', form.data.items.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></TableCell></TableRow>)}
-                                <TableRow><TableCell colSpan={3} className="text-right font-medium">Total</TableCell><TableCell className="font-medium">{money(total)}</TableCell><TableCell /></TableRow>
-                            </TableBody></Table></div>
-                            {form.errors.items && <p className="mt-2 text-sm text-destructive">{form.errors.items}</p>}
+                            <div className="mb-3 flex items-center justify-between">
+                                <h3 className="font-semibold">Line Items</h3>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        form.setData('items', [...form.data.items, { description: '', unit: '', cost: '' }])
+                                    }
+                                >
+                                    Add Row
+                                </Button>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-12">S/N</TableHead>
+                                            <TableHead>Description</TableHead>
+                                            <TableHead className="w-28">Unit</TableHead>
+                                            <TableHead className="w-36">Cost</TableHead>
+                                            <TableHead className="w-20" />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {form.data.items.map((item, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell className="align-top">{index + 1}</TableCell>
+                                                <TableCell>
+                                                    <Textarea
+                                                        className="min-h-20"
+                                                        name={`items[${index}][description]`}
+                                                        value={item.description}
+                                                        onChange={(event) =>
+                                                            updateItem(index, 'description', event.target.value)
+                                                        }
+                                                        required={!canDraft}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="align-top">
+                                                    <Input
+                                                        className="w-28"
+                                                        name={`items[${index}][unit]`}
+                                                        value={item.unit}
+                                                        placeholder="e.g. 2 days"
+                                                        onChange={(event) => updateItem(index, 'unit', event.target.value)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="align-top">
+                                                    <Input
+                                                        className="w-36"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        name={`items[${index}][cost]`}
+                                                        value={item.cost}
+                                                        placeholder="5,000,000"
+                                                        onChange={(event) => updateItem(index, 'cost', event.target.value)}
+                                                        required={!canDraft}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="align-top">
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            form.setData(
+                                                                'items',
+                                                                form.data.items.filter((_, itemIndex) => itemIndex !== index),
+                                                            )
+                                                        }
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-right font-medium">
+                                                Total
+                                            </TableCell>
+                                            <TableCell className="font-medium">{money(total)}</TableCell>
+                                            <TableCell />
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            {form.errors.items && <p className="text-destructive mt-2 text-sm">{form.errors.items}</p>}
                         </div>
                     </CardContent>
                     <CardFooter className="gap-2">
@@ -138,7 +306,13 @@ export default function Form({
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
-    return <div className="space-y-2"><Label>{label}</Label>{children}{error && <p className="text-sm text-destructive">{error}</p>}</div>;
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            {children}
+            {error && <p className="text-destructive text-sm">{error}</p>}
+        </div>
+    );
 }
 
 Form.layout = (page: ReactNode) => <AppLayout title="Requisition">{page}</AppLayout>;

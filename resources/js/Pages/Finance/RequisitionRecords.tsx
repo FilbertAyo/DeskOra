@@ -6,7 +6,16 @@ import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { FinanceTable, TruncateCell, money, shortDate } from '@/Pages/Finance/components';
+import {
+    FinanceListToolbar,
+    FinancePagination,
+    FinanceTable,
+    TruncateCell,
+    type ListFilters,
+    type Paginated,
+    money,
+    shortDate,
+} from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 
@@ -28,13 +37,23 @@ export default function RequisitionRecords({
     isFiltered,
     filterType,
     canDownloadRequisition,
+    filters,
 }: {
-    transactions: Array<RecordRow | GroupedRow>;
+    transactions: Paginated<RecordRow | GroupedRow>;
     isFiltered: boolean;
     filterType: string | null;
     canDownloadRequisition: boolean;
+    filters: ListFilters & { filter_type?: string | null };
 }) {
-    const query = filterType ? { filter_type: filterType } : {};
+    const query: Record<string, string> = {};
+    if (filterType) {
+        query.filter_type = filterType;
+    }
+    if (filters.search) {
+        query.search = filters.search;
+    }
+
+    const rows = transactions.data ?? [];
 
     return (
         <PageShell>
@@ -54,23 +73,29 @@ export default function RequisitionRecords({
                     </>
                 }
             />
-            <select
-                className="border-input bg-background h-9 max-w-xs rounded-md border px-3 text-sm"
-                value={filterType ?? ''}
-                onChange={(event) =>
-                    router.get(
-                        route('requisition.records'),
-                        event.target.value ? { filter_type: event.target.value } : {},
-                    )
-                }
+            <FinanceListToolbar
+                filters={filters}
+                actionUrl={route('requisition.records')}
+                extraParams={{ filter_type: filterType ?? undefined }}
             >
-                <option value="">Show All</option>
-                <option value="daily">Daily</option>
-                <option value="monthly">Monthly</option>
-            </select>
+                <select
+                    className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                    value={filterType ?? ''}
+                    onChange={(event) =>
+                        router.get(route('requisition.records'), {
+                            ...(event.target.value ? { filter_type: event.target.value } : {}),
+                            ...(filters.search ? { search: filters.search } : {}),
+                        })
+                    }
+                >
+                    <option value="">Show All</option>
+                    <option value="daily">Daily</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </FinanceListToolbar>
             {isFiltered ? (
-                <FinanceTable headers={['Period', 'Requisitions', 'Amount', 'Cumulative Total']} empty={transactions.length === 0}>
-                    {(transactions as GroupedRow[]).map((tx) => (
+                <FinanceTable headers={['Period', 'Requisitions', 'Amount', 'Cumulative Total']} empty={rows.length === 0}>
+                    {(rows as GroupedRow[]).map((tx) => (
                         <TableRow key={tx.label}>
                             <TableCell>{tx.label}</TableCell>
                             <TableCell>{tx.count}</TableCell>
@@ -92,9 +117,9 @@ export default function RequisitionRecords({
                         'Cumulative Total',
                         'Actions',
                     ]}
-                    empty={transactions.length === 0}
+                    empty={rows.length === 0}
                 >
-                    {(transactions as RecordRow[]).map((tx) => (
+                    {(rows as RecordRow[]).map((tx) => (
                         <TableRow key={tx.request_id}>
                             <TableCell className="whitespace-nowrap">{shortDate(tx.date)}</TableCell>
                             <TableCell className="font-mono whitespace-nowrap">{tx.reference}</TableCell>
@@ -131,6 +156,7 @@ export default function RequisitionRecords({
                     ))}
                 </FinanceTable>
             )}
+            <FinancePagination links={transactions.links} />
         </PageShell>
     );
 }

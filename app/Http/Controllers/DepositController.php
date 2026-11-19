@@ -9,6 +9,7 @@ use App\Models\Request as FinanceRequest;
 use App\Services\CashFlowForecastService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -197,17 +198,31 @@ class DepositController extends Controller
         return back()->with('error', 'Invalid format requested.');
     }
 
-    private function getRequisitionRecordTransactions(?string $filterType): array
+    private function getRequisitionRecordTransactions(?string $filterType, ?string $search = null): array
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $departmentIds = $user->departmentScopeIds();
+        $search = trim((string) $search);
 
         $requisitions = FinanceRequest::with(['user', 'requisitionDetails', 'department', 'approvals.actor'])
             ->whereIn('department_id', $departmentIds)
             ->where('request_type', 'Staff Requisition')
             ->where('status', 'approved')
             ->whereHas('approvals', fn ($query) => $query->where('step', 'authorize')->where('action', 'approved'))
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.$search.'%';
+                $query->where(function ($inner) use ($like) {
+                    $inner->where('request_no', 'like', $like)
+                        ->orWhereHas('user', fn ($userQuery) => $userQuery->where('name', 'like', $like))
+                        ->orWhereHas('requisitionDetails', function ($details) use ($like) {
+                            $details->where('activity_title', 'like', $like)
+                                ->orWhere('activity_code', 'like', $like)
+                                ->orWhere('project_program', 'like', $like)
+                                ->orWhere('budget_code', 'like', $like);
+                        });
+                });
+            })
             ->get()
             ->sortBy(fn (FinanceRequest $request) => $request->authorized_at)
             ->values();
@@ -248,7 +263,7 @@ class DepositController extends Controller
             }
 
             return [
-                'transactions' => $groupedData,
+                'transactions' => collect($groupedData)->values(),
                 'isFiltered' => true,
                 'filterType' => $filterType,
             ];
@@ -263,7 +278,7 @@ class DepositController extends Controller
         });
 
         return [
-            'transactions' => $transactions,
+            'transactions' => $transactions->values(),
             'isFiltered' => false,
             'filterType' => null,
         ];
@@ -272,14 +287,36 @@ class DepositController extends Controller
     public function requisitionRecords(Request $request)
     {
         $filterType = $request->input('filter_type');
-        $data = $this->getRequisitionRecordTransactions($filterType);
+        $search = trim((string) $request->input('search', ''));
+        $data = $this->getRequisitionRecordTransactions(
+            is_string($filterType) ? $filterType : null,
+            $search !== '' ? $search : null
+        );
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        $perPage = 15;
+        $page = max(1, (int) $request->query('page', 1));
+        $all = collect($data['transactions']);
+        $paginator = new LengthAwarePaginator(
+            $all->forPage($page, $perPage)->values(),
+            $all->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
 
         return Inertia::render('Finance/RequisitionRecords', [
-            ...$data,
-            'transactions' => collect($data['transactions'])->values(),
+            'transactions' => $paginator,
+            'isFiltered' => $data['isFiltered'],
+            'filterType' => $data['filterType'],
+            'filters' => [
+                'search' => $search !== '' ? $search : null,
+                'filter_type' => is_string($filterType) && $filterType !== '' ? $filterType : null,
+            ],
             'canDownloadRequisition' => $user->canAny([
                 'download staff requisition',
                 'authorize staff requisition',
@@ -292,7 +329,11 @@ class DepositController extends Controller
     {
         $format = $request->get('format');
         $filterType = $request->get('filter_type');
-        $data = $this->getRequisitionRecordTransactions($filterType);
+        $search = trim((string) $request->get('search', ''));
+        $data = $this->getRequisitionRecordTransactions(
+            is_string($filterType) ? $filterType : null,
+            $search !== '' ? $search : null
+        );
         $transactions = $data['transactions'];
         $department = strtoupper(optional(Auth::user()->department)->name ?? 'DEPARTMENT');
         $isFiltered = in_array($filterType, ['daily', 'monthly'], true);

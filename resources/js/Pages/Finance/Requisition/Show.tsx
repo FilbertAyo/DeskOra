@@ -8,7 +8,12 @@ import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { type ApprovalLog, ApprovalTimeline, type FinanceItem, RequestPreview } from '@/Pages/Finance/components';
+import {
+    ApprovalTimelineButton,
+    type ApprovalLog,
+    type FinanceItem,
+    RequestPreview,
+} from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
 
@@ -26,6 +31,7 @@ export default function Show({ request, approvalLogs }: { request: FinanceItem; 
                         <Button variant="outline" render={<AppLink href={route('requisition.index')} />}>
                             Back
                         </Button>
+                        <ApprovalTimelineButton logs={approvalLogs} />
                         <RowActions
                             items={[
                                 {
@@ -52,10 +58,7 @@ export default function Show({ request, approvalLogs }: { request: FinanceItem; 
                     <AlertDescription>This requisition has not been submitted for approval yet.</AlertDescription>
                 </Alert>
             )}
-            <div className="space-y-6">
-                <RequestPreview request={request} />
-                <ApprovalTimeline logs={approvalLogs} />
-            </div>
+            <RequestPreview request={request} />
         </PageShell>
     );
 }

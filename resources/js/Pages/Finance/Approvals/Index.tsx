@@ -7,9 +7,28 @@ import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { FinanceTable, TruncateCell, type FinanceItem, money, shortDate, StatusBadge } from '@/Pages/Finance/components';
+import {
+    FinanceListToolbar,
+    FinancePagination,
+    FinanceTable,
+    TruncateCell,
+    type FinanceItem,
+    type ListFilters,
+    type Paginated,
+    money,
+    shortDate,
+    StatusBadge,
+} from '@/Pages/Finance/components';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { route } from '@/lib/route';
+
+const statusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'resubmission', label: 'Resubmission' },
+];
 
 export default function Index({
     requests,
@@ -17,17 +36,31 @@ export default function Index({
     typeFilter,
     title,
     emptyMessage,
+    filters,
 }: {
-    requests: FinanceItem[];
+    requests: Paginated<FinanceItem>;
     stage: string | null;
     stageLabel: string | null;
     typeFilter: string | null;
     title: string;
     emptyMessage: string;
+    filters: ListFilters;
 }) {
+    const rows = requests.data ?? [];
+    const pageStart = ((requests.current_page ?? 1) - 1) * (requests.per_page ?? rows.length);
+
     return (
         <PageShell>
             <PageHeader title={title} actions={<Button variant="outline" onClick={() => router.reload()}>Refresh</Button>} />
+            <FinanceListToolbar
+                filters={filters}
+                statusOptions={statusOptions}
+                actionUrl={route('petty.list')}
+                extraParams={{
+                    stage: stage ?? undefined,
+                    type: typeFilter ?? undefined,
+                }}
+            />
             <FinanceTable
                 headers={[
                     'No.',
@@ -42,16 +75,16 @@ export default function Index({
                 ]}
                 empty={false}
             >
-                {requests.length === 0 ? (
+                {rows.length === 0 ? (
                     <TableRow>
                         <TableCell colSpan={9} className="text-muted-foreground h-24 text-center">
                             {emptyMessage}
                         </TableCell>
                     </TableRow>
                 ) : (
-                    requests.map((item, index) => (
+                    rows.map((item, index) => (
                         <TableRow key={item.id}>
-                            <TableCell className="w-12">{index + 1}</TableCell>
+                            <TableCell className="w-12">{pageStart + index + 1}</TableCell>
                             <TruncateCell className="max-w-[10rem]" title={item.user?.name ?? 'N/A'}>
                                 {item.user?.name ?? 'N/A'}
                             </TruncateCell>
@@ -98,6 +131,7 @@ export default function Index({
                     ))
                 )}
             </FinanceTable>
+            <FinancePagination links={requests.links} />
         </PageShell>
     );
 }

@@ -375,11 +375,15 @@ class RequisitionDraftTest extends TestCase
         $response->assertDontSee('DR002');
     }
 
-    public function test_staff_can_submit_off_plan_requisition_with_manual_codes(): void
+    public function test_staff_can_submit_off_plan_requisition_with_auto_assigned_code(): void
     {
         Notification::fake();
 
-        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        $department = Department::create([
+            'name' => 'Operations',
+            'status' => 'active',
+            'plan_section_number' => 8,
+        ]);
         $requester = User::factory()->create([
             'department_id' => $department->id,
             'status' => 'active',
@@ -395,7 +399,7 @@ class RequisitionDraftTest extends TestCase
             'project_program' => 'Emergency Support',
             'activity_selection' => '__off_plan__',
             'is_off_plan' => '1',
-            'activity_code' => 'OP-99',
+            'activity_code' => '',
             'activity_title' => 'Unplanned field visit',
             'budget_code' => 'BUD-OFF-01',
             'items' => [
@@ -410,15 +414,19 @@ class RequisitionDraftTest extends TestCase
         $details = $requisition->fresh('requisitionDetails')->requisitionDetails;
         $this->assertNotNull($details);
         $this->assertTrue($details->is_off_plan);
-        $this->assertSame('OP-99', $details->activity_code);
+        $this->assertSame('9.1', $details->activity_code);
         $this->assertSame('BUD-OFF-01', $details->budget_code);
         $this->assertSame('Unplanned field visit', $details->activity_title);
         $this->assertTrue($requisition->fresh('requisitionDetails')->is_off_plan);
     }
 
-    public function test_off_plan_submit_rejects_sentinel_as_activity_code(): void
+    public function test_off_plan_submit_auto_assigns_when_sentinel_sent_as_activity_code(): void
     {
-        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        $department = Department::create([
+            'name' => 'Operations',
+            'status' => 'active',
+            'plan_section_number' => 8,
+        ]);
         $requester = User::factory()->create([
             'department_id' => $department->id,
             'status' => 'active',
@@ -426,7 +434,7 @@ class RequisitionDraftTest extends TestCase
         ]);
         $requester->givePermissionTo('request pettycash');
 
-        $response = $this->actingAs($requester)->from(route('requisition.create'))->post(route('requisition.store'), [
+        $response = $this->actingAs($requester)->post(route('requisition.store'), [
             'user_id' => $requester->id,
             'department_id' => $department->id,
             'request_type' => 'Staff Requisition',
@@ -442,14 +450,78 @@ class RequisitionDraftTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('requisition.create'));
-        $response->assertSessionHasErrors('activity_code');
-        $this->assertSame(0, FinanceRequest::query()->count());
+        $response->assertRedirect(route('requisition.index'));
+        $details = FinanceRequest::query()->where('user_id', $requester->id)->first()?->fresh('requisitionDetails')->requisitionDetails;
+        $this->assertNotNull($details);
+        $this->assertTrue($details->is_off_plan);
+        $this->assertSame('9.1', $details->activity_code);
+    }
+
+    public function test_off_plan_codes_increment_sequentially(): void
+    {
+        Notification::fake();
+
+        $department = Department::create([
+            'name' => 'Operations',
+            'status' => 'active',
+            'plan_section_number' => 8,
+        ]);
+        $requester = User::factory()->create([
+            'department_id' => $department->id,
+            'status' => 'active',
+            'signature' => 'signatures/test.png',
+        ]);
+        $requester->givePermissionTo('request pettycash');
+
+        $existing = FinanceRequest::create([
+            'request_no' => 'DR-OFF-0',
+            'request_type' => 'Staff Requisition',
+            'user_id' => $requester->id,
+            'department_id' => $department->id,
+            'status' => 'pending',
+            'submitted_at' => now(),
+        ]);
+        RequisitionRequest::create([
+            'request_id' => $existing->id,
+            'project_program' => 'Prior off-plan',
+            'activity_code' => '9.1',
+            'activity_title' => 'First off-plan',
+            'budget_code' => 'BUD-OFF-00',
+            'is_off_plan' => true,
+            'amount' => 1000,
+        ]);
+
+        $response = $this->actingAs($requester)->post(route('requisition.store'), [
+            'user_id' => $requester->id,
+            'department_id' => $department->id,
+            'request_type' => 'Staff Requisition',
+            'action' => 'submit',
+            'project_program' => 'Emergency Support',
+            'activity_selection' => '__off_plan__',
+            'is_off_plan' => '1',
+            'activity_code' => '9.1',
+            'activity_title' => 'Second off-plan',
+            'budget_code' => 'BUD-OFF-01',
+            'items' => [
+                ['description' => 'Transport', 'unit' => 'trip', 'cost' => '75000'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('requisition.index'));
+        $created = FinanceRequest::query()
+            ->where('user_id', $requester->id)
+            ->where('request_no', '!=', 'DR-OFF-0')
+            ->first();
+        $this->assertSame('9.2', $created?->fresh('requisitionDetails')->requisitionDetails?->activity_code);
     }
 
     public function test_off_plan_draft_round_trips_on_edit(): void
     {
-        $department = Department::create(['name' => 'Operations', 'status' => 'active']);
+        $department = Department::create([
+            'name' => 'Operations',
+            'status' => 'active',
+            'plan_section_number' => 8,
+        ]);
         $requester = User::factory()->create([
             'department_id' => $department->id,
             'status' => 'active',
@@ -469,7 +541,7 @@ class RequisitionDraftTest extends TestCase
         RequisitionRequest::create([
             'request_id' => $draft->id,
             'project_program' => 'Emergency Support',
-            'activity_code' => 'OP-99',
+            'activity_code' => '9.1',
             'activity_title' => 'Unplanned field visit',
             'budget_code' => 'BUD-OFF-01',
             'is_off_plan' => true,
@@ -482,15 +554,16 @@ class RequisitionDraftTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Finance/Requisition/Form')
                 ->where('request.isOffPlan', true)
-                ->where('request.activityCode', 'OP-99')
-                ->where('request.budgetCode', 'BUD-OFF-01'));
+                ->where('request.activityCode', '9.1')
+                ->where('request.budgetCode', 'BUD-OFF-01')
+                ->where('nextOffPlanActivityCode', '9.1'));
 
         $response = $this->actingAs($requester)->put(route('requisition.update', $draft->id), [
             'action' => 'draft',
             'project_program' => 'Emergency Support Updated',
             'activity_selection' => '__off_plan__',
             'is_off_plan' => '1',
-            'activity_code' => 'OP-100',
+            'activity_code' => '9.1',
             'activity_title' => 'Updated off-plan title',
             'budget_code' => 'BUD-OFF-02',
             'items' => [
@@ -502,7 +575,7 @@ class RequisitionDraftTest extends TestCase
 
         $details = $draft->fresh('requisitionDetails')->requisitionDetails;
         $this->assertTrue($details->is_off_plan);
-        $this->assertSame('OP-100', $details->activity_code);
+        $this->assertSame('9.1', $details->activity_code);
         $this->assertSame('BUD-OFF-02', $details->budget_code);
         $this->assertSame('Updated off-plan title', $details->activity_title);
         $this->assertSame('Emergency Support Updated', $details->project_program);

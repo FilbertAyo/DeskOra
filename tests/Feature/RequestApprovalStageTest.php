@@ -121,8 +121,8 @@ class RequestApprovalStageTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Finance/Approvals/Index')
-            ->where('requests.0.amount', 60000)
-            ->where('requests.0.stageApproved', true));
+            ->where('requests.data.0.amount', 60000)
+            ->where('requests.data.0.stageApproved', true));
     }
 
     public function test_actionable_requests_are_listed_before_completed_ones(): void
@@ -140,8 +140,8 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('requests.0.amount', 50000)
-            ->where('requests.1.amount', 60000));
+            ->where('requests.data.0.amount', 50000)
+            ->where('requests.data.1.amount', 60000));
     }
 
     public function test_reviewer_sees_pending_and_already_reviewed_items(): void
@@ -159,9 +159,9 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->has('requests', 2)
-            ->where('requests.0.canAct', true)
-            ->where('requests.1.stageApproved', true));
+            ->has('requests.data', 2)
+            ->where('requests.data.0.canAct', true)
+            ->where('requests.data.1.stageApproved', true));
     }
 
     public function test_rejected_request_stays_on_stage_list_but_is_not_counted(): void
@@ -192,9 +192,9 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->has('requests', 2)
-            ->where('requests.0.amount', 44000)
-            ->where('requests.1.amount', 88000));
+            ->has('requests.data', 2)
+            ->where('requests.data.0.amount', 44000)
+            ->where('requests.data.1.amount', 88000));
     }
 
     public function test_reject_endpoint_logs_current_stage_and_clears_actionable_count(): void
@@ -245,8 +245,8 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->has('requests', 1)
-            ->where('requests.0.amount', 75000));
+            ->has('requests.data', 1)
+            ->where('requests.data.0.amount', 75000));
     }
 
     public function test_authorizer_sees_only_post_approve_items(): void
@@ -266,8 +266,8 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->has('requests', 1)
-            ->where('requests.0.amount', 90000));
+            ->has('requests.data', 1)
+            ->where('requests.data.0.amount', 90000));
     }
 
     public function test_user_without_stage_permission_gets_forbidden(): void
@@ -366,8 +366,8 @@ class RequestApprovalStageTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->has('requests', 1)
-            ->where('requests.0.requestType', 'Staff Requisition')
-            ->where('requests.0.canAct', true));
+            ->has('requests.data', 1)
+            ->where('requests.data.0.requestType', 'Staff Requisition')
+            ->where('requests.data.0.canAct', true));
     }
 }
