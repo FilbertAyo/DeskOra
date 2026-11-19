@@ -50,7 +50,7 @@ export function TruncateCell({
         full && full.length > maxLength ? `${full.slice(0, maxLength).trimEnd()}…` : (children ?? '—');
 
     return (
-        <TableCell className={cn('max-w-[12rem] overflow-hidden', className)} title={full || undefined}>
+        <TableCell className={cn('max-w-[12rem] min-w-[7rem] overflow-hidden', className)} title={full || undefined}>
             <span className="block truncate whitespace-nowrap">{display}</span>
         </TableCell>
     );
@@ -117,16 +117,30 @@ export function FinanceTable({
     empty?: boolean;
 }) {
     return (
-        <Card>
-            <CardContent className="overflow-x-auto p-0">
-                <Table className="w-full table-fixed">
+        <Card className="overflow-hidden">
+            <CardContent className="p-0">
+                {/*
+                  Avoid table-fixed: on narrow screens it crushes columns and badges overlap.
+                  Let content define width; the Table wrapper scrolls horizontally.
+                */}
+                <Table className="w-full min-w-max">
                     <TableHeader>
-                        <TableRow>{headers.map((header) => <TableHead key={header}>{header}</TableHead>)}</TableRow>
+                        <TableRow>
+                            {headers.map((header) => (
+                                <TableHead key={header}>{header}</TableHead>
+                            ))}
+                        </TableRow>
                     </TableHeader>
                     <TableBody>
                         {empty ? (
-                            <TableRow><TableCell colSpan={headers.length} className="h-24 text-center text-muted-foreground">No records found.</TableCell></TableRow>
-                        ) : children}
+                            <TableRow>
+                                <TableCell colSpan={headers.length} className="text-muted-foreground h-24 text-center">
+                                    No records found.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            children
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>

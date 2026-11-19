@@ -91,7 +91,7 @@ export default function Index({
                             <TruncateCell className="max-w-[18rem]" title={item.activityTitle ?? item.requestFor}>
                                 {item.activityTitle ?? item.requestFor}
                             </TruncateCell>
-                            <TableCell className="whitespace-nowrap">
+                            <TableCell>
                                 <Badge variant="outline">{item.requestType}</Badge>
                             </TableCell>
                             <TableCell>
@@ -107,12 +107,12 @@ export default function Index({
                                     '—'
                                 )}
                             </TableCell>
-                            <TableCell>{money(item.amount)}</TableCell>
+                            <TableCell className="tabular-nums">{money(item.amount)}</TableCell>
                             <TableCell>{shortDate(item.createdAt)}</TableCell>
                             <TableCell>
                                 <StatusBadge status={item.status} />
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="w-12 text-right">
                                 <RowActions
                                     items={[
                                         {
