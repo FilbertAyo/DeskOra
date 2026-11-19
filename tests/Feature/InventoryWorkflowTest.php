@@ -52,6 +52,33 @@ class InventoryWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_operations_nav_badges_are_shown_on_specific_links(): void
+    {
+        $user = $this->inventoryUser(['view inventory']);
+        $asset = $this->makeAsset();
+        $this->makeBorrowRequest($asset, $user);
+
+        InventoryMaintenanceRecord::query()->create([
+            'record_number' => 'WH-MNT-2026-0099',
+            'asset_id' => $this->makeAsset(['status' => InventoryAsset::STATUS_UNDER_REPAIR])->id,
+            'status' => InventoryMaintenanceRecord::STATUS_REPORTED,
+            'problem_description' => 'Needs repair',
+            'reported_by_user_id' => $user->id,
+            'reported_at' => now(),
+            'previous_status' => InventoryAsset::STATUS_AVAILABLE,
+            'previous_condition' => InventoryAsset::CONDITION_GOOD,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $nav = $response->inertiaPage()['props']['nav'];
+        $this->assertSame('1', $this->navBadge($nav, 'Borrowing'));
+        $this->assertSame('1', $this->navBadge($nav, 'Maintenance'));
+        $this->assertNull($this->navBadge($nav, 'Dispatch'));
+        $this->assertSame('2', $this->navBadge($nav, 'Operations'));
+    }
+
     public function test_repair_completion_records_provider_and_cost(): void
     {
         $user = $this->inventoryUser(['manage inventory maintenance', 'view inventory']);
@@ -857,5 +884,37 @@ class InventoryWorkflowTest extends TestCase
             'status' => InventoryBorrowRequest::STATUS_REQUESTED,
             'requested_by_user_id' => $requester->id,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $nav
+     */
+    private function navBadge(array $nav, string $label): ?string
+    {
+        $found = null;
+
+        $visit = function (array $items) use (&$visit, &$found, $label): void {
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+
+                if (($item['label'] ?? null) === $label) {
+                    $found = $item['badge'] ?? null;
+                }
+
+                if (is_array($item['children'] ?? null)) {
+                    $visit($item['children']);
+                }
+            }
+        };
+
+        foreach ($nav['groups'] ?? [] as $group) {
+            if (is_array($group) && is_array($group['items'] ?? null)) {
+                $visit($group['items']);
+            }
+        }
+
+        return is_string($found) ? $found : null;
     }
 }

@@ -281,28 +281,43 @@
                                     <li class="{{ Request::routeIs('inventory.borrowing.*') ? 'active' : '' }}">
                                         <a href="{{ route('inventory.borrowing.index') }}" class="pc-link">
                                             <span class="pc-mtext">Borrowing</span>
+                                            @if(($inventoryOverdueCount + $inventoryPendingBorrowCount) > 0)
+                                                <span class="badge bg-secondary ms-2">{{ $inventoryOverdueCount + $inventoryPendingBorrowCount }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                     <li class="{{ Request::routeIs('inventory.dispatches.*') ? 'active' : '' }}">
                                         <a href="{{ route('inventory.dispatches.index') }}" class="pc-link">
                                             <span class="pc-mtext">Dispatch</span>
+                                            @if($inventoryDispatchAttention > 0)
+                                                <span class="badge bg-secondary ms-2">{{ $inventoryDispatchAttention }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                     @canany(['manage inventory maintenance', 'view inventory'])
                                         <li class="{{ Request::routeIs('inventory.maintenance.*') ? 'active' : '' }}">
                                             <a href="{{ route('inventory.maintenance.index') }}" class="pc-link">
                                                 <span class="pc-mtext">Maintenance</span>
+                                                @if($inventoryRepairCount > 0)
+                                                    <span class="badge bg-secondary ms-2">{{ $inventoryRepairCount }}</span>
+                                                @endif
                                             </a>
                                         </li>
                                     @endcanany
                                     <li class="{{ Request::routeIs('inventory.disposal.*') ? 'active' : '' }}">
                                         <a href="{{ route('inventory.disposal.index') }}" class="pc-link">
                                             <span class="pc-mtext">Disposal</span>
+                                            @if($inventoryDisposalPending > 0)
+                                                <span class="badge bg-secondary ms-2">{{ $inventoryDisposalPending }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                     <li class="{{ Request::routeIs('inventory.verification.*') ? 'active' : '' }}">
                                         <a href="{{ route('inventory.verification.index') }}" class="pc-link">
                                             <span class="pc-mtext">Verification</span>
+                                            @if($inventoryOpenVerification > 0)
+                                                <span class="badge bg-secondary ms-2">{{ $inventoryOpenVerification }}</span>
+                                            @endif
                                         </a>
                                     </li>
                                 </ul>

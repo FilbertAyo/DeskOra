@@ -338,17 +338,37 @@ class PortalNav
      */
     private static function inventory(User $user): array
     {
+        $borrowingAttention = 0;
+        $dispatchAttention = 0;
+        $maintenanceAttention = 0;
+        $disposalAttention = 0;
+        $verificationAttention = 0;
         $opsAttention = 0;
+
         if ($user->can('view inventory')) {
-            $opsAttention = (int) Cache::remember('nav-inventory-ops-attention', now()->addSeconds(30), function () {
-                return InventoryBorrowRequest::overdueCount()
-                    + InventoryBorrowRequest::pendingReviewCount()
-                    + InventoryMaintenanceRecord::openCount()
-                    + InventoryDisposalRequest::pendingReviewCount()
-                    + InventoryVerificationSession::openCount()
-                    + InventoryDispatch::overdueCount()
-                    + InventoryDispatch::openMovementCount();
+            /** @var array{borrowing: int, dispatch: int, maintenance: int, disposal: int, verification: int} $opsCounts */
+            $opsCounts = Cache::remember('nav-inventory-ops-attention-v2', now()->addSeconds(30), function () {
+                return [
+                    'borrowing' => InventoryBorrowRequest::overdueCount()
+                        + InventoryBorrowRequest::pendingReviewCount(),
+                    'dispatch' => InventoryDispatch::overdueCount()
+                        + InventoryDispatch::openMovementCount(),
+                    'maintenance' => InventoryMaintenanceRecord::openCount(),
+                    'disposal' => InventoryDisposalRequest::pendingReviewCount(),
+                    'verification' => InventoryVerificationSession::openCount(),
+                ];
             });
+
+            $borrowingAttention = (int) ($opsCounts['borrowing'] ?? 0);
+            $dispatchAttention = (int) ($opsCounts['dispatch'] ?? 0);
+            $maintenanceAttention = (int) ($opsCounts['maintenance'] ?? 0);
+            $disposalAttention = (int) ($opsCounts['disposal'] ?? 0);
+            $verificationAttention = (int) ($opsCounts['verification'] ?? 0);
+            $opsAttention = $borrowingAttention
+                + $dispatchAttention
+                + $maintenanceAttention
+                + $disposalAttention
+                + $verificationAttention;
         }
 
         $children = [];
@@ -363,11 +383,11 @@ class PortalNav
             $children[] = self::link('Stock', 'inventory.stock-items.index', [], null, request()->routeIs('inventory.stock-items.*'));
             $children[] = self::link('Receipts', 'inventory.receipts.index', [], null, request()->routeIs('inventory.receipts.*'));
             $children[] = self::group('Operations', null, [
-                self::link('Borrowing', 'inventory.borrowing.index', [], null, request()->routeIs('inventory.borrowing.*')),
-                self::link('Dispatch', 'inventory.dispatches.index', [], null, request()->routeIs('inventory.dispatches.*')),
-                self::link('Maintenance', 'inventory.maintenance.index', [], null, request()->routeIs('inventory.maintenance.*')),
-                self::link('Disposal', 'inventory.disposal.index', [], null, request()->routeIs('inventory.disposal.*')),
-                self::link('Verification', 'inventory.verification.index', [], null, request()->routeIs('inventory.verification.*')),
+                self::link('Borrowing', 'inventory.borrowing.index', [], null, request()->routeIs('inventory.borrowing.*'), $borrowingAttention),
+                self::link('Dispatch', 'inventory.dispatches.index', [], null, request()->routeIs('inventory.dispatches.*'), $dispatchAttention),
+                self::link('Maintenance', 'inventory.maintenance.index', [], null, request()->routeIs('inventory.maintenance.*'), $maintenanceAttention),
+                self::link('Disposal', 'inventory.disposal.index', [], null, request()->routeIs('inventory.disposal.*'), $disposalAttention),
+                self::link('Verification', 'inventory.verification.index', [], null, request()->routeIs('inventory.verification.*'), $verificationAttention),
             ], request()->routeIs('inventory.borrowing.*', 'inventory.dispatches.*', 'inventory.maintenance.*', 'inventory.disposal.*', 'inventory.verification.*'), $opsAttention);
             $children[] = self::link('Reports', 'inventory.reports.index', [], null, request()->routeIs('inventory.reports.*'));
 
