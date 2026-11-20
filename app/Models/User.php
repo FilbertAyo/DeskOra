@@ -62,6 +62,7 @@ class User extends Authenticatable
         'status',
         'notification_channel',
         'last_login_at',
+        'remember_expires_at',
     ];
 
     public function scopeActive($query)
@@ -206,16 +207,20 @@ class User extends Authenticatable
         });
     }
 
-    public function requiresLoginOtp(?int $hours = null): bool
+    public function requiresLoginOtp(): bool
     {
         if ($this->isDemoViewer()) {
             return false;
         }
 
-        $hours ??= (int) config('auth.login_otp_inactivity_hours', 120);
+        // "Remember me" grants a password-only re-login window; otherwise OTP is required.
+        return ! $this->hasActiveRememberWindow();
+    }
 
-        return $this->last_login_at === null
-            || $this->last_login_at->lt(now()->subHours($hours));
+    public function hasActiveRememberWindow(): bool
+    {
+        return $this->remember_expires_at !== null
+            && $this->remember_expires_at->isFuture();
     }
 
     public function maskedEmail(): string
@@ -263,6 +268,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'remember_expires_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

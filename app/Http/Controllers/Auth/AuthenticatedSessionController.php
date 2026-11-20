@@ -177,9 +177,26 @@ class AuthenticatedSessionController extends Controller
     {
         $this->clearPendingLogin($request);
 
-        Auth::login($user, $remember);
+        $rememberDays = max(1, (int) config('auth.login_remember_days', 4));
 
-        $user->update(['last_login_at' => now()]);
+        if ($remember) {
+            Auth::guard('web')->setRememberDuration($rememberDays * 24 * 60);
+            Auth::login($user, true);
+
+            $user->forceFill([
+                'last_login_at' => now(),
+                'remember_expires_at' => now()->addDays($rememberDays),
+            ])->save();
+        } else {
+            // Invalidate any prior remember cookie and clear the OTP-skip window.
+            $user->forceFill([
+                'last_login_at' => now(),
+                'remember_expires_at' => null,
+                'remember_token' => null,
+            ])->save();
+
+            Auth::login($user, false);
+        }
 
         activity('auth')
             ->causedBy($user)
@@ -188,6 +205,7 @@ class AuthenticatedSessionController extends Controller
             ->withProperties([
                 'ip' => $request->ip(),
                 'user_agent' => (string) $request->userAgent(),
+                'remember' => $remember,
             ])
             ->log('User logged in');
 

@@ -114,14 +114,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Login OTP Inactivity Threshold
+    | Login "Remember Me" Window
     |--------------------------------------------------------------------------
     |
-    | Number of hours since the last successful login before email OTP is
-    | required on the next sign-in attempt. Default is 5 days (120 hours).
+    | When "Remember me" is checked at sign-in, the remember cookie and the
+    | OTP-skip window last this many days of inactivity. After it expires,
+    | the next sign-in requires an email verification code. Without remember
+    | me, the normal session lifetime applies and OTP is always required on
+    | the next login after the session ends.
     |
     */
 
-    'login_otp_inactivity_hours' => (int) env('LOGIN_OTP_INACTIVITY_HOURS', 120),
+    'login_remember_days' => (int) env('LOGIN_REMEMBER_DAYS', 4),
 
 ];
