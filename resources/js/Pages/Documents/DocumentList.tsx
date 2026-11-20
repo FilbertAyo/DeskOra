@@ -86,7 +86,9 @@ export default function DocumentList({ title, documents, createUrl, filters }: P
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline">{document.state === 'draft' ? 'Draft' : 'Submitted'}</Badge>
+                                            <Badge variant={document.state === 'draft' ? 'outline' : 'success'}>
+                                                {document.state === 'draft' ? 'Draft' : 'Submitted'}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <RowActions

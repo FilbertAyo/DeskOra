@@ -3,8 +3,8 @@ import { DownloadIcon, EyeIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
-import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import {
     FinanceListToolbar,
@@ -61,15 +61,12 @@ export default function RequisitionRecords({
                 title="Requisition Records"
                 actions={
                     <>
-                        <Button
-                            variant="destructive"
-                            render={<a href={route('requisition.records.download', { format: 'pdf', ...query })} />}
-                        >
-                            PDF
-                        </Button>
-                        <Button render={<a href={route('requisition.records.download', { format: 'excel', ...query })} />}>
-                            Excel
-                        </Button>
+                        <DownloadButton href={route('requisition.records.download', { format: 'pdf', ...query })}>
+                            Download PDF
+                        </DownloadButton>
+                        <DownloadButton href={route('requisition.records.download', { format: 'excel', ...query })}>
+                            Download Excel
+                        </DownloadButton>
                     </>
                 }
             />

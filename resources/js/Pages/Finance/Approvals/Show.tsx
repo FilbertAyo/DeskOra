@@ -1,6 +1,8 @@
 import { router, useForm } from '@inertiajs/react';
 
 import AppLink from '@/components/shared/AppLink';
+import BackButton from '@/components/shared/BackButton';
+import DownloadButton from '@/components/shared/DownloadButton';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 
@@ -69,9 +71,7 @@ export default function Show({
                 title="Request Details"
                 actions={
                     <>
-                        <Button variant="outline" render={<AppLink href={backUrl} />}>
-                            Back
-                        </Button>
+                        <BackButton href={backUrl} />
                         <ApprovalTimelineButton logs={approvalLogs} />
                         {canActOnRequest && hasSignature && (
                             <Dialog open={open} onOpenChange={setOpen}>
@@ -118,12 +118,9 @@ export default function Show({
                             </Dialog>
                         )}
                         {request.canDownload && (
-                            <Button
-                                variant="destructive"
-                                render={<a href={route('petty.requisition.download', { petty: request.id })} />}
-                            >
+                            <DownloadButton href={route('petty.requisition.download', { petty: request.id })}>
                                 Download
-                            </Button>
+                            </DownloadButton>
                         )}
                         {request.canPay && <PayButton id={request.id} />}
                     </>

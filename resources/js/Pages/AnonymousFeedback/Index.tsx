@@ -1,8 +1,9 @@
 ﻿import { Link, router } from '@inertiajs/react';
-import { DownloadIcon, LinkIcon } from 'lucide-react';
+import { LinkIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -82,10 +83,9 @@ export default function AnonymousFeedbackIndex({
                             <LinkIcon />
                             {copied ? 'Copied' : 'Copy link'}
                         </Button>
-                        <Button variant="outline" render={<a href={qrDownloadUrl} />}>
-                            <DownloadIcon />
+                        <DownloadButton href={qrDownloadUrl} size="default">
                             Download QR
-                        </Button>
+                        </DownloadButton>
                     </>
                 }
             />

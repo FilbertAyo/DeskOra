@@ -1,7 +1,8 @@
-import { Link, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -42,9 +43,7 @@ export default function UsersCreate({
             <PageHeader
                 title="Create user"
                 actions={
-                    <Button variant="outline" render={<Link href={indexUrl} />}>
-                        Back
-                    </Button>
+                    <BackButton href={indexUrl} />
                 }
             />
             <Card>

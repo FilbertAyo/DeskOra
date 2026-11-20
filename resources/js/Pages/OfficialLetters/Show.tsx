@@ -1,8 +1,9 @@
-import { Link, router, useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import { DownloadIcon, PencilIcon, ShieldCheckIcon, ShieldXIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,12 +85,7 @@ export default function OfficialLettersShow({
                 description={letter.reference_number}
                 actions={
                     <>
-                        <Button
-                            variant="outline"
-                            render={<Link href={isAuthorizerReview ? `${urls.index}?tab=authorizations` : urls.index} />}
-                        >
-                            Back
-                        </Button>
+                        <BackButton href={isAuthorizerReview ? `${urls.index}?tab=authorizations` : urls.index} />
                         <RowActions
                             items={[
                                 {

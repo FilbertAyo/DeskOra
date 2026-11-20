@@ -2,7 +2,6 @@ import { Link, router } from '@inertiajs/react';
 import {
     AlertTriangleIcon,
     CalendarDaysIcon,
-    DownloadIcon,
     EyeIcon,
     FileTextIcon,
     Link2Icon,
@@ -16,6 +15,8 @@ import {
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -254,9 +255,7 @@ export default function DocumentsShow({
                 description={`${typeLabel}${periodLine ? ` · ${periodLine}` : ''}`}
                 actions={
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" render={<Link href={indexUrl} />}>
-                            Back
-                        </Button>
+                        <BackButton href={indexUrl} />
                         <RowActions
                             items={[
                                 {
@@ -343,12 +342,7 @@ export default function DocumentsShow({
                             <FileTextIcon className="text-muted-foreground size-4" />
                             {title}
                         </CardTitle>
-                        {document.downloadUrl && (
-                            <Button variant="outline" size="sm" render={<a href={document.downloadUrl} />}>
-                                <DownloadIcon className="size-4" />
-                                Download PDF
-                            </Button>
-                        )}
+                        {document.downloadUrl && <DownloadButton href={document.downloadUrl} />}
                     </CardHeader>
                     <CardContent className="space-y-4 pt-6">
                         {isReport && (
@@ -829,10 +823,9 @@ export default function DocumentsShow({
                         </p>
                         {document.downloadUrl ? (
                             <div className="flex flex-wrap items-center gap-3">
-                                <Button render={<a href={document.downloadUrl} target="_blank" rel="noreferrer" />}>
-                                    <DownloadIcon className="size-4" />
+                                <DownloadButton href={document.downloadUrl} external>
                                     Open PDF
-                                </Button>
+                                </DownloadButton>
                                 {document.fileName && (
                                     <span className="text-muted-foreground text-sm">{document.fileName}</span>
                                 )}

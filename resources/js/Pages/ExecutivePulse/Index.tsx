@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import AppLink from '@/components/shared/AppLink';
 
 import AppLayout from '@/Layouts/AppLayout';
+import DownloadButton from '@/components/shared/DownloadButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -33,7 +34,7 @@ export default function ExecutivePulseIndex({
                     <h1 className="text-lg font-semibold">Executive Pulse</h1>
                     <p className="text-muted-foreground text-sm">Generated {snapshot.generated_at}</p>
                 </div>
-                <Button variant="outline" render={<a href={downloadUrl} />}>Download PDF</Button>
+                <DownloadButton href={downloadUrl} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard title="Weekly reports" value={`${snapshot.reports.percent}%`}>

@@ -1,8 +1,9 @@
-import { Link, router } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,11 +39,7 @@ export default function ReplenishmentsList({
             <PageHeader
                 title="Paid petty cash"
                 description="Select a date range to create a replenishment."
-                actions={
-                    <Button variant="outline" render={<Link href={indexUrl} />}>
-                        Back
-                    </Button>
-                }
+                actions={<BackButton href={indexUrl} />}
             />
             <Card>
                 <CardContent className="flex flex-wrap items-end gap-3 pt-6">

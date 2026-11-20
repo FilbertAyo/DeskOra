@@ -3,6 +3,7 @@ import { EyeIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -79,9 +80,7 @@ export default function UsersShow({
                 description="Account, recent documents, and activity."
                 actions={
                     <>
-                        <Button variant="outline" size="sm" render={<Link href={indexUrl} />}>
-                            Back
-                        </Button>
+                        <BackButton href={indexUrl} size="sm" />
                         <Button size="sm" render={<Link href={editUrl} />}>
                             Edit
                         </Button>

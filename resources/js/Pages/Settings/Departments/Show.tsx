@@ -1,6 +1,5 @@
-import { Link, router, useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
-    ArrowLeftIcon,
     EyeIcon,
     FileTextIcon,
     GitBranchIcon,
@@ -13,6 +12,7 @@ import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import AppLink from '@/components/shared/AppLink';
+import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -180,10 +180,7 @@ export default function DepartmentsShow({
                                 <PlusIcon className="size-4" />
                                 Add Sub-Department
                             </Button>
-                            <Button variant="outline" render={<Link href={indexUrl} />}>
-                                <ArrowLeftIcon className="size-4" />
-                                Back
-                            </Button>
+                            <BackButton href={indexUrl} />
                         </>
                     }
                 />

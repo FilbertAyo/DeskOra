@@ -205,7 +205,7 @@ export default function WeeklyReports({
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <Badge variant={document.state === 'draft' ? 'outline' : 'default'}>
+                                                <Badge variant={document.state === 'draft' ? 'outline' : 'success'}>
                                                     {document.state === 'draft' ? 'Draft' : 'Submitted'}
                                                 </Badge>
                                                 {returnedDocumentMap[document.id] != null && (

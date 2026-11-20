@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import AppLink from '@/components/shared/AppLink';
 import AppLayout from '@/Layouts/AppLayout';
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -95,9 +96,7 @@ export default function WeeklyMatrixPeriod({
                         <Button variant="outline" render={<AppLink href={indexUrl} />}>
                             All weeks
                         </Button>
-                        <Button variant="outline" render={<a href={downloadUrl} />}>
-                            Download PDF
-                        </Button>
+                        <DownloadButton href={downloadUrl} />
                         {canCreate && (
                             <Button type="button" onClick={() => openDialog('create')}>
                                 Create

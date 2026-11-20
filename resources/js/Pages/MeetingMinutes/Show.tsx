@@ -1,11 +1,9 @@
 import { DownloadIcon, PencilIcon } from 'lucide-react';
-
-import AppLink from '@/components/shared/AppLink';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 
@@ -32,9 +30,7 @@ export default function MeetingMinutesShow({ meetingMinute, canManageMinutes, ba
                 description={meetingMinute.period?.dateRange}
                 actions={
                     <>
-                        <Button variant="outline" render={<AppLink href={backUrl} />}>
-                            Back
-                        </Button>
+                        <BackButton href={backUrl} />
                         <RowActions
                             items={[
                                 { label: 'Download', href: meetingMinute.downloadUrl, icon: <DownloadIcon /> },

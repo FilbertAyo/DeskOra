@@ -2,7 +2,7 @@ import { router } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
-import { Button } from '@/components/ui/button';
+import DownloadButton from '@/components/shared/DownloadButton';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { type CashFlowForecast, FinanceTable, Forecast, money } from '@/Pages/Finance/components';
 import { PageHeader } from '@/lib/page-kit';
@@ -14,7 +14,19 @@ export default function Cashflow({ transactions, isFiltered, filterType, cashFlo
     const query = filterType ? { filter_type: filterType } : {};
     return (
         <>
-            <PageHeader title="Petty Cash Flow" actions={<><Button variant="destructive" render={<a href={route('cashflow.download', { format: 'pdf', ...query })} />}>PDF</Button><Button render={<a href={route('cashflow.download', { format: 'excel', ...query })} />}>Excel</Button></>} />
+            <PageHeader
+                title="Petty Cash Flow"
+                actions={
+                    <>
+                        <DownloadButton href={route('cashflow.download', { format: 'pdf', ...query })}>
+                            Download PDF
+                        </DownloadButton>
+                        <DownloadButton href={route('cashflow.download', { format: 'excel', ...query })}>
+                            Download Excel
+                        </DownloadButton>
+                    </>
+                }
+            />
             <div className="mb-6"><Forecast value={cashFlowForecast} /></div>
             <select className="border-input bg-background mb-4 h-9 rounded-md border px-3 text-sm" value={filterType ?? ''} onChange={(event) => router.get(route('cashflow.index'), event.target.value ? { filter_type: event.target.value } : {})}><option value="">Show All</option><option value="daily">Daily</option><option value="monthly">Monthly</option></select>
             <FinanceTable headers={isFiltered ? ['Date', 'Deduction', 'Running Balance'] : ['Transaction Date', 'Name', 'Deposit', 'Deduction', 'Running Balance']} empty={transactions.length === 0}>

@@ -1,7 +1,8 @@
-import { Link, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,11 +33,7 @@ export default function ReplenishmentsCreate({
         <div className="mx-auto flex max-w-2xl flex-col gap-6">
             <PageHeader
                 title="Create replenishment"
-                actions={
-                    <Button variant="outline" render={<Link href={indexUrl} />}>
-                        Back
-                    </Button>
-                }
+                actions={<BackButton href={indexUrl} />}
             />
             <Card>
                 <CardHeader>

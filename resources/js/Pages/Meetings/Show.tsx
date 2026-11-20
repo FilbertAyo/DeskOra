@@ -12,6 +12,8 @@ import {
 import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
+import DownloadButton from '@/components/shared/DownloadButton';
 import type { StaffUser } from '@/components/shared/StaffPicker';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -205,9 +207,7 @@ export default function MeetingsShow({
                 description={meeting.when_label}
                 actions={
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" render={<Link href={urls.index} />}>
-                            Back
-                        </Button>
+                        <BackButton href={urls.index} />
                         {meeting.status !== 'cancelled' && meeting.status !== 'completed' ? (
                             <Button render={<Link href={urls.call} />}>
                                 <VideoIcon className="size-4" />
@@ -409,9 +409,7 @@ export default function MeetingsShow({
                                         <Button size="sm" variant="outline" render={<Link href={meeting.period_minute.showUrl} />}>
                                             View PDF
                                         </Button>
-                                        <Button size="sm" variant="outline" render={<a href={meeting.period_minute.downloadUrl} />}>
-                                            Download
-                                        </Button>
+                                        <DownloadButton href={meeting.period_minute.downloadUrl}>Download</DownloadButton>
                                         {canManageMinutes ? (
                                             <Button size="sm" variant="outline" render={<Link href={meeting.period_minute.editUrl} />}>
                                                 Replace

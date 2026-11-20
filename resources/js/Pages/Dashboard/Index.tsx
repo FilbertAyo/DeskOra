@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { EyeIcon, PencilIcon } from 'lucide-react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -884,9 +885,7 @@ export default function DashboardIndex({
                             <Button variant="outline" render={<AppLink href={matrix.openUrl} />}>
                                 Open period
                             </Button>
-                            <Button variant="outline" render={<a href={matrix.downloadUrl} />}>
-                                Download PDF
-                            </Button>
+                            <DownloadButton href={matrix.downloadUrl} />
                         </DialogFooter>
                     )}
                 </DialogContent>

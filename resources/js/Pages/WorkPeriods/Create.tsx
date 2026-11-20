@@ -1,7 +1,8 @@
-import { Link, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,11 +27,7 @@ export default function WorkPeriodsCreate({
         <div className="mx-auto flex max-w-xl flex-col gap-6">
             <PageHeader
                 title="Create Work Period"
-                actions={
-                    <Button variant="outline" render={<Link href={indexUrl} />}>
-                        Back
-                    </Button>
-                }
+                actions={<BackButton href={indexUrl} />}
             />
             <Card>
                 <CardContent className="pt-6">

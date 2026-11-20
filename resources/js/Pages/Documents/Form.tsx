@@ -3,6 +3,7 @@ import { PlusIcon, Target, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -522,9 +523,7 @@ export default function DocumentsForm({
                           : 'Document information'
                 }
                 actions={
-                    <Button variant="outline" render={<Link href={indexUrl} />}>
-                        Back to Documents
-                    </Button>
+                    <BackButton href={indexUrl} />
                 }
             />
 

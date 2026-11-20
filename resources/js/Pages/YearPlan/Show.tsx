@@ -1,10 +1,11 @@
 import { router, useForm } from '@inertiajs/react';
 
-import AppLink from '@/components/shared/AppLink';
 import { DownloadIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,27 +41,18 @@ export default function YearPlanShow({ yearPlan, sections, grandTotal, subDepart
     const submit = () => editing ? form.put(editing.updateUrl, { preserveScroll: true, onSuccess: () => setOpen(false) }) : form.post(yearPlan.storeActivityUrl, { preserveScroll: true, onSuccess: () => setOpen(false) });
     return (
         <PageShell>
-            <div>
-                <AppLink href={yearPlan.indexUrl} className="text-muted-foreground text-sm hover:text-foreground">
-                    ← Year plans
-                </AppLink>
-                <PageHeader
-                    className="mb-0 mt-2"
-                    title={`Year Plan ${yearPlan.year}`}
-                    description="Total cost per line is frequency × units × unit value (TZS)."
-                    actions={
-                        <>
-                            <Button variant="outline" render={<a href={yearPlan.pdfUrl} />}>
-                                Download PDF
-                            </Button>
-                            <Button variant="outline" render={<a href={yearPlan.excelUrl} />}>
-                                Download Excel
-                            </Button>
-                            <Button onClick={() => startCreate()}>Add activity</Button>
-                        </>
-                    }
-                />
-            </div>
+            <PageHeader
+                title={`Year Plan ${yearPlan.year}`}
+                description="Total cost per line is frequency × units × unit value (TZS)."
+                actions={
+                    <>
+                        <BackButton href={yearPlan.indexUrl} />
+                        <DownloadButton href={yearPlan.pdfUrl} />
+                        <DownloadButton href={yearPlan.excelUrl}>Download Excel</DownloadButton>
+                        <Button onClick={() => startCreate()}>Add activity</Button>
+                    </>
+                }
+            />
             {sections.map((section) => (
                 <Card key={section.department.id} className="shadow-none">
                     <CardHeader className="border-b bg-muted/20">

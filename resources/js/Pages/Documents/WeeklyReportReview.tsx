@@ -2,6 +2,7 @@ import { Link, useForm } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
@@ -134,9 +135,7 @@ export default function WeeklyReportReview({
                 </CardContent>
                 <CardFooter className="flex flex-wrap justify-between gap-2 border-t">
                     <div className="flex gap-2">
-                        <Button variant="outline" render={<Link href={editUrl} />}>
-                            Back to report
-                        </Button>
+                        <BackButton href={editUrl} />
                         <Button variant="ghost" render={<Link href={indexUrl} />}>
                             Cancel
                         </Button>

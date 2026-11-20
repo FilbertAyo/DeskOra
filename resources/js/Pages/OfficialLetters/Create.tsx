@@ -1,8 +1,7 @@
-import { Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
-import { Button } from '@/components/ui/button';
+import BackButton from '@/components/shared/BackButton';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 
 import LetterForm, { type LetterSignatory } from './Form';
@@ -28,11 +27,7 @@ export default function OfficialLettersCreate({
         <PageShell>
             <PageHeader
                 title="New Official Letter"
-                actions={
-                    <Button variant="outline" render={<Link href={indexUrl} />}>
-                        Back
-                    </Button>
-                }
+                actions={<BackButton href={indexUrl} />}
             />
             <LetterForm
                 departments={departments}

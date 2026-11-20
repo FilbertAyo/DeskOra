@@ -1,11 +1,10 @@
-import { Link } from '@inertiajs/react';
 import { DownloadIcon, PencilIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader, PageShell } from '@/lib/page-kit';
@@ -72,9 +71,7 @@ export default function ActionLogsShow({
                 }
                 actions={
                     <>
-                        <Button variant="outline" render={<Link href={backUrl} />}>
-                            Back
-                        </Button>
+                        <BackButton href={backUrl} />
                         <RowActions
                             items={[
                                 {

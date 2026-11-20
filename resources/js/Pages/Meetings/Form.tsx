@@ -2,6 +2,7 @@ import { Link, useForm } from '@inertiajs/react';
 import type { FormEvent, ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import StaffPicker, { type StaffUser } from '@/components/shared/StaffPicker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,9 +89,7 @@ export default function MeetingsForm({ mode, meeting, staffUsers, workPeriods, s
                 title={mode === 'edit' ? 'Edit meeting' : 'Schedule meeting'}
                 description="Set the details, invite colleagues, and optionally add a call link for remote staff."
                 actions={
-                    <Button variant="outline" render={<Link href={backUrl} />}>
-                        Back
-                    </Button>
+                    <BackButton href={backUrl} />
                 }
             />
 

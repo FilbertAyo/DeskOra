@@ -1,13 +1,12 @@
 import { router } from '@inertiajs/react';
 
-import AppLink from '@/components/shared/AppLink';
 import { PencilIcon, Trash2Icon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import {
     ApprovalTimelineButton,
     type ApprovalLog,
@@ -28,9 +27,7 @@ export default function Show({ request, approvalLogs }: { request: FinanceItem; 
                 title="Requisition Details"
                 actions={
                     <>
-                        <Button variant="outline" render={<AppLink href={route('requisition.index')} />}>
-                            Back
-                        </Button>
+                        <BackButton href={route('requisition.index')} />
                         <ApprovalTimelineButton logs={approvalLogs} />
                         <RowActions
                             items={[

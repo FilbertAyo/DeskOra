@@ -2,6 +2,7 @@ import { Form, Link, usePage } from '@inertiajs/react';
 import { EyeIcon, PencilIcon, PlusIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
+import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -184,7 +185,13 @@ function InventoryScreen({ config }: { config: InventoryPageConfig }) {
                 actions={
                     <>
                         {config.exportRoutes?.map((item) => (
-                            <Button key={`${item.name}-${item.label}`} variant="outline" render={<Link href={route(item.name, item.params)} prefetch cacheFor="60s" />}>{item.label}</Button>
+                            <DownloadButton
+                                key={`${item.name}-${item.label}`}
+                                href={route(item.name, item.params)}
+                                size="default"
+                            >
+                                {item.label}
+                            </DownloadButton>
                         ))}
                         {config.createRoute && <Button render={<Link href={route(config.createRoute)} />}>New</Button>}
                         {isInlineCreateForm && (

@@ -2,6 +2,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
+import DownloadButton from '@/components/shared/DownloadButton';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,15 +137,9 @@ export default function WeeklyBudgetReview({
                                 + Add Mid-Week Budget
                             </Button>
                         )}
-                        {exportPdfUrl && (
-                            <Button variant="outline" render={<a href={exportPdfUrl} />}>
-                                Download PDF
-                            </Button>
-                        )}
+                        {exportPdfUrl && <DownloadButton href={exportPdfUrl} />}
                         {exportExcelUrl && (
-                            <Button variant="outline" render={<a href={exportExcelUrl} />}>
-                                Download Excel
-                            </Button>
+                            <DownloadButton href={exportExcelUrl}>Download Excel</DownloadButton>
                         )}
                     </>
                 }

@@ -1,8 +1,8 @@
-import { Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
-import { Button } from '@/components/ui/button';
+import BackButton from '@/components/shared/BackButton';
+import DownloadButton from '@/components/shared/DownloadButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/lib/page-kit';
 
@@ -38,12 +38,8 @@ export default function ReplenishmentsShow({
                 description={`${replenishment.from} → ${replenishment.to}`}
                 actions={
                     <>
-                        <Button variant="outline" render={<Link href={indexUrl} />}>
-                            Back
-                        </Button>
-                        <Button variant="outline" render={<a href={downloadUrl} />}>
-                            Download PDF
-                        </Button>
+                        <BackButton href={indexUrl} />
+                        <DownloadButton href={downloadUrl} />
                     </>
                 }
             />
