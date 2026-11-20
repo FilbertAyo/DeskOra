@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
-import { notify } from '@/lib/notify';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 
 type DocumentPayload = {
@@ -61,10 +60,7 @@ export default function WeeklyReportReview({
     const needsExplanation = ['partially_completed', 'not_completed'].includes(form.data.target_accomplished_status);
 
     const submit = () => {
-        form.put(submitUrl, {
-            preserveScroll: true,
-            onSuccess: () => notify('success', 'Weekly report submitted.'),
-        });
+        form.put(submitUrl);
     };
 
     return (

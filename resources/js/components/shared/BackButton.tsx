@@ -20,7 +20,7 @@ export default function BackButton({ href, prefetch = true, size = 'default', cl
 
     return (
         <Button variant="outline" size={size} className={cn(className)} render={<LinkComponent href={href} />}>
-            <ArrowLeftIcon />
+            <ArrowLeftIcon data-icon="inline-start" className="size-4" />
             Back
         </Button>
     );

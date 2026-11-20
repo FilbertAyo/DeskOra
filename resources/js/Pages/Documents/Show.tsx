@@ -133,10 +133,10 @@ function EmptyNote({ children }: { children: ReactNode }) {
     return <p className="text-muted-foreground text-sm">{children}</p>;
 }
 
-function DataTable({ children }: { children: ReactNode }) {
+function DataTable({ children, className }: { children: ReactNode; className?: string }) {
     return (
         <div className="overflow-x-auto rounded-md border">
-            <Table>{children}</Table>
+            <Table className={cn('table-fixed', className)}>{children}</Table>
         </div>
     );
 }
@@ -412,11 +412,11 @@ export default function DocumentsShow({
                                         <DataTable>
                                             <TableHeader>
                                                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                                                    <TableHead className="w-28 text-center">Day</TableHead>
-                                                    <TableHead>Activity</TableHead>
-                                                    <TableHead>Location</TableHead>
-                                                    <TableHead>Lead Staff/Team</TableHead>
-                                                    <TableHead>Notes</TableHead>
+                                                    <TableHead className="w-24 text-center">Day</TableHead>
+                                                    <TableHead className="w-[34%]">Activity</TableHead>
+                                                    <TableHead className="w-[16%]">Location</TableHead>
+                                                    <TableHead className="w-[22%]">Lead Staff/Team</TableHead>
+                                                    <TableHead className="w-[22%]">Notes</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -431,9 +431,9 @@ export default function DocumentsShow({
                                                                     {group.day}
                                                                 </TableCell>
                                                             )}
-                                                            <TableCell className="align-top">{String(row.activity ?? '—')}</TableCell>
-                                                            <TableCell className="align-top">{String(row.location ?? '—')}</TableCell>
-                                                            <TableCell className="align-top">
+                                                            <TableCell className="align-top whitespace-normal break-words">{String(row.activity ?? '—')}</TableCell>
+                                                            <TableCell className="align-top whitespace-normal break-words">{String(row.location ?? '—')}</TableCell>
+                                                            <TableCell className="align-top whitespace-normal break-words">
                                                                 {namesForIds(
                                                                     Array.isArray(row.team_member_ids)
                                                                         ? (row.team_member_ids as Array<string | number>)
@@ -441,7 +441,7 @@ export default function DocumentsShow({
                                                                     teamUsers,
                                                                 )}
                                                             </TableCell>
-                                                            <TableCell className="align-top whitespace-pre-wrap">
+                                                            <TableCell className="align-top whitespace-normal break-words">
                                                                 {String(row.notes_inclusion ?? '—')}
                                                             </TableCell>
                                                         </TableRow>
@@ -581,11 +581,11 @@ export default function DocumentsShow({
                                         <DataTable>
                                             <TableHeader>
                                                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                                                    <TableHead className="w-12 text-center">No.</TableHead>
-                                                    <TableHead>Activity/Output</TableHead>
-                                                    <TableHead>Progress</TableHead>
-                                                    <TableHead>Remarks/Challenges</TableHead>
-                                                    <TableHead>Next Step</TableHead>
+                                                    <TableHead className="w-14 text-center">No.</TableHead>
+                                                    <TableHead className="w-[32%]">Activity/Output</TableHead>
+                                                    <TableHead className="w-[16%]">Progress</TableHead>
+                                                    <TableHead className="w-[26%]">Remarks/Challenges</TableHead>
+                                                    <TableHead className="w-[26%]">Next Step</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -598,16 +598,16 @@ export default function DocumentsShow({
                                                     return (
                                                         <TableRow key={index}>
                                                             <TableCell className="text-center tabular-nums">{index + 1}</TableCell>
-                                                            <TableCell className="align-top">
+                                                            <TableCell className="align-top whitespace-normal break-words">
                                                                 {String(row.activity_output) === '__off_plan__'
                                                                     ? String(row.off_plan_activity ?? 'Off-plan activity')
                                                                     : String(row.activity_output ?? '—')}
                                                             </TableCell>
-                                                            <TableCell className="align-top">{progress || '—'}</TableCell>
-                                                            <TableCell className="align-top whitespace-pre-wrap">
+                                                            <TableCell className="align-top whitespace-normal break-words">{progress || '—'}</TableCell>
+                                                            <TableCell className="align-top whitespace-normal break-words">
                                                                 {String(row.remarks_challenges ?? '') || '—'}
                                                             </TableCell>
-                                                            <TableCell className="align-top whitespace-pre-wrap">
+                                                            <TableCell className="align-top whitespace-normal break-words">
                                                                 <div>{String(row.next_step ?? '') || '—'}</div>
                                                                 {carry && (
                                                                     <div className="text-sky-700 dark:text-sky-400 mt-1 text-xs font-medium">

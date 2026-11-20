@@ -268,10 +268,11 @@ class WeeklyReportActionTasksTest extends TestCase
         ]);
 
         $this->actingAs($staff)->get(route('documents.weekly-report.action-tasks', $report))
-            ->assertNotFound();
+            ->assertRedirect(route('documents.show', $report));
 
         $this->actingAs($staff)->get(route('documents.weekly-report.review', $report))
-            ->assertNotFound();
+            ->assertRedirect(route('documents.show', $report))
+            ->assertSessionHas('success', 'Weekly report submitted successfully.');
     }
 
     /**

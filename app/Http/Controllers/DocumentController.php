@@ -1003,9 +1003,22 @@ class DocumentController extends Controller
 
     protected function ensureWeeklyReportWizardDocument(Document $document): void
     {
-        if ($document->type !== Document::TYPE_WEEKLY_REPORT || ! $document->isDraft()) {
+        if ($document->type !== Document::TYPE_WEEKLY_REPORT) {
             abort(404);
         }
+
+        if ($document->isDraft()) {
+            return;
+        }
+
+        // The report is already submitted. A follow-up visit to this wizard
+        // (including an Inertia asset-version reload after submit) must land
+        // on the document with a success notice, not the Blade 404 page.
+        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+            redirect()
+                ->route('documents.show', $document)
+                ->with('success', 'Weekly report submitted successfully.')
+        );
     }
 
     protected function redirectToWeeklyReportWizardNextStep(Document $document, User $user, string $successMessage = ''): RedirectResponse
@@ -1037,6 +1050,10 @@ class DocumentController extends Controller
         if ($action === 'draft') {
             return redirect()->route('documents.edit', $resolved->id)
                 ->with('success', $successMessage);
+        }
+
+        if ($action === 'submit') {
+            $successMessage = 'Weekly report submitted successfully.';
         }
 
         return $this->redirectToWeeklyDocument($resolved, $successMessage);
@@ -2082,6 +2099,14 @@ class DocumentController extends Controller
     protected function redirectToWeeklyDocument(Document $document, string $successMessage): RedirectResponse
     {
         $resolved = Document::fromDomainId((string) $document->id) ?? $document;
+
+        if ($resolved->isSubmitted()) {
+            $successMessage = match ($resolved->type) {
+                Document::TYPE_WEEKLY_PLAN => 'Weekly plan submitted successfully.',
+                Document::TYPE_WEEKLY_REPORT => 'Weekly report submitted successfully.',
+                default => $successMessage,
+            };
+        }
 
         return redirect()->route('documents.show', ['document' => $resolved->id])
             ->with('success', $successMessage);
