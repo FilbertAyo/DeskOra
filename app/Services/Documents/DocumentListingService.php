@@ -4,6 +4,7 @@ namespace App\Services\Documents;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Models\WorkPeriod;
 use Illuminate\Support\Collection;
 
 class DocumentListingService
@@ -294,20 +295,20 @@ class DocumentListingService
     }
 
     /**
-     * For staff lists: rows where you are a collaborator (not the author) appear first, then by last update.
-     * Reviewers keep a simple newest-first ordering by Document::$updated_at.
+     * Newest work period first (week start date), then last update as tiebreaker.
+     * Shared/collaborative rows are not pinned above the viewer's own documents.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Document>  $query
      */
     public function applyWeeklyListSortForUser($query, User $user): void
     {
-        if ($user->hasPermissionTo('view all documents')) {
-            $query->orderByDesc('documents.updated_at');
-
-            return;
-        }
-
-        $query->orderByRaw('CASE WHEN documents.user_id = ? THEN 1 ELSE 0 END', [$user->id])
+        $query
+            ->orderByDesc(
+                WorkPeriod::query()
+                    ->select('week_start_date')
+                    ->whereColumn('work_periods.id', 'documents.period_id')
+                    ->limit(1)
+            )
             ->orderByDesc('documents.updated_at');
     }
 }

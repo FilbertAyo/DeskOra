@@ -25,7 +25,8 @@ export default function LetterBodyEditor({
     invalid?: boolean;
 }) {
     const editorRef = useRef<HTMLDivElement>(null);
-    const lastHtml = useRef(value);
+    // Start unset so the first effect seeds contentEditable from `value` on edit.
+    const lastHtml = useRef<string | null>(null);
 
     useEffect(() => {
         const editor = editorRef.current;

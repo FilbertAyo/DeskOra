@@ -589,8 +589,7 @@ class DocumentController extends Controller
     }
 
     /**
-     * For staff lists: rows where you are a collaborator (not the author) appear first, then by last update.
-     * Reviewers keep a simple newest-first ordering by {@see Document::$updated_at}.
+     * Newest work period first, then last update as tiebreaker.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Document>  $query
      */
