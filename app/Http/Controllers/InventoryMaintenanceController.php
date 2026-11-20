@@ -34,6 +34,21 @@ class InventoryMaintenanceController extends Controller
             $query->where('status', InventoryMaintenanceRecord::STATUS_COMPLETED);
         }
 
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('record_number', 'like', "%{$search}%")
+                    ->orWhere('problem_description', 'like', "%{$search}%")
+                    ->orWhereHas('asset', function ($assetQuery) use ($search) {
+                        $assetQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('asset_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('reportedBy', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         $records = $query->orderByDesc('reported_at')->paginate(20)->withQueryString();
 
         $counts = [
@@ -48,6 +63,7 @@ class InventoryMaintenanceController extends Controller
             'records' => $records,
             'tab' => $tab,
             'counts' => $counts,
+            'filters' => $request->only(['search']),
             'statusOptions' => InventoryMaintenanceRecord::statusOptions(),
         ]);
     }

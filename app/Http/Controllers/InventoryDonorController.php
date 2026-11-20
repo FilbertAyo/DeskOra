@@ -10,15 +10,27 @@ use Illuminate\Validation\Rule;
 
 class InventoryDonorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $donors = InventoryDonor::query()
+        $query = InventoryDonor::query()
             ->withCount('projects')
             ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return Inertia::render('Inventory/Donors/Index', compact('donors'));
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('contact_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        return Inertia::render('Inventory/Donors/Index', [
+            'donors' => $query->get(),
+            'filters' => $request->only(['search']),
+        ]);
     }
 
     public function store(Request $request)

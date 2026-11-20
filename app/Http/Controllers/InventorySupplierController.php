@@ -10,14 +10,26 @@ use Illuminate\Validation\Rule;
 
 class InventorySupplierController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $suppliers = InventorySupplier::query()
+        $query = InventorySupplier::query()
             ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return Inertia::render('Inventory/Suppliers/Index', compact('suppliers'));
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('contact_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        return Inertia::render('Inventory/Suppliers/Index', [
+            'suppliers' => $query->get(),
+            'filters' => $request->only(['search']),
+        ]);
     }
 
     public function store(Request $request)

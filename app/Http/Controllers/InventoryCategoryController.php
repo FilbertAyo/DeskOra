@@ -10,14 +10,26 @@ use Illuminate\Validation\Rule;
 
 class InventoryCategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $categories = InventoryCategory::query()
+        $query = InventoryCategory::query()
             ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return Inertia::render('Inventory/Categories/Index', compact('categories'));
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $categories = $query->get();
+
+        return Inertia::render('Inventory/Categories/Index', [
+            'categories' => $categories,
+            'filters' => $request->only(['search']),
+        ]);
     }
 
     public function store(Request $request)

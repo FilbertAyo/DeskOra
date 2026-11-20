@@ -55,6 +55,19 @@ class InventoryDispatchController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('dispatch_number', 'like', "%{$search}%")
+                    ->orWhere('title', 'like', "%{$search}%")
+                    ->orWhere('destination', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhereHas('createdBy', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         $dispatches = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
 
         $counts = [
@@ -74,6 +87,7 @@ class InventoryDispatchController extends Controller
             'dispatches' => $dispatches,
             'tab' => $tab,
             'counts' => $counts,
+            'filters' => $request->only(['search']),
             'statusOptions' => InventoryDispatch::statusOptions(),
         ]);
     }

@@ -11,20 +11,34 @@ use Illuminate\Validation\Rule;
 
 class InventoryProjectController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $projects = InventoryProject::query()
+        $query = InventoryProject::query()
             ->with('donor')
             ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('donor', function ($donorQuery) use ($search) {
+                        $donorQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
 
         $donors = InventoryDonor::query()
             ->where('status', 'active')
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return Inertia::render('Inventory/Projects/Index', compact('projects', 'donors'));
+        return Inertia::render('Inventory/Projects/Index', [
+            'projects' => $query->get(),
+            'donors' => $donors,
+            'filters' => $request->only(['search']),
+        ]);
     }
 
     public function store(Request $request)

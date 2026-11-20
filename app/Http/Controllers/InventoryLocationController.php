@@ -14,23 +14,37 @@ class InventoryLocationController extends Controller
     {
         $tab = $request->input('tab') === 'rooms' ? 'rooms' : 'locations';
 
-        $sites = InventoryLocation::query()
+        $sitesQuery = InventoryLocation::query()
             ->whereNull('parent_id')
             ->withCount(['children'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        $rooms = InventoryLocation::query()
+        $roomsQuery = InventoryLocation::query()
             ->whereNotNull('parent_id')
             ->with(['parent'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $sitesQuery->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+            $roomsQuery->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $sites = $sitesQuery->get();
+        $rooms = $roomsQuery->get();
 
         return Inertia::render('Inventory/Locations/Index', [
             'tab' => $tab,
             'sites' => $sites,
             'rooms' => $rooms,
-            'parentLocations' => $sites,
+            'parentLocations' => InventoryLocation::query()->whereNull('parent_id')->orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['search']),
         ]);
     }
 

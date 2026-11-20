@@ -26,22 +26,37 @@ class InventoryVerificationController extends Controller
         private readonly InventoryVerificationProcessor $processor,
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('viewAny', InventoryVerificationSession::class);
 
-        $sessions = InventoryVerificationSession::query()
+        $query = InventoryVerificationSession::query()
             ->with(['location', 'department', 'startedBy'])
             ->withCount([
                 'results',
-                'results as missing_count' => fn ($query) => $query->where('result', InventoryVerificationResult::RESULT_MISSING),
-                'results as pending_count' => fn ($query) => $query->where('result', InventoryVerificationResult::RESULT_PENDING),
-            ])
-            ->orderByDesc('started_at')
-            ->paginate(20);
+                'results as missing_count' => fn ($builder) => $builder->where('result', InventoryVerificationResult::RESULT_MISSING),
+                'results as pending_count' => fn ($builder) => $builder->where('result', InventoryVerificationResult::RESULT_PENDING),
+            ]);
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhereHas('department', function ($departmentQuery) use ($search) {
+                        $departmentQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('startedBy', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $sessions = $query->orderByDesc('started_at')->paginate(20)->withQueryString();
 
         return Inertia::render('Inventory/Verification/Index', [
             'sessions' => $sessions,
+            'filters' => $request->only(['search']),
             'statusOptions' => InventoryVerificationSession::statusOptions(),
         ]);
     }

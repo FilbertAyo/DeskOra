@@ -845,6 +845,93 @@ class InventoryWorkflowTest extends TestCase
                 ->where('parentLocations', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'name') === 'Adilisha HQ')));
     }
 
+    public function test_inventory_viewer_can_open_list_pages_but_not_create_routes(): void
+    {
+        $viewer = $this->inventoryUser(['view inventory']);
+
+        $listRoutes = [
+            'inventory.assets.index',
+            'inventory.stock-items.index',
+            'inventory.receipts.index',
+            'inventory.borrowing.index',
+            'inventory.dispatches.index',
+            'inventory.maintenance.index',
+            'inventory.disposal.index',
+            'inventory.verification.index',
+            'inventory.reports.index',
+        ];
+
+        foreach ($listRoutes as $routeName) {
+            $this->actingAs($viewer)
+                ->get(route($routeName))
+                ->assertOk();
+        }
+
+        $createRoutes = [
+            'inventory.assets.create',
+            'inventory.stock-items.create',
+            'inventory.receipts.create',
+            'inventory.borrowing.create',
+            'inventory.dispatches.create',
+            'inventory.maintenance.create',
+            'inventory.disposal.create',
+            'inventory.verification.create',
+        ];
+
+        foreach ($createRoutes as $routeName) {
+            $this->actingAs($viewer)
+                ->get(route($routeName))
+                ->assertForbidden();
+        }
+    }
+
+    public function test_maintenance_officer_can_open_complete_form_for_open_record(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory maintenance', 'view inventory']);
+        $asset = $this->makeAsset(['status' => InventoryAsset::STATUS_UNDER_REPAIR]);
+        $record = InventoryMaintenanceRecord::query()->create([
+            'record_number' => 'MNT-TEST-001',
+            'asset_id' => $asset->id,
+            'status' => InventoryMaintenanceRecord::STATUS_REPORTED,
+            'problem_description' => 'Needs repair',
+            'reported_by_user_id' => $officer->id,
+            'reported_at' => now(),
+            'previous_status' => InventoryAsset::STATUS_AVAILABLE,
+            'previous_condition' => InventoryAsset::CONDITION_GOOD,
+        ]);
+
+        $this->actingAs($officer)
+            ->get(route('inventory.maintenance.complete.form', $record))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Inventory/Maintenance/Complete'));
+    }
+
+    public function test_maintenance_index_search_filters_by_reporter_and_asset(): void
+    {
+        $officer = $this->inventoryUser(['manage inventory maintenance', 'view inventory']);
+        $reporter = User::factory()->create(['name' => 'Amina Reporter', 'status' => 'active']);
+        $asset = $this->makeAsset(['name' => 'Soft box light', 'status' => InventoryAsset::STATUS_UNDER_REPAIR]);
+
+        InventoryMaintenanceRecord::query()->create([
+            'record_number' => 'MNT-SEARCH-001',
+            'asset_id' => $asset->id,
+            'status' => InventoryMaintenanceRecord::STATUS_REPORTED,
+            'problem_description' => 'Broken hinge',
+            'reported_by_user_id' => $reporter->id,
+            'reported_at' => now(),
+            'previous_status' => InventoryAsset::STATUS_AVAILABLE,
+            'previous_condition' => InventoryAsset::CONDITION_GOOD,
+        ]);
+
+        $this->actingAs($officer)
+            ->get(route('inventory.maintenance.index', ['search' => 'Amina']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Maintenance/Index')
+                ->has('records.data', 1)
+                ->where('filters.search', 'Amina'));
+    }
+
     /**
      * @param  list<string>  $permissions
      */

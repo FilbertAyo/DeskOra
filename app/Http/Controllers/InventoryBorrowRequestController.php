@@ -48,6 +48,27 @@ class InventoryBorrowRequestController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('request_number', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhereHas('asset', function ($assetQuery) use ($search) {
+                        $assetQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('asset_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('stockItem', function ($stockQuery) use ($search) {
+                        $stockQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('borrower', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('requestedBy', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         $requests = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
 
         $counts = [
@@ -67,6 +88,7 @@ class InventoryBorrowRequestController extends Controller
             'requests' => $requests,
             'tab' => $tab,
             'counts' => $counts,
+            'filters' => $request->only(['search']),
             'statusOptions' => InventoryBorrowRequest::statusOptions(),
         ]);
     }
