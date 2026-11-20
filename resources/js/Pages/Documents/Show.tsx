@@ -141,10 +141,43 @@ function DataTable({ children, className }: { children: ReactNode; className?: s
     );
 }
 
+const WEEKDAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+function weekdayRank(day: string): number {
+    const normalized = day.trim().toLowerCase();
+    const index = WEEKDAY_ORDER.findIndex((name) => name.toLowerCase() === normalized);
+    return index === -1 ? WEEKDAY_ORDER.length : index;
+}
+
+function dayLabelFromActivityOutput(value: unknown): string {
+    const text = String(value ?? '').trim();
+    if (text === '' || text === '__off_plan__') {
+        return '';
+    }
+    const match = text.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\b/i);
+    return match?.[1] ?? '';
+}
+
+function sortRowsByWeekday(
+    rows: Array<Record<string, unknown>>,
+    dayFromRow: (row: Record<string, unknown>) => string,
+): Array<Record<string, unknown>> {
+    return [...rows].sort((left, right) => {
+        const leftDay = dayFromRow(left);
+        const rightDay = dayFromRow(right);
+        const byDay = weekdayRank(leftDay) - weekdayRank(rightDay);
+        if (byDay !== 0) {
+            return byDay;
+        }
+        return 0;
+    });
+}
+
 function groupActivitiesByDay(rows: Array<Record<string, unknown>>) {
+    const ordered = sortRowsByWeekday(rows, (row) => String(row.day ?? ''));
     const groups: Array<{ day: string; rows: Array<Record<string, unknown>> }> = [];
-    for (const row of rows) {
-        const day = String(row.day ?? '—');
+    for (const row of ordered) {
+        const day = String(row.day ?? '').trim() || '—';
         const last = groups[groups.length - 1];
         if (last && last.day === day) {
             last.rows.push(row);
@@ -206,11 +239,14 @@ export default function DocumentsShow({
             String(row.description_purpose ?? '').trim() !== '' ||
             String(row.amount ?? '').trim() !== '',
     );
-    const activityProgress = asRows<Record<string, unknown>>(content.activity_progress).filter((row) => {
-        return ['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'].some(
-            (key) => String(row[key] ?? '').trim() !== '',
-        );
-    });
+    const activityProgress = sortRowsByWeekday(
+        asRows<Record<string, unknown>>(content.activity_progress).filter((row) => {
+            return ['activity_output', 'off_plan_activity', 'progress', 'remarks_challenges', 'next_step'].some(
+                (key) => String(row[key] ?? '').trim() !== '',
+            );
+        }),
+        (row) => dayLabelFromActivityOutput(row.activity_output) || String(row.day ?? ''),
+    );
     const keyAchievements = asRows<unknown>(content.key_achievements)
         .map((item) => (typeof item === 'string' ? item : String((item as { achievement?: string })?.achievement ?? '')))
         .filter((item) => item.trim() !== '');
