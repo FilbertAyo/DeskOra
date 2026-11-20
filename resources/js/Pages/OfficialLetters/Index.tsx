@@ -58,7 +58,7 @@ function downloadStatusBadge(status?: string | null) {
         return <Badge variant="destructive">Rejected</Badge>;
     }
 
-    return null;
+    return <Badge variant="outline">No request</Badge>;
 }
 
 export default function OfficialLettersIndex({
@@ -240,7 +240,7 @@ export default function OfficialLettersIndex({
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <code className="text-xs">{letter.reference_number}</code>
                                                 {letter.is_shared && <Badge variant="secondary">Shared</Badge>}
-                                                {isAuthorizations && downloadStatusBadge(letter.download_status)}
+                                                {downloadStatusBadge(letter.download_status)}
                                             </div>
                                             <div className="font-medium">{letter.name || letter.subject || 'Official letter'}</div>
                                             <div className="text-muted-foreground text-xs">
