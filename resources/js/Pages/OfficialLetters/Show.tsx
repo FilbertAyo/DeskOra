@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import BackButton from '@/components/shared/BackButton';
 import RowActions from '@/components/shared/RowActions';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,9 +131,11 @@ export default function OfficialLettersShow({
             />
 
             {isSharedWithMe && (
-                <Card>
-                    <CardContent className="pt-6 text-sm">This letter was shared with you. You can view and edit it.</CardContent>
-                </Card>
+                <Alert className="border-amber-500/50 bg-amber-500/15 px-3 py-2 text-amber-800 dark:text-amber-200">
+                    <AlertDescription className="text-amber-800 dark:text-amber-200">
+                        Shared with you. You can view and edit this letter.
+                    </AlertDescription>
+                </Alert>
             )}
 
             {canAuthorizeDownload && (
@@ -188,7 +191,10 @@ export default function OfficialLettersShow({
                         </div>
                         <div>
                             <div className="text-muted-foreground text-xs">Body</div>
-                            <div dangerouslySetInnerHTML={{ __html: letter.body || '' }} />
+                            <div
+                                className="text-foreground [&_*]:!text-foreground"
+                                dangerouslySetInnerHTML={{ __html: letter.body || '' }}
+                            />
                         </div>
                         <div className="pt-4 text-center">
                             <div className="text-muted-foreground text-xs">{letter.closing}</div>
