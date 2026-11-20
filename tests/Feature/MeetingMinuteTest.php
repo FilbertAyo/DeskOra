@@ -313,4 +313,3 @@ class MeetingMinuteTest extends TestCase
         ]);
     }
 }
-

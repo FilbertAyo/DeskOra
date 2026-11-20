@@ -52,4 +52,3 @@ class ExecutivePulseTest extends TestCase
             ->assertOk();
     }
 }
-

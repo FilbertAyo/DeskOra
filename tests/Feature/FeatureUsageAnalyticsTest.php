@@ -215,4 +215,3 @@ class FeatureUsageAnalyticsTest extends TestCase
         $this->assertDatabaseHas('feature_usage_events', ['id' => $recent->id]);
     }
 }
-

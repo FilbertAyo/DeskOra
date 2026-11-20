@@ -56,8 +56,7 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Documents/Index')
-            ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                data_get($row, 'plan.title') === 'Colleague Plan'
+            ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'plan.title') === 'Colleague Plan'
                 && data_get($row, 'plan.userName') === $author->name
             )));
     }
@@ -204,8 +203,7 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Documents/Index')
-                ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                    data_get($row, 'plan.title') === 'Staff Week 16 Plan'
+                ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'plan.title') === 'Staff Week 16 Plan'
                     && data_get($row, 'report.title') === 'Staff Week 16 Report'
                 )));
     }
@@ -252,8 +250,7 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Documents/Index')
-            ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                data_get($row, 'plan.title') === 'Team Week 16 Plan'
+            ->where('weeklyRows.data', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'plan.title') === 'Team Week 16 Plan'
                 && data_get($row, 'report.title') === 'Collaborator Week 16 Report'
                 && collect(data_get($row, 'participants', []))->contains($planOwner->name)
                 && collect(data_get($row, 'participants', []))->contains($collaborator->name)
@@ -294,4 +291,3 @@ class DocumentsOrganizationWideCatalogTest extends TestCase
             ->assertForbidden();
     }
 }
-

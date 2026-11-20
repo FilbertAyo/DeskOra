@@ -24,12 +24,12 @@ use App\Services\WeeklySubmissionReminderService;
 use App\Services\WeeklySubmissionWindowService;
 use App\Services\WorkPeriodService;
 use Carbon\Carbon;
-use Inertia\Inertia;
-use Inertia\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class DashboardController extends Controller
 {
@@ -335,11 +335,7 @@ class DashboardController extends Controller
     /**
      * @param  array<string, mixed>|null  $deadlineStatuses
      * @param  array<string, mixed>  $availableTypes
-     * @param  mixed  $collaborationEvents
      * @param  array<string, mixed>  $actionLogProgress
-     * @param  mixed  $teamUsers
-     * @param  mixed  $assignedWeeklyActivities
-     * @param  mixed  $todaysWeeklyTasks
      * @param  array<string, mixed>  $coverage
      * @param  list<array{label: string, count: int, url: string}>  $approvalActions
      * @param  array<string, mixed>  $scorecard

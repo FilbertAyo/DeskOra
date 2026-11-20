@@ -6,8 +6,8 @@ use App\Data\PendingApprovalGateSnapshot;
 use App\Models\Request as FinanceRequest;
 use App\Models\User;
 use App\Services\Documents\WeeklyBudgetReviewService;
-use Illuminate\Contracts\Session\Session;
 use App\Support\SchemaTables;
+use Illuminate\Contracts\Session\Session;
 
 class PendingApprovalGate
 {

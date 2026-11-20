@@ -217,8 +217,7 @@ class WeeklyBudgetReviewTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Documents/WeeklyBudgetReview')
             ->where('activePeriodId', (string) $current->id)
-            ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Desk')
+            ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) => collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Desk')
             )));
     }
 
@@ -261,12 +260,9 @@ class WeeklyBudgetReviewTest extends TestCase
                 ->where('showingAllPendingWeeks', false)
                 ->where('showingRecentPeriods', true)
                 ->where('statusFilter', 'pending')
-                ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Desk')
-                ) && collect($rows)->contains(fn ($row) =>
-                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Laptop')
-                ) && ! collect($rows)->contains(fn ($row) =>
-                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Printer')
+                ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) => collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Desk')
+                ) && collect($rows)->contains(fn ($row) => collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Laptop')
+                ) && ! collect($rows)->contains(fn ($row) => collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Printer')
                 )));
 
         $this->actingAs($reviewer)
@@ -277,8 +273,7 @@ class WeeklyBudgetReviewTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('showingRecentPeriods', false)
-                ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                    collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Printer')
+                ->where('documents.data', fn ($rows) => collect($rows)->contains(fn ($row) => collect(data_get($row, 'budgetItems', []))->contains(fn ($item) => data_get($item, 'item') === 'Printer')
                 )));
     }
 

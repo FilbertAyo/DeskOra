@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-
 use App\Exports\InventoryAssetsExport;
 use App\Exports\InventoryIssuedStockExport;
 use App\Models\InventoryAsset;
@@ -11,6 +9,7 @@ use App\Models\InventoryStockIssue;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryMyItemsController extends Controller

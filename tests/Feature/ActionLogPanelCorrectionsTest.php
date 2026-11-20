@@ -1714,8 +1714,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('ActionLogs/Show')
-                ->where('tasks', fn ($tasks) => collect($tasks)->contains(fn ($task) =>
-                    data_get($task, 'task') === 'Prepare field report'
+                ->where('tasks', fn ($tasks) => collect($tasks)->contains(fn ($task) => data_get($task, 'task') === 'Prepare field report'
                     && data_get($task, 'is_assignee_self') === true
                 )));
 
@@ -1724,8 +1723,7 @@ class ActionLogPanelCorrectionsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('ActionLogs/Show')
-                ->where('tasks', fn ($tasks) => collect($tasks)->every(fn ($task) =>
-                    data_get($task, 'is_assignee_self') !== true
+                ->where('tasks', fn ($tasks) => collect($tasks)->every(fn ($task) => data_get($task, 'is_assignee_self') !== true
                 )));
     }
 }
