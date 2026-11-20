@@ -1,6 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
 import { DownloadIcon, PencilIcon, ShieldCheckIcon, ShieldXIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import BackButton from '@/components/shared/BackButton';
@@ -9,6 +9,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader, PageShell } from '@/lib/page-kit';
 import { notify } from '@/lib/notify';
@@ -77,7 +85,19 @@ export default function OfficialLettersShow({
     });
     const requestForm = useForm({ request_note: '' });
     const rejectForm = useForm({ decision_note: '' });
+    const [rejectOpen, setRejectOpen] = useState(false);
     const downloadStatus = letter.latest_download_request?.status ?? null;
+    const requesterName = letter.latest_download_request?.requester?.name ?? 'A staff member';
+
+    const submitReject = () => {
+        rejectForm.post(urls.rejectDownload, {
+            onSuccess: () => {
+                setRejectOpen(false);
+                rejectForm.reset('decision_note');
+                notify('success', 'Request rejected.');
+            },
+        });
+    };
 
     return (
         <PageShell>
@@ -101,8 +121,7 @@ export default function OfficialLettersShow({
                                     icon: <ShieldXIcon />,
                                     destructive: true,
                                     hidden: !canAuthorizeDownload,
-                                    onClick: () =>
-                                        rejectForm.post(urls.rejectDownload, { onSuccess: () => notify('success', 'Request rejected.') }),
+                                    onClick: () => setRejectOpen(true),
                                 },
                                 {
                                     label: 'Download PDF',
@@ -138,32 +157,47 @@ export default function OfficialLettersShow({
                 </Alert>
             )}
 
-            {canAuthorizeDownload && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Download authorization needed</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                        <p>
-                            {letter.latest_download_request?.requester?.name ?? 'A staff member'} requested permission to download this
-                            letter.
-                        </p>
+            <Dialog
+                open={rejectOpen}
+                onOpenChange={(open) => {
+                    setRejectOpen(open);
+                    if (!open) {
+                        rejectForm.reset('decision_note');
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reject download request</DialogTitle>
+                        <DialogDescription>
+                            {requesterName} requested permission to download this letter.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
                         {letter.latest_download_request?.request_note && (
-                            <p>
+                            <p className="text-sm">
                                 <strong>Note:</strong> {letter.latest_download_request.request_note}
                             </p>
                         )}
                         <label className="block">
-                            <span className="mb-1 block font-medium">Reject reason (optional)</span>
+                            <span className="mb-1 block text-sm font-medium">Reject reason (optional)</span>
                             <Textarea
                                 rows={3}
                                 value={rejectForm.data.decision_note}
                                 onChange={(e) => rejectForm.setData('decision_note', e.target.value)}
                             />
                         </label>
-                    </CardContent>
-                </Card>
-            )}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setRejectOpen(false)} disabled={rejectForm.processing}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="destructive" onClick={submitReject} disabled={rejectForm.processing} loading={rejectForm.processing}>
+                            Reject
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
                 <Card>
