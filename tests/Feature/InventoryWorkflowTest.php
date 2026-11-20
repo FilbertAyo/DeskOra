@@ -173,6 +173,55 @@ class InventoryWorkflowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_approving_disposal_closes_open_maintenance_and_clears_attention(): void
+    {
+        $requester = $this->inventoryUser(['manage inventory assets', 'view inventory']);
+        $approver = $this->inventoryUser(['approve inventory requests', 'view inventory']);
+        $asset = $this->makeAsset(['status' => InventoryAsset::STATUS_UNDER_REPAIR]);
+
+        $maintenance = InventoryMaintenanceRecord::query()->create([
+            'record_number' => 'WH-MNT-2026-0100',
+            'asset_id' => $asset->id,
+            'status' => InventoryMaintenanceRecord::STATUS_REPORTED,
+            'problem_description' => 'Beyond repair',
+            'reported_by_user_id' => $requester->id,
+            'reported_at' => now(),
+            'previous_status' => InventoryAsset::STATUS_AVAILABLE,
+            'previous_condition' => InventoryAsset::CONDITION_GOOD,
+        ]);
+
+        $disposal = InventoryDisposalRequest::query()->create([
+            'request_number' => 'WH-DSP-2026-0100',
+            'asset_id' => $asset->id,
+            'method' => InventoryDisposalRequest::METHOD_DESTROYED,
+            'reason' => 'Cannot be repaired',
+            'status' => InventoryDisposalRequest::STATUS_REQUESTED,
+            'requested_by_user_id' => $requester->id,
+        ]);
+
+        $this->assertSame(1, InventoryMaintenanceRecord::openCount());
+        $this->assertSame(1, InventoryDisposalRequest::pendingReviewCount());
+
+        $this->actingAs($approver)
+            ->post(route('inventory.disposal.approve', $disposal), [
+                'review_notes' => 'Approved for destruction',
+            ])
+            ->assertRedirect(route('inventory.disposal.show', $disposal));
+
+        $this->assertSame(InventoryAsset::STATUS_DISPOSED, $asset->fresh()->status);
+        $this->assertSame(InventoryMaintenanceRecord::STATUS_DISPOSED, $maintenance->fresh()->status);
+        $this->assertSame(0, InventoryMaintenanceRecord::openCount());
+        $this->assertSame(0, InventoryDisposalRequest::pendingReviewCount());
+
+        $this->actingAs($approver)
+            ->get(route('inventory.disposal.show', $disposal))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/Disposal/Show')
+                ->where('disposal.status', InventoryDisposalRequest::STATUS_APPROVED)
+                ->where('canReview', false));
+    }
+
     public function test_user_without_maintenance_permission_cannot_report_problem(): void
     {
         $user = $this->inventoryUser(['view inventory']);

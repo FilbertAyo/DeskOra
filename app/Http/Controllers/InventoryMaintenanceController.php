@@ -30,7 +30,10 @@ class InventoryMaintenanceController extends Controller
         if ($tab === 'open') {
             $query->where('status', InventoryMaintenanceRecord::STATUS_REPORTED);
         } elseif ($tab === 'completed') {
-            $query->where('status', InventoryMaintenanceRecord::STATUS_COMPLETED);
+            $query->whereIn('status', [
+                InventoryMaintenanceRecord::STATUS_COMPLETED,
+                InventoryMaintenanceRecord::STATUS_DISPOSED,
+            ]);
         }
 
         if ($request->filled('search')) {
@@ -54,7 +57,10 @@ class InventoryMaintenanceController extends Controller
             'all' => InventoryMaintenanceRecord::query()->count(),
             'open' => InventoryMaintenanceRecord::openCount(),
             'completed' => InventoryMaintenanceRecord::query()
-                ->where('status', InventoryMaintenanceRecord::STATUS_COMPLETED)
+                ->whereIn('status', [
+                    InventoryMaintenanceRecord::STATUS_COMPLETED,
+                    InventoryMaintenanceRecord::STATUS_DISPOSED,
+                ])
                 ->count(),
         ];
 

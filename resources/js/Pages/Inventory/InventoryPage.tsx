@@ -70,6 +70,7 @@ export type InventoryPageConfig = {
         helpText?: string;
     };
     maintenanceActions?: boolean;
+    disposalActions?: boolean;
 };
 
 function isRecord(value: unknown): value is RecordValue {
@@ -330,6 +331,7 @@ function DataGrid({
     statusOptions,
     can,
     maintenanceActions,
+    disposalActions,
 }: {
     rows: RecordValue[];
     columns: InventoryColumn[];
@@ -342,10 +344,13 @@ function DataGrid({
     statusOptions?: RecordValue;
     can: (permission?: string) => boolean;
     maintenanceActions?: boolean;
+    disposalActions?: boolean;
 }) {
     const showEdit = Boolean(editRoute && can(editPermission));
     const canCompleteMaintenance = can('manage inventory maintenance');
     const canRequestDisposal = can('manage inventory assets');
+    const canReviewDisposal = can('approve inventory requests');
+    const hasRowActions = Boolean(showRoute || showEdit || maintenanceActions || disposalActions);
 
     if (rows.length === 0) {
         return <p className="text-muted-foreground py-8 text-center text-sm">No records found.</p>;
@@ -362,15 +367,16 @@ function DataGrid({
                                 {column.label}
                             </th>
                         ))}
-                        {(showRoute || showEdit || maintenanceActions) && (
+                        {hasRowActions && (
                             <th className="px-3 py-2 text-right font-medium">Actions</th>
                         )}
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map((row, index) => {
-                        const isOpenMaintenance =
-                            String(row.status ?? '') === 'reported' || String(getByPath(row, 'status') ?? '') === 'reported';
+                        const rowStatus = String(row.status ?? getByPath(row, 'status') ?? '');
+                        const isOpenMaintenance = rowStatus === 'reported';
+                        const isPendingDisposal = rowStatus === 'requested';
                         const assetId = isRecord(getByPath(row, 'asset'))
                             ? String((getByPath(row, 'asset') as RecordValue).id ?? '')
                             : String(row.asset_id ?? '');
@@ -397,7 +403,7 @@ function DataGrid({
                                         </td>
                                     );
                                 })}
-                                {(showRoute || showEdit || maintenanceActions) && (
+                                {hasRowActions && (
                                     <td className="whitespace-nowrap px-2 py-1.5 text-right">
                                         <RowActions
                                             items={[
@@ -447,6 +453,23 @@ function DataGrid({
                                                         canRequestDisposal &&
                                                         isOpenMaintenance &&
                                                         assetId
+                                                    ),
+                                                },
+                                                {
+                                                    label: 'Review & approve',
+                                                    href:
+                                                        disposalActions &&
+                                                        canReviewDisposal &&
+                                                        isPendingDisposal &&
+                                                        row.id !== undefined
+                                                            ? route('inventory.disposal.show', { disposal: row.id })
+                                                            : undefined,
+                                                    icon: <EyeIcon />,
+                                                    hidden: !(
+                                                        disposalActions &&
+                                                        canReviewDisposal &&
+                                                        isPendingDisposal &&
+                                                        row.id !== undefined
                                                     ),
                                                 },
                                             ]}
@@ -805,6 +828,7 @@ function InventoryScreen({ config }: { config: InventoryPageConfig }) {
                                 statusOptions={statusOptions}
                                 can={can}
                                 maintenanceActions={config.maintenanceActions}
+                                disposalActions={config.disposalActions}
                             />
                             {meta.links.length > 3 && (
                                 <div className="p-4">
@@ -1319,8 +1343,9 @@ const pageMeta: Record<string, Partial<InventoryPageConfig>> = {
         searchable: true,
         numbered: true,
         columns: pageColumns['Disposal/Index'],
+        disposalActions: true,
     },
-    'Disposal/Show': { record: 'request' },
+    'Disposal/Show': { record: 'disposal' },
     'Verification/Index': {
         collection: 'sessions',
         createRoute: 'inventory.verification.create',

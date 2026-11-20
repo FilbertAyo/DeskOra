@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\InventoryAsset;
 use App\Models\InventoryDisposalRequest;
+use App\Models\InventoryMaintenanceRecord;
 use App\Services\Inventory\InventoryNumberGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -143,10 +144,15 @@ class InventoryDisposalRequestController extends Controller
 
         $disposal->load(['asset.location', 'asset.responsibleUser', 'requestedBy', 'reviewedBy']);
 
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
         return Inertia::render('Inventory/Disposal/Show', [
             'disposal' => $disposal,
             'statusOptions' => InventoryDisposalRequest::statusOptions(),
             'methodOptions' => InventoryDisposalRequest::methodOptions(),
+            'canReview' => $disposal->status === InventoryDisposalRequest::STATUS_REQUESTED
+                && $user->can('approve', $disposal),
         ]);
     }
 
@@ -182,11 +188,31 @@ class InventoryDisposalRequestController extends Controller
             $asset->update([
                 'status' => InventoryAsset::STATUS_DISPOSED,
             ]);
+
+            InventoryMaintenanceRecord::query()
+                ->where('asset_id', $asset->id)
+                ->where('status', InventoryMaintenanceRecord::STATUS_REPORTED)
+                ->lockForUpdate()
+                ->get()
+                ->each(function (InventoryMaintenanceRecord $record) use ($disposal, $user): void {
+                    $record->update([
+                        'status' => InventoryMaintenanceRecord::STATUS_DISPOSED,
+                        'repair_provider' => 'Disposed',
+                        'repaired_on' => now()->toDateString(),
+                        'condition_after' => InventoryAsset::CONDITION_DAMAGED,
+                        'repair_notes' => trim(
+                            'Closed by disposal approval '.$disposal->request_number
+                            .($disposal->reason ? ': '.$disposal->reason : '')
+                        ),
+                        'completed_by_user_id' => $user->id,
+                        'completed_at' => now(),
+                    ]);
+                });
         });
 
         return redirect()
             ->route('inventory.disposal.show', $disposal)
-            ->with('success', 'Disposal approved. The asset is locked and kept for history.');
+            ->with('success', 'Disposal approved. The asset is locked and related maintenance is marked disposed.');
     }
 
     public function reject(Request $request, InventoryDisposalRequest $disposal)

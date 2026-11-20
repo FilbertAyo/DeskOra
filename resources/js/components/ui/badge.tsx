@@ -52,14 +52,19 @@ const WARNING_STATUSES = new Set([
   'partially completed',
   'partially done',
   'pending',
+  'pending review',
+  'reported',
+  'requested',
   'resubmission',
-  'review'
+  'review',
+  'under repair'
 ])
 
 const DESTRUCTIVE_STATUSES = new Set([
   'cancelled',
   'canceled',
   'closed',
+  'disposed',
   'failed',
   'inactive',
   'not available',

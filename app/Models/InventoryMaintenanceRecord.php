@@ -16,6 +16,8 @@ class InventoryMaintenanceRecord extends Model
 
     public const STATUS_COMPLETED = 'completed';
 
+    public const STATUS_DISPOSED = 'disposed';
+
     protected $fillable = [
         'record_number',
         'asset_id',
@@ -83,6 +85,7 @@ class InventoryMaintenanceRecord extends Model
         return [
             self::STATUS_REPORTED => 'Under Repair',
             self::STATUS_COMPLETED => 'Completed',
+            self::STATUS_DISPOSED => 'Disposed',
         ];
     }
 }

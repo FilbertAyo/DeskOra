@@ -207,18 +207,56 @@ function DispatchShowPage() {
 
             <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Purpose</CardTitle>
+                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+                        <CardTitle className="text-base">Overview</CardTitle>
+                        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                            {statusLabel}
+                        </span>
                     </CardHeader>
-                    <CardContent className="text-sm">{dispatch.purpose || '—'}</CardContent>
+                    <CardContent className="space-y-3 text-sm">
+                        <div>
+                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                Dispatch #
+                            </p>
+                            <p className="mt-1">{dispatch.dispatch_number}</p>
+                        </div>
+                        <div>
+                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                Destination
+                            </p>
+                            <p className="mt-1">{dispatch.destination || '—'}</p>
+                        </div>
+                        <div>
+                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Purpose</p>
+                            <p className="mt-1 break-words">{dispatch.purpose || '—'}</p>
+                        </div>
+                        {dispatch.notes ? (
+                            <div>
+                                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                    Notes
+                                </p>
+                                <p className="mt-1 break-words">{dispatch.notes}</p>
+                            </div>
+                        ) : null}
+                    </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Dates</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm">
-                        <p>Dispatch: {dispatch.dispatch_date ?? '—'}</p>
-                        <p>Expected return: {dispatch.expected_return_date ?? '—'}</p>
+                    <CardContent className="space-y-3 text-sm">
+                        <div>
+                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                Dispatch date
+                            </p>
+                            <p className="mt-1">{dispatch.dispatch_date ?? '—'}</p>
+                        </div>
+                        <div>
+                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                Expected return
+                            </p>
+                            <p className="mt-1">{dispatch.expected_return_date ?? '—'}</p>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
