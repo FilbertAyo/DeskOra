@@ -11,7 +11,7 @@ use Inertia\Response;
 
 class SystemSettingController extends Controller
 {
-    public const SECTIONS = ['identity', 'branding', 'appearance', 'forms'];
+    public const SECTIONS = ['brand', 'logos'];
 
     public function __construct(
         private readonly SystemSettingService $settings,
@@ -28,28 +28,29 @@ class SystemSettingController extends Controller
         return Inertia::render('Settings/System/Edit', [
             'section' => $section,
             'sections' => [
-                ['id' => 'identity', 'label' => 'Identity', 'description' => 'System name shown across the portal'],
-                ['id' => 'branding', 'label' => 'Logos & media', 'description' => 'Photo, icon, and mark assets'],
-                ['id' => 'appearance', 'label' => 'Appearance', 'description' => 'Primary color and look'],
-                ['id' => 'forms', 'label' => 'Forms & downloads', 'description' => 'Logo on printable exports'],
+                [
+                    'id' => 'brand',
+                    'label' => 'Brand',
+                    'description' => 'System name and primary color',
+                ],
+                [
+                    'id' => 'logos',
+                    'label' => 'Logos',
+                    'description' => 'Portal icon, photo, and forms logo',
+                ],
             ],
-            'identity' => [
+            'brand' => [
                 'appName' => $branding['appName'],
+                'primaryColor' => $branding['primaryColor'],
+                'defaultPrimaryColor' => SystemSetting::DEFAULT_PRIMARY_COLOR,
             ],
-            'brandingAssets' => [
+            'logos' => [
                 'logoUrl' => $branding['logo'],
                 'iconUrl' => $branding['logoIcon'],
                 'usingDefaultLogo' => $branding['usingDefaultLogo'],
                 'usingDefaultIcon' => $branding['usingDefaultIcon'],
-            ],
-            'appearance' => [
-                'primaryColor' => $branding['primaryColor'],
-                'defaultPrimaryColor' => SystemSetting::DEFAULT_PRIMARY_COLOR,
-            ],
-            'forms' => [
-                'formsLogoPath' => $formsLogoPath,
                 'formsLogoUrl' => asset($formsLogoPath),
-                'usingDefaultLogo' => $this->settings->get(SystemSetting::KEY_FORMS_LOGO) === null
+                'usingDefaultFormsLogo' => $this->settings->get(SystemSetting::KEY_FORMS_LOGO) === null
                     || $this->settings->get(SystemSetting::KEY_FORMS_LOGO) === '',
             ],
             'updateUrl' => route('settings.system.update'),
@@ -61,31 +62,33 @@ class SystemSettingController extends Controller
         $section = $this->resolveSection($request->input('section'));
 
         return match ($section) {
-            'identity' => $this->updateIdentity($request),
-            'branding' => $this->updateBranding($request),
-            'appearance' => $this->updateAppearance($request),
-            'forms' => $this->updateForms($request),
+            'brand' => $this->updateBrand($request),
+            'logos' => $this->updateLogos($request),
         };
     }
 
-    private function updateIdentity(Request $request): RedirectResponse
+    private function updateBrand(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'app_name' => ['required', 'string', 'max:120'],
+            'primary_color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         $this->settings->setAppName(trim($validated['app_name']));
+        $this->settings->setPrimaryColor($validated['primary_color']);
 
-        return $this->redirectToSection('identity', 'System name updated.');
+        return $this->redirectToSection('brand', 'Brand settings updated.');
     }
 
-    private function updateBranding(Request $request): RedirectResponse
+    private function updateLogos(Request $request): RedirectResponse
     {
         $request->validate([
             'logo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
             'icon' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            'forms_logo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
             'remove_icon' => ['nullable', 'boolean'],
+            'remove_forms_logo' => ['nullable', 'boolean'],
         ]);
 
         $changed = false;
@@ -106,43 +109,18 @@ class SystemSettingController extends Controller
             $changed = true;
         }
 
-        return $this->redirectToSection(
-            'branding',
-            $changed ? 'Branding assets updated.' : 'No changes were made.'
-        );
-    }
-
-    private function updateAppearance(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'primary_color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-        ]);
-
-        $this->settings->setPrimaryColor($validated['primary_color']);
-
-        return $this->redirectToSection('appearance', 'Appearance updated.');
-    }
-
-    private function updateForms(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'forms_logo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
-            'remove_forms_logo' => ['nullable', 'boolean'],
-        ]);
-
         if ($request->boolean('remove_forms_logo')) {
             $this->settings->clearFormsLogo();
-
-            return $this->redirectToSection('forms', 'Forms logo reset to the default logo.');
-        }
-
-        if ($request->hasFile('forms_logo')) {
+            $changed = true;
+        } elseif ($request->hasFile('forms_logo')) {
             $this->settings->storeFormsLogo($request->file('forms_logo'));
-
-            return $this->redirectToSection('forms', 'Forms logo updated successfully.');
+            $changed = true;
         }
 
-        return $this->redirectToSection('forms', 'No changes were made.');
+        return $this->redirectToSection(
+            'logos',
+            $changed ? 'Logo settings updated.' : 'No changes were made.'
+        );
     }
 
     private function redirectToSection(string $section, string $message): RedirectResponse
@@ -154,8 +132,15 @@ class SystemSettingController extends Controller
 
     private function resolveSection(mixed $section): string
     {
-        $value = is_string($section) ? $section : 'identity';
+        $value = is_string($section) ? $section : 'brand';
 
-        return in_array($value, self::SECTIONS, true) ? $value : 'identity';
+        // Map legacy section query values from the previous four-tab layout.
+        $legacy = match ($value) {
+            'identity', 'appearance' => 'brand',
+            'branding', 'forms' => 'logos',
+            default => $value,
+        };
+
+        return in_array($legacy, self::SECTIONS, true) ? $legacy : 'brand';
     }
 }

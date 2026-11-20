@@ -39,22 +39,22 @@ class SystemSettingTest extends TestCase
         $admin->givePermissionTo('manage system settings');
 
         $this->actingAs($admin)
-            ->get(route('settings.system.edit', ['section' => 'forms']))
+            ->get(route('settings.system.edit', ['section' => 'logos']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Settings/System/Edit')
-                ->where('section', 'forms')
-                ->has('forms.formsLogoUrl')
+                ->where('section', 'logos')
+                ->has('logos.formsLogoUrl')
                 ->has('updateUrl'));
 
         $file = UploadedFile::fake()->image('forms-logo.png', 200, 80);
 
         $this->actingAs($admin)
             ->put(route('settings.system.update'), [
-                'section' => 'forms',
+                'section' => 'logos',
                 'forms_logo' => $file,
             ])
-            ->assertRedirect(route('settings.system.edit', ['section' => 'forms']))
+            ->assertRedirect(route('settings.system.edit', ['section' => 'logos']))
             ->assertSessionHas('success');
 
         $path = app(SystemSettingService::class)->get(SystemSetting::KEY_FORMS_LOGO);
@@ -63,7 +63,7 @@ class SystemSettingTest extends TestCase
         Storage::disk('public')->assertExists(substr($path, strlen('storage/')));
     }
 
-    public function test_admin_can_update_identity_branding_and_appearance(): void
+    public function test_admin_can_update_brand_and_logos(): void
     {
         Storage::fake('public');
 
@@ -72,15 +72,20 @@ class SystemSettingTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('settings.system.update'), [
-                'section' => 'identity',
+                'section' => 'brand',
                 'app_name' => 'Adilisha Digital',
+                'primary_color' => '#112233',
             ])
-            ->assertRedirect(route('settings.system.edit', ['section' => 'identity']))
+            ->assertRedirect(route('settings.system.edit', ['section' => 'brand']))
             ->assertSessionHas('success');
 
         $this->assertSame(
             'Adilisha Digital',
             app(SystemSettingService::class)->get(SystemSetting::KEY_APP_NAME)
+        );
+        $this->assertSame(
+            '#112233',
+            app(SystemSettingService::class)->get(SystemSetting::KEY_PRIMARY_COLOR)
         );
 
         $logo = UploadedFile::fake()->image('org-photo.png', 240, 120);
@@ -88,11 +93,11 @@ class SystemSettingTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('settings.system.update'), [
-                'section' => 'branding',
+                'section' => 'logos',
                 'logo' => $logo,
                 'icon' => $icon,
             ])
-            ->assertRedirect(route('settings.system.edit', ['section' => 'branding']))
+            ->assertRedirect(route('settings.system.edit', ['section' => 'logos']))
             ->assertSessionHas('success');
 
         $branding = app(SystemSettingService::class)->branding();
@@ -100,20 +105,23 @@ class SystemSettingTest extends TestCase
         $this->assertFalse($branding['usingDefaultIcon']);
         $this->assertStringStartsWith('storage/', $branding['logoPath']);
         $this->assertStringStartsWith('storage/', $branding['iconPath']);
+        $this->assertSame('#112233', $branding['primaryColor']);
+    }
+
+    public function test_legacy_section_query_maps_to_grouped_tabs(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->givePermissionTo('manage system settings');
 
         $this->actingAs($admin)
-            ->put(route('settings.system.update'), [
-                'section' => 'appearance',
-                'primary_color' => '#112233',
-            ])
-            ->assertRedirect(route('settings.system.edit', ['section' => 'appearance']))
-            ->assertSessionHas('success');
+            ->get(route('settings.system.edit', ['section' => 'appearance']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('section', 'brand'));
 
-        $this->assertSame(
-            '#112233',
-            app(SystemSettingService::class)->get(SystemSetting::KEY_PRIMARY_COLOR)
-        );
-        $this->assertSame('#112233', app(SystemSettingService::class)->branding()['primaryColor']);
+        $this->actingAs($admin)
+            ->get(route('settings.system.edit', ['section' => 'forms']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('section', 'logos'));
     }
 
     public function test_user_without_permission_cannot_access_system_settings(): void

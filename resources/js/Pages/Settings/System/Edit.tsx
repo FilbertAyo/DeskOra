@@ -1,5 +1,5 @@
 import { useForm, router } from '@inertiajs/react';
-import { ImageIcon, Palette, Printer, Type } from 'lucide-react';
+import { ImageIcon, Type } from 'lucide-react';
 import type { ComponentType, ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -13,7 +13,7 @@ import { notify } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { route } from '@/lib/route';
 
-type SectionId = 'identity' | 'branding' | 'appearance' | 'forms';
+type SectionId = 'brand' | 'logos';
 
 type SectionMeta = {
     id: SectionId;
@@ -24,46 +24,58 @@ type SectionMeta = {
 type Props = {
     section: SectionId;
     sections: SectionMeta[];
-    identity: { appName: string };
-    brandingAssets: {
+    brand: {
+        appName: string;
+        primaryColor: string;
+        defaultPrimaryColor: string;
+    };
+    logos: {
         logoUrl: string;
         iconUrl: string;
         usingDefaultLogo: boolean;
         usingDefaultIcon: boolean;
-    };
-    appearance: { primaryColor: string; defaultPrimaryColor: string };
-    forms: {
-        formsLogoPath: string;
         formsLogoUrl: string;
-        usingDefaultLogo: boolean;
+        usingDefaultFormsLogo: boolean;
     };
     updateUrl: string;
 };
 
 const SECTION_ICONS: Record<SectionId, ComponentType<{ className?: string }>> = {
-    identity: Type,
-    branding: ImageIcon,
-    appearance: Palette,
-    forms: Printer,
+    brand: Type,
+    logos: ImageIcon,
 };
 
-function IdentityPanel({ appName, updateUrl }: { appName: string; updateUrl: string }) {
-    const form = useForm({ section: 'identity' as const, app_name: appName });
+function BrandPanel({
+    appName,
+    primaryColor,
+    defaultPrimaryColor,
+    updateUrl,
+}: {
+    appName: string;
+    primaryColor: string;
+    defaultPrimaryColor: string;
+    updateUrl: string;
+}) {
+    const form = useForm({
+        section: 'brand' as const,
+        app_name: appName,
+        primary_color: primaryColor,
+    });
 
     return (
         <Card className="shadow-none">
             <CardHeader>
-                <CardTitle>System name</CardTitle>
-                <CardDescription>This name appears in the sidebar, footer, login screen, and page titles.</CardDescription>
+                <CardTitle>Brand</CardTitle>
+                <CardDescription>System name and accent color used across the portal.</CardDescription>
             </CardHeader>
             <CardContent>
                 <form
-                    className="max-w-lg space-y-4"
+                    className="max-w-lg space-y-6"
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.put(updateUrl, {
                             preserveScroll: true,
-                            onSuccess: () => notify('success', 'System name updated.'),
+                            onSuccess: () => notify('success', 'Brand settings updated.'),
                         });
                     }}
                 >
@@ -77,168 +89,10 @@ function IdentityPanel({ appName, updateUrl }: { appName: string; updateUrl: str
                             placeholder="Adilisha Portal"
                             maxLength={120}
                         />
+                        <p className="text-muted-foreground text-xs">Shown in the sidebar, footer, login screen, and page titles.</p>
                         {form.errors.app_name && <p className="text-destructive text-sm">{form.errors.app_name}</p>}
                     </div>
-                    <Button type="submit" disabled={form.processing} loading={form.processing}>
-                        Save identity
-                    </Button>
-                </form>
-            </CardContent>
-        </Card>
-    );
-}
 
-function BrandingPanel({
-    logoUrl,
-    iconUrl,
-    usingDefaultLogo,
-    usingDefaultIcon,
-    updateUrl,
-}: {
-    logoUrl: string;
-    iconUrl: string;
-    usingDefaultLogo: boolean;
-    usingDefaultIcon: boolean;
-    updateUrl: string;
-}) {
-    const form = useForm<{
-        section: 'branding';
-        logo: File | null;
-        icon: File | null;
-        remove_logo: boolean;
-        remove_icon: boolean;
-    }>({
-        section: 'branding',
-        logo: null,
-        icon: null,
-        remove_logo: false,
-        remove_icon: false,
-    });
-
-    return (
-        <Card className="shadow-none">
-            <CardHeader>
-                <CardTitle>Logos & media</CardTitle>
-                <CardDescription>Upload the organization photo and square icon used across the portal.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form
-                    className="space-y-8"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        form.put(updateUrl, {
-                            forceFormData: true,
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                form.setData({
-                                    section: 'branding',
-                                    logo: null,
-                                    icon: null,
-                                    remove_logo: false,
-                                    remove_icon: false,
-                                });
-                                notify('success', 'Branding assets updated.');
-                            },
-                        });
-                    }}
-                >
-                    <div className="grid gap-6 md:grid-cols-[12rem_1fr]">
-                        <div className="flex items-center justify-center rounded-md border bg-muted/30 p-4">
-                            <img src={logoUrl} alt="System photo" className="max-h-28 object-contain" />
-                        </div>
-                        <div className="space-y-3">
-                            <div>
-                                <Label htmlFor="logo">System photo / logo</Label>
-                                <p className="text-muted-foreground mt-1 text-xs">Shown on login and branded surfaces. Prefer a clear landscape or square image.</p>
-                            </div>
-                            <Input
-                                id="logo"
-                                name="logo"
-                                type="file"
-                                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
-                                onChange={(event) => form.setData('logo', event.target.files?.[0] ?? null)}
-                            />
-                            {form.errors.logo && <p className="text-destructive text-sm">{form.errors.logo}</p>}
-                            {!usingDefaultLogo && (
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        name="remove_logo"
-                                        checked={form.data.remove_logo}
-                                        onCheckedChange={(checked) => form.setData('remove_logo', checked === true)}
-                                    />
-                                    Reset to default photo
-                                </label>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid gap-6 md:grid-cols-[12rem_1fr]">
-                        <div className="flex items-center justify-center rounded-md border bg-muted/30 p-4">
-                            <img src={iconUrl} alt="System icon" className="size-16 object-contain" />
-                        </div>
-                        <div className="space-y-3">
-                            <div>
-                                <Label htmlFor="icon">System icon</Label>
-                                <p className="text-muted-foreground mt-1 text-xs">Square mark for the sidebar and browser tab (favicon).</p>
-                            </div>
-                            <Input
-                                id="icon"
-                                name="icon"
-                                type="file"
-                                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
-                                onChange={(event) => form.setData('icon', event.target.files?.[0] ?? null)}
-                            />
-                            {form.errors.icon && <p className="text-destructive text-sm">{form.errors.icon}</p>}
-                            {!usingDefaultIcon && (
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        name="remove_icon"
-                                        checked={form.data.remove_icon}
-                                        onCheckedChange={(checked) => form.setData('remove_icon', checked === true)}
-                                    />
-                                    Reset to default icon
-                                </label>
-                            )}
-                        </div>
-                    </div>
-
-                    <Button type="submit" disabled={form.processing} loading={form.processing}>
-                        Save branding
-                    </Button>
-                </form>
-            </CardContent>
-        </Card>
-    );
-}
-
-function AppearancePanel({
-    primaryColor,
-    defaultPrimaryColor,
-    updateUrl,
-}: {
-    primaryColor: string;
-    defaultPrimaryColor: string;
-    updateUrl: string;
-}) {
-    const form = useForm({ section: 'appearance' as const, primary_color: primaryColor });
-
-    return (
-        <Card className="shadow-none">
-            <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>Choose the primary accent used for buttons, links, and highlights.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form
-                    className="max-w-lg space-y-5"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        form.put(updateUrl, {
-                            preserveScroll: true,
-                            onSuccess: () => notify('success', 'Appearance updated.'),
-                        });
-                    }}
-                >
                     <div className="space-y-3">
                         <Label htmlFor="primary_color">Primary color</Label>
                         <div className="flex flex-wrap items-center gap-3">
@@ -274,8 +128,9 @@ function AppearancePanel({
                             Reset to default ({defaultPrimaryColor})
                         </button>
                     </div>
+
                     <Button type="submit" disabled={form.processing} loading={form.processing}>
-                        Save appearance
+                        Save brand
                     </Button>
                 </form>
             </CardContent>
@@ -283,52 +138,147 @@ function AppearancePanel({
     );
 }
 
-function FormsPanel({
-    formsLogoUrl,
+function LogosPanel({
+    logoUrl,
+    iconUrl,
     usingDefaultLogo,
+    usingDefaultIcon,
+    formsLogoUrl,
+    usingDefaultFormsLogo,
     updateUrl,
 }: {
-    formsLogoUrl: string;
+    logoUrl: string;
+    iconUrl: string;
     usingDefaultLogo: boolean;
+    usingDefaultIcon: boolean;
+    formsLogoUrl: string;
+    usingDefaultFormsLogo: boolean;
     updateUrl: string;
 }) {
-    const form = useForm<{ section: 'forms'; forms_logo: File | null; remove_forms_logo: boolean }>({
-        section: 'forms',
+    const form = useForm<{
+        section: 'logos';
+        logo: File | null;
+        icon: File | null;
+        forms_logo: File | null;
+        remove_logo: boolean;
+        remove_icon: boolean;
+        remove_forms_logo: boolean;
+    }>({
+        section: 'logos',
+        logo: null,
+        icon: null,
         forms_logo: null,
+        remove_logo: false,
+        remove_icon: false,
         remove_forms_logo: false,
     });
 
     return (
         <Card className="shadow-none">
             <CardHeader>
-                <CardTitle>Forms logo</CardTitle>
+                <CardTitle>Logos</CardTitle>
                 <CardDescription>
-                    {usingDefaultLogo
-                        ? 'Currently using the default application logo on printable and downloadable forms.'
-                        : 'A custom forms logo is active on printable and downloadable forms.'}
+                    Manage the portal icon, organization photo, and forms logo used on downloads and printable exports.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <form
-                    className="grid gap-6 md:grid-cols-[16rem_1fr]"
+                    className="space-y-8"
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.put(updateUrl, {
                             forceFormData: true,
                             preserveScroll: true,
                             onSuccess: () => {
-                                form.setData({ section: 'forms', forms_logo: null, remove_forms_logo: false });
-                                notify('success', 'System settings updated.');
+                                form.setData({
+                                    section: 'logos',
+                                    logo: null,
+                                    icon: null,
+                                    forms_logo: null,
+                                    remove_logo: false,
+                                    remove_icon: false,
+                                    remove_forms_logo: false,
+                                });
+                                notify('success', 'Logo settings updated.');
                             },
                         });
                     }}
                 >
-                    <div className="rounded-md border bg-muted/30 p-4">
-                        <img src={formsLogoUrl} alt="Forms logo" className="mx-auto max-h-32 object-contain" />
+                    <div className="grid gap-6 md:grid-cols-[12rem_1fr]">
+                        <div className="flex items-center justify-center rounded-md border bg-muted/30 p-4">
+                            <img src={iconUrl} alt="System icon" className="size-16 object-contain" />
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <Label htmlFor="icon">System icon</Label>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    Square mark for the sidebar, browser tab, and authentication pages.
+                                </p>
+                            </div>
+                            <Input
+                                id="icon"
+                                name="icon"
+                                type="file"
+                                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                                onChange={(event) => form.setData('icon', event.target.files?.[0] ?? null)}
+                            />
+                            {form.errors.icon && <p className="text-destructive text-sm">{form.errors.icon}</p>}
+                            {!usingDefaultIcon && (
+                                <label className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        name="remove_icon"
+                                        checked={form.data.remove_icon}
+                                        onCheckedChange={(checked) => form.setData('remove_icon', checked === true)}
+                                    />
+                                    Reset to default icon
+                                </label>
+                            )}
+                        </div>
                     </div>
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="forms_logo">Upload new logo</Label>
+
+                    <div className="grid gap-6 md:grid-cols-[12rem_1fr]">
+                        <div className="flex items-center justify-center rounded-md border bg-muted/30 p-4">
+                            <img src={logoUrl} alt="System photo" className="max-h-28 object-contain" />
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <Label htmlFor="logo">System photo / logo</Label>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    Organization photo or full logo for branded surfaces.
+                                </p>
+                            </div>
+                            <Input
+                                id="logo"
+                                name="logo"
+                                type="file"
+                                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                                onChange={(event) => form.setData('logo', event.target.files?.[0] ?? null)}
+                            />
+                            {form.errors.logo && <p className="text-destructive text-sm">{form.errors.logo}</p>}
+                            {!usingDefaultLogo && (
+                                <label className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        name="remove_logo"
+                                        checked={form.data.remove_logo}
+                                        onCheckedChange={(checked) => form.setData('remove_logo', checked === true)}
+                                    />
+                                    Reset to default photo
+                                </label>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-[12rem_1fr]">
+                        <div className="flex items-center justify-center rounded-md border bg-muted/30 p-4">
+                            <img src={formsLogoUrl} alt="Forms logo" className="max-h-28 object-contain" />
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <Label htmlFor="forms_logo">Forms & downloads logo</Label>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    Used on printable and downloadable forms such as requisitions.
+                                </p>
+                            </div>
                             <Input
                                 id="forms_logo"
                                 name="forms_logo"
@@ -337,57 +287,48 @@ function FormsPanel({
                                 onChange={(event) => form.setData('forms_logo', event.target.files?.[0] ?? null)}
                             />
                             {form.errors.forms_logo && <p className="text-destructive text-sm">{form.errors.forms_logo}</p>}
+                            {!usingDefaultFormsLogo && (
+                                <label className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        name="remove_forms_logo"
+                                        checked={form.data.remove_forms_logo}
+                                        onCheckedChange={(checked) => form.setData('remove_forms_logo', checked === true)}
+                                    />
+                                    Reset to default forms logo
+                                </label>
+                            )}
                         </div>
-                        {!usingDefaultLogo && (
-                            <label className="flex items-center gap-2 text-sm">
-                                <Checkbox
-                                    name="remove_forms_logo"
-                                    checked={form.data.remove_forms_logo}
-                                    onCheckedChange={(checked) => form.setData('remove_forms_logo', checked === true)}
-                                />
-                                Reset to default logo
-                            </label>
-                        )}
-                        <Button type="submit" disabled={form.processing} loading={form.processing}>
-                            Save changes
-                        </Button>
                     </div>
+
+                    <Button type="submit" disabled={form.processing} loading={form.processing}>
+                        Save logos
+                    </Button>
                 </form>
             </CardContent>
         </Card>
     );
 }
 
-function renderSection(
-    section: SectionId,
-    props: Pick<Props, 'identity' | 'brandingAssets' | 'appearance' | 'forms' | 'updateUrl'>,
-): ReactNode {
+function renderSection(section: SectionId, props: Pick<Props, 'brand' | 'logos' | 'updateUrl'>): ReactNode {
     switch (section) {
-        case 'identity':
-            return <IdentityPanel appName={props.identity.appName} updateUrl={props.updateUrl} />;
-        case 'branding':
+        case 'brand':
             return (
-                <BrandingPanel
-                    logoUrl={props.brandingAssets.logoUrl}
-                    iconUrl={props.brandingAssets.iconUrl}
-                    usingDefaultLogo={props.brandingAssets.usingDefaultLogo}
-                    usingDefaultIcon={props.brandingAssets.usingDefaultIcon}
+                <BrandPanel
+                    appName={props.brand.appName}
+                    primaryColor={props.brand.primaryColor}
+                    defaultPrimaryColor={props.brand.defaultPrimaryColor}
                     updateUrl={props.updateUrl}
                 />
             );
-        case 'appearance':
+        case 'logos':
             return (
-                <AppearancePanel
-                    primaryColor={props.appearance.primaryColor}
-                    defaultPrimaryColor={props.appearance.defaultPrimaryColor}
-                    updateUrl={props.updateUrl}
-                />
-            );
-        case 'forms':
-            return (
-                <FormsPanel
-                    formsLogoUrl={props.forms.formsLogoUrl}
-                    usingDefaultLogo={props.forms.usingDefaultLogo}
+                <LogosPanel
+                    logoUrl={props.logos.logoUrl}
+                    iconUrl={props.logos.iconUrl}
+                    usingDefaultLogo={props.logos.usingDefaultLogo}
+                    usingDefaultIcon={props.logos.usingDefaultIcon}
+                    formsLogoUrl={props.logos.formsLogoUrl}
+                    usingDefaultFormsLogo={props.logos.usingDefaultFormsLogo}
                     updateUrl={props.updateUrl}
                 />
             );
@@ -398,15 +339,7 @@ function renderSection(
     }
 }
 
-export default function SystemEdit({
-    section,
-    sections,
-    identity,
-    brandingAssets,
-    appearance,
-    forms,
-    updateUrl,
-}: Props) {
+export default function SystemEdit({ section, sections, brand, logos, updateUrl }: Props) {
     const goToSection = (id: SectionId) => {
         router.get(route('settings.system.edit'), { section: id }, { preserveState: true, preserveScroll: true, replace: true });
     };
@@ -447,12 +380,9 @@ export default function SystemEdit({
                             );
                         })}
                     </ul>
-                    <p className="text-muted-foreground mt-4 hidden text-xs lg:block">
-                        More system options can be added here later — email, locale, and document defaults.
-                    </p>
                 </nav>
 
-                <div className="min-w-0">{renderSection(section, { identity, brandingAssets, appearance, forms, updateUrl })}</div>
+                <div className="min-w-0">{renderSection(section, { brand, logos, updateUrl })}</div>
             </div>
         </div>
     );

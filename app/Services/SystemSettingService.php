@@ -118,7 +118,7 @@ class SystemSettingService
                 'type' => SystemSetting::TYPE_FILE,
                 'value' => null,
                 'label' => 'System icon',
-                'description' => 'Square icon used in the sidebar and browser tab.',
+                'description' => 'Square icon used in the sidebar, browser tab, and authentication pages.',
             ]
         );
 
@@ -269,7 +269,7 @@ class SystemSettingService
             'system/branding',
             SystemSetting::GROUP_BRANDING,
             'System icon',
-            'Square icon used in the sidebar and browser tab.'
+            'Square icon used in the sidebar, browser tab, and authentication pages.'
         );
     }
 
@@ -279,7 +279,7 @@ class SystemSettingService
             SystemSetting::KEY_ICON,
             SystemSetting::GROUP_BRANDING,
             'System icon',
-            'Square icon used in the sidebar and browser tab.'
+            'Square icon used in the sidebar, browser tab, and authentication pages.'
         );
     }
 
