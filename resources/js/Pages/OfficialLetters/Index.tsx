@@ -1,15 +1,16 @@
 import { Link, router } from '@inertiajs/react';
-import { DownloadIcon, EyeIcon, FileTextIcon, PencilIcon, ShieldCheckIcon, ShieldXIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { DownloadIcon, EyeIcon, FileTextIcon, PencilIcon, SearchIcon, ShieldCheckIcon, ShieldXIcon } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { notify } from '@/lib/notify';
 import { cn } from '@/lib/utils';
-import { PageHeader, PageShell } from '@/lib/page-kit';
+import { PageHeader, PageShell, PaginationLinks } from '@/lib/page-kit';
 
 type Letter = {
     id: number | string;
@@ -20,6 +21,7 @@ type Letter = {
     letter_date?: string | null;
     creator?: string | null;
     requested_by?: string | null;
+    download_status?: string | null;
     is_shared?: boolean;
     can_edit?: boolean;
     can_download?: boolean;
@@ -41,9 +43,23 @@ type Props = {
     canAuthorizeDownloads: boolean;
     tab: string;
     pendingAuthorizationCount: number;
-    filters: { department_code?: string; year?: string | number; month?: string | number };
+    filters: { department_code?: string; year?: string | number; month?: string | number; search?: string };
     urls: { index: string; create?: string };
 };
+
+function downloadStatusBadge(status?: string | null) {
+    if (status === 'pending') {
+        return <Badge variant="warning">Pending</Badge>;
+    }
+    if (status === 'authorized') {
+        return <Badge variant="success">Authorized</Badge>;
+    }
+    if (status === 'rejected') {
+        return <Badge variant="destructive">Rejected</Badge>;
+    }
+
+    return null;
+}
 
 export default function OfficialLettersIndex({
     letters,
@@ -57,6 +73,25 @@ export default function OfficialLettersIndex({
     urls,
 }: Props) {
     const isAuthorizations = tab === 'authorizations';
+    const [search, setSearch] = useState(filters.search ?? '');
+
+    useEffect(() => {
+        setSearch(filters.search ?? '');
+    }, [filters.search]);
+
+    useEffect(() => {
+        const next = search.trim();
+        const current = (filters.search ?? '').trim();
+        if (next === current) {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => {
+            applyFilters({ search: next || undefined });
+        }, 300);
+
+        return () => window.clearTimeout(timeout);
+    }, [search]);
 
     const applyFilters = (patch: Record<string, string | undefined>) => {
         router.get(
@@ -66,9 +101,10 @@ export default function OfficialLettersIndex({
                 department_code: filters.department_code || undefined,
                 year: filters.year || undefined,
                 month: filters.month || undefined,
+                search: (filters.search ?? '').trim() || undefined,
                 ...patch,
             },
-            { preserveState: true },
+            { preserveState: true, replace: true },
         );
     };
 
@@ -118,7 +154,7 @@ export default function OfficialLettersIndex({
                     </CardContent>
                 </Card>
 
-                <div className="space-y-4">
+                <div className="min-w-0 space-y-4">
                     {canAuthorizeDownloads && pendingAuthorizationCount > 0 && !isAuthorizations && (
                         <Card className="shadow-none">
                             <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm">
@@ -138,7 +174,21 @@ export default function OfficialLettersIndex({
                             <CardTitle className="text-base">
                                 {isAuthorizations ? 'Download authorizations' : 'My official letters'}
                             </CardTitle>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
+                                <div className="relative min-w-[14rem] flex-1 sm:max-w-xs">
+                                    <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                                    <Input
+                                        className="pl-9"
+                                        value={search}
+                                        onChange={(event) => setSearch(event.target.value)}
+                                        placeholder={
+                                            isAuthorizations
+                                                ? 'Search reference, subject, requester…'
+                                                : 'Search reference, name, subject…'
+                                        }
+                                        aria-label="Search letters"
+                                    />
+                                </div>
                                 <select
                                     className="border-input bg-background h-9 rounded-md border px-2 text-sm"
                                     value={filters.department_code ?? ''}
@@ -184,12 +234,13 @@ export default function OfficialLettersIndex({
                                 letters.data.map((letter) => (
                                     <div
                                         key={letter.id}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+                                        className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
                                     >
-                                        <div className="min-w-0 space-y-1">
+                                        <div className="min-w-0 flex-1 space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <code className="text-xs">{letter.reference_number}</code>
                                                 {letter.is_shared && <Badge variant="secondary">Shared</Badge>}
+                                                {isAuthorizations && downloadStatusBadge(letter.download_status)}
                                             </div>
                                             <div className="font-medium">{letter.name || letter.subject || 'Official letter'}</div>
                                             <div className="text-muted-foreground text-xs">
@@ -200,83 +251,86 @@ export default function OfficialLettersIndex({
                                                     : ''}
                                             </div>
                                         </div>
-                                        <RowActions
-                                            items={[
-                                                { label: 'Open', href: letter.show_url, icon: <EyeIcon /> },
-                                                {
-                                                    label: 'Edit',
-                                                    href: letter.edit_url,
-                                                    icon: <PencilIcon />,
-                                                    hidden: !(letter.can_edit && letter.edit_url),
-                                                },
-                                                {
-                                                    label: 'Authorize',
-                                                    icon: <ShieldCheckIcon />,
-                                                    hidden: !(
-                                                        isAuthorizations &&
-                                                        letter.can_authorize_download &&
-                                                        letter.authorize_download_url
-                                                    ),
-                                                    onClick: () =>
-                                                        router.post(
-                                                            letter.authorize_download_url!,
-                                                            {},
-                                                            {
-                                                                onSuccess: () =>
-                                                                    notify('success', 'Download authorized.'),
-                                                            },
+                                        <div className="shrink-0 self-center">
+                                            <RowActions
+                                                items={[
+                                                    { label: 'Open', href: letter.show_url, icon: <EyeIcon /> },
+                                                    {
+                                                        label: 'Edit',
+                                                        href: letter.edit_url,
+                                                        icon: <PencilIcon />,
+                                                        hidden: !(letter.can_edit && letter.edit_url),
+                                                    },
+                                                    {
+                                                        label: 'Authorize',
+                                                        icon: <ShieldCheckIcon />,
+                                                        hidden: !(
+                                                            isAuthorizations &&
+                                                            letter.can_authorize_download &&
+                                                            letter.authorize_download_url
                                                         ),
-                                                },
-                                                {
-                                                    label: 'Reject',
-                                                    icon: <ShieldXIcon />,
-                                                    destructive: true,
-                                                    hidden: !(
-                                                        isAuthorizations &&
-                                                        letter.can_authorize_download &&
-                                                        letter.reject_download_url
-                                                    ),
-                                                    onClick: () =>
-                                                        router.post(
-                                                            letter.reject_download_url!,
-                                                            {},
-                                                            {
-                                                                onSuccess: () =>
-                                                                    notify('success', 'Request rejected.'),
-                                                            },
+                                                        onClick: () =>
+                                                            router.post(
+                                                                letter.authorize_download_url!,
+                                                                {},
+                                                                {
+                                                                    onSuccess: () =>
+                                                                        notify('success', 'Download authorized.'),
+                                                                },
+                                                            ),
+                                                    },
+                                                    {
+                                                        label: 'Reject',
+                                                        icon: <ShieldXIcon />,
+                                                        destructive: true,
+                                                        hidden: !(
+                                                            isAuthorizations &&
+                                                            letter.can_authorize_download &&
+                                                            letter.reject_download_url
                                                         ),
-                                                },
-                                                {
-                                                    label: 'Request download',
-                                                    hidden: !(
-                                                        !isAuthorizations &&
-                                                        letter.can_request_download &&
-                                                        letter.request_download_url
-                                                    ),
-                                                    onClick: () =>
-                                                        router.post(
-                                                            letter.request_download_url!,
-                                                            {},
-                                                            {
-                                                                onSuccess: () =>
-                                                                    notify(
-                                                                        'success',
-                                                                        'Download authorization requested.',
-                                                                    ),
-                                                            },
+                                                        onClick: () =>
+                                                            router.post(
+                                                                letter.reject_download_url!,
+                                                                {},
+                                                                {
+                                                                    onSuccess: () =>
+                                                                        notify('success', 'Request rejected.'),
+                                                                },
+                                                            ),
+                                                    },
+                                                    {
+                                                        label: 'Request download',
+                                                        hidden: !(
+                                                            !isAuthorizations &&
+                                                            letter.can_request_download &&
+                                                            letter.request_download_url
                                                         ),
-                                                },
-                                                {
-                                                    label: 'Download PDF',
-                                                    href: letter.download_url,
-                                                    icon: <DownloadIcon />,
-                                                    hidden: !(letter.can_download && letter.download_url),
-                                                },
-                                            ]}
-                                        />
+                                                        onClick: () =>
+                                                            router.post(
+                                                                letter.request_download_url!,
+                                                                {},
+                                                                {
+                                                                    onSuccess: () =>
+                                                                        notify(
+                                                                            'success',
+                                                                            'Download authorization requested.',
+                                                                        ),
+                                                                },
+                                                            ),
+                                                    },
+                                                    {
+                                                        label: 'Download PDF',
+                                                        href: letter.download_url,
+                                                        icon: <DownloadIcon />,
+                                                        hidden: !(letter.can_download && letter.download_url),
+                                                    },
+                                                ]}
+                                            />
+                                        </div>
                                     </div>
                                 ))
                             )}
+                            <PaginationLinks className="mt-4" links={letters.links ?? []} />
                         </CardContent>
                     </Card>
                 </div>

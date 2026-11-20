@@ -65,6 +65,25 @@ class OfficialLetterController extends Controller
             $query->whereMonth('letter_date', $request->integer('month'));
         }
 
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $query->where(function ($builder) use ($search, $tab) {
+                $builder->where('reference_number', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('subject', 'like', "%{$search}%")
+                    ->orWhere('recipient', 'like', "%{$search}%")
+                    ->orWhereHas('creator', function ($creator) use ($search) {
+                        $creator->where('name', 'like', "%{$search}%");
+                    });
+
+                if ($tab === 'authorizations') {
+                    $builder->orWhereHas('latestDownloadRequest.requester', function ($requester) use ($search) {
+                        $requester->where('name', 'like', "%{$search}%");
+                    });
+                }
+            });
+        }
+
         $letters = $query->paginate(15)->withQueryString();
         $departments = config('official-letters.departments', []);
         $yearsQuery = OfficialLetter::query();
@@ -93,6 +112,7 @@ class OfficialLetterController extends Controller
             'letter_date' => optional($letter->letter_date)->toDateString(),
             'creator' => $letter->creator?->name,
             'requested_by' => $letter->latestDownloadRequest?->requester?->name,
+            'download_status' => $letter->latestDownloadRequest?->status,
             'is_shared' => ! $letter->isOwnedBy($user) && $letter->isSharedWith($user),
             'can_edit' => $user->can('update', $letter),
             'can_download' => $user->can('download', $letter),
@@ -114,7 +134,7 @@ class OfficialLetterController extends Controller
             'canAuthorizeDownloads' => $canAuthorizeDownloads,
             'tab' => $tab,
             'pendingAuthorizationCount' => $pendingAuthorizationCount,
-            'filters' => $request->only(['department_code', 'year', 'month']),
+            'filters' => $request->only(['department_code', 'year', 'month', 'search']),
             'urls' => [
                 'index' => route('official-letters.index'),
                 'create' => route('official-letters.create'),
