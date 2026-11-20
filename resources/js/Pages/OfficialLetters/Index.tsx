@@ -170,11 +170,11 @@ export default function OfficialLettersIndex({
                     )}
 
                     <Card className="shadow-none">
-                        <CardHeader className="flex flex-col gap-3 border-b bg-muted/20 lg:flex-row lg:items-center lg:justify-between">
+                        <CardHeader className="flex flex-col gap-3 border-b bg-muted/20">
                             <CardTitle className="text-base">
                                 {isAuthorizations ? 'Download authorizations' : 'My official letters'}
                             </CardTitle>
-                            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
+                            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                                 <div className="relative min-w-[14rem] flex-1 sm:max-w-xs">
                                     <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                                     <Input
