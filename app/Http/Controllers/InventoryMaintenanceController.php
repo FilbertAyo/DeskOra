@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-
 use App\Models\InventoryAsset;
 use App\Models\InventoryMaintenanceRecord;
 use App\Services\Inventory\InventoryNumberGenerator;
@@ -12,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class InventoryMaintenanceController extends Controller
 {

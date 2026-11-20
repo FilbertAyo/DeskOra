@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-
 use App\Models\InventoryLocation;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class InventoryLocationController extends Controller
 {

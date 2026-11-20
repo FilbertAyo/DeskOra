@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-
 use App\Models\InventoryAsset;
 use App\Models\InventoryBorrowRequest;
 use App\Models\InventoryStockItem;
@@ -14,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class InventoryBorrowRequestController extends Controller
 {

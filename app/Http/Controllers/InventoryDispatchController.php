@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-
 use App\Models\InventoryAsset;
 use App\Models\InventoryCategory;
 use App\Models\InventoryDispatch;
@@ -19,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class InventoryDispatchController extends Controller
 {

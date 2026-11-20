@@ -466,8 +466,7 @@ class InventoryWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Inventory/Assets/Index')
-                ->where('assets.data', fn ($rows) => collect($rows)->contains(fn ($row) =>
-                    data_get($row, 'name') === 'Projector'
+                ->where('assets.data', fn ($rows) => collect($rows)->contains(fn ($row) => data_get($row, 'name') === 'Projector'
                     && (
                         data_get($row, 'location.name') === 'Board Room'
                         || data_get($row, 'location.parent.name') === 'Adilisha HQ'
