@@ -275,6 +275,33 @@ class WeeklyReportActionTasksTest extends TestCase
             ->assertSessionHas('success', 'Weekly report submitted successfully.');
     }
 
+    public function test_submitting_an_already_submitted_weekly_report_opens_the_document(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 4, 2, 10, 0, 0));
+
+        $staff = User::factory()->create();
+        $staff->givePermissionTo('create weekly report');
+        $period = $this->createOpenPeriod(2026, 14, '2026-03-30', '2026-04-05');
+
+        $report = Document::create([
+            'user_id' => $staff->id,
+            'period_id' => $period->id,
+            'type' => Document::TYPE_WEEKLY_REPORT,
+            'title' => 'Weekly Report',
+            'state' => Document::STATE_SUBMITTED,
+            'content' => [],
+        ]);
+
+        $this->actingAs($staff)
+            ->put(route('documents.update', $report), [
+                'action' => 'submit',
+                'wizard_review' => '1',
+                'target_accomplished_status' => 'completed',
+            ])
+            ->assertRedirect(route('documents.show', $report))
+            ->assertSessionHas('success', 'Weekly report submitted successfully.');
+    }
+
     /**
      * @return array{0: User, 1: WorkPeriod, 2: Document}
      */

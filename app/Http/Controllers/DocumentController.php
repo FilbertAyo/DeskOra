@@ -2157,6 +2157,22 @@ class DocumentController extends Controller
         ];
     }
 
+    protected function notifyWeeklySubmissionQuietly(Document $document, User $user): void
+    {
+        try {
+            $document->loadMissing('period');
+            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $user);
+            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $user);
+        } catch (\Throwable $e) {
+            logger()->error('WEEKLY_SUBMIT_NOTIFY_FAILED', [
+                'document_id' => (string) $document->id,
+                'user_id' => (string) $user->id,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     protected function periodPayload(?WorkPeriod $period): ?array
     {
         if (! $period) {

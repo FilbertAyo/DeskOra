@@ -157,9 +157,7 @@ trait HandlesDocumentWorkflow
                     : 'Unable to submit your document due to a server error. Please try again.');
         }
         if (! $wasSubmitted) {
-            $document->loadMissing('period');
-            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $actingUser);
-            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $actingUser);
+            $this->notifyWeeklySubmissionQuietly($document, $actingUser);
         }
 
         return redirect()->route('documents.show', $document)

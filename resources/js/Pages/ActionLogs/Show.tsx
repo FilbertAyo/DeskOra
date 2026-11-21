@@ -70,7 +70,6 @@ export default function ActionLogsShow({
     const state = String(document.state ?? '');
     const period = document.period as Period | null | undefined;
     const createdBy = String(document.userName ?? document.creator ?? '—');
-    const updatedAt = String(document.updatedAt ?? document.updated_at ?? '—');
     const downloadUrl = document.downloadUrl ? String(document.downloadUrl) : undefined;
     const editUrl = document.editUrl ? String(document.editUrl) : undefined;
     const periodLabel = period
@@ -121,7 +120,7 @@ export default function ActionLogsShow({
             />
 
             <Card size="sm" className="shadow-none">
-                <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
+                <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
                     <SummaryItem label="State">
                         <Badge variant={statusBadgeVariant(state || '')}>
                             {state === 'draft' ? 'Draft' : state === 'submitted' ? 'Submitted' : state || '—'}
@@ -129,8 +128,6 @@ export default function ActionLogsShow({
                     </SummaryItem>
                     <SummaryItem label="Created by">{createdBy}</SummaryItem>
                     <SummaryItem label="Work period">{periodLabel}</SummaryItem>
-                    <SummaryItem label="Updated">{updatedAt}</SummaryItem>
-                    <SummaryItem label="Tasks">{tasks.length}</SummaryItem>
                     <SummaryItem label="Task progress">
                         <span className="text-emerald-700">{progressCounts.done} done</span>
                         <span className="text-muted-foreground"> · </span>

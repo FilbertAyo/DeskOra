@@ -56,3 +56,23 @@ router.on('httpException', (event) => {
         window.location.reload();
     }
 });
+
+// A weekly-report submit that the server already saved can still come back as
+// the old Blade error page. Leave that page and open the report instead of
+// showing the error inside a popup.
+router.on('invalid', (event) => {
+    const status = event.detail.response?.status ?? 0;
+    const responseUrl = event.detail.response?.url ?? '';
+    const here = window.location.pathname;
+    const onReview =
+        /\/documents\/[^/]+\/weekly-report\/(?:review|action-tasks)(?:\/|$)/.test(responseUrl) ||
+        /\/documents\/[^/]+\/weekly-report\/(?:review|action-tasks)(?:\/|$)/.test(here);
+
+    if (!onReview || ![403, 404, 500, 503].includes(status)) {
+        return;
+    }
+
+    event.preventDefault();
+    const reportUrl = here.replace(/\/weekly-report\/(?:review|action-tasks)\/?$/, '');
+    window.location.assign(reportUrl === here ? here : reportUrl);
+});

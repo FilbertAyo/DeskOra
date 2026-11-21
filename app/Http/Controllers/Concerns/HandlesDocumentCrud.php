@@ -837,9 +837,7 @@ trait HandlesDocumentCrud
                 });
 
                 if ($action === 'submit') {
-                    $existingDocument->loadMissing('period');
-                    $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($existingDocument, $user);
-                    $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($existingDocument, $user);
+                    $this->notifyWeeklySubmissionQuietly($existingDocument, $user);
                 }
             } catch (ValidationException $e) {
                 throw $e;
@@ -940,9 +938,7 @@ trait HandlesDocumentCrud
         }
 
         if ($action === 'submit') {
-            $document->loadMissing('period');
-            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $user);
-            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $user);
+            $this->notifyWeeklySubmissionQuietly($document, $user);
         }
 
         $message = ($action === 'submit')
@@ -1158,6 +1154,11 @@ trait HandlesDocumentCrud
         /** @var \App\Models\User $actingUser */
         $actingUser = Auth::user();
         $wasSubmitted = $document->isSubmitted();
+
+        if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->isSubmitted()) {
+            return redirect()->route('documents.show', $document)
+                ->with('success', 'Weekly report submitted successfully.');
+        }
 
         // Authorize update action
         $this->authorize('update', $document);
@@ -1477,9 +1478,7 @@ trait HandlesDocumentCrud
         }
 
         if ($action === 'submit' && ! $wasSubmitted) {
-            $document->loadMissing('period');
-            $this->workflowEmailNotificationService->notifyWeeklyDocumentSubmitted($document, $actingUser);
-            $this->workflowEmailNotificationService->notifyWeeklyBudgetSubmitted($document, $actingUser);
+            $this->notifyWeeklySubmissionQuietly($document, $actingUser);
         }
 
         $message = ($action === 'submit')
