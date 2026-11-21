@@ -322,23 +322,23 @@ export default function DocumentsShow({
                 actions={
                     <div className="flex items-center gap-2">
                         <BackButton href={indexUrl} />
-                        <RowActions
-                            items={[
-                                {
-                                    label: 'Edit',
-                                    href: document.editUrl,
-                                    icon: <PencilIcon />,
-                                    hidden: !(document.canEdit && document.editUrl),
-                                },
-                                {
-                                    label: 'Reject',
-                                    icon: <XCircleIcon />,
-                                    destructive: true,
-                                    hidden: !document.rejectUrl,
-                                    onClick: () => setRejectOpen(true),
-                                },
-                            ]}
-                        />
+                        {document.rejectUrl ? (
+                            <Button type="button" variant="destructive" size="sm" onClick={() => setRejectOpen(true)}>
+                                <XCircleIcon className="size-4" />
+                                Reject
+                            </Button>
+                        ) : null}
+                        {document.canEdit && document.editUrl ? (
+                            <RowActions
+                                items={[
+                                    {
+                                        label: 'Edit',
+                                        href: document.editUrl,
+                                        icon: <PencilIcon />,
+                                    },
+                                ]}
+                            />
+                        ) : null}
                     </div>
                 }
             />
