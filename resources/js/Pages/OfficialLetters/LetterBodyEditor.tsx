@@ -1,5 +1,5 @@
 import { BoldIcon, ItalicIcon, ListIcon, ListOrderedIcon, Redo2Icon, RemoveFormattingIcon, UnderlineIcon, Undo2Icon } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,12 +25,12 @@ export default function LetterBodyEditor({
     invalid?: boolean;
 }) {
     const editorRef = useRef<HTMLDivElement>(null);
-    // Painted on first render. React leaves the DOM alone while this string stays stable,
-    // so typing is not reset and the saved body is visible immediately on edit.
-    const initialHtml = useRef(value);
-    const lastHtml = useRef(value);
+    // null until the saved body is written once. React must not own this HTML:
+    // dangerouslySetInnerHTML is a new object every render, and React then
+    // assigns innerHTML back to the original value, which erases each keystroke.
+    const lastHtml = useRef<string | null>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const editor = editorRef.current;
         if (!editor || value === lastHtml.current) {
             return;
@@ -42,6 +42,10 @@ export default function LetterBodyEditor({
 
     const emit = () => {
         const html = editorRef.current?.innerHTML ?? '';
+        if (html === lastHtml.current) {
+            return;
+        }
+
         lastHtml.current = html;
         onChange(html);
     };
@@ -73,13 +77,11 @@ export default function LetterBodyEditor({
             <div
                 ref={editorRef}
                 contentEditable
-                suppressContentEditableWarning
                 role="textbox"
                 aria-multiline="true"
                 aria-label="Letter body"
                 className="text-foreground min-h-[360px] px-3 py-3 text-[12pt] leading-snug outline-none [&_*]:!text-foreground [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-[0.6em] [&_p]:text-justify [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6"
                 style={{ fontFamily: "Calibri, Carlito, 'Segoe UI', sans-serif", textAlign: 'justify', WebkitTextFillColor: 'currentcolor' }}
-                dangerouslySetInnerHTML={{ __html: initialHtml.current }}
                 onInput={emit}
                 onBlur={emit}
             />
