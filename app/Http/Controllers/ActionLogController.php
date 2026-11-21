@@ -451,11 +451,6 @@ class ActionLogController extends Controller
 
         $tasks = $document->getActionLogTasksForPeriodDisplay();
 
-        $responsibleIds = collect($tasks)
-            ->flatMap(fn ($task) => is_array($task) ? ($task['responsible_user_ids'] ?? []) : [])
-            ->filter()
-            ->unique();
-
         /** @var \App\Models\User $viewer */
         $viewer = request()->user();
         $viewerId = (string) $viewer->id;
@@ -472,10 +467,31 @@ class ActionLogController extends Controller
             ]);
         })->values();
 
+        $nameIds = $tasks->flatMap(function ($task) {
+            $ids = is_array($task) ? ($task['responsible_user_ids'] ?? []) : [];
+            $history = is_array($task['display_history'] ?? null) ? $task['display_history'] : [];
+            foreach ($history as $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                if (! empty($entry['updated_by'])) {
+                    $ids[] = $entry['updated_by'];
+                }
+                foreach (is_array($entry['reassigned_from'] ?? null) ? $entry['reassigned_from'] : [] as $id) {
+                    $ids[] = $id;
+                }
+                if (! empty($entry['reassigned_to'])) {
+                    $ids[] = $entry['reassigned_to'];
+                }
+            }
+
+            return $ids;
+        })->filter()->map(fn ($id) => (string) $id)->unique()->values();
+
         return Inertia::render('ActionLogs/Show', [
             'document' => $this->actionLogPayload($document),
             'tasks' => $tasks,
-            'responsibleNames' => User::query()->whereIn('id', $responsibleIds)->pluck('name', 'id'),
+            'responsibleNames' => User::query()->whereIn('id', $nameIds)->pluck('name', 'id'),
             'canManage' => $viewer->can('manageActionLogs', $document),
             'canDelete' => $document->canBeDeleted(),
             'backUrl' => route('action-logs.index'),
