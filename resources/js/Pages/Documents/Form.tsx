@@ -722,6 +722,7 @@ export default function DocumentsForm({
                                                     type="button"
                                                     size="sm"
                                                     variant="ghost"
+                                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                     disabled={form.data.content.planned_activities.length <= 1}
                                                     onClick={() =>
                                                         form.setData('content', {
@@ -807,6 +808,7 @@ export default function DocumentsForm({
                                                     type="button"
                                                     size="sm"
                                                     variant="ghost"
+                                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                     disabled={form.data.content.key_meetings.length <= 1}
                                                     onClick={() =>
                                                         form.setData('content', {
@@ -872,6 +874,7 @@ export default function DocumentsForm({
                                                     type="button"
                                                     size="sm"
                                                     variant="ghost"
+                                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                     disabled={form.data.content.budget.length <= 1}
                                                     onClick={() =>
                                                         form.setData('content', {
@@ -1011,6 +1014,7 @@ export default function DocumentsForm({
                                                             type="button"
                                                             size="sm"
                                                             variant="ghost"
+                                                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                             onClick={() => removeOffPlanProgress(index)}
                                                         >
                                                             <Trash2Icon className="size-4" /> Remove

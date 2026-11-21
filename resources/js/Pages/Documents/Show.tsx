@@ -154,6 +154,38 @@ function DataTable({ children, className }: { children: ReactNode; className?: s
     );
 }
 
+function assignedByName(row: Record<string, unknown>, users: NamedUser[]): string {
+    const nested = row.source_user ?? row.sourceUser;
+    if (nested && typeof nested === 'object' && 'name' in nested) {
+        const name = String((nested as { name?: unknown }).name ?? '').trim();
+        if (name !== '') {
+            return name;
+        }
+    }
+
+    const direct = String(row.source_user_name ?? '').trim();
+    if (direct !== '') {
+        return direct;
+    }
+
+    const sourceId = String(row.source_user_id ?? '');
+    if (sourceId === '') {
+        return '';
+    }
+
+    return users.find((user) => String(user.id) === sourceId)?.name ?? '';
+}
+
+function WrapCell({ children, pre = false }: { children: ReactNode; pre?: boolean }) {
+    return (
+        <TableCell className="max-w-0 align-top overflow-hidden" style={{ whiteSpace: 'normal' }}>
+            <div className="leading-5" style={{ overflowWrap: 'anywhere', whiteSpace: pre ? 'pre-wrap' : 'normal' }}>
+                {children}
+            </div>
+        </TableCell>
+    );
+}
+
 const WEEKDAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
 function weekdayRank(day: string): number {
@@ -401,20 +433,20 @@ export default function DocumentsShow({
             </Dialog>
 
             {(isPlan || isReport) && (
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid items-start gap-3 lg:grid-cols-2">
                     {showWeeklyRelatedPanel && (
-                        <Card className="shadow-none">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20 py-3">
+                        <Card className="gap-0 py-0 shadow-none">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20 !px-4 !py-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                                     <Link2Icon className="text-muted-foreground size-4" />
                                     {relatedTitle}
                                 </CardTitle>
                                 {relatedDocument ? stateBadge(relatedDocument.state) : <Badge variant="outline">Not created</Badge>}
                             </CardHeader>
-                            <CardContent className="flex items-start justify-between gap-3 pt-4 text-sm">
+                            <CardContent className="flex items-start justify-between gap-3 !px-4 !py-2.5 text-sm">
                                 {relatedDocument ? (
                                     <>
-                                        <div className="min-w-0 space-y-1">
+                                        <div className="min-w-0 space-y-0.5">
                                             <div className="font-semibold">{relatedDocument.title}</div>
                                             <p className="text-muted-foreground text-xs">
                                                 {[relatedDocument.userName, relatedDocument.createdAt].filter(Boolean).join(' · ') ||
@@ -429,7 +461,7 @@ export default function DocumentsShow({
                                         )}
                                     </>
                                 ) : (
-                                    <div className="space-y-3">
+                                    <div className="space-y-2">
                                         <EmptyNote>Not created yet for this period.</EmptyNote>
                                         {createRelated?.route && (
                                             <Button size="sm" render={<Link href={createRelated.route} />}>
@@ -445,12 +477,12 @@ export default function DocumentsShow({
                         </Card>
                     )}
 
-                    <Card className={cn('shadow-none', !showWeeklyRelatedPanel && 'lg:col-span-2')}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20 py-3">
+                    <Card className={cn('gap-0 py-0 shadow-none', !showWeeklyRelatedPanel && 'lg:col-span-2')}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/20 !px-4 !py-2">
                             <CardTitle className="text-sm font-semibold">Document Information & Actions</CardTitle>
                             {stateBadge(document.state)}
                         </CardHeader>
-                        <CardContent className="pt-4 text-sm">
+                        <CardContent className="!px-4 !py-2.5 text-sm">
                             <p className="text-muted-foreground">
                                 Created by: {document.userName ?? '—'}
                                 {periodLine ? ` | ${periodLine}` : ''}
@@ -585,12 +617,16 @@ export default function DocumentsShow({
                                                 {assignedWeeklyActivities.map((row, index) => {
                                                     const payload =
                                                         (row.activity_payload as Record<string, unknown> | undefined) ?? row;
+                                                    const assignedBy = assignedByName(row, teamUsers);
                                                     return (
                                                         <div key={index} className="rounded-md border p-3 text-sm">
                                                             <div className="font-medium">{String(payload.activity ?? 'Activity')}</div>
                                                             <div className="text-muted-foreground text-xs">
                                                                 {[payload.day, payload.location].filter(Boolean).join(' · ')}
                                                             </div>
+                                                            {assignedBy !== '' && (
+                                                                <div className="text-muted-foreground text-xs">Assigned by {assignedBy}</div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
@@ -603,10 +639,13 @@ export default function DocumentsShow({
                                                     <div key={index} className="rounded-md border p-3 text-sm">
                                                         <div className="font-medium">{row.meeting || 'Meeting'}</div>
                                                         <div className="text-muted-foreground text-xs">
-                                                            {[row.date, row.location, row.incoming_source_user_name]
-                                                                .filter(Boolean)
-                                                                .join(' · ')}
+                                                            {[row.date, row.location].filter(Boolean).join(' · ')}
                                                         </div>
+                                                        {row.incoming_source_user_name && (
+                                                            <div className="text-muted-foreground text-xs">
+                                                                Assigned by {row.incoming_source_user_name}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -622,33 +661,32 @@ export default function DocumentsShow({
                                         <EmptyNote>No meetings planned.</EmptyNote>
                                     ) : (
                                         <DataTable>
+                                            <colgroup>
+                                                <col style={{ width: '14%' }} />
+                                                <col style={{ width: '28%' }} />
+                                                <col style={{ width: '16%' }} />
+                                                <col style={{ width: '12%' }} />
+                                                <col style={{ width: '30%' }} />
+                                            </colgroup>
                                             <TableHeader>
                                                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                                                    <TableHead className="w-24">Date</TableHead>
-                                                    <TableHead className="w-[26%]">Meeting</TableHead>
-                                                    <TableHead className="w-[16%]">Participants</TableHead>
-                                                    <TableHead className="w-[12%]">Location</TableHead>
-                                                    <TableHead className="w-[30%]">Notes</TableHead>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Meeting</TableHead>
+                                                    <TableHead>Participants</TableHead>
+                                                    <TableHead>Location</TableHead>
+                                                    <TableHead>Notes</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
                                                 {keyMeetings.map((row, index) => (
                                                     <TableRow key={index}>
-                                                        <TableCell className="align-top whitespace-normal">
-                                                            {row.date || '—'}
-                                                        </TableCell>
-                                                        <TableCell className="align-top whitespace-normal break-words">
-                                                            {row.meeting || '—'}
-                                                        </TableCell>
-                                                        <TableCell className="align-top whitespace-normal break-words">
+                                                        <WrapCell>{row.date || '—'}</WrapCell>
+                                                        <WrapCell>{row.meeting || '—'}</WrapCell>
+                                                        <WrapCell>
                                                             {row.participants || namesForIds(row.participant_user_ids, teamUsers)}
-                                                        </TableCell>
-                                                        <TableCell className="align-top whitespace-normal break-words">
-                                                            {row.location || '—'}
-                                                        </TableCell>
-                                                        <TableCell className="align-top whitespace-pre-wrap break-words">
-                                                            {row.reactions_notes || ''}
-                                                        </TableCell>
+                                                        </WrapCell>
+                                                        <WrapCell>{row.location || '—'}</WrapCell>
+                                                        <WrapCell pre>{row.reactions_notes || ''}</WrapCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
@@ -785,6 +823,14 @@ export default function DocumentsShow({
                                         <EmptyNote>No meetings recorded.</EmptyNote>
                                     ) : (
                                         <DataTable>
+                                            <colgroup>
+                                                <col style={{ width: '12%' }} />
+                                                <col style={{ width: '24%' }} />
+                                                <col style={{ width: '16%' }} />
+                                                <col style={{ width: '12%' }} />
+                                                <col style={{ width: '12%' }} />
+                                                <col style={{ width: '24%' }} />
+                                            </colgroup>
                                             <TableHeader>
                                                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                                                     <TableHead>Date</TableHead>
@@ -798,23 +844,21 @@ export default function DocumentsShow({
                                             <TableBody>
                                                 {meetings.map((row, index) => (
                                                     <TableRow key={index}>
-                                                        <TableCell>{row.date || '—'}</TableCell>
-                                                        <TableCell>
+                                                        <WrapCell>{row.date || '—'}</WrapCell>
+                                                        <WrapCell>
                                                             {row.meeting || '—'}
                                                             {row.is_readonly_for_current_user && (
                                                                 <Badge variant="outline" className="ml-2">
                                                                     Assigned
                                                                 </Badge>
                                                             )}
-                                                        </TableCell>
-                                                        <TableCell>
+                                                        </WrapCell>
+                                                        <WrapCell>
                                                             {row.participants || namesForIds(row.participant_user_ids, teamUsers)}
-                                                        </TableCell>
-                                                        <TableCell>{row.status || '—'}</TableCell>
-                                                        <TableCell>{row.location || '—'}</TableCell>
-                                                        <TableCell className="whitespace-pre-wrap">
-                                                            {row.reactions_notes || ''}
-                                                        </TableCell>
+                                                        </WrapCell>
+                                                        <WrapCell>{row.status || '—'}</WrapCell>
+                                                        <WrapCell>{row.location || '—'}</WrapCell>
+                                                        <WrapCell pre>{row.reactions_notes || ''}</WrapCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
