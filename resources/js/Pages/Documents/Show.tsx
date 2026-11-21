@@ -624,23 +624,29 @@ export default function DocumentsShow({
                                         <DataTable>
                                             <TableHeader>
                                                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                                                    <TableHead>Date</TableHead>
-                                                    <TableHead>Meeting</TableHead>
-                                                    <TableHead>Participants</TableHead>
-                                                    <TableHead>Location</TableHead>
-                                                    <TableHead>Notes</TableHead>
+                                                    <TableHead className="w-24">Date</TableHead>
+                                                    <TableHead className="w-[26%]">Meeting</TableHead>
+                                                    <TableHead className="w-[16%]">Participants</TableHead>
+                                                    <TableHead className="w-[12%]">Location</TableHead>
+                                                    <TableHead className="w-[30%]">Notes</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
                                                 {keyMeetings.map((row, index) => (
                                                     <TableRow key={index}>
-                                                        <TableCell>{row.date || '—'}</TableCell>
-                                                        <TableCell>{row.meeting || '—'}</TableCell>
-                                                        <TableCell>
+                                                        <TableCell className="align-top whitespace-normal">
+                                                            {row.date || '—'}
+                                                        </TableCell>
+                                                        <TableCell className="align-top whitespace-normal break-words">
+                                                            {row.meeting || '—'}
+                                                        </TableCell>
+                                                        <TableCell className="align-top whitespace-normal break-words">
                                                             {row.participants || namesForIds(row.participant_user_ids, teamUsers)}
                                                         </TableCell>
-                                                        <TableCell>{row.location || '—'}</TableCell>
-                                                        <TableCell className="whitespace-pre-wrap">
+                                                        <TableCell className="align-top whitespace-normal break-words">
+                                                            {row.location || '—'}
+                                                        </TableCell>
+                                                        <TableCell className="align-top whitespace-pre-wrap break-words">
                                                             {row.reactions_notes || ''}
                                                         </TableCell>
                                                     </TableRow>
