@@ -514,6 +514,18 @@ export default function DocumentsForm({
         form.setData('content', { ...form.data.content, activity_progress: rows });
     };
 
+    const removeOffPlanProgress = (index: number) => {
+        const row = form.data.content.activity_progress[index];
+        if (!row || row.activity_output !== '__off_plan__') {
+            return;
+        }
+
+        form.setData('content', {
+            ...form.data.content,
+            activity_progress: form.data.content.activity_progress.filter((_, i) => i !== index),
+        });
+    };
+
     return (
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
             <PageHeader
@@ -942,56 +954,72 @@ export default function DocumentsForm({
                                     </Button>
                                 </div>
                                 <div className="space-y-4">
-                                    {form.data.content.activity_progress.map((row, index) => (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
-                                            <label className="space-y-1 text-sm md:col-span-2">
-                                                <span className="font-medium">Activity</span>
-                                                {row.activity_output === '__off_plan__' ? (
+                                    {form.data.content.activity_progress.map((row, index) => {
+                                        const isOffPlan = row.activity_output === '__off_plan__';
+
+                                        return (
+                                            <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
+                                                <label className="space-y-1 text-sm md:col-span-2">
+                                                    <span className="font-medium">Activity</span>
+                                                    {isOffPlan ? (
+                                                        <Input
+                                                            value={row.off_plan_activity ?? ''}
+                                                            placeholder="Off-plan activity"
+                                                            onChange={(event) =>
+                                                                updateProgress(index, { off_plan_activity: event.target.value })
+                                                            }
+                                                        />
+                                                    ) : (
+                                                        <Input value={row.activity_output} disabled />
+                                                    )}
+                                                </label>
+                                                <label className="space-y-1 text-sm">
+                                                    <span className="font-medium">Progress</span>
+                                                    <select
+                                                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                                        value={row.progress}
+                                                        onChange={(event) => updateProgress(index, { progress: event.target.value })}
+                                                    >
+                                                        <option value="">-- Select --</option>
+                                                        {PROGRESS.map((option) => (
+                                                            <option key={option} value={option}>
+                                                                {option}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                <label className="space-y-1 text-sm">
+                                                    <span className="font-medium">Next step</span>
                                                     <Input
-                                                        value={row.off_plan_activity ?? ''}
-                                                        placeholder="Off-plan activity"
+                                                        value={row.next_step}
+                                                        onChange={(event) => updateProgress(index, { next_step: event.target.value })}
+                                                    />
+                                                </label>
+                                                <label className="space-y-1 text-sm md:col-span-2">
+                                                    <span className="font-medium">Remarks / Challenges</span>
+                                                    <Textarea
+                                                        rows={3}
+                                                        value={row.remarks_challenges}
                                                         onChange={(event) =>
-                                                            updateProgress(index, { off_plan_activity: event.target.value })
+                                                            updateProgress(index, { remarks_challenges: event.target.value })
                                                         }
                                                     />
-                                                ) : (
-                                                    <Input value={row.activity_output} disabled />
-                                                )}
-                                            </label>
-                                            <label className="space-y-1 text-sm">
-                                                <span className="font-medium">Progress</span>
-                                                <select
-                                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                                                    value={row.progress}
-                                                    onChange={(event) => updateProgress(index, { progress: event.target.value })}
-                                                >
-                                                    <option value="">-- Select --</option>
-                                                    {PROGRESS.map((option) => (
-                                                        <option key={option} value={option}>
-                                                            {option}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                            <label className="space-y-1 text-sm">
-                                                <span className="font-medium">Next step</span>
-                                                <Input
-                                                    value={row.next_step}
-                                                    onChange={(event) => updateProgress(index, { next_step: event.target.value })}
-                                                />
-                                            </label>
-                                            <label className="space-y-1 text-sm md:col-span-2">
-                                                <span className="font-medium">Remarks / Challenges</span>
-                                                <Textarea
-                                                    rows={3}
-                                                    value={row.remarks_challenges}
-                                                    onChange={(event) =>
-                                                        updateProgress(index, { remarks_challenges: event.target.value })
-                                                    }
-                                                />
-                                            </label>
-                                        </div>
-                                    ))}
+                                                </label>
+                                                {isOffPlan ? (
+                                                    <div className="flex justify-end md:col-span-2">
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => removeOffPlanProgress(index)}
+                                                        >
+                                                            <Trash2Icon className="size-4" /> Remove
+                                                        </Button>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </section>
 
