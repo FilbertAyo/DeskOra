@@ -451,22 +451,43 @@ function TaskGroup({
     );
 }
 
+function formatDueDate(value: string | null | undefined): string | null {
+    if (!value) {
+        return null;
+    }
+
+    const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) {
+        return match[1];
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toISOString().slice(0, 10);
+}
+
 function TaskCard({ task, onUpdate }: { task: Task; onUpdate: (task: Task) => void }) {
     const state = taskState(task);
     const badge = updateBadge(state);
+    const dueDate = formatDueDate(task.due_date);
 
     return (
         <div className={cn('rounded-lg border p-3', cardTone(state))}>
-            <div className="flex items-start justify-between gap-3">
-                <p className="font-medium">{task.task}</p>
-                <Badge variant={badge.variant}>{badge.label}</Badge>
-            </div>
+            <p className="text-sm font-medium leading-snug text-pretty">{task.task}</p>
             {task.responsible_names.length > 0 && (
                 <p className="text-muted-foreground mt-1 text-xs">{task.responsible_names.join(', ')}</p>
             )}
             {task.notes_progress && <p className="mt-2 text-sm">{task.notes_progress}</p>}
-            <div className="mt-3 flex items-center justify-between gap-2">
-                {task.due_date ? <p className="text-muted-foreground text-xs">Due {task.due_date}</p> : <span />}
+            <div className="mt-3 flex items-end justify-between gap-3">
+                <div className="min-w-0 space-y-1.5">
+                    {dueDate && <p className="text-muted-foreground text-xs">Due {dueDate}</p>}
+                    <Badge variant={badge.variant} className="h-4 px-1.5 text-[10px] font-medium">
+                        {badge.label}
+                    </Badge>
+                </div>
                 {task.editable && (
                     <Button type="button" size="sm" variant={state === 'needs_update' ? 'default' : 'outline'} onClick={() => onUpdate(task)}>
                         Update
