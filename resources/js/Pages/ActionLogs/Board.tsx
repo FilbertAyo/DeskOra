@@ -148,9 +148,6 @@ export default function ActionLogsBoard({ board, progressOptions, updateOptions,
     const [taskOpen, setTaskOpen] = useState(false);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
     const summary = board.summary ?? { needsUpdate: 0, updatedByYou: 0, notUpdated: 0, assigned: 0 };
-    const mine = board.mine ?? [];
-    const needsMine = mine.filter((task) => taskState(task) === 'needs_update');
-    const updatedMine = mine.filter((task) => taskState(task) === 'updated_by_you');
 
     const taskForm = useForm({
         task_uid: '',
@@ -242,45 +239,18 @@ export default function ActionLogsBoard({ board, progressOptions, updateOptions,
                         <SummaryStat label="Not updated yet" value={summary.notUpdated} hint="Open tasks still waiting this week" tone="muted" />
                     </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Your tasks this week</CardTitle>
-                            <CardDescription>
-                                {summary.assigned > 0
-                                    ? `${weekLabel}. ${summary.needsUpdate === 0 ? 'Every open task assigned to you has an update.' : `${summary.needsUpdate} still need your update.`}`
-                                    : 'You are not assigned on this week’s action log.'}
-                            </CardDescription>
-                        </CardHeader>
-                        {summary.assigned > 0 && (
-                            <CardContent className="grid gap-4 lg:grid-cols-2">
-                                <TaskGroup
-                                    title="Needs your update"
-                                    empty="Nothing left to update."
-                                    tasks={needsMine}
-                                    onUpdate={openTask}
-                                />
-                                <TaskGroup
-                                    title="Already updated by you"
-                                    empty="You have not saved an update this week yet."
-                                    tasks={updatedMine}
-                                    onUpdate={openTask}
-                                />
-                            </CardContent>
-                        )}
-                    </Card>
-
                     <div className="flex flex-wrap gap-2">
                         <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
                             All tasks
                         </FilterChip>
                         <FilterChip active={filter === 'needs_update'} onClick={() => setFilter('needs_update')}>
-                            Needs your update
+                            Needs your update{summary.needsUpdate > 0 ? ` (${summary.needsUpdate})` : ''}
                         </FilterChip>
                         <FilterChip active={filter === 'updated_by_you'} onClick={() => setFilter('updated_by_you')}>
-                            Updated by you
+                            Updated by you{summary.updatedByYou > 0 ? ` (${summary.updatedByYou})` : ''}
                         </FilterChip>
                         <FilterChip active={filter === 'not_updated'} onClick={() => setFilter('not_updated')}>
-                            Not updated yet
+                            Not updated yet{summary.notUpdated > 0 ? ` (${summary.notUpdated})` : ''}
                         </FilterChip>
                     </div>
 
@@ -425,29 +395,6 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
         <Button type="button" size="sm" variant={active ? 'default' : 'outline'} onClick={onClick}>
             {children}
         </Button>
-    );
-}
-
-function TaskGroup({
-    title,
-    empty,
-    tasks,
-    onUpdate,
-}: {
-    title: string;
-    empty: string;
-    tasks: Task[];
-    onUpdate: (task: Task) => void;
-}) {
-    return (
-        <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{title}</h3>
-            {tasks.length === 0 ? (
-                <p className="text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-sm">{empty}</p>
-            ) : (
-                tasks.map((task) => <TaskCard key={`${title}-${task.task_uid}`} task={task} onUpdate={onUpdate} />)
-            )}
-        </section>
     );
 }
 
