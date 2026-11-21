@@ -57,6 +57,35 @@ class ActionLogBoardUpdatesTest extends TestCase
                 ->where('overlays.actionLogReminder', null));
     }
 
+    public function test_not_started_acknowledgement_clears_the_reminder(): void
+    {
+        [$staff, $period, $document] = $this->assignedLog();
+
+        $this->actingAs($staff)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('overlays.actionLogReminder.pending', 1));
+
+        $this->actingAs($staff)
+            ->put(route('action-logs.quick-update', $document), [
+                'task_uid' => 'task-staff-week',
+                'progress' => ActionLogTaskSupport::PROGRESS_NOT_STARTED,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($staff)
+            ->get(route('action-logs.board', ['period_id' => $period->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('board.summary.needsUpdate', 0)
+                ->where('board.mine.0.update_state', ActionLogTaskSupport::STATE_UPDATED_BY_YOU));
+
+        $this->actingAs($staff)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('overlays.actionLogReminder', null));
+    }
+
     public function test_reminder_appears_until_the_staff_member_updates_or_snoozes(): void
     {
         [$staff] = $this->assignedLog();

@@ -9,7 +9,6 @@ use App\Models\WorkPeriod;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Support\ActionLogTaskSupport;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Cache;
 
 class ActionLogProgressService
 {
@@ -271,17 +270,10 @@ class ActionLogProgressService
             return $this->emptyWeekStatus(null);
         }
 
-        $stamp = ActionLog::query()
-            ->where('period_id', $period->id)
-            ->whereNull('superseded_by_action_log_id')
-            ->orderByDesc('id')
-            ->first(['id', 'updated_at']);
-
-        $key = 'action-log-week-status:'.$user->id.':'.$period->id.':'
-            .($stamp->id ?? '0').':'
-            .($stamp?->updated_at?->getTimestamp() ?? 0);
-
-        return Cache::remember($key, now()->addMinutes(5), fn () => $this->buildWeekStatus($user, $period));
+        // Read the current log directly. A cached snapshot stays stale when staff
+        // save "Not Started", because that save changes task history without
+        // changing the action log row timestamp.
+        return $this->buildWeekStatus($user, $period);
     }
 
     /**
