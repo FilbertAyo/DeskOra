@@ -133,12 +133,7 @@ export default function Login() {
                                 checked={form.data.remember}
                                 onCheckedChange={(checked) => form.setData('remember', checked === true)}
                             />
-                            <span className="flex flex-col gap-0.5">
-                                <span>Remember me</span>
-                                <span className="text-muted-foreground text-xs font-normal">
-                                    Stay signed in for 4 days without email verification
-                                </span>
-                            </span>
+                            <span>Remember me</span>
                         </label>
                         <Link href={route('password.request')} className="text-sm hover:underline">
                             Forgot Password?
