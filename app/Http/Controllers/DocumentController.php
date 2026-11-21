@@ -23,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -2146,6 +2147,9 @@ class DocumentController extends Controller
             'updatedAt' => $document->updated_at?->format('M d, Y'),
             'updatedAgo' => $document->updated_at?->diffForHumans(),
             'canEdit' => $document->canBeEdited(),
+            'rejectUrl' => Gate::allows('reject', $document)
+                ? route('documents.reject', $document)
+                : null,
             'showUrl' => route('documents.show', $document),
             'editUrl' => route('documents.edit', $document),
             'fileName' => $document->original_filename,

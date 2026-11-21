@@ -1,9 +1,10 @@
 import { Link, useForm } from '@inertiajs/react';
-import { PlusIcon, Target, Trash2Icon, UsersIcon } from 'lucide-react';
+import { AlertTriangleIcon, PlusIcon, Target, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import BackButton from '@/components/shared/BackButton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -63,6 +64,7 @@ type DocumentPayload = {
     type?: string;
     title?: string;
     mainTarget?: string | null;
+    reviewRejectionReason?: string | null;
     content?: Record<string, unknown>;
     periodId?: string | null;
     sharedUsers?: StaffUser[];
@@ -289,6 +291,7 @@ export default function DocumentsForm({
     const type = String(document?.type ?? selectedType ?? '');
     const isPlan = type === 'weekly_plan';
     const isReport = type === 'weekly_report';
+    const rejectionReason = (document?.reviewRejectionReason ?? '').trim();
     const content = (document?.content ?? {}) as Record<string, unknown>;
 
     const initialActivities: ActivityRow[] = useMemo(() => {
@@ -526,6 +529,16 @@ export default function DocumentsForm({
                     <BackButton href={indexUrl} />
                 }
             />
+
+            {rejectionReason !== '' && (
+                <Alert className="border-amber-500/40 bg-amber-500/10">
+                    <AlertTriangleIcon />
+                    <AlertTitle>Returned for revision</AlertTitle>
+                    <AlertDescription className="whitespace-pre-wrap text-foreground">
+                        {rejectionReason} Update this {isReport ? 'weekly report' : 'weekly plan'} and submit it again.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <Card>
                 <CardHeader className="border-b">

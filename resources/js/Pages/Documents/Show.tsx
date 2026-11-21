@@ -1,4 +1,4 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     AlertTriangleIcon,
     CalendarDaysIcon,
@@ -11,16 +11,28 @@ import {
     TrophyIcon,
     UsersIcon,
     WalletIcon,
+    XCircleIcon,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import BackButton from '@/components/shared/BackButton';
 import DownloadButton from '@/components/shared/DownloadButton';
 import RowActions from '@/components/shared/RowActions';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { PageHeader, PageShell } from '@/lib/page-kit';
@@ -43,11 +55,12 @@ type Doc = {
     content?: Record<string, unknown>;
     createdAt?: string | null;
     canEdit?: boolean;
+    reviewRejectionReason?: string | null;
     showUrl?: string;
     editUrl?: string;
     fileName?: string | null;
     downloadUrl?: string | null;
-    returnToDraftUrl?: string;
+    rejectUrl?: string | null;
 };
 
 const MONTH_NAMES = [
@@ -193,7 +206,6 @@ export default function DocumentsShow({
     relatedDocument,
     relatedAction,
     showWeeklyRelatedPanel,
-    reviewerPresentation,
     teamUsers = [],
     reportMeetingRows = [],
     incomingMeetings = [],
@@ -214,10 +226,15 @@ export default function DocumentsShow({
     indexUrl?: string;
     [key: string]: unknown;
 }) {
+    const rejectForm = useForm({ reason: '' });
+    const [rejectOpen, setRejectOpen] = useState(false);
     const title = document.title ?? 'Document';
     const typeLabel = document.typeName ?? document.type ?? '';
+    const rejectionReason = (document.reviewRejectionReason ?? '').trim();
+    const showRejectionReason = document.state === 'draft' && rejectionReason !== '';
     const isPlan = document.type === 'weekly_plan';
     const isReport = document.type === 'weekly_report';
+    const documentKind = isReport ? 'weekly report' : 'weekly plan';
     const isMonthly = document.type === 'monthly_report';
     const content = document.content ?? {};
     const createRelated =
@@ -284,6 +301,19 @@ export default function DocumentsShow({
             String(row.amount ?? '').trim() !== '',
     );
 
+    const submitReject = () => {
+        if (!document.rejectUrl) {
+            return;
+        }
+        rejectForm.post(document.rejectUrl, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setRejectOpen(false);
+                rejectForm.reset('reason');
+            },
+        });
+    };
+
     return (
         <PageShell>
             <PageHeader
@@ -301,15 +331,74 @@ export default function DocumentsShow({
                                     hidden: !(document.canEdit && document.editUrl),
                                 },
                                 {
-                                    label: 'Return to Draft',
-                                    hidden: !(reviewerPresentation && document.returnToDraftUrl),
-                                    onClick: () => router.post(document.returnToDraftUrl!),
+                                    label: 'Reject',
+                                    icon: <XCircleIcon />,
+                                    destructive: true,
+                                    hidden: !document.rejectUrl,
+                                    onClick: () => setRejectOpen(true),
                                 },
                             ]}
                         />
                     </div>
                 }
             />
+
+            {showRejectionReason && (
+                <Alert className="border-amber-500/40 bg-amber-500/10">
+                    <AlertTriangleIcon />
+                    <AlertTitle>Returned for revision</AlertTitle>
+                    <AlertDescription className="whitespace-pre-wrap text-foreground">{rejectionReason}</AlertDescription>
+                </Alert>
+            )}
+
+            <Dialog
+                open={rejectOpen}
+                onOpenChange={(open) => {
+                    setRejectOpen(open);
+                    if (!open) {
+                        rejectForm.reset('reason');
+                        rejectForm.clearErrors();
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reject {documentKind}</DialogTitle>
+                        <DialogDescription>
+                            This {documentKind} goes back to draft so staff can edit it and submit again.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <Field>
+                            <FieldLabel htmlFor="reject-reason">Reason</FieldLabel>
+                            <Textarea
+                                id="reject-reason"
+                                rows={4}
+                                value={rejectForm.data.reason}
+                                onChange={(event) => rejectForm.setData('reason', event.target.value)}
+                                placeholder="Explain what needs to change"
+                                required
+                                minLength={3}
+                            />
+                            <FieldError>{rejectForm.errors.reason}</FieldError>
+                        </Field>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setRejectOpen(false)} disabled={rejectForm.processing}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={submitReject}
+                            disabled={rejectForm.processing || rejectForm.data.reason.trim().length < 3}
+                            loading={rejectForm.processing}
+                        >
+                            Reject
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {(isPlan || isReport) && (
                 <div className="grid gap-4 lg:grid-cols-2">
