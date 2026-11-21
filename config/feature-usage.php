@@ -32,6 +32,7 @@ return [
         'analytics.events.store',
         'approval-gate.snapshot',
         'approval-gate.remind-later',
+        'action-logs.remind-later',
         'feature-usage.index',
         'login',
         'logout',

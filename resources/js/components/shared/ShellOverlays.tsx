@@ -4,6 +4,7 @@ import AppLink from '@/components/shared/AppLink';
 import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -28,6 +29,7 @@ type Colleague = {
 };
 
 const APPROVAL_GATE_SNOOZE_PREFIX = 'deskora.approval_gate.snoozed.';
+const ACTION_LOG_SNOOZE_PREFIX = 'deskora.action_log.snoozed.';
 
 function csrfToken(): string {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
@@ -64,6 +66,52 @@ function isApprovalGateLocallySnoozed(userId: string | number | null | undefined
         return window.sessionStorage.getItem(key) === '1';
     } catch {
         return false;
+    }
+}
+
+function actionLogSnoozeKey(
+    userId: string | number | null | undefined,
+    week: number | string | null | undefined,
+    year: number | string | null | undefined,
+): string | null {
+    if (userId === null || userId === undefined || String(userId) === '' || week == null || year == null) {
+        return null;
+    }
+
+    return `${ACTION_LOG_SNOOZE_PREFIX}${String(userId)}.${String(week)}.${String(year)}`;
+}
+
+function isActionLogLocallySnoozed(
+    userId: string | number | null | undefined,
+    week: number | string | null | undefined,
+    year: number | string | null | undefined,
+): boolean {
+    const key = actionLogSnoozeKey(userId, week, year);
+    if (!key) {
+        return false;
+    }
+
+    try {
+        return window.sessionStorage.getItem(key) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function markActionLogLocallySnoozed(
+    userId: string | number | null | undefined,
+    week: number | string | null | undefined,
+    year: number | string | null | undefined,
+): void {
+    const key = actionLogSnoozeKey(userId, week, year);
+    if (!key) {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(key, '1');
+    } catch {
+        // Ignore private-mode / storage quota failures; server snooze still applies.
     }
 }
 
@@ -112,13 +160,25 @@ export default function ShellOverlays() {
     const [results, setResults] = useState<Colleague[]>([]);
     const [selected, setSelected] = useState<Colleague | null>(null);
     const [reason, setReason] = useState('');
-    const [pendingAction, setPendingAction] = useState<'snooze' | 'skip' | 'later' | 'nominate' | null>(null);
+    const reminder = overlays.actionLogReminder;
+    const reminderLocallySnoozed = isActionLogLocallySnoozed(userId, reminder?.week, reminder?.year);
+    const [reminderOpen, setReminderOpen] = useState(
+        reminder !== null && !reminderLocallySnoozed && overlays.approvalGate === null && overlays.nomination === null && !gateLocallySnoozed,
+    );
+    const [pendingAction, setPendingAction] = useState<'snooze' | 'skip' | 'later' | 'nominate' | 'log' | null>(null);
 
     useEffect(() => {
         const snoozed = isApprovalGateLocallySnoozed(userId);
+        const reminderSnoozed = isActionLogLocallySnoozed(userId, overlays.actionLogReminder?.week, overlays.actionLogReminder?.year);
         setGateOpen(overlays.approvalGate !== null && !snoozed);
         setNominationOpen(overlays.approvalGate === null && !snoozed && overlays.nomination !== null);
-    }, [overlays.approvalGate, overlays.nomination, userId]);
+        setReminderOpen(
+            overlays.actionLogReminder !== null &&
+                !reminderSnoozed &&
+                (overlays.approvalGate === null || snoozed) &&
+                overlays.nomination === null,
+        );
+    }, [overlays.approvalGate, overlays.nomination, overlays.actionLogReminder, userId]);
 
     useEffect(() => {
         if (!nominationOpen || query.trim() === '') {
@@ -177,6 +237,15 @@ export default function ShellOverlays() {
             }
 
             notify('error', result.body.message || 'Could not nominate');
+        });
+    };
+
+    const snoozeActionLog = () => {
+        markActionLogLocallySnoozed(userId, reminder?.week, reminder?.year);
+        setReminderOpen(false);
+        setPendingAction('log');
+        void postJson(route('action-logs.remind-later')).finally(() => {
+            setPendingAction(null);
         });
     };
 
@@ -340,6 +409,46 @@ export default function ShellOverlays() {
                                 Nominate a Colleague
                             </Button>
                         </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={reminderOpen} onOpenChange={(open) => open && setReminderOpen(true)} disablePointerDismissal>
+                <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+                    <DialogHeader>
+                        <DialogTitle>Update your action log</DialogTitle>
+                        <DialogDescription>
+                            You are on week {reminder?.week} of {reminder?.year}
+                            {reminder?.dateRange ? ` (${reminder.dateRange})` : ''} and {reminder?.pending ?? 0}{' '}
+                            {(reminder?.pending ?? 0) === 1 ? 'task still needs' : 'tasks still need'} your update.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {reminder && reminder.tasks.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                            {reminder.tasks.map((task, index) => (
+                                <div key={`${task.task}-${index}`} className="flex items-start justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                                    <span>
+                                        <span className="block text-sm font-medium">{task.task}</span>
+                                        <span className="text-muted-foreground text-xs">{task.progress}</span>
+                                    </span>
+                                    <Badge variant="warning">Needs update</Badge>
+                                </div>
+                            ))}
+                            {reminder.pending > reminder.tasks.length && (
+                                <p className="text-muted-foreground text-sm">
+                                    And {reminder.pending - reminder.tasks.length} more on the board.
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button type="button" variant="outline" disabled={pendingAction !== null} onClick={snoozeActionLog}>
+                            {pendingAction === 'log' ? <Loader2Icon className="animate-spin" /> : null}
+                            Remind me later
+                        </Button>
+                        {reminder?.boardUrl && (
+                            <Button render={<AppLink href={reminder.boardUrl} />}>Update on the board</Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -42,17 +42,7 @@ class WeeklyScorecardService
         $plan = Document::findWeeklyPlanForUserAndPeriod((string) $period->id, (string) $user->id);
         $report = Document::findWeeklyReportForUserAndPeriod((string) $period->id, (string) $user->id);
 
-        $actionProgress = $this->actionLogProgressService->buildForUser($user);
-        $openActions = collect($actionProgress['activeTasks'] ?? [])
-            ->filter(function ($task) {
-                if (! is_array($task)) {
-                    return false;
-                }
-                $progress = strtolower(trim((string) ($task['latest_progress'] ?? 'Not Started')));
-
-                return ! in_array($progress, ['done', 'cancelled'], true);
-            })
-            ->count();
+        $openActions = (int) $this->actionLogProgressService->weekStatusFor($user, $period)['open_count'];
 
         $workLogDays = WeeklyWorkLog::query()
             ->where('user_id', $user->id)

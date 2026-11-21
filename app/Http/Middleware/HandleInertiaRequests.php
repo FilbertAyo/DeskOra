@@ -6,6 +6,7 @@ use App\Http\Controllers\StaffAppreciationNominationController;
 use App\Models\AnonymousFeedback;
 use App\Models\User;
 use App\Models\WorkPeriod;
+use App\Services\ActionLogProgressService;
 use App\Services\PendingApprovalGate;
 use App\Services\StaffAppreciationService;
 use App\Services\SystemSettingService;
@@ -70,19 +71,21 @@ class HandleInertiaRequests extends Middleware
                 'demo' => false,
                 'approvalGate' => null,
                 'nomination' => null,
+                'actionLogReminder' => null,
                 'anonymousFeedback' => null,
             ],
         ];
     }
 
     /**
-     * @return array{demo: bool, approvalGate: array<string, mixed>|null, nomination: array{periodId: string, label: string}|null, anonymousFeedback: array{count: int, hideOnCurrentPage: bool}|null}
+     * @return array{demo: bool, approvalGate: array<string, mixed>|null, nomination: array{periodId: string, label: string}|null, actionLogReminder: array<string, mixed>|null, anonymousFeedback: array{count: int, hideOnCurrentPage: bool}|null}
      */
     private function overlays(Request $request, User $user): array
     {
         $demo = $user->isDemoViewer();
         $approvalGate = null;
         $nomination = null;
+        $actionLogReminder = null;
         $anonymousFeedback = null;
 
         if (($user->status ?? '') === 'active' && ! $demo && $request->hasSession()) {
@@ -99,17 +102,28 @@ class HandleInertiaRequests extends Middleware
 
             if ($approvalGate === null && SchemaTables::has('nomination_periods')) {
                 $service = app(StaffAppreciationService::class);
-                $period = $service->currentOpenPeriod();
+                $nominationPeriod = $service->currentOpenPeriod();
 
-                if ($period && ! $service->hasResponded($period, $user)) {
-                    $snoozed = $request->session()->get(StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
+                if ($nominationPeriod && ! $service->hasResponded($nominationPeriod, $user)) {
+                    $snoozedNomination = $request->session()->get(StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
 
-                    if ($snoozed !== $period->id) {
+                    if ($snoozedNomination !== $nominationPeriod->id) {
                         $nomination = [
-                            'periodId' => (string) $period->id,
-                            'label' => $period->label(),
+                            'periodId' => (string) $nominationPeriod->id,
+                            'label' => $nominationPeriod->label(),
                         ];
                     }
+                }
+            }
+
+            if ($approvalGate === null && $nomination === null && ! $request->routeIs('action-logs.board')) {
+                $workPeriod = Cache::remember('current-work-period-nav', now()->addSeconds(60), function () {
+                    return WorkPeriod::getCurrent();
+                });
+                $snoozedUpdate = (string) $request->session()->get(ActionLogProgressService::UPDATE_SNOOZE_SESSION_KEY, '');
+
+                if ($workPeriod && $snoozedUpdate !== (string) $workPeriod->id) {
+                    $actionLogReminder = app(ActionLogProgressService::class)->reminderPayload($user);
                 }
             }
         }
@@ -137,6 +151,7 @@ class HandleInertiaRequests extends Middleware
             'demo' => $demo,
             'approvalGate' => $approvalGate,
             'nomination' => $nomination,
+            'actionLogReminder' => $actionLogReminder,
             'anonymousFeedback' => $anonymousFeedback,
         ];
     }

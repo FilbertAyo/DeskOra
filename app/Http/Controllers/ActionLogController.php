@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\WorkPeriod;
 use App\Services\ActionLogCarryForwardService;
 use App\Services\ActionLogKanbanService;
+use App\Services\ActionLogProgressService;
 use App\Support\ActionLogTaskSupport;
 use App\Support\ShortId;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -15,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -122,15 +124,46 @@ class ActionLogController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $focus = (string) $request->query('focus', 'all');
+        if (! in_array($focus, ['all', ActionLogTaskSupport::STATE_NEEDS_UPDATE, ActionLogTaskSupport::STATE_UPDATED_BY_YOU, ActionLogTaskSupport::STATE_NOT_UPDATED], true)) {
+            $focus = 'all';
+        }
+
+        $teamUsers = Cache::remember('active-staff-options', now()->addSeconds(60), function () {
+            return User::query()
+                ->active()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (User $member) => [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                ])
+                ->values()
+                ->all();
+        });
+
         return Inertia::render('ActionLogs/Board', [
             'board' => $board,
             'workPeriods' => $workPeriods,
             'departments' => $departments,
             'progressOptions' => ActionLogTaskSupport::PROGRESS_OPTIONS,
+            'updateOptions' => array_merge(ActionLogTaskSupport::STAFF_PROGRESS_OPTIONS, [ActionLogTaskSupport::QUICK_UPDATE_REASSIGN]),
             'filters' => $request->only(['period_id', 'assignee_id', 'department_id']),
+            'focus' => $focus,
+            'teamUsers' => $teamUsers,
             'boardUrl' => route('action-logs.board'),
             'indexUrl' => route('action-logs.index'),
         ]);
+    }
+
+    public function remindLater(Request $request): JsonResponse
+    {
+        $period = WorkPeriod::getCurrent();
+        if ($period) {
+            $request->session()->put(ActionLogProgressService::UPDATE_SNOOZE_SESSION_KEY, (string) $period->id);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     /**
@@ -516,7 +549,7 @@ class ActionLogController extends Controller
 
         if (! $isManager) {
             return redirect()->route('action-logs.show', $document)
-                ->with('error', 'Only action log managers can edit tasks here. Use Dashboard → My Action Tasks to update your assigned tasks.');
+                ->with('error', 'Only action log managers can edit tasks here. Use the Action Log Board to update your assigned tasks.');
         }
 
         $this->authorize('manageActionLogs', $document);
@@ -558,7 +591,7 @@ class ActionLogController extends Controller
         $isManager = $this->isActionLogManager($actingUser);
         if (! $isManager) {
             return redirect()->route('action-logs.show', $document)
-                ->with('error', 'Only action log managers can edit tasks here. Use Dashboard → My Action Tasks to update your assigned tasks.');
+                ->with('error', 'Only action log managers can edit tasks here. Use the Action Log Board to update your assigned tasks.');
         }
 
         $this->authorize('manageActionLogs', $document);
@@ -656,8 +689,8 @@ class ActionLogController extends Controller
 
     /**
      * Apply a lightweight progress + notes update to a single assigned task.
-     * Used by the dashboard "My Action Tasks" quick-update widget so assignees
-     * can report progress without opening the full editor.
+     * Used by the Action Log Board so assignees can report progress without
+     * opening the full editor.
      */
     public function quickUpdate(Request $request, Document $document)
     {

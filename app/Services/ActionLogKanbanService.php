@@ -17,7 +17,10 @@ class ActionLogKanbanService
      *     columns: array<string, list<array<string, mixed>>>,
      *     filters: array{assignee_id: ?string, department_id: ?string},
      *     assignees: Collection<int, User>,
-     *     can_edit: bool
+     *     can_edit: bool,
+     *     week: ?array{id: string, number: int|string, year: int|string, range: string, open: bool},
+     *     mine: list<array<string, mixed>>,
+     *     summary: array{needsUpdate: int, updatedByYou: int, notUpdated: int, assigned: int}
      * }
      */
     public function boardFor(User $viewer, ?string $periodId = null, ?string $assigneeId = null, ?string $departmentId = null): array
@@ -37,6 +40,12 @@ class ActionLogKanbanService
 
         $assignees = collect();
         $canEdit = false;
+        $emptySummary = [
+            'needsUpdate' => 0,
+            'updatedByYou' => 0,
+            'notUpdated' => 0,
+            'assigned' => 0,
+        ];
 
         if (! $document || ! $period) {
             return [
@@ -49,6 +58,9 @@ class ActionLogKanbanService
                 ],
                 'assignees' => $assignees,
                 'can_edit' => false,
+                'week' => $period ? $this->weekPayload($period) : null,
+                'mine' => [],
+                'summary' => $emptySummary,
             ];
         }
 
@@ -73,6 +85,11 @@ class ActionLogKanbanService
             ->keyBy(fn (User $user) => (string) $user->id);
 
         $assignees = $usersById->sortBy('name')->values();
+        $mine = [];
+        $summary = $emptySummary;
+        $viewerId = (string) $viewer->id;
+        $periodId = (string) $period->id;
+        $periodOpen = $period->isOpen();
 
         foreach ($tasks as $task) {
             if (! is_array($task)) {
@@ -96,6 +113,39 @@ class ActionLogKanbanService
                 ->filter()
                 ->values();
 
+            $state = ActionLogTaskSupport::updateState($task, $periodId, $viewerId, $periodOpen);
+            $isMine = in_array($viewerId, $responsibleIds, true);
+            $card = [
+                'task_uid' => $taskUid,
+                'task' => $label,
+                'progress' => $progress,
+                'notes_progress' => trim((string) ($task['notes_progress'] ?? '')),
+                'due_date' => $task['due_date'] ?? null,
+                'responsible_user_ids' => $responsibleIds,
+                'responsible_names' => $responsibleUsers->pluck('name')->all(),
+                'document_id' => (string) $document->id,
+                'editable' => $canEdit && (
+                    $viewer->hasAnyPermission(['create action logs', 'manage action logs'])
+                    || $isMine
+                ),
+                'mine' => $isMine,
+                'update_state' => $state,
+            ];
+
+            if ($isMine) {
+                $mine[] = $card;
+                $summary['assigned']++;
+                if ($state === ActionLogTaskSupport::STATE_NEEDS_UPDATE) {
+                    $summary['needsUpdate']++;
+                }
+                if ($state === ActionLogTaskSupport::STATE_UPDATED_BY_YOU) {
+                    $summary['updatedByYou']++;
+                }
+            }
+            if (in_array($state, [ActionLogTaskSupport::STATE_NEEDS_UPDATE, ActionLogTaskSupport::STATE_NOT_UPDATED], true)) {
+                $summary['notUpdated']++;
+            }
+
             if ($assigneeId && ! in_array($assigneeId, $responsibleIds, true)) {
                 continue;
             }
@@ -109,21 +159,24 @@ class ActionLogKanbanService
                 }
             }
 
-            $columns[$progress][] = [
-                'task_uid' => $taskUid,
-                'task' => $label,
-                'progress' => $progress,
-                'notes_progress' => trim((string) ($task['notes_progress'] ?? '')),
-                'due_date' => $task['due_date'] ?? null,
-                'responsible_user_ids' => $responsibleIds,
-                'responsible_names' => $responsibleUsers->pluck('name')->all(),
-                'document_id' => (string) $document->id,
-                'editable' => $canEdit && (
-                    $viewer->hasAnyPermission(['create action logs', 'manage action logs'])
-                    || in_array((string) $viewer->id, $responsibleIds, true)
-                ),
-            ];
+            $columns[$progress][] = $card;
         }
+
+        $rank = [
+            ActionLogTaskSupport::STATE_NEEDS_UPDATE => 0,
+            ActionLogTaskSupport::STATE_NOT_UPDATED => 1,
+            ActionLogTaskSupport::STATE_UPDATED_BY_YOU => 2,
+            ActionLogTaskSupport::STATE_UPDATED => 3,
+            ActionLogTaskSupport::STATE_CLOSED => 4,
+        ];
+        usort($mine, function (array $left, array $right) use ($rank): int {
+            $byState = ($rank[$left['update_state']] ?? 9) <=> ($rank[$right['update_state']] ?? 9);
+            if ($byState !== 0) {
+                return $byState;
+            }
+
+            return strcasecmp((string) $left['task'], (string) $right['task']);
+        });
 
         return [
             'period' => $period,
@@ -135,6 +188,23 @@ class ActionLogKanbanService
             ],
             'assignees' => $assignees,
             'can_edit' => $canEdit,
+            'week' => $this->weekPayload($period),
+            'mine' => $mine,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * @return array{id: string, number: int|string, year: int|string, range: string, open: bool}
+     */
+    private function weekPayload(WorkPeriod $period): array
+    {
+        return [
+            'id' => (string) $period->id,
+            'number' => $period->week_number,
+            'year' => $period->year,
+            'range' => $period->date_range,
+            'open' => $period->isOpen(),
         ];
     }
 }

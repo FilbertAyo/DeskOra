@@ -184,6 +184,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('action-logs')->name('action-logs.')->group(function () {
         Route::get('/', [ActionLogController::class, 'index'])->name('index');
         Route::get('/board', [ActionLogController::class, 'board'])->name('board');
+        Route::post('/remind-later', [ActionLogController::class, 'remindLater'])->name('remind-later');
         Route::get('/create', [ActionLogController::class, 'create'])->name('create');
         Route::post('/', [ActionLogController::class, 'store'])->name('store');
         Route::get('/{document}/download', [ActionLogController::class, 'downloadPdf'])->name('download');

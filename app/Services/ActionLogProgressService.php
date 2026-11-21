@@ -9,9 +9,12 @@ use App\Models\WorkPeriod;
 use App\Services\Documents\DocumentContentAssembler;
 use App\Support\ActionLogTaskSupport;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 
 class ActionLogProgressService
 {
+    public const UPDATE_SNOOZE_SESSION_KEY = 'action_log_update_snooze';
+
     /** @var array<string, array<string, mixed>> */
     private array $buildForUserCache = [];
 
@@ -240,6 +243,183 @@ class ActionLogProgressService
     public function hasPendingUpdates(User $user): bool
     {
         return $this->pendingUpdatesForUser($user) !== [];
+    }
+
+    /**
+     * Current-week assignment snapshot for one action log.
+     * Used by the scorecard and the update reminder so those screens do not
+     * rebuild the full task timeline.
+     *
+     * @return array{
+     *     period_id: ?string,
+     *     week: int|string|null,
+     *     year: int|string|null,
+     *     date_range: ?string,
+     *     open: bool,
+     *     document_id: ?string,
+     *     open_count: int,
+     *     needs_update: int,
+     *     updated_by_you: int,
+     *     assigned: int,
+     *     pending_tasks: list<array{task: string, progress: string}>
+     * }
+     */
+    public function weekStatusFor(User $user, ?WorkPeriod $period = null): array
+    {
+        $period = $period ?? WorkPeriod::getCurrent();
+        if (! $period) {
+            return $this->emptyWeekStatus(null);
+        }
+
+        $stamp = ActionLog::query()
+            ->where('period_id', $period->id)
+            ->whereNull('superseded_by_action_log_id')
+            ->orderByDesc('id')
+            ->first(['id', 'updated_at']);
+
+        $key = 'action-log-week-status:'.$user->id.':'.$period->id.':'
+            .($stamp->id ?? '0').':'
+            .($stamp?->updated_at?->getTimestamp() ?? 0);
+
+        return Cache::remember($key, now()->addMinutes(5), fn () => $this->buildWeekStatus($user, $period));
+    }
+
+    /**
+     * @return array{
+     *     week: int|string|null,
+     *     year: int|string|null,
+     *     dateRange: ?string,
+     *     pending: int,
+     *     updated: int,
+     *     tasks: list<array{task: string, progress: string}>,
+     *     boardUrl: string
+     * }|null
+     */
+    public function reminderPayload(User $user): ?array
+    {
+        if (($user->status ?? '') !== 'active' || $user->isDemoViewer()) {
+            return null;
+        }
+
+        $status = $this->weekStatusFor($user);
+        if (! $status['open'] || $status['assigned'] < 1 || $status['needs_update'] < 1 || $status['document_id'] === null) {
+            return null;
+        }
+
+        return [
+            'week' => $status['week'],
+            'year' => $status['year'],
+            'dateRange' => $status['date_range'],
+            'pending' => $status['needs_update'],
+            'updated' => $status['updated_by_you'],
+            'tasks' => $status['pending_tasks'],
+            'boardUrl' => route('action-logs.board', ['focus' => ActionLogTaskSupport::STATE_NEEDS_UPDATE]),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     period_id: ?string,
+     *     week: int|string|null,
+     *     year: int|string|null,
+     *     date_range: ?string,
+     *     open: bool,
+     *     document_id: ?string,
+     *     open_count: int,
+     *     needs_update: int,
+     *     updated_by_you: int,
+     *     assigned: int,
+     *     pending_tasks: list<array{task: string, progress: string}>
+     * }
+     */
+    private function emptyWeekStatus(?WorkPeriod $period): array
+    {
+        return [
+            'period_id' => $period ? (string) $period->id : null,
+            'week' => $period?->week_number,
+            'year' => $period?->year,
+            'date_range' => $period?->date_range,
+            'open' => $period ? $period->isOpen() : false,
+            'document_id' => null,
+            'open_count' => 0,
+            'needs_update' => 0,
+            'updated_by_you' => 0,
+            'assigned' => 0,
+            'pending_tasks' => [],
+        ];
+    }
+
+    /**
+     * @return array{
+     *     period_id: ?string,
+     *     week: int|string|null,
+     *     year: int|string|null,
+     *     date_range: ?string,
+     *     open: bool,
+     *     document_id: ?string,
+     *     open_count: int,
+     *     needs_update: int,
+     *     updated_by_you: int,
+     *     assigned: int,
+     *     pending_tasks: list<array{task: string, progress: string}>
+     * }
+     */
+    private function buildWeekStatus(User $user, WorkPeriod $period): array
+    {
+        $status = $this->emptyWeekStatus($period);
+        $document = Document::findCanonicalActionLogForPeriod((string) $period->id);
+        if (! $document) {
+            return $status;
+        }
+
+        $viewerId = (string) $user->id;
+        $periodId = (string) $period->id;
+        $periodOpen = $period->isOpen();
+        $pending = [];
+
+        foreach (ActionLogTaskSupport::extractTasks($document->content) as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+
+            $label = trim((string) ($task['task'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+
+            $responsible = ActionLogTaskSupport::normalizeResponsibleIds($task['responsible_user_ids'] ?? []);
+            if (! in_array($viewerId, $responsible, true)) {
+                continue;
+            }
+
+            $status['assigned']++;
+            $progress = trim((string) ($task['progress'] ?? ActionLogTaskSupport::PROGRESS_NOT_STARTED));
+            if ($progress === '') {
+                $progress = ActionLogTaskSupport::PROGRESS_NOT_STARTED;
+            }
+            if (! in_array($progress, [ActionLogTaskSupport::PROGRESS_DONE, ActionLogTaskSupport::PROGRESS_CANCELLED], true)) {
+                $status['open_count']++;
+            }
+
+            $state = ActionLogTaskSupport::updateState($task, $periodId, $viewerId, $periodOpen);
+            if ($state === ActionLogTaskSupport::STATE_NEEDS_UPDATE) {
+                $status['needs_update']++;
+                if (count($pending) < 6) {
+                    $pending[] = [
+                        'task' => $label,
+                        'progress' => $progress,
+                    ];
+                }
+            }
+            if ($state === ActionLogTaskSupport::STATE_UPDATED_BY_YOU) {
+                $status['updated_by_you']++;
+            }
+        }
+
+        $status['document_id'] = (string) $document->id;
+        $status['pending_tasks'] = $pending;
+
+        return $status;
     }
 
     /**

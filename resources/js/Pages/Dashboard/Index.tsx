@@ -3,11 +3,8 @@ import { useForm } from '@inertiajs/react';
 import AppLink from '@/components/shared/AppLink';
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { EyeIcon, PencilIcon } from 'lucide-react';
-
 import AppLayout from '@/Layouts/AppLayout';
 import DownloadButton from '@/components/shared/DownloadButton';
-import RowActions from '@/components/shared/RowActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +22,6 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { saveOfflineWorkLog } from '@/lib/offline-work-logs';
 import { notify } from '@/lib/notify';
-import { route } from '@/lib/route';
 import { cn } from '@/lib/utils';
 
 type Greeting = { salutation: string; firstName: string; message: string };
@@ -122,21 +118,6 @@ type Scorecard = {
     carryOvers: number;
 };
 
-type ActionTask = {
-    task: string;
-    latestProgress: string;
-    periodLabel: string;
-    needsUpdate: boolean;
-    carriedFrom: string;
-    editable: boolean;
-    documentId: string | number | null;
-    taskUid: string;
-    notes: string;
-    showUrl: string | null;
-};
-
-type TeamUser = { id: string | number; name: string };
-
 type PageProps = {
     greeting: Greeting;
     matrix: Matrix | null;
@@ -152,12 +133,7 @@ type PageProps = {
     collaboration: Collaboration[];
     actions: ApprovalAction[];
     scorecard: Scorecard | null;
-    actionTasks: ActionTask[];
-    actionLogsUrl: string;
-    teamUsers: TeamUser[];
 };
-
-const progressOptions = ['Not Started', 'In Progress', 'Done', 'Cancelled', 'Reassign'] as const;
 
 function averageScore(values: Array<number | null>): number | null {
     const numbers = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
@@ -166,12 +142,6 @@ function averageScore(values: Array<number | null>): number | null {
     }
 
     return Math.round(numbers.reduce((sum, value) => sum + value, 0) / numbers.length);
-}
-
-type Progress = (typeof progressOptions)[number];
-
-function isProgress(value: string): value is Progress {
-    return (progressOptions as readonly string[]).includes(value);
 }
 
 function plural(count: number, word: string): string {
@@ -190,16 +160,16 @@ function scoreTone(score: number): string {
     return 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300';
 }
 
-function actionTone(label: string): string {
+function actionVariant(label: string): 'destructive' | 'info' | 'warning' {
     if (label.startsWith('Authorize') || label.includes('disposal')) {
-        return 'bg-red-600 text-white';
+        return 'destructive';
     }
 
     if (label.startsWith('Approve')) {
-        return 'bg-primary text-primary-foreground';
+        return 'info';
     }
 
-    return 'bg-amber-500 text-white';
+    return 'warning';
 }
 
 function actionCta(label: string): string {
@@ -233,17 +203,12 @@ export default function DashboardIndex({
     collaboration,
     actions,
     scorecard,
-    actionTasks,
-    actionLogsUrl,
-    teamUsers,
 }: PageProps) {
     const [logOpen, setLogOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [matrixOpen, setMatrixOpen] = useState(false);
     const [matrixHtml, setMatrixHtml] = useState<string | null>(null);
     const [matrixError, setMatrixError] = useState(false);
-    const [taskOpen, setTaskOpen] = useState(false);
-    const [activeTask, setActiveTask] = useState<ActionTask | null>(null);
 
     const logForm = useForm({
         period_id: workLog.periodId ?? '',
@@ -251,13 +216,6 @@ export default function DashboardIndex({
         done: workLog.entry?.done ?? '',
         blocker: workLog.entry?.blocker ?? '',
         next: workLog.entry?.next ?? '',
-    });
-
-    const taskForm = useForm({
-        task_uid: '',
-        progress: 'Not Started',
-        notes_progress: '',
-        reassign_user_id: '',
     });
 
     useEffect(() => {
@@ -335,51 +293,6 @@ export default function DashboardIndex({
         }
     };
 
-    const openTask = (task: ActionTask) => {
-        setActiveTask(task);
-        taskForm.setData({
-            task_uid: task.taskUid,
-            progress: isProgress(task.latestProgress) ? task.latestProgress : 'Not Started',
-            notes_progress: task.notes,
-            reassign_user_id: '',
-        });
-        taskForm.clearErrors();
-        setTaskOpen(true);
-    };
-
-    const progress = isProgress(taskForm.data.progress) ? taskForm.data.progress : 'Not Started';
-    const notesRequired = progress !== 'Not Started';
-    const reassigning = progress === 'Reassign';
-
-    const submitTask = () => {
-        if (!activeTask?.documentId) {
-            return;
-        }
-
-        if (notesRequired && taskForm.data.notes_progress.trim() === '') {
-            taskForm.setError('notes_progress', reassigning ? 'A reason is required.' : 'Progress notes are required.');
-
-            return;
-        }
-
-        if (reassigning && taskForm.data.reassign_user_id === '') {
-            taskForm.setError('reassign_user_id', 'Select a staff member.');
-
-            return;
-        }
-
-        taskForm.transform((data) => ({
-            task_uid: data.task_uid,
-            progress: data.progress,
-            notes_progress: data.progress === 'Not Started' ? '' : data.notes_progress,
-            reassign_user_id: data.progress === 'Reassign' ? data.reassign_user_id : '',
-        }));
-        taskForm.put(route('action-logs.quick-update', { document: activeTask.documentId }), {
-            preserveScroll: true,
-            onSuccess: () => setTaskOpen(false),
-        });
-    };
-
     const seriesAverages = performance.series.map((series) => ({
         name: series.name,
         score: averageScore(series.data),
@@ -398,7 +311,7 @@ export default function DashboardIndex({
     const weeklyActions = [weeklyPlan, weeklyReport].filter((segment) => segment?.showCta).length;
     const actionCount = actions.reduce((sum, action) => sum + action.count, 0) + weeklyActions;
     const tasksClear = !today.showTasks || today.tasks.length === 0;
-    const activitiesEmpty = actionTasks.length === 0 && tasksClear && collaboration.length === 0;
+    const activitiesEmpty = tasksClear && collaboration.length === 0;
 
     return (
         <div className="flex flex-col gap-6">
@@ -619,45 +532,6 @@ export default function DashboardIndex({
                             )}
                         </div>
                     )}
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>My Weekly Activities</CardTitle>
-                            <CardDescription>Today&apos;s plan, revisions &amp; shares</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                            {today.showTasks && today.tasks.length > 0 && (
-                                <section>
-                                    <h3 className="mb-2 text-sm font-medium">{today.day}&apos;s tasks</h3>
-                                    <div className="flex flex-col gap-2">
-                                        {today.tasks.map((task, index) => (
-                                            <div key={`${task.activity}-${index}`} className="flex items-start justify-between gap-3">
-                                                <span>{task.activity}</span>
-                                                <span className="text-muted-foreground text-xs whitespace-nowrap">{task.source}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
-                            {collaboration.length > 0 && (
-                                <section>
-                                    <h3 className="mb-2 text-sm font-medium">Shared with you</h3>
-                                    <div className="flex flex-col gap-2">
-                                        {collaboration.map((event, index) => (
-                                            <div key={`${event.message}-${index}`} className="flex items-start gap-2">
-                                                <Badge variant="outline">{event.badge}</Badge>
-                                                <div className="min-w-0 flex-1 text-sm">
-                                                    {event.href ? <AppLink href={event.href}>{event.message}</AppLink> : <span>{event.message}</span>}
-                                                </div>
-                                                <span className="text-muted-foreground text-xs whitespace-nowrap">{event.when}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
-                            {activitiesEmpty && <p className="text-muted-foreground py-4 text-center">Nothing pending right now.</p>}
-                        </CardContent>
-                    </Card>
                 </div>
 
                 <div className="flex flex-col gap-6">
@@ -683,7 +557,7 @@ export default function DashboardIndex({
                                         <span className="block font-medium">{action.label}</span>
                                         <span className="text-muted-foreground text-sm">{plural(action.count, 'item')} waiting</span>
                                     </span>
-                                    <Badge className={actionTone(action.label)}>{actionCta(action.label)}</Badge>
+                                    <Badge variant={actionVariant(action.label)}>{actionCta(action.label)}</Badge>
                                 </AppLink>
                             ))}
                             {weeklyPlan?.showCta && weeklyPlan.url && <WeeklyAction kind="plan" segment={weeklyPlan} />}
@@ -715,59 +589,40 @@ export default function DashboardIndex({
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>
-                                My Action Tasks
-                                {actionTasks.length > 0 && (
-                                    <Badge variant="outline" className="ml-2">
-                                        {actionTasks.length}
-                                    </Badge>
-                                )}
-                            </CardTitle>
-                            <CardAction>
-                                <AppLink href={actionLogsUrl} className="text-sm" data-feature="feature.dashboard.action_tasks">
-                                    View all
-                                </AppLink>
-                            </CardAction>
+                            <CardTitle>My Weekly Activities</CardTitle>
+                            <CardDescription>Today&apos;s plan, revisions &amp; shares</CardDescription>
                         </CardHeader>
-                        <CardContent className="flex flex-col gap-3">
-                            {actionTasks.length === 0 ? (
-                                <p className="text-muted-foreground py-4 text-center">No action tasks need your attention right now.</p>
-                            ) : (
-                                <>
-                                    <p className="text-muted-foreground text-sm">Tasks assigned to you that still need an update.</p>
-                                    {actionTasks.map((task) => (
-                                        <div key={`${task.documentId}-${task.taskUid}`} className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="text-sm">{task.task}</p>
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                    <Badge variant="outline">{task.latestProgress}</Badge>
-                                                    {task.periodLabel && <Badge variant="outline">{task.periodLabel}</Badge>}
-                                                    {task.needsUpdate && <Badge variant="outline">Carried forward</Badge>}
-                                                </div>
-                                                {task.needsUpdate && task.carriedFrom && (
-                                                    <p className="text-muted-foreground mt-1 text-xs">From {task.carriedFrom} — no update this week yet.</p>
-                                                )}
+                        <CardContent className="flex flex-col gap-4">
+                            {today.showTasks && today.tasks.length > 0 && (
+                                <section>
+                                    <h3 className="mb-2 text-sm font-medium">{today.day}&apos;s tasks</h3>
+                                    <div className="flex flex-col gap-2">
+                                        {today.tasks.map((task, index) => (
+                                            <div key={`${task.activity}-${index}`} className="flex items-start justify-between gap-3">
+                                                <span>{task.activity}</span>
+                                                <span className="text-muted-foreground text-xs whitespace-nowrap">{task.source}</span>
                                             </div>
-                                            <RowActions
-                                                items={[
-                                                    {
-                                                        label: 'Update',
-                                                        icon: <PencilIcon />,
-                                                        hidden: !task.editable,
-                                                        onClick: () => openTask(task),
-                                                    },
-                                                    {
-                                                        label: 'View',
-                                                        href: task.showUrl,
-                                                        icon: <EyeIcon />,
-                                                        hidden: task.editable || !task.showUrl,
-                                                    },
-                                                ]}
-                                            />
-                                        </div>
-                                    ))}
-                                </>
+                                        ))}
+                                    </div>
+                                </section>
                             )}
+                            {collaboration.length > 0 && (
+                                <section>
+                                    <h3 className="mb-2 text-sm font-medium">Shared with you</h3>
+                                    <div className="flex flex-col gap-2">
+                                        {collaboration.map((event, index) => (
+                                            <div key={`${event.message}-${index}`} className="flex items-start gap-2">
+                                                <Badge variant={event.removed ? 'secondary' : 'success'}>{event.badge}</Badge>
+                                                <div className="min-w-0 flex-1 text-sm">
+                                                    {event.href ? <AppLink href={event.href}>{event.message}</AppLink> : <span>{event.message}</span>}
+                                                </div>
+                                                <span className="text-muted-foreground text-xs whitespace-nowrap">{event.when}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+                            {activitiesEmpty && <p className="text-muted-foreground py-4 text-center">Nothing pending right now.</p>}
                         </CardContent>
                     </Card>
                 </div>
@@ -891,85 +746,6 @@ export default function DashboardIndex({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Quick Update</DialogTitle>
-                        <DialogDescription>{activeTask?.periodLabel}</DialogDescription>
-                    </DialogHeader>
-                    <form
-                        className="flex flex-col gap-3"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            submitTask();
-                        }}
-                    >
-                        <div className="bg-muted rounded-lg px-3 py-2 text-sm">{activeTask?.task}</div>
-                        <Field>
-                            <FieldLabel htmlFor="quickTaskProgress">Progress status</FieldLabel>
-                            <select
-                                id="quickTaskProgress"
-                                name="progress"
-                                required
-                                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                                value={taskForm.data.progress}
-                                onChange={(event) => taskForm.setData('progress', event.target.value)}
-                            >
-                                {progressOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                        </Field>
-                        {reassigning && (
-                            <Field>
-                                <FieldLabel htmlFor="quickTaskReassign">Reassign to</FieldLabel>
-                                <select
-                                    id="quickTaskReassign"
-                                    name="reassign_user_id"
-                                    required
-                                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-                                    value={taskForm.data.reassign_user_id}
-                                    onChange={(event) => taskForm.setData('reassign_user_id', event.target.value)}
-                                >
-                                    <option value="">Select staff member...</option>
-                                    {teamUsers.map((member) => (
-                                        <option key={member.id} value={member.id}>
-                                            {member.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <FieldError>{taskForm.errors.reassign_user_id}</FieldError>
-                            </Field>
-                        )}
-                        {notesRequired && (
-                            <Field>
-                                <FieldLabel htmlFor="quickTaskNotes">{reassigning ? 'Reason for reassignment' : 'Progress notes'}</FieldLabel>
-                                <Textarea
-                                    id="quickTaskNotes"
-                                    name="notes_progress"
-                                    required
-                                    maxLength={4000}
-                                    rows={4}
-                                    value={taskForm.data.notes_progress}
-                                    placeholder="What did you do this week? Any blockers or context?"
-                                    onChange={(event) => taskForm.setData('notes_progress', event.target.value)}
-                                />
-                                <FieldError>{taskForm.errors.notes_progress}</FieldError>
-                            </Field>
-                        )}
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setTaskOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={taskForm.processing} loading={taskForm.processing}>
-                                Save update
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
@@ -1015,6 +791,7 @@ function GraceRow({ kind, entry }: { kind: string; entry: GraceEntry }) {
 function WeeklyAction({ kind, segment }: { kind: 'plan' | 'report'; segment: ReminderSegment }) {
     const title = kind === 'plan' ? 'Weekly plan' : 'Weekly report';
     const cta = segment.needsRevision ? 'Revise' : segment.hasDocument ? 'Open' : 'Create';
+    const variant = segment.needsRevision ? 'warning' : segment.hasDocument ? 'info' : 'secondary';
     const subtitle = segment.needsRevision
         ? 'Returned for revision — resubmit soon'
         : segment.hasDocument
@@ -1033,7 +810,7 @@ function WeeklyAction({ kind, segment }: { kind: 'plan' | 'report'; segment: Rem
                     W{segment.week}, {segment.year} · {subtitle}
                 </span>
             </span>
-            <Badge>{cta}</Badge>
+            <Badge variant={variant}>{cta}</Badge>
         </AppLink>
     );
 }

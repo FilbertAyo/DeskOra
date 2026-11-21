@@ -82,6 +82,15 @@ export type SharedProps = {
             }>;
         } | null;
         nomination: { periodId: string; label: string } | null;
+        actionLogReminder: {
+            week: number | string | null;
+            year: number | string | null;
+            dateRange: string | null;
+            pending: number;
+            updated: number;
+            tasks: Array<{ task: string; progress: string }>;
+            boardUrl: string;
+        } | null;
         anonymousFeedback: { count: number; hideOnCurrentPage: boolean } | null;
     };
 };

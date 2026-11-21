@@ -13,7 +13,6 @@ use App\Models\WeeklyWorkLog;
 use App\Models\WorkPeriod;
 use App\Models\YearPlan;
 use App\Models\YearPlanActivity;
-use App\Services\ActionLogProgressService;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\GreetingService;
 use App\Services\MonthlyPerformanceService;
@@ -36,7 +35,6 @@ class DashboardController extends Controller
     public function __construct(
         private readonly WorkPeriodService $workPeriodService,
         private readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
-        private readonly ActionLogProgressService $actionLogProgressService,
         private readonly RequestApprovalNavService $requestApprovalNavService,
         private readonly WeeklyBudgetReviewService $weeklyBudgetReviewService,
         private readonly WeeklyScorecardService $weeklyScorecardService,
@@ -74,14 +72,6 @@ class DashboardController extends Controller
 
         $collaborationEvents = $this->recentCollaborationEventsFor($user, $recentPeriodIds);
 
-        $actionLogProgress = $this->actionLogProgressService->buildForUser($user);
-        $teamUsers = Cache::remember('dashboard-team-users', now()->addSeconds(60), function () {
-            return User::query()
-                ->active()
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get();
-        });
         $assignedWeeklyActivities = $currentPeriod
             ? $this->weeklyActivityAssignmentService->assignmentsForUser(
                 (string) $user->id,
@@ -183,8 +173,6 @@ class DashboardController extends Controller
             $dashboardAvailableTypes,
             $sharedWithMeCount,
             $collaborationEvents,
-            $actionLogProgress,
-            $teamUsers,
             $assignedWeeklyActivities,
             $todaysDayName,
             $todaysWeeklyTasks,
@@ -335,7 +323,6 @@ class DashboardController extends Controller
     /**
      * @param  array<string, mixed>|null  $deadlineStatuses
      * @param  array<string, mixed>  $availableTypes
-     * @param  array<string, mixed>  $actionLogProgress
      * @param  array<string, mixed>  $coverage
      * @param  list<array{label: string, count: int, url: string}>  $approvalActions
      * @param  array<string, mixed>  $scorecard
@@ -349,8 +336,6 @@ class DashboardController extends Controller
         array $availableTypes,
         int $sharedWithMeCount,
         mixed $collaborationEvents,
-        array $actionLogProgress,
-        mixed $teamUsers,
         mixed $assignedWeeklyActivities,
         string $todaysDayName,
         mixed $todaysWeeklyTasks,
@@ -362,34 +347,6 @@ class DashboardController extends Controller
         array $performance,
     ): array {
         $weekday = in_array($todaysDayName, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], true);
-        $tasks = collect($actionLogProgress['activeTasks'] ?? [])
-            ->filter(function ($task) {
-                if (! is_array($task)) {
-                    return false;
-                }
-
-                $progress = strtolower(trim((string) ($task['latest_progress'] ?? 'Not Started')));
-
-                return ! in_array($progress, ['done', 'cancelled'], true);
-            })
-            ->map(function (array $task) {
-                $documentId = $task['document_id'] ?? null;
-
-                return [
-                    'task' => (string) ($task['task'] ?? 'Task'),
-                    'latestProgress' => (string) ($task['latest_progress'] ?? 'Not Started'),
-                    'periodLabel' => (string) ($task['period_label'] ?? ''),
-                    'needsUpdate' => (bool) ($task['needs_update'] ?? false),
-                    'carriedFrom' => (string) ($task['carried_from_period_label'] ?? ''),
-                    'editable' => (bool) ($task['editable'] ?? false),
-                    'documentId' => $documentId,
-                    'taskUid' => (string) ($task['task_uid'] ?? ''),
-                    'notes' => (string) ($task['latest_notes'] ?? ''),
-                    'showUrl' => $documentId ? route('action-logs.show', $documentId) : null,
-                ];
-            })
-            ->values()
-            ->all();
 
         $reminder = [
             'showToast' => false,
@@ -432,7 +389,7 @@ class DashboardController extends Controller
                 'actionUrl' => $coverage['actionUrl'] ?? null,
             ],
             'stats' => [
-                'openTasks' => count($tasks),
+                'openTasks' => (int) ($scorecard['open_actions'] ?? 0),
                 'shared' => $sharedWithMeCount,
                 'assigned' => collect($assignedWeeklyActivities)->count(),
                 'weeklyPlansUrl' => isset($availableTypes[Document::TYPE_WEEKLY_PLAN]) ? route('documents.weekly-plans') : null,
@@ -498,12 +455,6 @@ class DashboardController extends Controller
                 'openActions' => (int) ($scorecard['open_actions'] ?? 0),
                 'carryOvers' => (int) ($scorecard['carry_overs'] ?? 0),
             ] : null,
-            'actionTasks' => $tasks,
-            'actionLogsUrl' => route('action-logs.index'),
-            'teamUsers' => collect($teamUsers)->map(fn (User $member) => [
-                'id' => $member->id,
-                'name' => $member->name,
-            ])->values()->all(),
         ];
     }
 
