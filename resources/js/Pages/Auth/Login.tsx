@@ -44,7 +44,7 @@ export default function Login() {
     const form = useForm({
         email: '',
         password: '',
-        remember: false,
+        remember: true,
     });
     const [formNotice, setFormNotice] = useState<string | null>(null);
     const emailError = form.errors.email ?? formNotice;
