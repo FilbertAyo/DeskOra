@@ -71,6 +71,7 @@ export default function Login() {
 
         form.post(route('login'), {
             preserveScroll: true,
+            replace: true,
             onError: (errors) => {
                 if (!firstFormError(errors)) {
                     setFormNotice('These credentials do not match our records.');

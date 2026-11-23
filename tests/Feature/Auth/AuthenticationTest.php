@@ -36,7 +36,8 @@ class AuthenticationTest extends TestCase
 
         $this->assertAuthenticatedAs($user);
         $response->assertRedirect(route('dashboard', absolute: false));
-        $response->assertCookie(Auth::guard()->getRecallerName());
+        $response->assertCookieExpired(Auth::guard()->getRecallerName());
+        $this->assertNull($user->fresh()->remember_token);
         $this->assertTrue($user->fresh()->remember_expires_at->greaterThan(now()->addDays(3)));
     }
 
@@ -99,7 +100,7 @@ class AuthenticationTest extends TestCase
         Notification::assertCount(1);
     }
 
-    public function test_logging_in_without_remember_clears_remember_window(): void
+    public function test_login_inside_window_skips_otp_when_remember_is_unchecked(): void
     {
         Notification::fake();
 
@@ -108,24 +109,43 @@ class AuthenticationTest extends TestCase
             'remember_expires_at' => now()->addDays(2),
         ]);
 
-        $this->post('/login', [
-            'email' => $user->email,
-            'password' => 'password',
-        ])->assertRedirect(route('dashboard', absolute: false));
-
-        $this->assertAuthenticated();
-        $this->assertNull($user->fresh()->remember_expires_at);
-
-        Auth::logout();
-
         $response = $this->post('/login', [
             'email' => $user->email,
             'password' => 'password',
         ]);
 
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertCookieExpired(Auth::guard()->getRecallerName());
+        Notification::assertNothingSent();
+        $this->assertTrue($user->fresh()->remember_expires_at->greaterThan(now()->addDays(3)));
+    }
+
+    public function test_remember_cookie_does_not_restore_session_after_timeout(): void
+    {
+        $user = User::factory()->create([
+            'remember_expires_at' => now()->addDays(2),
+            'remember_token' => 'remember-token-value',
+        ]);
+
+        $recaller = $user->getAuthIdentifier().'|'.$user->getRememberToken().'|'.$user->getAuthPassword();
+
+        $response = $this->withCookie(Auth::guard('web')->getRecallerName(), $recaller)
+            ->get('/dashboard');
+
         $this->assertGuest();
-        $response->assertRedirect(route('login.verify-otp'));
-        Notification::assertCount(1);
+        $response->assertRedirect(route('login'));
+    }
+
+    public function test_active_use_slides_the_remember_window(): void
+    {
+        $user = User::factory()->create([
+            'remember_expires_at' => now()->addHours(12),
+        ]);
+
+        $this->actingAs($user)->get('/session/ping')->assertOk();
+
+        $this->assertTrue($user->fresh()->remember_expires_at->greaterThan(now()->addDays(3)));
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
@@ -204,7 +224,8 @@ class AuthenticationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
-        $response->assertCookie(Auth::guard()->getRecallerName());
+        $response->assertCookieExpired(Auth::guard()->getRecallerName());
+        $this->assertNull($user->fresh()->remember_token);
 
         $fresh = $user->fresh();
         $this->assertTrue($fresh->last_login_at->greaterThan(now()->subMinute()));
@@ -272,5 +293,6 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
         $response->assertRedirect(route('login', absolute: false));
+        $response->assertCookieExpired(Auth::guard()->getRecallerName());
     }
 }

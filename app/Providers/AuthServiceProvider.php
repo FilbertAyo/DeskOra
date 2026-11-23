@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Auth\SessionOnlyUserProvider;
 use App\Models\AnonymousFeedback;
 use App\Models\Document;
 use App\Models\FeatureUsageEvent;
@@ -36,6 +37,7 @@ use App\Policies\NominationPeriodPolicy;
 use App\Policies\OfficialLetterPolicy;
 use App\Policies\WeeklyWorkLogPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Auth;
 use Spatie\Activitylog\Models\Activity;
 
 class AuthServiceProvider extends ServiceProvider
@@ -79,5 +81,9 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
+
+        Auth::provider('session_users', function ($app, array $config) {
+            return new SessionOnlyUserProvider($app['hash'], $config['model']);
+        });
     }
 }

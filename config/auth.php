@@ -61,7 +61,7 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'session_users',
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 
@@ -117,11 +117,12 @@ return [
     | Login "Remember Me" Window
     |--------------------------------------------------------------------------
     |
-    | When "Remember me" is checked at sign-in, the remember cookie and the
-    | OTP-skip window last this many days of inactivity. After it expires,
-    | the next sign-in requires an email verification code. Without remember
-    | me, the normal session lifetime applies and OTP is always required on
-    | the next login after the session ends.
+    | "Remember me" does not keep the session signed in. Every login ends
+    | at the normal session lifetime, and the next visit must send email
+    | and password again. Checking the box only skips the email verification
+    | code for this many days of account activity. Activity slides the
+    | window forward. After it expires, the next sign-in requires a code.
+    | Without remember me, OTP is always required on the next login.
     |
     */
 

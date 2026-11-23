@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAnonymousFeedbackToken;
 use App\Http\Middleware\EnsureDemoReadOnly;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventAuthResponseCache;
+use App\Http\Middleware\SlideRememberOtpWindow;
 use App\Http\Middleware\TrackFeatureUsage;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->web(append: [
+            SlideRememberOtpWindow::class,
             EnsureDemoReadOnly::class,
             TrackFeatureUsage::class,
             HandleInertiaRequests::class,

@@ -20,7 +20,9 @@ export default function VerifyOtp({ maskedEmail }: { maskedEmail: string }) {
             <form
                 onSubmit={(event) => {
                     event.preventDefault();
-                    form.post(route('login.verify-otp.store'));
+                    form.post(route('login.verify-otp.store'), {
+                        replace: true,
+                    });
                 }}
             >
                 <FieldGroup className="gap-4">

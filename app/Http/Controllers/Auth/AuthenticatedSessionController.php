@@ -149,6 +149,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
+        $this->forgetRememberCookie();
+
         return redirect()->route('login');
     }
 
@@ -178,25 +180,19 @@ class AuthenticatedSessionController extends Controller
         $this->clearPendingLogin($request);
 
         $rememberDays = max(1, (int) config('auth.login_remember_days', 4));
+        // An active window stays open until four days of inactivity, even when
+        // this sign-in leaves the checkbox unchecked.
+        $keepWindow = $remember || $user->hasActiveRememberWindow();
 
-        if ($remember) {
-            Auth::guard('web')->setRememberDuration($rememberDays * 24 * 60);
-            Auth::login($user, true);
+        Auth::guard('web')->login($user, false);
 
-            $user->forceFill([
-                'last_login_at' => now(),
-                'remember_expires_at' => now()->addDays($rememberDays),
-            ])->save();
-        } else {
-            // Invalidate any prior remember cookie and clear the OTP-skip window.
-            $user->forceFill([
-                'last_login_at' => now(),
-                'remember_expires_at' => null,
-                'remember_token' => null,
-            ])->save();
+        $user->forceFill([
+            'last_login_at' => now(),
+            'remember_expires_at' => $keepWindow ? now()->addDays($rememberDays) : null,
+            'remember_token' => null,
+        ])->save();
 
-            Auth::login($user, false);
-        }
+        $this->forgetRememberCookie();
 
         activity('auth')
             ->causedBy($user)
@@ -212,6 +208,11 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard', absolute: false));
+    }
+
+    private function forgetRememberCookie(): void
+    {
+        cookie()->queue(cookie()->forget(Auth::guard('web')->getRecallerName()));
     }
 
     private function hasPendingLogin(Request $request): bool
