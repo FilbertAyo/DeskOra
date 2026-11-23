@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
+use SadiqSalau\LaravelOtp\Facades\Otp;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -280,6 +281,27 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
         $response->assertSessionHasErrors('code');
+    }
+
+    public function test_login_stays_on_the_form_when_the_verification_email_fails(): void
+    {
+        $user = User::factory()->create([
+            'last_login_at' => null,
+            'remember_expires_at' => null,
+        ]);
+
+        Otp::shouldReceive('identifier')->once()->andReturnSelf();
+        Otp::shouldReceive('send')->once()->andThrow(new \RuntimeException('smtp down'));
+
+        $response = $this->from('/login')->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'remember' => '1',
+        ]);
+
+        $response->assertRedirect('/login');
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 
     public function test_users_can_logout(): void

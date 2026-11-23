@@ -125,22 +125,27 @@ router.on('httpException', (event) => {
     }
 });
 
-// A weekly-report submit that the server already saved can still come back as
-// the old Blade error page. Leave that page and open the report instead of
-// showing the error inside a popup.
+// A non-Inertia HTML body (an old Blade error page, or a server that died
+// before Laravel) must not open in Inertia's popup. Send the person to the
+// React error page instead. A weekly-report submit that already saved still
+// returns to the report.
 router.on('invalid', (event) => {
-    const status = event.detail.response?.status ?? 0;
+    event.preventDefault();
+
+    const status = event.detail.response?.status ?? 500;
     const responseUrl = event.detail.response?.url ?? '';
     const here = window.location.pathname;
     const onReview =
         /\/documents\/[^/]+\/weekly-report\/(?:review|action-tasks)(?:\/|$)/.test(responseUrl) ||
         /\/documents\/[^/]+\/weekly-report\/(?:review|action-tasks)(?:\/|$)/.test(here);
 
-    if (!onReview || ![403, 404, 500, 503].includes(status)) {
+    if (onReview && [403, 404, 500, 503].includes(status)) {
+        const reportUrl = here.replace(/\/weekly-report\/(?:review|action-tasks)\/?$/, '');
+        window.location.assign(reportUrl === here ? here : reportUrl);
+
         return;
     }
 
-    event.preventDefault();
-    const reportUrl = here.replace(/\/weekly-report\/(?:review|action-tasks)\/?$/, '');
-    window.location.assign(reportUrl === here ? here : reportUrl);
+    const known = [403, 404, 419, 500, 503].includes(status) ? status : 500;
+    window.location.replace(`/error/${known}`);
 });

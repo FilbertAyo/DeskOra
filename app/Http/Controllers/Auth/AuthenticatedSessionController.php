@@ -116,7 +116,15 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('login');
         }
 
-        $result = Otp::identifier($this->loginOtpIdentifier($request))->update();
+        try {
+            $result = Otp::identifier($this->loginOtpIdentifier($request))->update();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors([
+                'code' => 'We could not send the verification email. Please try again in a moment.',
+            ]);
+        }
 
         if ($result['status'] !== Otp::OTP_SENT) {
             return back()->withErrors([
@@ -158,10 +166,20 @@ class AuthenticatedSessionController extends Controller
     {
         $identifier = 'login:'.$user->email;
 
-        Otp::identifier($identifier)->send(
-            new LoginInactivityOtp($user),
-            Notification::route('mail', $user->email)
-        );
+        try {
+            Otp::identifier($identifier)->send(
+                new LoginInactivityOtp($user),
+                Notification::route('mail', $user->email)
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => 'We could not send the verification email. Please try again in a moment.',
+                ]);
+        }
 
         $request->session()->put([
             'pending_login_user_id' => $user->id,
@@ -194,16 +212,20 @@ class AuthenticatedSessionController extends Controller
 
         $this->forgetRememberCookie();
 
-        activity('auth')
-            ->causedBy($user)
-            ->performedOn($user)
-            ->event('login')
-            ->withProperties([
-                'ip' => $request->ip(),
-                'user_agent' => (string) $request->userAgent(),
-                'remember' => $remember,
-            ])
-            ->log('User logged in');
+        try {
+            activity('auth')
+                ->causedBy($user)
+                ->performedOn($user)
+                ->event('login')
+                ->withProperties([
+                    'ip' => $request->ip(),
+                    'user_agent' => (string) $request->userAgent(),
+                    'remember' => $remember,
+                ])
+                ->log('User logged in');
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         $request->session()->regenerate();
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAnonymousFeedbackToken;
+use App\Http\Responses\InertiaErrorResponse;
 use App\Http\Middleware\EnsureDemoReadOnly;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventAuthResponseCache;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpFoundation\Response;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -66,5 +68,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->back()
                 ->withInput($request->except('password', 'password_confirmation', '_token'))
                 ->with('warning', $message);
+        });
+
+        // Inertia shows a non-Inertia HTML error inside a modal. Serve the React
+        // error page instead of the old Blade error views.
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
+            return InertiaErrorResponse::render($request, $response, $exception);
         });
     })->create();

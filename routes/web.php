@@ -53,7 +53,15 @@ use App\Http\Controllers\WeeklyMatrixController;
 use App\Http\Controllers\WeeklyWorkLogController;
 use App\Http\Controllers\WorkPeriodController;
 use App\Http\Controllers\YearPlanController;
+use App\Http\Responses\InertiaErrorResponse;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+
+Route::get('/error/{status}', function (int $status) {
+    abort_unless(in_array($status, InertiaErrorResponse::STATUSES, true), 404);
+
+    return Inertia::render('Errors/Show', InertiaErrorResponse::props($status));
+})->whereNumber('status')->name('error.show');
 
 // Lightweight session liveness check for long-lived forms.
 Route::get('/session/ping', function () {

@@ -72,7 +72,9 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        Auth::provider('session_users', function ($app, array $config) {
+            return new SessionOnlyUserProvider($app['hash'], $config['model']);
+        });
     }
 
     /**
@@ -81,9 +83,5 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
-
-        Auth::provider('session_users', function ($app, array $config) {
-            return new SessionOnlyUserProvider($app['hash'], $config['model']);
-        });
     }
 }
