@@ -124,7 +124,7 @@ class WeeklyPlanBudgetLinkService
         $item = trim($item);
         $purpose = trim($purpose);
         if ($item !== '' && $purpose !== '') {
-            $description = $item.' — '.$purpose;
+            $description = $item.' : '.$purpose;
         } else {
             $description = $item !== '' ? $item : $purpose;
         }

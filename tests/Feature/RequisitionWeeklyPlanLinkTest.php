@@ -66,7 +66,7 @@ class RequisitionWeeklyPlanLinkTest extends TestCase
                 ->component('Finance/Requisition/Form')
                 ->has('weeklyPlanBudgets', 1)
                 ->where('weeklyPlanBudgets.0.isCurrentWeek', true)
-                ->where('weeklyPlanBudgets.0.items.0.description', 'Printing — Books for the clinic')
+                ->where('weeklyPlanBudgets.0.items.0.description', 'Printing : Books for the clinic')
                 ->where('weeklyPlanBudgets.0.items.0.unit', 'reams')
                 ->where('weeklyPlanBudgets.0.items.0.cost', 25000));
     }

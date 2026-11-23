@@ -111,7 +111,11 @@ export default function Form({
     };
     const selectWeeklyPlan = (planId: string) => {
         if (planId === '') {
-            form.setData('weekly_plan_id', '');
+            form.setData((data) => ({
+                ...data,
+                weekly_plan_id: '',
+                items: [blankLine()],
+            }));
             return;
         }
         const plan = weeklyPlanBudgets.find((item) => item.id === planId);
@@ -241,26 +245,27 @@ export default function Form({
                                     onChange={(event) => form.setData('date_of_requirement', event.target.value)}
                                 />
                             </Field>
-                        </div>
-                        <Field label="Link to weekly plan budget" error={form.errors.weekly_plan_id}>
-                            <select
-                                name="weekly_plan_id"
-                                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                                value={form.data.weekly_plan_id}
-                                onChange={(event) => selectWeeklyPlan(event.target.value)}
+                            <Field
+                                label="Pull from weekly plan budget"
+                                labelClassName="text-primary"
+                                error={form.errors.weekly_plan_id}
                             >
-                                <option value="">None — enter line items manually</option>
-                                {weeklyPlanBudgets.map((plan) => (
-                                    <option key={plan.id} value={plan.id}>
-                                        {plan.label}
-                                        {plan.isCurrentWeek ? ' (this week)' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-muted-foreground text-xs">
-                                Choosing a plan fills the line items from that budget. You can edit them or add another row.
-                            </p>
-                        </Field>
+                                <select
+                                    name="weekly_plan_id"
+                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                    value={form.data.weekly_plan_id}
+                                    onChange={(event) => selectWeeklyPlan(event.target.value)}
+                                >
+                                    <option value="">Enter manually</option>
+                                    {weeklyPlanBudgets.map((plan) => (
+                                        <option key={plan.id} value={plan.id}>
+                                            {plan.label}
+                                            {plan.isCurrentWeek ? ' (this week)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </Field>
+                        </div>
                         <div>
                             <div className="mb-3 flex items-center justify-between">
                                 <h3 className="font-semibold">Line Items</h3>
@@ -366,10 +371,20 @@ export default function Form({
     );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+function Field({
+    label,
+    labelClassName,
+    error,
+    children,
+}: {
+    label: string;
+    labelClassName?: string;
+    error?: string;
+    children: ReactNode;
+}) {
     return (
         <div className="space-y-2">
-            <Label>{label}</Label>
+            <Label className={labelClassName}>{label}</Label>
             {children}
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
