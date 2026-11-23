@@ -240,9 +240,9 @@ class DocumentController extends Controller
      *
      * @return array<string, array{department_name: string, department_id: string|null, requested_total: float, provided_total: float, staff: array}>
      */
-    protected function groupBudgetDocumentsByDepartment(\Illuminate\Support\Collection $documents, ?User $viewer = null): array
+    protected function groupBudgetDocumentsByDepartment(\Illuminate\Support\Collection $documents, ?User $viewer = null, ?string $statusFilter = null): array
     {
-        return $this->weeklyBudgetReviewService->groupBudgetDocumentsByDepartment($documents, $viewer);
+        return $this->weeklyBudgetReviewService->groupBudgetDocumentsByDepartment($documents, $viewer, $statusFilter);
     }
 
     /**
@@ -274,6 +274,9 @@ class DocumentController extends Controller
 
     protected function determinePlanBudgetReviewStatus(array $summary): string
     {
+        if ($summary['all_completed'] ?? false) {
+            return Document::BUDGET_REVIEW_COMPLETED;
+        }
         if ($summary['all_approved']) {
             return Document::BUDGET_REVIEW_APPROVED;
         }
@@ -287,6 +290,15 @@ class DocumentController extends Controller
         return Document::BUDGET_REVIEW_PENDING;
     }
 
+    protected function resolvePlanBudgetReviewStatus(array $summary, ?string $currentStatus = null): string
+    {
+        if ($currentStatus === Document::BUDGET_REVIEW_COMPLETED) {
+            return Document::BUDGET_REVIEW_COMPLETED;
+        }
+
+        return $this->determinePlanBudgetReviewStatus($summary);
+    }
+
     /**
      * Build document_id => latest rejection reason map for visible documents.
      */
@@ -295,7 +307,7 @@ class DocumentController extends Controller
         return $this->documentListingService->getReturnedDocumentMapForIds($documentIds);
     }
 
-    protected function budgetReviewDefaultsForWeeklyPlan(?array $content, ?array $existingReviewItems = null): array
+    protected function budgetReviewDefaultsForWeeklyPlan(?array $content, ?array $existingReviewItems = null, ?Document $existingDocument = null): array
     {
         if (! $this->templateHasBudgetRows($content)) {
             return [
@@ -343,12 +355,16 @@ class DocumentController extends Controller
             }
         }
 
+        $keepCompleted = $existingDocument?->budget_review_status === Document::BUDGET_REVIEW_COMPLETED;
+
         return [
-            'budget_review_status' => Document::BUDGET_REVIEW_PENDING,
-            'budget_reviewed_by' => null,
-            'budget_reviewed_at' => null,
-            'budget_provided_amount' => null,
-            'budget_review_note' => null,
+            'budget_review_status' => $keepCompleted
+                ? Document::BUDGET_REVIEW_COMPLETED
+                : Document::BUDGET_REVIEW_PENDING,
+            'budget_reviewed_by' => $keepCompleted ? $existingDocument->budget_reviewed_by : null,
+            'budget_reviewed_at' => $keepCompleted ? $existingDocument->budget_reviewed_at : null,
+            'budget_provided_amount' => $keepCompleted ? $existingDocument->budget_provided_amount : null,
+            'budget_review_note' => $keepCompleted ? $existingDocument->budget_review_note : null,
             'budget_review_items' => $itemReviews,
         ];
     }
@@ -760,7 +776,7 @@ class DocumentController extends Controller
 
             $content['budget'] = $this->filterNonEmptyRows(
                 $content['budget'] ?? [],
-                ['item', 'description_purpose', 'amount']
+                ['item', 'description_purpose', 'unit', 'amount']
             );
             $content['budget'] = $this->ensureBudgetRowUids($content['budget']);
         }
@@ -1986,8 +2002,9 @@ class DocumentController extends Controller
 
             $item = trim((string) ($budgetRow['item'] ?? ''));
             $description = trim((string) ($budgetRow['description_purpose'] ?? ''));
+            $unit = trim((string) ($budgetRow['unit'] ?? ''));
             $amount = trim((string) ($budgetRow['amount'] ?? ''));
-            if ($item !== '' || $description !== '' || $amount !== '') {
+            if ($item !== '' || $description !== '' || $unit !== '' || $amount !== '') {
                 return true;
             }
         }
@@ -2138,6 +2155,9 @@ class DocumentController extends Controller
             'targetAccomplished' => $document->target_accomplished,
             'targetExplanation' => $document->target_explanation,
             'reviewRejectionReason' => $document->review_rejection_reason,
+            'budgetReviewStatus' => $document->type === Document::TYPE_WEEKLY_PLAN
+                ? $document->budget_review_status_label
+                : null,
             'content' => is_array($document->content) ? $document->content : [],
             'sharedUsers' => $document->sharedUsers->map(fn (User $sharedUser) => [
                 'id' => $sharedUser->id,

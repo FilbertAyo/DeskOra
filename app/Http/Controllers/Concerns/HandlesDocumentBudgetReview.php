@@ -60,7 +60,11 @@ trait HandlesDocumentBudgetReview
         );
 
         // Build grouped data: department -> staff -> budget items
-        $grouped = $this->groupBudgetDocumentsByDepartment($documents->getCollection(), $user);
+        $grouped = $this->groupBudgetDocumentsByDepartment(
+            $documents->getCollection(),
+            $user,
+            is_string($statusFilter) ? $statusFilter : null,
+        );
         $aggregateStats = $this->weeklyBudgetReviewService->computeBudgetStatsFromGrouped($grouped);
 
         $usersWithBudgets = User::query()
@@ -350,7 +354,7 @@ trait HandlesDocumentBudgetReview
 
             $document->budget_review_items = $existingReviews;
             $summary = $document->budgetReviewSummary();
-            $planStatus = $this->determinePlanBudgetReviewStatus($summary);
+            $planStatus = $this->resolvePlanBudgetReviewStatus($summary, $document->budget_review_status);
 
             $document->update([
                 'budget_review_items' => $existingReviews,
@@ -430,7 +434,7 @@ trait HandlesDocumentBudgetReview
         // Recompute plan-level summary from all item decisions
         $document->unsetRelation('weeklyPlanDomain');
         $summary = $document->budgetReviewSummary();
-        $planStatus = $this->determinePlanBudgetReviewStatus($summary);
+        $planStatus = $this->resolvePlanBudgetReviewStatus($summary, $weeklyPlan->budget_review_status);
 
         $weeklyPlan->update([
             'budget_review_status' => $planStatus,
@@ -579,7 +583,7 @@ trait HandlesDocumentBudgetReview
             $targetDocument->content = $content;
             $targetDocument->budget_review_items = $existingReviews;
             $summary = $targetDocument->budgetReviewSummary();
-            $planStatus = $this->determinePlanBudgetReviewStatus($summary);
+            $planStatus = $this->resolvePlanBudgetReviewStatus($summary, $targetDocument->budget_review_status);
             $targetDocument->update([
                 'content' => $content,
                 'budget_review_items' => $existingReviews,
@@ -625,7 +629,7 @@ trait HandlesDocumentBudgetReview
         $targetDocument->unsetRelation('weeklyPlanDomain');
         $summary = $targetDocument->budgetReviewSummary();
 
-        $planStatus = $this->determinePlanBudgetReviewStatus($summary);
+        $planStatus = $this->resolvePlanBudgetReviewStatus($summary, $weeklyPlan->budget_review_status);
 
         $weeklyPlan->update([
             'budget_review_status' => $planStatus,

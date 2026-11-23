@@ -20,15 +20,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { notify } from '@/lib/notify';
 import { PageHeader } from '@/lib/page-kit';
+import { route } from '@/lib/route';
 
 type Period = { id: string; weekNumber?: number; year?: number; dateRange?: string };
 type BudgetItem = {
     item?: string;
     description_purpose?: string;
+    unit?: string;
     amount?: string | number;
+    amount_numeric?: number;
     budget_uid?: string;
     status_label?: string;
     action_label?: string;
+    can_act?: boolean;
+    modal_title?: string | null;
+    submit_label?: string | null;
     document_id?: string;
     owner_name?: string;
 };
@@ -97,6 +103,15 @@ export default function WeeklyBudgetReview({
 }) {
     const groups = Array.isArray(grouped) ? grouped : Object.values(grouped);
     const [midweekOpen, setMidweekOpen] = useState(false);
+    const [actionItem, setActionItem] = useState<BudgetItem | null>(null);
+    const [amountChoice, setAmountChoice] = useState<'requested' | 'custom'>('requested');
+    const [customAmount, setCustomAmount] = useState('');
+    const actionForm = useForm({
+        budget_uid: '',
+        decision: 'approved',
+        provided_amount: '',
+        note: '',
+    });
     const midweekForm = useForm({
         user_id: '',
         period_id: activePeriodId ?? filters.period_id ?? '',
@@ -105,6 +120,45 @@ export default function WeeklyBudgetReview({
     });
     const apply = (patch: Record<string, string | undefined>) =>
         router.get(indexUrl, { ...filters, ...patch }, { preserveState: true });
+
+    const openAction = (item: BudgetItem) => {
+        setActionItem(item);
+        setAmountChoice('requested');
+        setCustomAmount('');
+        actionForm.clearErrors();
+        actionForm.setData({
+            budget_uid: item.budget_uid ?? '',
+            decision: 'approved',
+            provided_amount: '',
+            note: '',
+        });
+    };
+
+    const submitDecision = (decision: 'approved' | 'rejected') => {
+        if (!actionItem?.document_id || !actionItem.budget_uid) {
+            return;
+        }
+        const requested = Number(actionItem.amount_numeric ?? actionItem.amount ?? 0);
+        const provided =
+            decision === 'rejected' ? 0 : amountChoice === 'requested' ? requested : Number(customAmount);
+        if (decision === 'approved' && amountChoice === 'custom' && (customAmount.trim() === '' || Number.isNaN(provided) || provided < 0)) {
+            actionForm.setError('provided_amount', 'Enter the provided amount.');
+            return;
+        }
+        actionForm.transform(() => ({
+            budget_uid: actionItem.budget_uid,
+            decision,
+            provided_amount: provided,
+            note: actionForm.data.note.trim() === '' ? null : actionForm.data.note,
+        }));
+        actionForm.post(route('documents.process-weekly-budget-review', { document: actionItem.document_id }), {
+            preserveScroll: true,
+            onSuccess: () => {
+                notify('success', decision === 'rejected' ? 'Budget item rejected.' : 'Budget item updated.');
+                setActionItem(null);
+            },
+        });
+    };
 
     const submitMidweek = (event: FormEvent) => {
         event.preventDefault();
@@ -192,6 +246,7 @@ export default function WeeklyBudgetReview({
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
+                        <option value="completed">Completed</option>
                     </select>
                     <Button variant="outline" onClick={() => router.get(indexUrl, {}, { preserveState: true })}>
                         Clear
@@ -257,8 +312,10 @@ export default function WeeklyBudgetReview({
                                                         <TableHead>#</TableHead>
                                                         <TableHead>Item</TableHead>
                                                         <TableHead>Description / Purpose</TableHead>
+                                                        <TableHead>Unit</TableHead>
                                                         <TableHead>Requested</TableHead>
                                                         <TableHead>Status</TableHead>
+                                                        <TableHead className="w-28">Action</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -267,15 +324,21 @@ export default function WeeklyBudgetReview({
                                                             <TableCell>{String(itemIndex + 1).padStart(2, '0')}</TableCell>
                                                             <TableCell>{item.item ?? '—'}</TableCell>
                                                             <TableCell>{item.description_purpose ?? '—'}</TableCell>
-                                                            <TableCell>{Number(item.amount ?? 0).toLocaleString()}</TableCell>
+                                                            <TableCell>{item.unit || '—'}</TableCell>
+                                                            <TableCell>{Number(item.amount_numeric ?? item.amount ?? 0).toLocaleString()}</TableCell>
                                                             <TableCell>
-                                                                <Badge
-                                                                    variant={statusBadgeVariant(
-                                                                        item.status_label ?? item.action_label ?? 'Pending',
-                                                                    )}
-                                                                >
-                                                                    {item.status_label ?? item.action_label ?? 'Pending'}
+                                                                <Badge variant={statusBadgeVariant(item.status_label ?? 'Pending')}>
+                                                                    {item.status_label ?? 'Pending'}
                                                                 </Badge>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {item.can_act && item.action_label ? (
+                                                                    <Button type="button" size="sm" onClick={() => openAction(item)}>
+                                                                        {item.action_label}
+                                                                    </Button>
+                                                                ) : (
+                                                                    '—'
+                                                                )}
                                                             </TableCell>
                                                         </TableRow>
                                                     ))}
@@ -373,6 +436,87 @@ export default function WeeklyBudgetReview({
                     </DialogContent>
                 </Dialog>
             )}
+
+            <Dialog open={actionItem !== null} onOpenChange={(open) => !open && setActionItem(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{actionItem?.modal_title ?? 'Budget item'}</DialogTitle>
+                        <DialogDescription>
+                            {actionItem?.item || 'Budget item'}
+                            {actionItem?.description_purpose ? ` — ${actionItem.description_purpose}` : ''}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-sm">
+                            Requested amount:{' '}
+                            <span className="font-medium">
+                                {Number(actionItem?.amount_numeric ?? actionItem?.amount ?? 0).toLocaleString()}
+                            </span>
+                            {actionItem?.unit ? ` · ${actionItem.unit}` : ''}
+                        </p>
+                        <fieldset className="space-y-2">
+                            <legend className="text-sm font-medium">Provided amount</legend>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input
+                                    type="radio"
+                                    name="provided-amount-choice"
+                                    checked={amountChoice === 'requested'}
+                                    onChange={() => setAmountChoice('requested')}
+                                />
+                                Use the requested amount
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input
+                                    type="radio"
+                                    name="provided-amount-choice"
+                                    checked={amountChoice === 'custom'}
+                                    onChange={() => setAmountChoice('custom')}
+                                />
+                                Enter a different provided amount
+                            </label>
+                            {amountChoice === 'custom' && (
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={customAmount}
+                                    onChange={(event) => setCustomAmount(event.target.value)}
+                                    aria-label="Provided amount"
+                                />
+                            )}
+                            <FieldError>{actionForm.errors.provided_amount}</FieldError>
+                        </fieldset>
+                        <Field>
+                            <FieldLabel htmlFor="budget-note">Note</FieldLabel>
+                            <Textarea
+                                id="budget-note"
+                                rows={3}
+                                value={actionForm.data.note}
+                                onChange={(event) => actionForm.setData('note', event.target.value)}
+                            />
+                            <FieldError>{actionForm.errors.note}</FieldError>
+                        </Field>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={actionForm.processing}
+                                onClick={() => submitDecision('rejected')}
+                            >
+                                Reject
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={actionForm.processing}
+                                loading={actionForm.processing}
+                                onClick={() => submitDecision('approved')}
+                            >
+                                {actionItem?.submit_label ?? 'Save'}
+                            </Button>
+                        </DialogFooter>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WeeklyPlan;
+use App\Models\WeeklyPlanBudgetItem;
 use App\Models\WeeklyPlanBudgetReview;
 use App\Models\WorkPeriod;
 use Carbon\Carbon;
@@ -1001,6 +1002,106 @@ class WeeklyBudgetReviewTest extends TestCase
         $this->assertEquals(600.0, $summary['requested_total']);
         $this->assertEquals(80.0, $summary['provided_total']);
         $this->assertTrue($summary['is_partial']);
+    }
+
+    public function test_pending_review_exposes_an_action_and_stores_a_chosen_provided_amount(): void
+    {
+        [$current] = $this->createPeriods();
+        $department = $this->createDepartment();
+        $staff = $this->createStaffUser($department);
+        $reviewer = $this->createStageReviewer('review weekly budgets');
+        $plan = $this->createPlanWithBudget($staff, $current, [[
+            'budget_uid' => 'print1',
+            'item' => 'Printing',
+            'description_purpose' => 'Books',
+            'unit' => 'reams',
+            'amount' => '25000',
+        ]]);
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.weekly-budget-review', [
+                'period_id' => $current->id,
+                'status' => 'pending',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('grouped', function ($grouped) {
+                $item = collect($grouped)
+                    ->flatMap(fn ($period) => collect($period['departments'] ?? []))
+                    ->flatMap(fn ($department) => collect($department['staff'] ?? []))
+                    ->flatMap(fn ($staff) => $staff['items'] ?? [])
+                    ->first(fn ($row) => ($row['item'] ?? '') === 'Printing');
+
+                return is_array($item)
+                    && ($item['unit'] ?? null) === 'reams'
+                    && ($item['can_act'] ?? false) === true
+                    && ($item['action_label'] ?? null) === 'Review'
+                    && ($item['status_label'] ?? null) === 'Pending Review'
+                    && (float) ($item['amount_numeric'] ?? 0) === 25000.0;
+            }));
+
+        $this->actingAs($reviewer)
+            ->post(route('documents.process-weekly-budget-review', $plan->id), [
+                'budget_uid' => 'print1',
+                'decision' => 'approved',
+                'provided_amount' => 18000,
+                'note' => 'Reduced',
+            ])
+            ->assertRedirect();
+
+        $budgetItem = WeeklyPlanBudgetItem::query()->where('budget_uid', 'print1')->first();
+        $this->assertNotNull($budgetItem);
+        $this->assertSame('reams', $budgetItem->unit);
+        $this->assertSame(Document::BUDGET_REVIEW_STAGE_REVIEWED, $budgetItem->review?->approval_stage);
+        $this->assertEquals(18000, (float) $budgetItem->review?->review_provided_amount);
+        $this->assertSame('Reduced', $budgetItem->review?->note);
+    }
+
+    public function test_completed_budget_lines_stay_visible_on_the_completed_filter_without_an_action(): void
+    {
+        [$current] = $this->createPeriods();
+        $department = $this->createDepartment();
+        $staff = $this->createStaffUser($department);
+        $reviewer = $this->createStageReviewer('review weekly budgets');
+        $plan = $this->createPlanWithBudget($staff, $current, [[
+            'budget_uid' => 'done1',
+            'item' => 'Transport',
+            'description_purpose' => 'Field',
+            'unit' => 'days',
+            'amount' => '10000',
+        ]]);
+
+        $budgetItem = WeeklyPlanBudgetItem::query()->where('budget_uid', 'done1')->firstOrFail();
+        WeeklyPlanBudgetReview::query()->updateOrCreate(
+            ['weekly_plan_budget_item_id' => $budgetItem->id],
+            [
+                'decision' => Document::BUDGET_REVIEW_APPROVED,
+                'approval_stage' => Document::BUDGET_REVIEW_STAGE_COMPLETED,
+                'provided_amount' => 10000,
+            ]
+        );
+        WeeklyPlan::query()->whereKey($plan->id)->update([
+            'budget_review_status' => Document::BUDGET_REVIEW_COMPLETED,
+        ]);
+
+        $this->actingAs($reviewer)
+            ->get(route('documents.weekly-budget-review', [
+                'period_id' => $current->id,
+                'status' => 'completed',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('statusFilter', 'completed')
+                ->where('grouped', function ($grouped) {
+                    $item = collect($grouped)
+                        ->flatMap(fn ($period) => collect($period['departments'] ?? []))
+                        ->flatMap(fn ($department) => collect($department['staff'] ?? []))
+                        ->flatMap(fn ($staff) => $staff['items'] ?? [])
+                        ->first(fn ($row) => ($row['budget_uid'] ?? '') === 'done1');
+
+                    return is_array($item)
+                        && ($item['status_label'] ?? null) === 'Completed'
+                        && ($item['can_act'] ?? true) === false;
+                }));
     }
 
     protected function tearDown(): void

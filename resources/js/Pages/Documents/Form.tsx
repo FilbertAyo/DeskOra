@@ -46,7 +46,7 @@ type MeetingRow = {
     is_readonly_for_current_user?: boolean | string;
 };
 
-type BudgetRow = { item: string; description_purpose: string; amount: string; budget_uid?: string };
+type BudgetRow = { item: string; description_purpose: string; unit: string; amount: string; budget_uid?: string };
 type BudgetStatusRow = { budget_uid?: string; item?: string; status?: string; notes?: string };
 type ProgressRow = {
     activity_output: string;
@@ -121,7 +121,7 @@ function emptyMeeting(userId: string): MeetingRow {
 }
 
 function emptyBudget(): BudgetRow {
-    return { item: '', description_purpose: '', amount: '' };
+    return { item: '', description_purpose: '', unit: '', amount: '' };
 }
 
 function StaffMultiSelect({
@@ -411,6 +411,7 @@ export default function DocumentsForm({
             (row) =>
                 String(row.item ?? '').trim() !== '' ||
                 String(row.description_purpose ?? '').trim() !== '' ||
+                String(row.unit ?? '').trim() !== '' ||
                 String(row.amount ?? '').trim() !== '',
         );
     }, [isReport, relatedPlan]);
@@ -844,7 +845,7 @@ export default function DocumentsForm({
                                 </div>
                                 <div className="space-y-4">
                                     {form.data.content.budget.map((row, index) => (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_10rem_auto]">
+                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_8rem_10rem_auto]">
                                             <label className="space-y-1 text-sm">
                                                 <span className="font-medium">Budget Item / Activity</span>
                                                 <Input
@@ -859,6 +860,14 @@ export default function DocumentsForm({
                                                     rows={3}
                                                     value={row.description_purpose}
                                                     onChange={(event) => updateBudget(index, { description_purpose: event.target.value })}
+                                                />
+                                            </label>
+                                            <label className="space-y-1 text-sm">
+                                                <span className="font-medium">Unit</span>
+                                                <Input
+                                                    value={row.unit}
+                                                    placeholder="e.g., reams"
+                                                    onChange={(event) => updateBudget(index, { unit: event.target.value })}
                                                 />
                                             </label>
                                             <label className="space-y-1 text-sm">
@@ -1217,7 +1226,7 @@ export default function DocumentsForm({
                                                             {planRow.description_purpose || '—'}
                                                         </p>
                                                         <p className="mt-1 text-xs tabular-nums">
-                                                            Amount: {planRow.amount || '—'}
+                                                            Unit: {planRow.unit || '—'} · Amount: {planRow.amount || '—'}
                                                         </p>
                                                     </div>
                                                     <div>

@@ -242,7 +242,7 @@
             if (! is_array($row)) {
                 return false;
             }
-            foreach (['item', 'description_purpose', 'amount'] as $k) {
+            foreach (['item', 'description_purpose', 'unit', 'amount'] as $k) {
                 if (trim((string) ($row[$k] ?? '')) !== '') {
                     return true;
                 }
@@ -257,7 +257,7 @@
                 continue;
             }
             $rowHasContent = false;
-            foreach (['item', 'description_purpose', 'amount'] as $budgetKey) {
+            foreach (['item', 'description_purpose', 'unit', 'amount'] as $budgetKey) {
                 if (trim((string) ($budgetRow[$budgetKey] ?? '')) !== '') {
                     $rowHasContent = true;
                     break;
@@ -507,9 +507,10 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 30%;">Budget Item / Activity</th>
+                    <th style="width: 28%;">Budget Item / Activity</th>
                     <th>Description / Purpose</th>
-                    <th style="width: 18%;">Amount (TZS)</th>
+                    <th style="width: 12%;">Unit</th>
+                    <th style="width: 16%;">Amount (TZS)</th>
                 </tr>
             </thead>
             <tbody>
@@ -517,7 +518,7 @@
                     @php
                         $row = is_array($row) ? $row : [];
                         $bEmpty = true;
-                        foreach (['item', 'description_purpose', 'amount'] as $bk) {
+                        foreach (['item', 'description_purpose', 'unit', 'amount'] as $bk) {
                             if (trim((string) ($row[$bk] ?? '')) !== '') {
                                 $bEmpty = false;
                                 break;
@@ -528,12 +529,13 @@
                         <tr>
                             <td>{{ $row['item'] ?? '' }}</td>
                             <td>{{ $row['description_purpose'] ?? '' }}</td>
+                            <td>{{ $row['unit'] ?? '' }}</td>
                             <td>{{ $row['amount'] ?? '' }}</td>
                         </tr>
                     @endif
                 @endforeach
                 <tr class="fw-bold">
-                    <td colspan="2" class="text-end">Total</td>
+                    <td colspan="3" class="text-end">Total</td>
                     <td class="text-end">{{ number_format($budgetTotal, 2) }}</td>
                 </tr>
             </tbody>

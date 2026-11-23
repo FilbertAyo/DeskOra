@@ -51,6 +51,7 @@ class WeeklyBudgetApprovalFlow
             Document::BUDGET_REVIEW_STAGE_APPROVED => self::canProcessStage($user, self::STAGE_AUTHORIZE)
                 ? self::STAGE_AUTHORIZE
                 : null,
+            Document::BUDGET_REVIEW_STAGE_COMPLETED => null,
             default => null,
         };
     }
@@ -77,6 +78,10 @@ class WeeklyBudgetApprovalFlow
 
     public static function statusLabel(string $approvalStage, bool $isFinalApproved, bool $isRejected): string
     {
+        if ($approvalStage === Document::BUDGET_REVIEW_STAGE_COMPLETED) {
+            return 'Completed';
+        }
+
         if ($isFinalApproved) {
             return 'Approved';
         }
@@ -94,6 +99,10 @@ class WeeklyBudgetApprovalFlow
 
     public static function statusBadgeClass(string $approvalStage, bool $isFinalApproved, bool $isRejected): string
     {
+        if ($approvalStage === Document::BUDGET_REVIEW_STAGE_COMPLETED) {
+            return 'bg-light-success border border-success';
+        }
+
         if ($isFinalApproved) {
             return 'bg-light-success border border-success';
         }
@@ -159,7 +168,7 @@ class WeeklyBudgetApprovalFlow
         $isFinalApproved = ($item['decision'] ?? '') === Document::BUDGET_REVIEW_APPROVED
             && $approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
 
-        if ($isRejected || $isFinalApproved) {
+        if ($isRejected || $isFinalApproved || $approvalStage === Document::BUDGET_REVIEW_STAGE_COMPLETED) {
             return false;
         }
 
@@ -167,6 +176,7 @@ class WeeklyBudgetApprovalFlow
             Document::BUDGET_REVIEW_STAGE_PENDING => $user->can('review weekly budgets'),
             Document::BUDGET_REVIEW_STAGE_REVIEWED => $user->can('approve weekly budgets'),
             Document::BUDGET_REVIEW_STAGE_APPROVED => $user->can('authorize weekly budgets'),
+            Document::BUDGET_REVIEW_STAGE_COMPLETED => false,
             default => false,
         };
     }
@@ -188,9 +198,10 @@ class WeeklyBudgetApprovalFlow
         $approvalStage = $item['approval_stage'] ?? Document::BUDGET_REVIEW_STAGE_PENDING;
         $isFinalApproved = ($item['decision'] ?? '') === Document::BUDGET_REVIEW_APPROVED
             && $approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
+        $isCompleted = $approvalStage === Document::BUDGET_REVIEW_STAGE_COMPLETED;
 
         $nextStage = null;
-        if (! $isRejected && ! $isFinalApproved) {
+        if (! $isRejected && ! $isFinalApproved && ! $isCompleted) {
             $nextStage = self::resolveNextActionStage($approvalStage, $user);
         }
 

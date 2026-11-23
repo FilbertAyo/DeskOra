@@ -21,6 +21,7 @@ use App\Models\YearPlanActivity;
 use App\Services\NotificationService;
 use App\Services\RequestApprovalNavService;
 use App\Services\RequisitionNotificationService;
+use App\Services\Requisitions\WeeklyPlanBudgetLinkService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -38,6 +39,7 @@ class PettyController extends Controller
     public function __construct(
         private readonly RequisitionNotificationService $requisitionNotifications,
         private readonly RequestApprovalNavService $requestApprovalNavService,
+        private readonly WeeklyPlanBudgetLinkService $weeklyPlanBudgetLink,
     ) {}
 
     private function forgetApprovalNavCounts(): void
@@ -290,6 +292,7 @@ class PettyController extends Controller
         return Inertia::render('Finance/Requisition/Form', [
             'mode' => 'create',
             'planActivities' => $planActivities,
+            'weeklyPlanBudgets' => $user ? $this->weeklyPlanBudgetLink->optionsForUser($user) : [],
             'nextOffPlanActivityCode' => $this->nextOffPlanActivityCode($user),
             'hasSignature' => $hasSignature,
             'formContext' => [
@@ -362,6 +365,9 @@ class PettyController extends Controller
             $baseRules,
             $isDraft ? $this->requisitionDraftValidationRules() : $this->requisitionSubmitValidationRules()
         ));
+        /** @var User $actor */
+        $actor = Auth::user();
+        $validated['weekly_plan_id'] = $this->weeklyPlanBudgetLink->ownedPlanId($validated['weekly_plan_id'] ?? null, $actor);
         $validated = $this->resolveRequisitionActivityFields($request, $validated, $isDraft);
 
         if ($validated === null) {
@@ -576,6 +582,8 @@ class PettyController extends Controller
         $this->forgetApprovalNavCounts();
 
         if ($petty->request_type === 'Staff Requisition') {
+            $petty->load('requisitionDetails');
+            $this->weeklyPlanBudgetLink->markCompleted($petty->requisitionDetails?->weekly_plan_id);
             $this->requisitionNotifications->notifyRequester($petty, 'authorized', Auth::user());
         } else {
             [$name, $reason, $encodedId] = $this->buildRequestMailArgs($petty);
@@ -744,6 +752,7 @@ class PettyController extends Controller
         return Inertia::render('Finance/Requisition/Form', [
             'mode' => 'edit',
             'planActivities' => $planActivities,
+            'weeklyPlanBudgets' => $user ? $this->weeklyPlanBudgetLink->optionsForUser($user) : [],
             'nextOffPlanActivityCode' => $this->nextOffPlanActivityCode($user, (string) $petty->id),
             'hasSignature' => true,
             'formContext' => [
@@ -784,6 +793,9 @@ class PettyController extends Controller
             'department_id' => ['nullable', 'string', 'short_id', 'exists:departments,id'],
             'action' => $actionRule,
         ], $rules));
+        /** @var User $actor */
+        $actor = Auth::user();
+        $validated['weekly_plan_id'] = $this->weeklyPlanBudgetLink->ownedPlanId($validated['weekly_plan_id'] ?? null, $actor);
         $validated = $this->resolveRequisitionActivityFields($request, $validated, $saveAsDraft, (string) $petty->id);
 
         if ($validated === null) {
@@ -992,6 +1004,7 @@ class PettyController extends Controller
             'date_of_request' => 'nullable|date',
             'date_of_requirement' => 'nullable|date',
             'reason' => 'nullable|string|max:1000',
+            'weekly_plan_id' => 'nullable|string|max:26',
             'items' => 'nullable|array',
             'items.*.description' => 'nullable|string|max:255',
             'items.*.unit' => 'nullable|string|max:255',
@@ -1014,6 +1027,7 @@ class PettyController extends Controller
             'date_of_request' => 'nullable|date',
             'date_of_requirement' => 'nullable|date',
             'reason' => 'nullable|string|max:1000',
+            'weekly_plan_id' => 'nullable|string|max:26',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:255',
             'items.*.unit' => 'nullable|string|max:255',
@@ -1212,6 +1226,7 @@ class PettyController extends Controller
                 'date_of_requirement' => $validated['date_of_requirement'] ?? null,
                 'reason' => $validated['reason'] ?? null,
                 'amount' => $amount,
+                'weekly_plan_id' => $validated['weekly_plan_id'] ?? null,
             ]
         );
 
@@ -1295,6 +1310,9 @@ class PettyController extends Controller
             'activityTitle' => $request->activity_title,
             'budgetCode' => $request->budget_code,
             'isOffPlan' => $request->is_off_plan,
+            'weeklyPlanId' => $request->requisitionDetails?->weekly_plan_id
+                ? (string) $request->requisitionDetails->weekly_plan_id
+                : null,
             'dateOfRequest' => optional($request->date_of_request)->format('Y-m-d'),
             'dateOfRequirement' => optional($request->date_of_requirement)->format('Y-m-d'),
             'items' => $request->requisitionItems->map(fn (RequisitionItem $item) => [

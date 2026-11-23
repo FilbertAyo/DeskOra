@@ -56,6 +56,7 @@ type Doc = {
     createdAt?: string | null;
     canEdit?: boolean;
     reviewRejectionReason?: string | null;
+    budgetReviewStatus?: string | null;
     showUrl?: string;
     editUrl?: string;
     fileName?: string | null;
@@ -123,11 +124,13 @@ function targetBadge(label: string) {
 function Section({
     title,
     icon,
+    extra,
     children,
     className,
 }: {
     title: string;
     icon?: ReactNode;
+    extra?: ReactNode;
     children: ReactNode;
     className?: string;
 }) {
@@ -136,6 +139,7 @@ function Section({
             <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
                 {icon}
                 <h3 className="text-sm font-semibold">{title}</h3>
+                {extra ? <div className="ml-auto">{extra}</div> : null}
             </div>
             <div className="p-4">{children}</div>
         </div>
@@ -286,6 +290,7 @@ export default function DocumentsShow({
         (row) =>
             String(row.item ?? '').trim() !== '' ||
             String(row.description_purpose ?? '').trim() !== '' ||
+            String(row.unit ?? '').trim() !== '' ||
             String(row.amount ?? '').trim() !== '',
     );
     const activityProgress = sortRowsByWeekday(
@@ -330,6 +335,7 @@ export default function DocumentsShow({
         (row) =>
             String(row.item ?? '').trim() !== '' ||
             String(row.description_purpose ?? '').trim() !== '' ||
+            String(row.unit ?? '').trim() !== '' ||
             String(row.amount ?? '').trim() !== '',
     );
 
@@ -694,7 +700,17 @@ export default function DocumentsShow({
                                     )}
                                 </Section>
 
-                                <Section title="Budget" icon={<WalletIcon className="text-muted-foreground size-4" />}>
+                                <Section
+                                    title="Budget"
+                                    icon={<WalletIcon className="text-muted-foreground size-4" />}
+                                    extra={
+                                        document.budgetReviewStatus ? (
+                                            <Badge variant={statusBadgeVariant(document.budgetReviewStatus)}>
+                                                {document.budgetReviewStatus}
+                                            </Badge>
+                                        ) : null
+                                    }
+                                >
                                     {budget.length === 0 ? (
                                         <EmptyNote>No budget items.</EmptyNote>
                                     ) : (
@@ -703,6 +719,7 @@ export default function DocumentsShow({
                                                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                                                     <TableHead>Budget Item / Activity</TableHead>
                                                     <TableHead>Description / Purpose</TableHead>
+                                                    <TableHead>Unit</TableHead>
                                                     <TableHead className="text-right">Amount (TZS)</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -713,12 +730,14 @@ export default function DocumentsShow({
                                                         <TableCell className="whitespace-pre-wrap">
                                                             {String(row.description_purpose ?? '—')}
                                                         </TableCell>
+                                                        <TableCell>{String(row.unit ?? '') || '—'}</TableCell>
                                                         <TableCell className="text-right tabular-nums">
                                                             {money(row.amount)}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
                                                 <TableRow className="bg-muted/20 font-semibold">
+                                                    <TableCell />
                                                     <TableCell />
                                                     <TableCell className="text-right">Total</TableCell>
                                                     <TableCell className="text-right tabular-nums">{money(budgetTotal)}</TableCell>

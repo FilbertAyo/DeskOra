@@ -18,10 +18,32 @@ import { route } from '@/lib/route';
 
 type Activity = { id: string; code: string; description: string; department_id: string; year: number | string | null };
 type LineItem = { description: string; unit: string; cost: string | number };
+type WeeklyPlanBudget = {
+    id: string;
+    label: string;
+    isCurrentWeek: boolean;
+    items: LineItem[];
+};
+
+function blankLine(): LineItem {
+    return { description: '', unit: '', cost: '' };
+}
+
+function linesFromPlan(plan: WeeklyPlanBudget | undefined): LineItem[] {
+    if (!plan || plan.items.length === 0) {
+        return [blankLine()];
+    }
+    return plan.items.map((item) => ({
+        description: item.description,
+        unit: item.unit ?? '',
+        cost: item.cost,
+    }));
+}
 
 export default function Form({
     mode,
     planActivities,
+    weeklyPlanBudgets = [],
     nextOffPlanActivityCode,
     hasSignature,
     formContext,
@@ -29,12 +51,20 @@ export default function Form({
 }: {
     mode: 'create' | 'edit';
     planActivities: Activity[];
+    weeklyPlanBudgets?: WeeklyPlanBudget[];
     nextOffPlanActivityCode: string;
     hasSignature: boolean;
     formContext: { userId: string; departmentId: string };
     request: FinanceItem | null;
 }) {
     const savedActivity = request?.isOffPlan ? '__off_plan__' : (request?.activityCode ?? '');
+    const defaultPlanId =
+        mode === 'edit'
+            ? (request?.weeklyPlanId ?? '')
+            : (weeklyPlanBudgets.find((plan) => plan.isCurrentWeek)?.id ?? '');
+    const savedItems = request?.items.length
+        ? request.items.map((item) => ({ description: item.description, unit: item.unit ?? '', cost: item.cost }))
+        : [blankLine()];
     const form = useForm({
         user_id: formContext.userId,
         department_id: request?.departmentId ?? formContext.departmentId,
@@ -48,9 +78,11 @@ export default function Form({
         budget_code: request?.budgetCode ?? '',
         date_of_request: request?.dateOfRequest ?? '',
         date_of_requirement: request?.dateOfRequirement ?? '',
-        items: request?.items.length
-            ? request.items.map((item) => ({ description: item.description, unit: item.unit ?? '', cost: item.cost }))
-            : [{ description: '', unit: '', cost: '' }],
+        weekly_plan_id: defaultPlanId,
+        items:
+            mode === 'create' && defaultPlanId
+                ? linesFromPlan(weeklyPlanBudgets.find((plan) => plan.id === defaultPlanId))
+                : savedItems,
     });
     const offPlan = form.data.activity_selection === '__off_plan__';
     const selectActivity = (code: string) => {
@@ -75,6 +107,18 @@ export default function Form({
             activity_title: activity?.description ?? data.activity_title,
             budget_code: activity?.year ? String(activity.year) : '',
             department_id: activity?.department_id ?? data.department_id,
+        }));
+    };
+    const selectWeeklyPlan = (planId: string) => {
+        if (planId === '') {
+            form.setData('weekly_plan_id', '');
+            return;
+        }
+        const plan = weeklyPlanBudgets.find((item) => item.id === planId);
+        form.setData((data) => ({
+            ...data,
+            weekly_plan_id: planId,
+            items: linesFromPlan(plan),
         }));
     };
     const updateItem = (index: number, key: keyof LineItem, value: string) => {
@@ -198,15 +242,32 @@ export default function Form({
                                 />
                             </Field>
                         </div>
+                        <Field label="Link to weekly plan budget" error={form.errors.weekly_plan_id}>
+                            <select
+                                name="weekly_plan_id"
+                                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                value={form.data.weekly_plan_id}
+                                onChange={(event) => selectWeeklyPlan(event.target.value)}
+                            >
+                                <option value="">None — enter line items manually</option>
+                                {weeklyPlanBudgets.map((plan) => (
+                                    <option key={plan.id} value={plan.id}>
+                                        {plan.label}
+                                        {plan.isCurrentWeek ? ' (this week)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-muted-foreground text-xs">
+                                Choosing a plan fills the line items from that budget. You can edit them or add another row.
+                            </p>
+                        </Field>
                         <div>
                             <div className="mb-3 flex items-center justify-between">
                                 <h3 className="font-semibold">Line Items</h3>
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() =>
-                                        form.setData('items', [...form.data.items, { description: '', unit: '', cost: '' }])
-                                    }
+                                    onClick={() => form.setData('items', [...form.data.items, blankLine()])}
                                 >
                                     Add Row
                                 </Button>

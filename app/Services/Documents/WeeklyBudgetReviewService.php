@@ -358,7 +358,7 @@ class WeeklyBudgetReviewService
                             ->orWhere('budget_review_status', Document::BUDGET_REVIEW_PENDING);
                     });
             });
-        } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED], true)) {
+        } elseif (in_array($statusFilter, [Document::BUDGET_REVIEW_APPROVED, Document::BUDGET_REVIEW_REJECTED, Document::BUDGET_REVIEW_COMPLETED], true)) {
             $query->whereHas('weeklyPlanDomain', function ($planQuery) use ($statusFilter) {
                 $planQuery->where('budget_review_status', $statusFilter);
             });
@@ -438,7 +438,7 @@ class WeeklyBudgetReviewService
      *     }>
      * }>
      */
-    public function groupBudgetDocumentsByDepartment(Collection $documents, ?User $viewer = null): array
+    public function groupBudgetDocumentsByDepartment(Collection $documents, ?User $viewer = null, ?string $statusFilter = null): array
     {
         $grouped = [];
         $actorIds = [];
@@ -468,6 +468,7 @@ class WeeklyBudgetReviewService
                     'budget_uid' => $uid,
                     'item' => $item['item'],
                     'description_purpose' => $item['description_purpose'],
+                    'unit' => (string) ($item['unit'] ?? ''),
                     'amount' => $item['amount'],
                     'amount_numeric' => $amountNumeric,
                     'decision' => $review['decision'] ?? Document::BUDGET_REVIEW_PENDING,
@@ -487,9 +488,22 @@ class WeeklyBudgetReviewService
                     'document_id' => $document->id,
                 ];
 
-                if ($viewer && ! WeeklyBudgetApprovalFlow::itemIsInUserQueue($row, $viewer)) {
+                $isCompleted = $approvalStage === Document::BUDGET_REVIEW_STAGE_COMPLETED;
+                $keepCompletedRow = $statusFilter === Document::BUDGET_REVIEW_COMPLETED && $isCompleted;
+                if ($viewer && ! $keepCompletedRow && ! WeeklyBudgetApprovalFlow::itemIsInUserQueue($row, $viewer)) {
                     continue;
                 }
+
+                $action = $viewer ? WeeklyBudgetApprovalFlow::itemViewContext($row, $viewer) : null;
+                $isRejected = ($row['decision'] ?? '') === Document::BUDGET_REVIEW_REJECTED
+                    || $approvalStage === Document::BUDGET_REVIEW_STAGE_REJECTED;
+                $isFinalApproved = ($row['decision'] ?? '') === Document::BUDGET_REVIEW_APPROVED
+                    && $approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED;
+                $row['status_label'] = $action['statusLabel'] ?? WeeklyBudgetApprovalFlow::statusLabel($approvalStage, $isFinalApproved, $isRejected);
+                $row['action_label'] = $action['actionLabel'] ?? null;
+                $row['can_act'] = ($action['nextStage'] ?? null) !== null;
+                $row['modal_title'] = $action['modalTitle'] ?? null;
+                $row['submit_label'] = $action['submitLabel'] ?? null;
 
                 if (! isset($grouped[$periodId])) {
                     $grouped[$periodId] = [
@@ -541,11 +555,14 @@ class WeeklyBudgetReviewService
                 $staff['requested_total'] += $amountNumeric;
                 $grouped[$periodId]['departments'][$departmentId]['requested_total'] += $amountNumeric;
                 $grouped[$periodId]['requested_total'] += $amountNumeric;
-                if ($approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED) {
+                if ($approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED
+                    || $approvalStage === Document::BUDGET_REVIEW_STAGE_COMPLETED) {
                     $staff['provided_total'] += $providedAmount;
                     $grouped[$periodId]['departments'][$departmentId]['provided_total'] += $providedAmount;
                     $grouped[$periodId]['provided_total'] += $providedAmount;
-                    $staff['summary']['approved']++;
+                    if ($approvalStage === Document::BUDGET_REVIEW_STAGE_AUTHORIZED) {
+                        $staff['summary']['approved']++;
+                    }
                 } elseif (($row['decision'] ?? '') === Document::BUDGET_REVIEW_REJECTED
                     || $approvalStage === Document::BUDGET_REVIEW_STAGE_REJECTED) {
                     $staff['summary']['rejected']++;

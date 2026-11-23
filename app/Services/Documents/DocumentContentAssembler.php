@@ -89,6 +89,7 @@ class DocumentContentAssembler
                 'budget_uid' => (string) $item->budget_uid,
                 'item' => (string) ($item->item ?? ''),
                 'description_purpose' => (string) ($item->description_purpose ?? ''),
+                'unit' => (string) ($item->unit ?? ''),
                 'amount' => (string) ($item->amount_raw ?? ''),
             ];
         }

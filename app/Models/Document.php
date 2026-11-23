@@ -182,6 +182,8 @@ class Document extends Model
 
     public const BUDGET_REVIEW_REJECTED = 'rejected';
 
+    public const BUDGET_REVIEW_COMPLETED = 'completed';
+
     public const BUDGET_REVIEW_STAGE_PENDING = 'pending';
 
     public const BUDGET_REVIEW_STAGE_REVIEWED = 'reviewed';
@@ -191,6 +193,8 @@ class Document extends Model
     public const BUDGET_REVIEW_STAGE_AUTHORIZED = 'authorized';
 
     public const BUDGET_REVIEW_STAGE_REJECTED = 'rejected';
+
+    public const BUDGET_REVIEW_STAGE_COMPLETED = 'completed';
 
     /**
      * The attributes that are mass assignable.
@@ -1197,6 +1201,7 @@ class Document extends Model
             self::BUDGET_REVIEW_PENDING => 'Pending',
             self::BUDGET_REVIEW_APPROVED => 'Approved',
             self::BUDGET_REVIEW_REJECTED => 'Rejected',
+            self::BUDGET_REVIEW_COMPLETED => 'Completed',
             default => ucfirst((string) $this->budget_review_status),
         };
     }
@@ -1218,11 +1223,12 @@ class Document extends Model
                         'budget_uid' => (string) $item->budget_uid,
                         'item' => (string) ($item->item ?? ''),
                         'description_purpose' => (string) ($item->description_purpose ?? ''),
+                        'unit' => (string) ($item->unit ?? ''),
                         'amount' => (string) ($item->amount_raw ?? ''),
                         'amount_numeric' => (float) ($item->amount_numeric ?? 0),
                     ];
                 })
-                ->filter(static fn (array $row) => $row['item'] !== '' || $row['description_purpose'] !== '' || $row['amount'] !== '')
+                ->filter(static fn (array $row) => $row['item'] !== '' || $row['description_purpose'] !== '' || $row['unit'] !== '' || $row['amount'] !== '')
                 ->values()
                 ->all();
         }
@@ -1244,8 +1250,9 @@ class Document extends Model
 
             $item = trim((string) ($budgetRow['item'] ?? ''));
             $description = trim((string) ($budgetRow['description_purpose'] ?? ''));
+            $unit = trim((string) ($budgetRow['unit'] ?? ''));
             $amount = trim((string) ($budgetRow['amount'] ?? ''));
-            if ($item === '' && $description === '' && $amount === '') {
+            if ($item === '' && $description === '' && $unit === '' && $amount === '') {
                 continue;
             }
 
@@ -1258,6 +1265,7 @@ class Document extends Model
                 'budget_uid' => $uid,
                 'item' => $item,
                 'description_purpose' => $description,
+                'unit' => $unit,
                 'amount' => $amount,
                 'amount_numeric' => self::parseBudgetAmount($amount),
             ];
@@ -1385,6 +1393,7 @@ class Document extends Model
         $pending = 0;
         $approved = 0;
         $rejected = 0;
+        $completed = 0;
         $requestedTotal = 0.0;
         $providedTotal = 0.0;
 
@@ -1396,6 +1405,9 @@ class Document extends Model
             $approvalStage = $review['approval_stage'] ?? self::BUDGET_REVIEW_STAGE_PENDING;
             if ($decision === self::BUDGET_REVIEW_REJECTED || $approvalStage === self::BUDGET_REVIEW_STAGE_REJECTED) {
                 $rejected++;
+            } elseif ($approvalStage === self::BUDGET_REVIEW_STAGE_COMPLETED) {
+                $completed++;
+                $providedTotal += (float) ($review['provided_amount'] ?? 0);
             } elseif ($decision === self::BUDGET_REVIEW_APPROVED && $approvalStage === self::BUDGET_REVIEW_STAGE_AUTHORIZED) {
                 $approved++;
                 $providedTotal += (float) ($review['provided_amount'] ?? 0);
@@ -1413,11 +1425,13 @@ class Document extends Model
             'pending' => $pending,
             'approved' => $approved,
             'rejected' => $rejected,
+            'completed' => $completed,
             'requested_total' => $requestedTotal,
             'provided_total' => $providedTotal,
             'is_partial' => $isPartial,
             'all_approved' => count($items) > 0 && $approved === count($items),
             'all_rejected' => count($items) > 0 && $rejected === count($items),
+            'all_completed' => count($items) > 0 && $completed === count($items),
         ];
     }
 
@@ -1485,6 +1499,7 @@ class Document extends Model
             self::BUDGET_REVIEW_STAGE_APPROVED,
             self::BUDGET_REVIEW_STAGE_AUTHORIZED,
             self::BUDGET_REVIEW_STAGE_REJECTED,
+            self::BUDGET_REVIEW_STAGE_COMPLETED,
         ];
     }
 

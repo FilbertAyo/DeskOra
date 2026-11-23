@@ -16,6 +16,7 @@ class WeeklyPlanBudgetItem extends Model
         'budget_uid',
         'item',
         'description_purpose',
+        'unit',
         'amount_raw',
         'amount_numeric',
         'sort_order',

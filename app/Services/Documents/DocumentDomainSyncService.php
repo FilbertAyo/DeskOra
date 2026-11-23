@@ -178,8 +178,9 @@ class DocumentDomainSyncService
             }
             $item = trim((string) ($row['item'] ?? ''));
             $description = trim((string) ($row['description_purpose'] ?? ''));
+            $unit = trim((string) ($row['unit'] ?? ''));
             $amountRaw = trim((string) ($row['amount'] ?? ''));
-            if ($item === '' && $description === '' && $amountRaw === '') {
+            if ($item === '' && $description === '' && $unit === '' && $amountRaw === '') {
                 continue;
             }
 
@@ -189,6 +190,7 @@ class DocumentDomainSyncService
                 'budget_uid' => $budgetUid,
                 'item' => $item !== '' ? $item : null,
                 'description_purpose' => $description !== '' ? $description : null,
+                'unit' => $unit !== '' ? $unit : null,
                 'amount_raw' => $amountRaw !== '' ? $amountRaw : null,
                 'amount_numeric' => Document::parseBudgetAmount($amountRaw),
                 'sort_order' => $index,

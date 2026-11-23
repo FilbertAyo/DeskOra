@@ -778,7 +778,7 @@ trait HandlesDocumentCrud
                 if ($request->type === Document::TYPE_WEEKLY_PLAN) {
                     $updateData = array_merge(
                         $updateData,
-                        $this->budgetReviewDefaultsForWeeklyPlan($templateContent, $existingDocument->budget_review_items)
+                        $this->budgetReviewDefaultsForWeeklyPlan($templateContent, $existingDocument->budget_review_items, $existingDocument)
                     );
                 }
             }
@@ -1433,7 +1433,7 @@ trait HandlesDocumentCrud
             if ($document->type === Document::TYPE_WEEKLY_PLAN) {
                 $updateData = array_merge(
                     $updateData,
-                    $this->budgetReviewDefaultsForWeeklyPlan($templateContent, $document->budget_review_items)
+                    $this->budgetReviewDefaultsForWeeklyPlan($templateContent, $document->budget_review_items, $document)
                 );
             }
         }

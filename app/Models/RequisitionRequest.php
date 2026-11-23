@@ -27,6 +27,7 @@ class RequisitionRequest extends Model
                 'date_of_requirement',
                 'reason',
                 'amount',
+                'weekly_plan_id',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
@@ -44,6 +45,7 @@ class RequisitionRequest extends Model
         'date_of_requirement',
         'reason',
         'amount',
+        'weekly_plan_id',
     ];
 
     protected $casts = [

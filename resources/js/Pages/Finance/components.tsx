@@ -74,6 +74,7 @@ export type FinanceItem = {
     activityTitle: string | null;
     budgetCode: string | null;
     isOffPlan: boolean;
+    weeklyPlanId?: string | null;
     dateOfRequest: string | null;
     dateOfRequirement: string | null;
     items: Array<{ id: string; serialNo: number; description: string; unit: string | null; cost: number }>;
