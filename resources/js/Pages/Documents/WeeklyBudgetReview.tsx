@@ -71,6 +71,25 @@ function asList<T>(value: T[] | Record<string, T> | undefined | null): T[] {
     return Array.isArray(value) ? value : Object.values(value);
 }
 
+function parseMoney(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    const normalized = String(value ?? '')
+        .replace(/,/g, '')
+        .replace(/[^\d.-]/g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function requestedAmount(item: BudgetItem): number {
+    const numeric = parseMoney(item.amount_numeric);
+    if (numeric !== 0) {
+        return numeric;
+    }
+    return parseMoney(item.amount);
+}
+
 export default function WeeklyBudgetReview({
     grouped = {},
     stats,
@@ -138,7 +157,7 @@ export default function WeeklyBudgetReview({
         if (!actionItem?.document_id || !actionItem.budget_uid) {
             return;
         }
-        const requested = Number(actionItem.amount_numeric ?? actionItem.amount ?? 0);
+        const requested = requestedAmount(actionItem);
         const provided =
             decision === 'rejected' ? 0 : amountChoice === 'requested' ? requested : Number(customAmount);
         if (decision === 'approved' && amountChoice === 'custom' && (customAmount.trim() === '' || Number.isNaN(provided) || provided < 0)) {
@@ -325,7 +344,7 @@ export default function WeeklyBudgetReview({
                                                             <TableCell>{item.item ?? '—'}</TableCell>
                                                             <TableCell>{item.description_purpose ?? '—'}</TableCell>
                                                             <TableCell>{item.unit || '—'}</TableCell>
-                                                            <TableCell>{Number(item.amount_numeric ?? item.amount ?? 0).toLocaleString()}</TableCell>
+                                                            <TableCell>{requestedAmount(item).toLocaleString()}</TableCell>
                                                             <TableCell>
                                                                 <Badge variant={statusBadgeVariant(item.status_label ?? 'Pending')}>
                                                                     {item.status_label ?? 'Pending'}
@@ -450,7 +469,7 @@ export default function WeeklyBudgetReview({
                         <p className="text-sm">
                             Requested amount:{' '}
                             <span className="font-medium">
-                                {Number(actionItem?.amount_numeric ?? actionItem?.amount ?? 0).toLocaleString()}
+                                {actionItem ? requestedAmount(actionItem).toLocaleString() : '0'}
                             </span>
                             {actionItem?.unit ? ` · ${actionItem.unit}` : ''}
                         </p>
