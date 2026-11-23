@@ -3,6 +3,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
 import DownloadButton from '@/components/shared/DownloadButton';
+import RowActions from '@/components/shared/RowActions';
 import { Badge, statusBadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -334,7 +335,7 @@ export default function WeeklyBudgetReview({
                                                         <TableHead>Unit</TableHead>
                                                         <TableHead>Requested</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead className="w-28">Action</TableHead>
+                                                        <TableHead className="w-16">Action</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -351,13 +352,15 @@ export default function WeeklyBudgetReview({
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {item.can_act && item.action_label ? (
-                                                                    <Button type="button" size="sm" onClick={() => openAction(item)}>
-                                                                        {item.action_label}
-                                                                    </Button>
-                                                                ) : (
-                                                                    '—'
-                                                                )}
+                                                                <RowActions
+                                                                    items={[
+                                                                        {
+                                                                            label: item.action_label ?? 'Review',
+                                                                            onClick: () => openAction(item),
+                                                                            hidden: !(item.can_act && item.action_label),
+                                                                        },
+                                                                    ]}
+                                                                />
                                                             </TableCell>
                                                         </TableRow>
                                                     ))}
@@ -519,6 +522,7 @@ export default function WeeklyBudgetReview({
                             <Button
                                 type="button"
                                 variant="outline"
+                                className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 disabled={actionForm.processing}
                                 onClick={() => submitDecision('rejected')}
                             >
