@@ -116,7 +116,29 @@ class StaffAppreciationNominationTest extends TestCase
         $this->actingAs($user)
             ->post(route('appreciation.remind-later'))
             ->assertOk()
-            ->assertSessionHas(StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
+            ->assertSessionHas(StaffAppreciationNominationController::SNOOZE_SESSION_KEY)
+            ->assertJsonPath('ok', true);
+
+        $response = $this->actingAs($user)->get(route('profile.edit'));
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('overlays.nomination', null));
+
+        // Simulate a fresh request after refresh: session still carries the snooze.
+        $again = $this->actingAs($user)->get(route('profile.edit'));
+        $again->assertInertia(fn (Assert $page) => $page
+            ->where('overlays.nomination', null));
+    }
+
+    public function test_remind_later_cache_hides_modal_even_without_session_flag(): void
+    {
+        $user = $this->activeUser();
+
+        $this->actingAs($user)
+            ->post(route('appreciation.remind-later'))
+            ->assertOk();
+
+        // Drop only the session flag; cache backup must still hide the prompt.
+        session()->forget(StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
 
         $response = $this->actingAs($user)->get(route('profile.edit'));
         $response->assertInertia(fn (Assert $page) => $page

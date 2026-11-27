@@ -105,9 +105,7 @@ class HandleInertiaRequests extends Middleware
                 $nominationPeriod = $service->currentOpenPeriod();
 
                 if ($nominationPeriod && ! $service->hasResponded($nominationPeriod, $user)) {
-                    $snoozedNomination = $request->session()->get(StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
-
-                    if ($snoozedNomination !== $nominationPeriod->id) {
+                    if (! StaffAppreciationNominationController::isSnoozed($request->session(), $user, $nominationPeriod)) {
                         $nomination = [
                             'periodId' => (string) $nominationPeriod->id,
                             'label' => $nominationPeriod->label(),

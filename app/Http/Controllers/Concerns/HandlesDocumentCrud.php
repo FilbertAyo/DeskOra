@@ -419,6 +419,8 @@ trait HandlesDocumentCrud
 
             $validationRules['content.planned_activities'] = ['nullable', 'array'];
             $validationRules['content.planned_activities.*.day'] = ['nullable', 'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'];
+            $validationRules['content.planned_activities.*.days'] = ['nullable', 'array'];
+            $validationRules['content.planned_activities.*.days.*'] = ['nullable', 'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'];
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];
@@ -1196,6 +1198,8 @@ trait HandlesDocumentCrud
 
             $validationRules['content.planned_activities'] = ['nullable', 'array'];
             $validationRules['content.planned_activities.*.day'] = ['nullable', 'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'];
+            $validationRules['content.planned_activities.*.days'] = ['nullable', 'array'];
+            $validationRules['content.planned_activities.*.days.*'] = ['nullable', 'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'];
             $validationRules['content.planned_activities.*.activity'] = ['nullable', 'string', 'max:2000'];
             $validationRules['content.planned_activities.*.location'] = ['nullable', 'string', 'max:255'];
             $validationRules['content.planned_activities.*.team_member_ids'] = ['nullable', 'array'];

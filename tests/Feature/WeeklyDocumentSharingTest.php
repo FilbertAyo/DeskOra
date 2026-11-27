@@ -454,6 +454,44 @@ class WeeklyDocumentSharingTest extends TestCase
         $response->assertDontSee('Finance weekly report', false);
     }
 
+    public function test_weekly_plan_expands_multi_day_activity_into_each_selected_day(): void
+    {
+        [, $nextPeriod] = $this->createCurrentAndNextPeriods();
+        $department = Department::create(['name' => 'Programs']);
+        $owner = $this->createUserInDepartment($department, ['create weekly plan']);
+
+        $this->actingAs($owner)->post(route('documents.store'), [
+            'type' => Document::TYPE_WEEKLY_PLAN,
+            'period_id' => $nextPeriod->id,
+            'main_target' => 'Multi-day target',
+            'content' => [
+                'planned_activities' => [
+                    [
+                        'days' => ['Monday', 'Tuesday', 'Wednesday'],
+                        'activity' => 'Clinic outreach',
+                        'location' => 'Field',
+                        'team_member_ids' => [$owner->id],
+                        'notes_inclusion' => 'Same task across three days',
+                    ],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $document = Document::query()
+            ->where('user_id', $owner->id)
+            ->where('type', Document::TYPE_WEEKLY_PLAN)
+            ->firstOrFail();
+
+        $activities = collect($document->content['planned_activities'] ?? []);
+        $this->assertCount(3, $activities);
+        $this->assertSame(
+            ['Monday', 'Tuesday', 'Wednesday'],
+            $activities->pluck('day')->values()->all()
+        );
+        $this->assertTrue($activities->every(fn ($row) => ($row['activity'] ?? '') === 'Clinic outreach'));
+        $this->assertCount(3, $activities->pluck('activity_uid')->filter()->unique());
+    }
+
     public function test_weekly_plan_assignments_are_projected_as_preview_on_draft_save(): void
     {
         [, $nextPeriod] = $this->createCurrentAndNextPeriods();

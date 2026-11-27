@@ -111,7 +111,7 @@ class AppServiceProvider extends ServiceProvider
                 );
             }
 
-            if (Auth::check() && Schema::hasTable('nomination_periods')) {
+            if (Auth::check() && request()->hasSession() && Schema::hasTable('nomination_periods')) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
                 $service = app(\App\Services\StaffAppreciationService::class);
@@ -121,8 +121,11 @@ class AppServiceProvider extends ServiceProvider
                     && ($user->status ?? '') === 'active'
                     && ! $user->isDemoViewer()
                     && ! $service->hasResponded($staffNominationPeriod, $user)) {
-                    $snoozed = session(\App\Http\Controllers\StaffAppreciationNominationController::SNOOZE_SESSION_KEY);
-                    $showStaffNominationModal = $snoozed !== $staffNominationPeriod->id;
+                    $showStaffNominationModal = ! \App\Http\Controllers\StaffAppreciationNominationController::isSnoozed(
+                        request()->session(),
+                        $user,
+                        $staffNominationPeriod
+                    );
                 }
             }
 

@@ -23,7 +23,10 @@ type StaffUser = { id: string; name: string };
 type Period = { id: string; weekNumber: number; year: number; dateRange: string };
 
 type ActivityRow = {
-    day: string;
+    /** Primary day (kept for saved/legacy rows). Prefer `days` while editing. */
+    day?: string;
+    /** One or more weekdays this activity should appear on. */
+    days: string[];
     activity: string;
     location: string;
     team_member_ids: string[];
@@ -95,6 +98,7 @@ const PROGRESS = ['Done', 'Done and carry', 'Partially done', 'Not started'];
 function emptyActivity(userId: string): ActivityRow {
     return {
         day: 'Monday',
+        days: ['Monday'],
         activity: '',
         location: '',
         team_member_ids: userId ? [userId] : [],
@@ -102,6 +106,49 @@ function emptyActivity(userId: string): ActivityRow {
         activity_uid: '',
         carry_over_source_weekly_report_id: '',
     };
+}
+
+function activityDaysFromRow(row: Partial<ActivityRow> | Record<string, unknown>): string[] {
+    const fromDays = Array.isArray(row.days)
+        ? row.days.map((day) => String(day)).filter((day) => DAYS.includes(day))
+        : [];
+    if (fromDays.length > 0) {
+        return [...new Set(fromDays)];
+    }
+
+    const single = String(row.day ?? '').trim();
+    if (single !== '' && DAYS.includes(single)) {
+        return [single];
+    }
+
+    return ['Monday'];
+}
+
+function normalizeActivityRow(row: Partial<ActivityRow>, userId: string): ActivityRow {
+    const days = activityDaysFromRow(row);
+
+    return {
+        ...emptyActivity(userId),
+        ...row,
+        days,
+        day: days[0] ?? 'Monday',
+        team_member_ids: (row.team_member_ids ?? []).map(String),
+    };
+}
+
+/** Expand multi-day draft rows into one saved activity per day. */
+function expandActivitiesForSubmit(rows: ActivityRow[]): Array<Omit<ActivityRow, 'days'> & { day: string }> {
+    return rows.flatMap((row) => {
+        const days = activityDaysFromRow(row);
+        const { days: _days, ...rest } = row;
+
+        return days.map((day, index) => ({
+            ...rest,
+            day,
+            // Each expanded day needs its own uid so identical tasks are not collapsed.
+            activity_uid: index === 0 ? String(row.activity_uid ?? '') : '',
+        }));
+    });
 }
 
 function emptyMeeting(userId: string): MeetingRow {
@@ -298,18 +345,10 @@ export default function DocumentsForm({
         if (isPlan) {
             const existing = Array.isArray(content.planned_activities) ? (content.planned_activities as ActivityRow[]) : [];
             if (existing.length > 0) {
-                return existing.map((row) => ({
-                    ...emptyActivity(currentUserId),
-                    ...row,
-                    team_member_ids: (row.team_member_ids ?? []).map(String),
-                }));
+                return existing.map((row) => normalizeActivityRow(row, currentUserId));
             }
             if (carriedActivities.length > 0) {
-                return carriedActivities.map((row) => ({
-                    ...emptyActivity(currentUserId),
-                    ...row,
-                    team_member_ids: (row.team_member_ids ?? []).map(String),
-                }));
+                return carriedActivities.map((row) => normalizeActivityRow(row, currentUserId));
             }
             return [emptyActivity(currentUserId)];
         }
@@ -479,7 +518,20 @@ export default function DocumentsForm({
             : 'Create document';
 
     const submit = (action: string) => {
-        form.transform((data) => ({ ...data, action }));
+        form.transform((data) => {
+            const planned = Array.isArray(data.content?.planned_activities)
+                ? (data.content.planned_activities as ActivityRow[])
+                : [];
+
+            return {
+                ...data,
+                action,
+                content: {
+                    ...data.content,
+                    planned_activities: expandActivitiesForSubmit(planned),
+                },
+            };
+        });
         const options = {
             preserveScroll: true,
             onFinish: () => form.transform((data) => data),
@@ -493,8 +545,25 @@ export default function DocumentsForm({
 
     const updateActivity = (index: number, patch: Partial<ActivityRow>) => {
         const rows = [...form.data.content.planned_activities];
-        rows[index] = { ...rows[index], ...patch };
+        const next = { ...rows[index], ...patch };
+        if (patch.days) {
+            next.days = patch.days;
+            next.day = patch.days[0] ?? next.day ?? 'Monday';
+        }
+        rows[index] = next;
         form.setData('content', { ...form.data.content, planned_activities: rows });
+    };
+
+    const toggleActivityDay = (index: number, day: string) => {
+        const row = form.data.content.planned_activities[index];
+        if (!row) {
+            return;
+        }
+
+        const current = activityDaysFromRow(row);
+        const next = current.includes(day) ? current.filter((item) => item !== day) : [...current, day];
+        // Keep at least one day selected so the row stays valid while editing.
+        updateActivity(index, { days: next.length > 0 ? next : current });
     };
 
     const updateMeeting = (index: number, patch: Partial<MeetingRow>) => {
@@ -562,30 +631,36 @@ export default function DocumentsForm({
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-6">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <label className="block space-y-1.5 text-sm">
-                            <span className="font-medium">Document Type</span>
-                            <Input value={availableTypes[type] ?? type} disabled />
-                            <input type="hidden" value={form.data.type} readOnly />
-                        </label>
-                        <label className="block space-y-1.5 text-sm">
-                            <span className="font-medium">Work Period</span>
-                            <select
-                                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-70"
-                                value={form.data.period_id}
-                                disabled={mode === 'edit' || Boolean(defaultPeriodId)}
-                                onChange={(event) => form.setData('period_id', event.target.value)}
-                            >
-                                <option value="">Select period</option>
-                                {workPeriods.map((period) => (
-                                    <option key={period.id} value={period.id}>
-                                        Week {period.weekNumber} of {period.year} ({period.dateRange})
-                                    </option>
-                                ))}
-                            </select>
-                            {form.errors.period_id && <p className="text-destructive text-sm">{form.errors.period_id}</p>}
-                        </label>
-                    </div>
+                    {/* Weekly plan/report already show type + period in the card header; keep values in form state. */}
+                    {!(isPlan || isReport) && (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <label className="block space-y-1.5 text-sm">
+                                <span className="font-medium">Document Type</span>
+                                <Input value={availableTypes[type] ?? type} disabled />
+                                <input type="hidden" value={form.data.type} readOnly />
+                            </label>
+                            <label className="block space-y-1.5 text-sm">
+                                <span className="font-medium">Work Period</span>
+                                <select
+                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-70"
+                                    value={form.data.period_id}
+                                    disabled={mode === 'edit' || Boolean(defaultPeriodId)}
+                                    onChange={(event) => form.setData('period_id', event.target.value)}
+                                >
+                                    <option value="">Select period</option>
+                                    {workPeriods.map((period) => (
+                                        <option key={period.id} value={period.id}>
+                                            Week {period.weekNumber} of {period.year} ({period.dateRange})
+                                        </option>
+                                    ))}
+                                </select>
+                                {form.errors.period_id && <p className="text-destructive text-sm">{form.errors.period_id}</p>}
+                            </label>
+                        </div>
+                    )}
+                    {(isPlan || isReport) && form.errors.period_id && (
+                        <p className="text-destructive text-sm">{form.errors.period_id}</p>
+                    )}
 
                     {isPlan && (
                         <>
@@ -664,23 +739,38 @@ export default function DocumentsForm({
                                     </Button>
                                 </div>
                                 <div className="space-y-4">
-                                    {form.data.content.planned_activities.map((row, index) => (
+                                    {form.data.content.planned_activities.map((row, index) => {
+                                        const selectedDays = activityDaysFromRow(row);
+
+                                        return (
                                         <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
-                                            <label className="space-y-1 text-sm">
-                                                <span className="font-medium">Day</span>
-                                                <select
-                                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                                                    value={row.day}
-                                                    onChange={(event) => updateActivity(index, { day: event.target.value })}
-                                                >
-                                                    <option value="">-- Select --</option>
-                                                    {DAYS.map((day) => (
-                                                        <option key={day} value={day}>
-                                                            {day}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
+                                            <div className="space-y-1 text-sm md:col-span-3">
+                                                <span className="font-medium">Day(s)</span>
+                                                <p className="text-muted-foreground text-xs">
+                                                    Select every day this task will be done. It will appear under each selected day.
+                                                </p>
+                                                <div className="flex flex-wrap gap-2 pt-1">
+                                                    {DAYS.map((day) => {
+                                                        const checked = selectedDays.includes(day);
+                                                        return (
+                                                            <label
+                                                                key={day}
+                                                                className={`inline-flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                                                                    checked ? 'border-primary bg-primary/10' : 'border-input bg-background'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="size-3.5"
+                                                                    checked={checked}
+                                                                    onChange={() => toggleActivityDay(index, day)}
+                                                                />
+                                                                {day}
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                             <label className="space-y-1 text-sm">
                                                 <span className="font-medium">Location</span>
                                                 <select
@@ -696,12 +786,14 @@ export default function DocumentsForm({
                                                     ))}
                                                 </select>
                                             </label>
-                                            <StaffPickerField
-                                                label="Staff / Team"
-                                                users={teamUsers}
-                                                value={row.team_member_ids}
-                                                onChange={(ids) => updateActivity(index, { team_member_ids: ids })}
-                                            />
+                                            <div className="md:col-span-2">
+                                                <StaffPickerField
+                                                    label="Staff / Team"
+                                                    users={teamUsers}
+                                                    value={row.team_member_ids}
+                                                    onChange={(ids) => updateActivity(index, { team_member_ids: ids })}
+                                                />
+                                            </div>
                                             <label className="space-y-1 text-sm md:col-span-3">
                                                 <span className="font-medium">Activity</span>
                                                 <Textarea
@@ -736,7 +828,8 @@ export default function DocumentsForm({
                                                 </Button>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </section>
 

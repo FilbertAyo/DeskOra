@@ -30,6 +30,7 @@ type Colleague = {
 
 const APPROVAL_GATE_SNOOZE_PREFIX = 'deskora.approval_gate.snoozed.';
 const ACTION_LOG_SNOOZE_PREFIX = 'deskora.action_log.snoozed.';
+const NOMINATION_SNOOZE_PREFIX = 'deskora.appreciation.snoozed.';
 
 function csrfToken(): string {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
@@ -128,6 +129,110 @@ function markApprovalGateLocallySnoozed(userId: string | number | null | undefin
     }
 }
 
+function nominationSnoozeKey(
+    userId: string | number | null | undefined,
+    periodId: string | number | null | undefined,
+): string | null {
+    if (
+        userId === null ||
+        userId === undefined ||
+        String(userId) === '' ||
+        periodId === null ||
+        periodId === undefined ||
+        String(periodId) === ''
+    ) {
+        return null;
+    }
+
+    return `${NOMINATION_SNOOZE_PREFIX}${String(userId)}.${String(periodId)}`;
+}
+
+const NOMINATION_SNOOZE_HOURS = 12;
+
+function readNominationSnoozeExpiry(key: string): number | null {
+    try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) {
+            return null;
+        }
+
+        // Legacy sessionStorage / plain "1" flag — treat as snoozed for this load,
+        // then upgrade into a timed localStorage entry on the next mark.
+        if (raw === '1') {
+            return Date.now() + NOMINATION_SNOOZE_HOURS * 60 * 60 * 1000;
+        }
+
+        const parsed = JSON.parse(raw) as { expiresAt?: unknown };
+        const expiresAt = typeof parsed.expiresAt === 'number' ? parsed.expiresAt : Number(parsed.expiresAt);
+
+        return Number.isFinite(expiresAt) ? expiresAt : null;
+    } catch {
+        try {
+            // Fall back to the older sessionStorage flag if present.
+            return window.sessionStorage.getItem(key) === '1'
+                ? Date.now() + NOMINATION_SNOOZE_HOURS * 60 * 60 * 1000
+                : null;
+        } catch {
+            return null;
+        }
+    }
+}
+
+function isNominationLocallySnoozed(
+    userId: string | number | null | undefined,
+    periodId: string | number | null | undefined,
+): boolean {
+    const key = nominationSnoozeKey(userId, periodId);
+    if (!key) {
+        return false;
+    }
+
+    const expiresAt = readNominationSnoozeExpiry(key);
+    if (expiresAt === null) {
+        return false;
+    }
+
+    if (expiresAt <= Date.now()) {
+        try {
+            window.localStorage.removeItem(key);
+            window.sessionStorage.removeItem(key);
+        } catch {
+            // Ignore storage failures.
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+function markNominationLocallySnoozed(
+    userId: string | number | null | undefined,
+    periodId: string | number | null | undefined,
+): void {
+    const key = nominationSnoozeKey(userId, periodId);
+    if (!key) {
+        return;
+    }
+
+    const payload = JSON.stringify({
+        expiresAt: Date.now() + NOMINATION_SNOOZE_HOURS * 60 * 60 * 1000,
+    });
+
+    try {
+        window.localStorage.setItem(key, payload);
+    } catch {
+        // Ignore private-mode / storage quota failures; server snooze still applies.
+    }
+
+    try {
+        // Keep the sessionStorage flag for same-tab refresh even if localStorage is blocked.
+        window.sessionStorage.setItem(key, '1');
+    } catch {
+        // Ignore private-mode / storage quota failures.
+    }
+}
+
 async function postJson(url: string, body: Record<string, string> = {}): Promise<{ ok: boolean; body: { ok?: boolean; message?: string } }> {
     const token = csrfToken();
     const xsrf = xsrfTokenFromCookie();
@@ -151,10 +256,12 @@ async function postJson(url: string, body: Record<string, string> = {}): Promise
 export default function ShellOverlays() {
     const { overlays, auth } = usePage<SharedProps>().props;
     const userId = auth.user?.id;
+    const nominationPeriodId = overlays.nomination?.periodId;
     const gateLocallySnoozed = isApprovalGateLocallySnoozed(userId);
+    const nominationLocallySnoozed = isNominationLocallySnoozed(userId, nominationPeriodId);
     const [gateOpen, setGateOpen] = useState(overlays.approvalGate !== null && !gateLocallySnoozed);
     const [nominationOpen, setNominationOpen] = useState(
-        overlays.approvalGate === null && !gateLocallySnoozed && overlays.nomination !== null,
+        overlays.approvalGate === null && !gateLocallySnoozed && overlays.nomination !== null && !nominationLocallySnoozed,
     );
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Colleague[]>([]);
@@ -163,20 +270,25 @@ export default function ShellOverlays() {
     const reminder = overlays.actionLogReminder;
     const reminderLocallySnoozed = isActionLogLocallySnoozed(userId, reminder?.week, reminder?.year);
     const [reminderOpen, setReminderOpen] = useState(
-        reminder !== null && !reminderLocallySnoozed && overlays.approvalGate === null && overlays.nomination === null && !gateLocallySnoozed,
+        reminder !== null &&
+            !reminderLocallySnoozed &&
+            overlays.approvalGate === null &&
+            (overlays.nomination === null || nominationLocallySnoozed) &&
+            !gateLocallySnoozed,
     );
     const [pendingAction, setPendingAction] = useState<'snooze' | 'skip' | 'later' | 'nominate' | 'log' | null>(null);
 
     useEffect(() => {
         const snoozed = isApprovalGateLocallySnoozed(userId);
+        const nominationSnoozed = isNominationLocallySnoozed(userId, overlays.nomination?.periodId);
         const reminderSnoozed = isActionLogLocallySnoozed(userId, overlays.actionLogReminder?.week, overlays.actionLogReminder?.year);
         setGateOpen(overlays.approvalGate !== null && !snoozed);
-        setNominationOpen(overlays.approvalGate === null && !snoozed && overlays.nomination !== null);
+        setNominationOpen(overlays.approvalGate === null && !snoozed && overlays.nomination !== null && !nominationSnoozed);
         setReminderOpen(
             overlays.actionLogReminder !== null &&
                 !reminderSnoozed &&
                 (overlays.approvalGate === null || snoozed) &&
-                overlays.nomination === null,
+                (overlays.nomination === null || nominationSnoozed),
         );
     }, [overlays.approvalGate, overlays.nomination, overlays.actionLogReminder, userId]);
 
@@ -214,10 +326,12 @@ export default function ShellOverlays() {
     };
 
     const closeNomination = (url: string, action: 'skip' | 'later') => {
+        // Persist immediately so navigation/refresh cannot reopen this session's prompt.
+        markNominationLocallySnoozed(userId, nominationPeriodId);
+        setNominationOpen(false);
         setPendingAction(action);
         void postJson(url).finally(() => {
             setPendingAction(null);
-            setNominationOpen(false);
         });
     };
 
@@ -231,6 +345,7 @@ export default function ShellOverlays() {
             setPendingAction(null);
 
             if (result.ok && result.body.ok) {
+                markNominationLocallySnoozed(userId, nominationPeriodId);
                 setNominationOpen(false);
 
                 return;

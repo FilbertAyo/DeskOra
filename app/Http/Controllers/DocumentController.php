@@ -727,9 +727,10 @@ class DocumentController extends Controller
                 'reflection_progress' => $reflectionProgress,
             ], static fn ($value) => is_string($value) ? $value !== '' : $value !== null);
 
-            // Keep only "complete" activity rows (Day + Activity).
-            // This prevents downstream sync from failing due to half-filled rows.
+            // Expand multi-day draft rows (days[]) into one row per weekday, then
+            // keep only "complete" activity rows (Day + Activity).
             $plannedActivities = is_array($content['planned_activities'] ?? null) ? $content['planned_activities'] : [];
+            $plannedActivities = $this->expandWeeklyPlanActivityDays($plannedActivities);
             $content['planned_activities'] = array_values(array_filter($plannedActivities, function ($row) {
                 if (! is_array($row)) {
                     return false;
@@ -889,6 +890,16 @@ class DocumentController extends Controller
             }
 
             $day = trim((string) ($row['day'] ?? ''));
+            $days = [];
+            if (is_array($row['days'] ?? null)) {
+                foreach ($row['days'] as $candidate) {
+                    $candidate = trim((string) $candidate);
+                    if (in_array($candidate, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], true)) {
+                        $days[] = $candidate;
+                    }
+                }
+            }
+            $hasDay = $day !== '' || $days !== [];
             $activity = trim((string) ($row['activity'] ?? ''));
             $location = trim((string) ($row['location'] ?? ''));
             $notes = trim((string) ($row['notes_inclusion'] ?? ''));
@@ -897,7 +908,7 @@ class DocumentController extends Controller
             $teamIds = array_values(array_filter(array_map(static fn ($id) => trim((string) $id), $teamIds), static fn ($id) => $id !== ''));
 
             $hasAny =
-                $day !== ''
+                $hasDay
                 || $activity !== ''
                 || $location !== ''
                 || $notes !== ''
@@ -907,7 +918,7 @@ class DocumentController extends Controller
                 continue;
             }
 
-            if ($day === '' || $activity === '') {
+            if (! $hasDay || $activity === '') {
                 // Drafts are allowed to be incomplete; we rely on normalization
                 // to discard half-filled rows. Submitting should be strict.
                 if ($action === 'submit') {
@@ -1864,6 +1875,62 @@ class DocumentController extends Controller
         unset($row);
 
         return $rows;
+    }
+
+    /**
+     * Turn a single activity that lists multiple weekdays into one row per day.
+     *
+     * @param  array<int, mixed>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    protected function expandWeeklyPlanActivityDays(array $rows): array
+    {
+        $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        $expanded = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $days = [];
+            if (is_array($row['days'] ?? null)) {
+                foreach ($row['days'] as $day) {
+                    $day = trim((string) $day);
+                    if (in_array($day, $dayOrder, true)) {
+                        $days[] = $day;
+                    }
+                }
+            }
+
+            $single = trim((string) ($row['day'] ?? ''));
+            if ($days === [] && $single !== '' && in_array($single, $dayOrder, true)) {
+                $days = [$single];
+            }
+
+            $days = array_values(array_unique($days));
+            usort($days, static fn (string $a, string $b): int => array_search($a, $dayOrder, true) <=> array_search($b, $dayOrder, true));
+
+            if ($days === []) {
+                unset($row['days']);
+                $expanded[] = $row;
+
+                continue;
+            }
+
+            foreach ($days as $index => $day) {
+                $copy = $row;
+                unset($copy['days']);
+                $copy['day'] = $day;
+                // Later days need fresh uids so dedupe does not collapse them.
+                if ($index > 0) {
+                    $copy['activity_uid'] = '';
+                }
+                $expanded[] = $copy;
+            }
+        }
+
+        return $expanded;
     }
 
     /**
