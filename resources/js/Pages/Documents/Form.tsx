@@ -1,5 +1,5 @@
 import { Link, useForm } from '@inertiajs/react';
-import { AlertTriangleIcon, PlusIcon, Target, Trash2Icon, UsersIcon } from 'lucide-react';
+import { AlertTriangleIcon, CalendarDaysIcon, PlusIcon, Target, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import AppLayout from '@/Layouts/AppLayout';
@@ -113,7 +113,9 @@ function activityDaysFromRow(row: Partial<ActivityRow> | Record<string, unknown>
         ? row.days.map((day) => String(day)).filter((day) => DAYS.includes(day))
         : [];
     if (fromDays.length > 0) {
-        return [...new Set(fromDays)];
+        const unique = [...new Set(fromDays)];
+
+        return DAYS.filter((day) => unique.includes(day));
     }
 
     const single = String(row.day ?? '').trim();
@@ -223,6 +225,102 @@ function staffSummary(users: StaffUser[], value: string[]): string {
         return names.join(', ');
     }
     return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+}
+
+function daySummary(days: string[]): string {
+    const ordered = DAYS.filter((day) => days.includes(day));
+    if (ordered.length === 0) {
+        return 'Select day(s)…';
+    }
+    if (ordered.length <= 3) {
+        return ordered.join(', ');
+    }
+
+    return `${ordered.slice(0, 2).join(', ')} +${ordered.length - 2}`;
+}
+
+function DayPickerField({
+    value,
+    onChange,
+}: {
+    value: string[];
+    onChange: (days: string[]) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState<string[]>(value);
+
+    useEffect(() => {
+        if (open) {
+            setDraft(DAYS.filter((day) => value.includes(day)));
+        }
+    }, [open, value]);
+
+    const toggle = (day: string) => {
+        setDraft((current) => (current.includes(day) ? current.filter((item) => item !== day) : [...current, day]));
+    };
+
+    const selected = DAYS.filter((day) => value.includes(day));
+
+    return (
+        <div className="space-y-1 text-sm">
+            <span className="font-medium">Day(s)</span>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="border-input bg-background hover:bg-muted/40 flex h-9 w-full items-center gap-2 rounded-md border px-3 text-left text-sm"
+            >
+                <CalendarDaysIcon className="text-muted-foreground size-4 shrink-0" />
+                <span className={`min-w-0 flex-1 truncate ${selected.length === 0 ? 'text-muted-foreground' : ''}`}>
+                    {daySummary(selected)}
+                </span>
+                {selected.length > 0 && (
+                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                        {selected.length}
+                    </span>
+                )}
+            </button>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Select day(s)</DialogTitle>
+                        <DialogDescription>
+                            Choose every day this task will be done. It will appear under each selected day.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="border-input space-y-1 rounded-md border p-2">
+                        {DAYS.map((day) => {
+                            const checked = draft.includes(day);
+                            return (
+                                <label
+                                    key={day}
+                                    className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                                >
+                                    <input type="checkbox" checked={checked} onChange={() => toggle(day)} />
+                                    <span>{day}</span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            disabled={draft.length === 0}
+                            onClick={() => {
+                                onChange(DAYS.filter((day) => draft.includes(day)));
+                                setOpen(false);
+                            }}
+                        >
+                            Apply ({draft.length})
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
 }
 
 function StaffPickerField({
@@ -554,18 +652,6 @@ export default function DocumentsForm({
         form.setData('content', { ...form.data.content, planned_activities: rows });
     };
 
-    const toggleActivityDay = (index: number, day: string) => {
-        const row = form.data.content.planned_activities[index];
-        if (!row) {
-            return;
-        }
-
-        const current = activityDaysFromRow(row);
-        const next = current.includes(day) ? current.filter((item) => item !== day) : [...current, day];
-        // Keep at least one day selected so the row stays valid while editing.
-        updateActivity(index, { days: next.length > 0 ? next : current });
-    };
-
     const updateMeeting = (index: number, patch: Partial<MeetingRow>) => {
         const rows = [...form.data.content.key_meetings];
         rows[index] = { ...rows[index], ...patch };
@@ -743,35 +829,14 @@ export default function DocumentsForm({
                                         const selectedDays = activityDaysFromRow(row);
 
                                         return (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
-                                            <div className="space-y-1 text-sm md:col-span-3">
-                                                <span className="font-medium">Day(s)</span>
-                                                <p className="text-muted-foreground text-xs">
-                                                    Select every day this task will be done. It will appear under each selected day.
-                                                </p>
-                                                <div className="flex flex-wrap gap-2 pt-1">
-                                                    {DAYS.map((day) => {
-                                                        const checked = selectedDays.includes(day);
-                                                        return (
-                                                            <label
-                                                                key={day}
-                                                                className={`inline-flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
-                                                                    checked ? 'border-primary bg-primary/10' : 'border-input bg-background'
-                                                                }`}
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="size-3.5"
-                                                                    checked={checked}
-                                                                    onChange={() => toggleActivityDay(index, day)}
-                                                                />
-                                                                {day}
-                                                            </label>
-                                                        );
-                                                    })}
-                                                </div>
+                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-6">
+                                            <div className="md:col-span-2">
+                                                <DayPickerField
+                                                    value={selectedDays}
+                                                    onChange={(days) => updateActivity(index, { days })}
+                                                />
                                             </div>
-                                            <label className="space-y-1 text-sm">
+                                            <label className="space-y-1 text-sm md:col-span-2">
                                                 <span className="font-medium">Location</span>
                                                 <select
                                                     className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
@@ -805,12 +870,12 @@ export default function DocumentsForm({
                                             <label className="space-y-1 text-sm md:col-span-3">
                                                 <span className="font-medium">Notes / Inclusion</span>
                                                 <Textarea
-                                                    rows={3}
+                                                    rows={4}
                                                     value={row.notes_inclusion}
                                                     onChange={(event) => updateActivity(index, { notes_inclusion: event.target.value })}
                                                 />
                                             </label>
-                                            <div className="flex justify-end md:col-span-3">
+                                            <div className="flex justify-end md:col-span-6">
                                                 <Button
                                                     type="button"
                                                     size="sm"
