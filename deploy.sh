@@ -59,13 +59,9 @@ fi
 
 # Same cleanup as the GitHub Actions SSH wrapper: stray make:migration files on
 # the server are still discovered by artisan and can fail deploy mid-migrate.
-# Avoid `cmd | while read` under `set -o pipefail` — EOF from read exits 1.
+# Scoped ONLY to database/migrations — does not touch .env, storage, or uploads.
 echo "==> Removing untracked migration files (if any)..."
-while IFS= read -r stray; do
-  [ -n "$stray" ] || continue
-  echo "    rm $stray"
-  rm -f -- "$stray"
-done < <(git ls-files --others --exclude-standard -- database/migrations)
+git clean -fd -- database/migrations
 
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
