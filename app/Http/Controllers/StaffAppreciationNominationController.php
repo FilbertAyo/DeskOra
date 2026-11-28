@@ -70,6 +70,7 @@ class StaffAppreciationNominationController extends Controller
             Cache::forget(self::snoozeCacheKey($user->id, $period->id));
         }
     }
+
     public function store(Request $request): JsonResponse
     {
         /** @var User $actor */

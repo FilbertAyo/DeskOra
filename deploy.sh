@@ -42,13 +42,28 @@ fi
 echo "==> Pulling latest code..."
 git fetch origin
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then
+  BRANCH="main"
+  echo "    Detached HEAD detected; checking out main"
+  git checkout -B main "origin/main"
+fi
 REMOTE="origin/${BRANCH}"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "    Discarding local changes to tracked files so deploy can proceed:"
   git status --porcelain --untracked-files=no
   git reset --hard "$REMOTE"
 else
-  git pull --ff-only
+  git pull --ff-only "$REMOTE" || git reset --hard "$REMOTE"
+fi
+
+# Same cleanup as the GitHub Actions SSH wrapper: stray make:migration files on
+# the server are still discovered by artisan and can fail deploy mid-migrate.
+if [ -n "$(git ls-files --others --exclude-standard -- database/migrations)" ]; then
+  echo "==> Removing untracked migration files..."
+  git ls-files --others --exclude-standard -- database/migrations | while IFS= read -r stray; do
+    echo "    rm $stray"
+    rm -f -- "$stray"
+  done
 fi
 
 echo "==> Installing production dependencies..."

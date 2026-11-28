@@ -1,21 +1,21 @@
 <?php
 
 use App\Http\Middleware\EnsureAnonymousFeedbackToken;
-use App\Http\Responses\InertiaErrorResponse;
 use App\Http\Middleware\EnsureDemoReadOnly;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventAuthResponseCache;
 use App\Http\Middleware\SlideRememberOtpWindow;
 use App\Http\Middleware\TrackFeatureUsage;
+use App\Http\Responses\InertiaErrorResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
-use Symfony\Component\HttpFoundation\Response;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
