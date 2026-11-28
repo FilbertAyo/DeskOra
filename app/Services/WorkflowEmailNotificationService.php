@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Notification;
 class WorkflowEmailNotificationService
 {
     /**
-     * Notify approvers (e.g. CEO / document_approver role) when a weekly plan/report is submitted.
+     * Notify approvers (e.g. CEO / management role) when a weekly plan/report is submitted.
      */
     public function notifyWeeklyDocumentSubmitted(Document $document, User $submittedBy): void
     {

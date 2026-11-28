@@ -8,7 +8,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Weekly plan/report submissions notify users by permission (not job title).
-    | Assign the document_approver role to the CEO and budget_operator to finance.
+    | Assign the management role to document approvers and budget_operator to finance.
     |
     */
 
@@ -73,15 +73,12 @@ return [
     | Roles that should default to email when created/updated via user management.
     */
     'roles_default_email_channel' => [
-        'document_approver',
+        'management',
         'budget_operator',
         'budget_reviewer',
         'budget_approver',
         'budget_authorizer',
         'superadmin',
-        'requisition_reviewer',
-        'requisition_approver',
-        'requisition_authorizer',
     ],
 
 ];

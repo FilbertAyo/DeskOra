@@ -126,4 +126,63 @@ class RolesAndPermissionsSeederTest extends TestCase
         $this->assertTrue($officer->hasPermissionTo('manage inventory receipts'));
         $this->assertFalse($officer->hasPermissionTo('approve inventory requests'));
     }
+
+    public function test_budget_roles_cover_weekly_budget_petty_cash_and_requisition(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $reviewer = Role::findByName('budget_reviewer');
+        $approver = Role::findByName('budget_approver');
+        $authorizer = Role::findByName('budget_authorizer');
+        $management = Role::findByName('management');
+
+        $this->assertTrue($reviewer->hasPermissionTo('review weekly budgets'));
+        $this->assertTrue($reviewer->hasPermissionTo('review pettycash'));
+        $this->assertTrue($reviewer->hasPermissionTo('review staff requisition'));
+
+        $this->assertTrue($approver->hasPermissionTo('approve weekly budgets'));
+        $this->assertTrue($approver->hasPermissionTo('approve pettycash'));
+        $this->assertTrue($approver->hasPermissionTo('approve staff requisition'));
+
+        $this->assertTrue($authorizer->hasPermissionTo('authorize weekly budgets'));
+        $this->assertTrue($authorizer->hasPermissionTo('authorize pettycash'));
+        $this->assertTrue($authorizer->hasPermissionTo('authorize staff requisition'));
+        $this->assertTrue($authorizer->hasPermissionTo('download staff requisition'));
+
+        $this->assertTrue($management->hasPermissionTo('approve documents'));
+        $this->assertTrue($management->hasPermissionTo('view all documents'));
+
+        $this->assertNull(Role::query()->where('name', 'document_approver')->first());
+        $this->assertNull(Role::query()->where('name', 'requisition_reviewer')->first());
+        $this->assertNull(Role::query()->where('name', 'pettycash_approver')->first());
+    }
+
+    public function test_obsolete_roles_are_migrated_onto_consolidated_roles(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $legacyDoc = Role::create(['name' => 'document_approver']);
+        $legacyDoc->syncPermissions(['approve documents', 'view all documents']);
+        $legacyReq = Role::create(['name' => 'requisition_reviewer']);
+        $legacyReq->givePermissionTo('review staff requisition');
+
+        $ceo = \App\Models\User::factory()->create();
+        $ceo->assignRole('document_approver');
+        $reviewer = \App\Models\User::factory()->create();
+        $reviewer->assignRole('requisition_reviewer');
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $ceo->refresh();
+        $reviewer->refresh();
+
+        $this->assertTrue($ceo->hasRole('management'));
+        $this->assertFalse($ceo->hasRole('document_approver'));
+        $this->assertTrue($ceo->can('approve documents'));
+
+        $this->assertTrue($reviewer->hasRole('budget_reviewer'));
+        $this->assertFalse($reviewer->hasRole('requisition_reviewer'));
+        $this->assertTrue($reviewer->can('review staff requisition'));
+        $this->assertTrue($reviewer->can('review weekly budgets'));
+    }
 }

@@ -233,7 +233,7 @@ class WorkflowEmailNotificationTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_document_approver_role_receives_submission_email_without_direct_permission_grant(): void
+    public function test_management_role_receives_submission_email_without_direct_permission_grant(): void
     {
         Notification::fake();
 
@@ -242,7 +242,7 @@ class WorkflowEmailNotificationTest extends TestCase
         $owner->givePermissionTo('create weekly report');
 
         $ceo = $this->createActiveUserWithChannel('email');
-        $ceo->assignRole(Role::findByName('document_approver'));
+        $ceo->assignRole(Role::findByName('management'));
 
         $document = Document::create([
             'user_id' => $owner->id,

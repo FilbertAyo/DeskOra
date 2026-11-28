@@ -9,12 +9,14 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 /**
- * Additive roles/permissions seeder used by deploy.sh.
+ * Additive roles/permissions seeder for local/dev and fresh installs.
  *
- * Safe on production: creates missing permissions and roles, merges baseline
- * permissions onto known roles, and never deletes users, documents, or inventory
- * records. Extra permissions already on a role are kept. Inventory roles are
- * created empty of users — attach them in Settings → Users.
+ * Creates missing permissions and the canonical role set, merges baseline
+ * permissions onto known roles, and never deletes users or documents.
+ * Extra permissions already on a role are kept.
+ *
+ * Deploy does not run this seeder — production role consolidation is handled
+ * by a one-time migration so deleted custom roles are not recreated.
  */
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -29,6 +31,21 @@ class RolesAndPermissionsSeeder extends Seeder
         'authorize requests' => 'authorize pettycash',
         'review requests' => null,
         'approve requests' => null,
+    ];
+
+    /**
+     * Obsolete per-module roles → consolidated money / management roles.
+     *
+     * @var array<string, string>
+     */
+    public const OBSOLETE_ROLE_MIGRATION = [
+        'document_approver' => 'management',
+        'requisition_reviewer' => 'budget_reviewer',
+        'requisition_approver' => 'budget_approver',
+        'requisition_authorizer' => 'budget_authorizer',
+        'pettycash_reviewer' => 'budget_reviewer',
+        'pettycash_approver' => 'budget_approver',
+        'pettycash_authorizer' => 'budget_authorizer',
     ];
 
     /**
@@ -130,17 +147,11 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
-        $documentApproverRole = Role::firstOrCreate(['name' => 'document_approver']);
+        $managementRole = Role::firstOrCreate(['name' => 'management']);
         $budgetReviewerRole = Role::firstOrCreate(['name' => 'budget_reviewer']);
         $budgetApproverRole = Role::firstOrCreate(['name' => 'budget_approver']);
         $budgetAuthorizerRole = Role::firstOrCreate(['name' => 'budget_authorizer']);
         $budgetOperatorRole = Role::firstOrCreate(['name' => 'budget_operator']);
-        $requisitionReviewerRole = Role::firstOrCreate(['name' => 'requisition_reviewer']);
-        $requisitionApproverRole = Role::firstOrCreate(['name' => 'requisition_approver']);
-        $requisitionAuthorizerRole = Role::firstOrCreate(['name' => 'requisition_authorizer']);
-        $pettycashReviewerRole = Role::firstOrCreate(['name' => 'pettycash_reviewer']);
-        $pettycashApproverRole = Role::firstOrCreate(['name' => 'pettycash_approver']);
-        $pettycashAuthorizerRole = Role::firstOrCreate(['name' => 'pettycash_authorizer']);
         $inventoryViewerRole = Role::firstOrCreate(['name' => 'inventory_viewer']);
         $inventoryOfficerRole = Role::firstOrCreate(['name' => 'inventory_officer']);
         $inventoryApproverRole = Role::firstOrCreate(['name' => 'inventory_approver']);
@@ -149,49 +160,37 @@ class RolesAndPermissionsSeeder extends Seeder
         $inventoryAssetOfficerRole = Role::firstOrCreate(['name' => 'inventory_asset_officer']);
         $demoViewerRole = Role::firstOrCreate(['name' => config('demo.role', 'demo_viewer')]);
 
+        // Money-module stages: one role covers weekly budget, petty cash, and requisition.
         $budgetReviewerPermissions = [
             'view weekly budgets',
             'review weekly budgets',
+            'review pettycash',
+            'review staff requisition',
         ];
         $budgetApproverPermissions = [
             'view weekly budgets',
             'approve weekly budgets',
+            'approve pettycash',
+            'approve staff requisition',
         ];
         $budgetAuthorizerPermissions = [
             'view weekly budgets',
             'authorize weekly budgets',
+            'authorize pettycash',
+            'authorize staff requisition',
+            'download staff requisition',
         ];
         $budgetOperatorPermissions = [
             'view weekly budgets',
             'process weekly budgets',
         ];
-        $documentApproverPermissions = [
+        $managementPermissions = [
             'approve documents',
             'view all documents',
-            'view weekly budgets',
         ];
         $staffPermissions = [
             'create weekly plan',
             'create weekly report',
-        ];
-        $requisitionReviewerPermissions = [
-            'review staff requisition',
-        ];
-        $requisitionApproverPermissions = [
-            'approve staff requisition',
-        ];
-        $requisitionAuthorizerPermissions = [
-            'authorize staff requisition',
-            'download staff requisition',
-        ];
-        $pettycashReviewerPermissions = [
-            'review pettycash',
-        ];
-        $pettycashApproverPermissions = [
-            'approve pettycash',
-        ];
-        $pettycashAuthorizerPermissions = [
-            'authorize pettycash',
         ];
         $inventoryViewerPermissions = [
             'view inventory',
@@ -232,25 +231,21 @@ class RolesAndPermissionsSeeder extends Seeder
         $demoViewerRole->syncPermissions($allPermissions);
 
         // Other roles keep admin-assigned extras (e.g. manage official letters on staff)
-        // so deploy.sh reseeds do not wipe production customizations.
+        // so local re-seeds do not wipe customizations.
         $this->ensureRolePermissions($staffRole, $staffPermissions);
-        $this->ensureRolePermissions($documentApproverRole, $documentApproverPermissions);
+        $this->ensureRolePermissions($managementRole, $managementPermissions);
         $this->ensureRolePermissions($budgetReviewerRole, $budgetReviewerPermissions);
         $this->ensureRolePermissions($budgetApproverRole, $budgetApproverPermissions);
         $this->ensureRolePermissions($budgetAuthorizerRole, $budgetAuthorizerPermissions);
         $this->ensureRolePermissions($budgetOperatorRole, $budgetOperatorPermissions);
-        $this->ensureRolePermissions($requisitionReviewerRole, $requisitionReviewerPermissions);
-        $this->ensureRolePermissions($requisitionApproverRole, $requisitionApproverPermissions);
-        $this->ensureRolePermissions($requisitionAuthorizerRole, $requisitionAuthorizerPermissions);
-        $this->ensureRolePermissions($pettycashReviewerRole, $pettycashReviewerPermissions);
-        $this->ensureRolePermissions($pettycashApproverRole, $pettycashApproverPermissions);
-        $this->ensureRolePermissions($pettycashAuthorizerRole, $pettycashAuthorizerPermissions);
         $this->ensureRolePermissions($inventoryViewerRole, $inventoryViewerPermissions);
         $this->ensureRolePermissions($inventoryOfficerRole, $inventoryOfficerPermissions);
         $this->ensureRolePermissions($inventoryApproverRole, $inventoryApproverPermissions);
         $this->ensureRolePermissions($inventoryAdminRole, $inventoryPermissions);
         $this->ensureRolePermissions($inventoryStoreClerkRole, $inventoryStoreClerkPermissions);
         $this->ensureRolePermissions($inventoryAssetOfficerRole, $inventoryAssetOfficerPermissions);
+
+        $this->migrateObsoleteRoles();
 
         Role::query()->each(function (Role $role) {
             $this->ensureRolePermissions($role, ['view own inventory items']);
@@ -265,6 +260,48 @@ class RolesAndPermissionsSeeder extends Seeder
                     $user->assignRole($superadminRole);
                 }
             });
+
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+    }
+
+    /**
+     * Move users off obsolete roles, then delete those roles.
+     */
+    public function migrateObsoleteRoles(): void
+    {
+        foreach (self::OBSOLETE_ROLE_MIGRATION as $obsoleteName => $targetName) {
+            $obsolete = Role::query()->where('name', $obsoleteName)->first();
+            if (! $obsolete) {
+                continue;
+            }
+
+            $target = Role::firstOrCreate(['name' => $targetName]);
+
+            $userIds = DB::table('model_has_roles')
+                ->where('role_id', $obsolete->id)
+                ->where('model_type', User::class)
+                ->pluck('model_id');
+
+            foreach ($userIds as $userId) {
+                $alreadyHasTarget = DB::table('model_has_roles')
+                    ->where('role_id', $target->id)
+                    ->where('model_id', $userId)
+                    ->where('model_type', User::class)
+                    ->exists();
+
+                if (! $alreadyHasTarget) {
+                    DB::table('model_has_roles')->insert([
+                        'role_id' => $target->id,
+                        'model_id' => $userId,
+                        'model_type' => User::class,
+                    ]);
+                }
+            }
+
+            DB::table('model_has_roles')->where('role_id', $obsolete->id)->delete();
+            DB::table('role_has_permissions')->where('role_id', $obsolete->id)->delete();
+            $obsolete->delete();
+        }
 
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }

@@ -11,13 +11,13 @@ class WorkflowUserNotificationDefaultsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_assigning_document_approver_role_upgrades_sms_channel_to_email(): void
+    public function test_assigning_management_role_upgrades_sms_channel_to_email(): void
     {
         $user = User::factory()->create([
             'notification_channel' => 'sms',
         ]);
 
-        WorkflowUserNotificationDefaults::apply($user, ['document_approver']);
+        WorkflowUserNotificationDefaults::apply($user, ['management']);
 
         $this->assertSame('email', $user->fresh()->notification_channel);
     }
@@ -39,7 +39,7 @@ class WorkflowUserNotificationDefaultsTest extends TestCase
             'notification_channel' => 'both',
         ]);
 
-        WorkflowUserNotificationDefaults::apply($user, ['document_approver']);
+        WorkflowUserNotificationDefaults::apply($user, ['management']);
 
         $this->assertSame('both', $user->fresh()->notification_channel);
     }

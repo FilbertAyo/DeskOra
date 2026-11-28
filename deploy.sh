@@ -97,12 +97,9 @@ if [ "$RUN_DOMAIN_BACKFILL" = "1" ]; then
   "$PHP_BIN" artisan documents:verify-domain-parity --sample=25
 fi
 
-echo "==> Running RolesAndPermissionsSeeder (additive only)..."
-echo "    Creates missing permissions and roles, including Inventory and demo_viewer roles."
-echo "    Merges baseline permissions onto known roles; keeps extra permissions already assigned."
-echo "    Does not delete users, documents, or inventory records."
-echo "    Does not assign Inventory roles to existing users — attach those in Settings → Users."
-"$PHP_BIN" artisan db:seed --class=RolesAndPermissionsSeeder --force --no-interaction
+echo "==> Skipping RolesAndPermissionsSeeder on deploy."
+echo "    Role/permission baselines are applied via migrations when needed."
+echo "    Admin-deleted roles are no longer recreated on every push."
 
 echo "==> Running DemoUserSeeder (additive only)..."
 echo "    Creates or refreshes the view-only demo account when DEMO_VIEWER_ENABLED is true."

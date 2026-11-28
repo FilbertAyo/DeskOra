@@ -57,7 +57,7 @@ class UsersSeeder extends Seeder
         ]);
 
         $superadminRole = Role::firstOrCreate(['name' => 'superadmin']);
-        $documentApproverRole = Role::firstOrCreate(['name' => 'document_approver']);
+        $managementRole = Role::firstOrCreate(['name' => 'management']);
         $budgetOperatorRole = Role::firstOrCreate(['name' => 'budget_operator']);
         $staffRole = Role::firstOrCreate(['name' => 'staff']);
 
@@ -83,7 +83,7 @@ class UsersSeeder extends Seeder
             'status' => 'active',
             'notification_channel' => 'email',
         ]);
-        $ceo->syncRoles([$documentApproverRole->name]);
+        $ceo->syncRoles([$managementRole->name]);
 
         $financeManager = User::create([
             'name' => 'Finance Manager',
@@ -111,7 +111,7 @@ class UsersSeeder extends Seeder
 
         $this->command->info('Users seeded (password for all: password):');
         $this->command->info('  admin@adilisha.or.tz — superadmin');
-        $this->command->info('  ceo@adilisha.or.tz — document approver (weekly plan/report review emails)');
+        $this->command->info('  ceo@adilisha.or.tz — management (weekly plan/report review emails)');
         $this->command->info('  finance@adilisha.or.tz — budget operator (weekly plan budget emails)');
         $this->command->info('  staff@adilisha.or.tz — staff (create weekly plan/report)');
         $this->command->info('Departments: Programs, Finance and Administration, Communications and Advocacy.');
