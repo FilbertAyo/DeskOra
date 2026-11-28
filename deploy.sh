@@ -84,6 +84,17 @@ if grep -qE '^APP_ENV=production' .env 2>/dev/null; then
   echo "    db:wipe, and full db:seed (DatabaseSeeder / UsersSeeder) are never run here."
 fi
 
+# Stray untracked migrations on the server (e.g. one-off artisan make:migration
+# leftovers) are still loaded by `migrate` and can abort deploy when they collide
+# with tables that already exist from the tracked history.
+if [ -n "$(git ls-files --others --exclude-standard -- database/migrations)" ]; then
+  echo "==> Removing untracked migration files before migrate..."
+  git ls-files --others --exclude-standard -- database/migrations | while IFS= read -r stray; do
+    echo "    rm $stray"
+    rm -f -- "$stray"
+  done
+fi
+
 echo "==> Running database migrations (forward-only)..."
 "$PHP_BIN" artisan migrate --force
 
