@@ -42,26 +42,22 @@ fi
 echo "==> Pulling latest code..."
 git fetch origin
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then
-  BRANCH="main"
-  echo "    Detached HEAD detected; checking out main"
-  git checkout -B main "origin/main"
-fi
 REMOTE="origin/${BRANCH}"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "    Discarding local changes to tracked files so deploy can proceed:"
   git status --porcelain --untracked-files=no
   git reset --hard "$REMOTE"
 else
-  # "$REMOTE" is origin/<branch>; pull needs remote + branch name separately.
-  git pull --ff-only origin "$BRANCH" || git reset --hard "$REMOTE"
+  git pull --ff-only
 fi
 
-# Same cleanup as the GitHub Actions SSH wrapper: stray make:migration files on
-# the server are still discovered by artisan and can fail deploy mid-migrate.
-# Scoped ONLY to database/migrations — does not touch .env, storage, or uploads.
 echo "==> Removing untracked migration files (if any)..."
-git clean -fd -- database/migrations
+# Scoped ONLY to database/migrations. Never touches .env, storage, uploads, or DB data.
+git clean -fd -- database/migrations || true
+
+echo "==> Removing stale untracked Vite build leftovers (if any)..."
+# Only untracked hashed chunks under public/build; tracked assets and .env/uploads stay.
+git clean -fd -- public/build || true
 
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
