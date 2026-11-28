@@ -315,11 +315,22 @@ trait HandlesDocumentCrud
         $shareableUsers = $this->shareableDepartmentUsersFor($user);
         $assignedWeeklyActivities = collect();
         $incomingMeetings = [];
+        $managementAssignedTasks = [];
         if ($selectedType === Document::TYPE_WEEKLY_PLAN && $defaultPeriodId) {
             $assignedWeeklyActivities = $this->weeklyActivityAssignmentService->assignmentsForUser((string) $user->id, (string) $defaultPeriodId);
             $incomingMeetings = $this->incomingMeetingsForUserAndPeriod(
                 (string) $defaultPeriodId,
                 [(string) $user->id]
+            );
+            $managementAssignedTasks = $this->managementAssignedTasksForUserPeriod(
+                (string) $user->id,
+                (string) $defaultPeriodId
+            );
+        }
+        if ($selectedType === Document::TYPE_WEEKLY_REPORT && $defaultPeriodId) {
+            $managementAssignedTasks = $this->managementAssignedTasksForUserPeriod(
+                (string) $user->id,
+                (string) $defaultPeriodId
             );
         }
 
@@ -348,6 +359,7 @@ trait HandlesDocumentCrud
                 'name' => $shareableUser->name,
             ])->values(),
             'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'managementAssignedTasks' => $managementAssignedTasks,
             'incomingMeetings' => $incomingMeetings,
             'currentUserId' => (string) $user->id,
             'indexUrl' => session('documents.last_listing_url') ?: route('documents.index'),
@@ -471,6 +483,11 @@ trait HandlesDocumentCrud
             $validationRules['content.budget_statuses'] = ['nullable', 'array'];
             $validationRules['content.budget_statuses.*.status'] = ['nullable', 'string', 'in:Not started,Pending,Received,Paid'];
             $validationRules['content.budget_statuses.*.notes'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.management_task_progress'] = ['nullable', 'array'];
+            $validationRules['content.management_task_progress.*.management_task_recipient_id'] = ['nullable', 'string', 'short_id'];
+            $validationRules['content.management_task_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
+            $validationRules['content.management_task_progress.*.report_feedback'] = ['nullable', 'string', 'max:4000'];
         }
 
         // Add validation for target accomplishment for weekly reports
@@ -814,11 +831,16 @@ trait HandlesDocumentCrud
             }
 
             try {
+                $managementTaskProgressRows = is_array($templateContent['management_task_progress'] ?? null)
+                    ? $templateContent['management_task_progress']
+                    : [];
+
                 DB::transaction(function () use (
                     $existingDocument,
                     $updateData,
                     $sharedUserIds,
-                    $user
+                    $user,
+                    $managementTaskProgressRows
 
                 ) {
                     $existingDocument->update($updateData);
@@ -834,6 +856,7 @@ trait HandlesDocumentCrud
                     }
 
                     if ($existingDocument->type === Document::TYPE_WEEKLY_REPORT) {
+                        $this->syncManagementTaskProgressFromReport($existingDocument, $managementTaskProgressRows);
                         $this->syncNextWeeklyPlanCarryOverFromReport($existingDocument->fresh());
                     }
                 });
@@ -907,8 +930,11 @@ trait HandlesDocumentCrud
         }
 
         $document = null;
+        $managementTaskProgressRows = is_array($templateContent['management_task_progress'] ?? null)
+            ? $templateContent['management_task_progress']
+            : [];
         try {
-            DB::transaction(function () use ($documentData, &$document, $sharedUserIds, $user) {
+            DB::transaction(function () use ($documentData, &$document, $sharedUserIds, $user, $managementTaskProgressRows) {
                 $document = Document::create($documentData);
 
                 if (Document::supportsSharedEditing($document->type)) {
@@ -918,6 +944,7 @@ trait HandlesDocumentCrud
                 $this->syncWeeklyPlanAssignments($document);
 
                 if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+                    $this->syncManagementTaskProgressFromReport($document, $managementTaskProgressRows);
                     $this->syncNextWeeklyPlanCarryOverFromReport($document);
                 }
             });
@@ -972,6 +999,7 @@ trait HandlesDocumentCrud
         $showWeeklyRelatedPanel = $this->shouldShowWeeklyRelatedPanel($document, $relatedDocument, $relatedAction);
 
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
+        $managementAssignedTasks = $this->managementAssignedTasksForDocument($document);
 
         $teamUsers = $this->teamUsersForSelection();
 
@@ -998,6 +1026,7 @@ trait HandlesDocumentCrud
             'relatedAction' => $relatedAction,
             'showWeeklyRelatedPanel' => $showWeeklyRelatedPanel,
             'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'managementAssignedTasks' => $managementAssignedTasks,
             'carriedActivities' => $carriedActivities,
             'incomingMeetings' => $incomingMeetings,
             'teamUsers' => $teamUsers->map(fn (User $teamUser) => [
@@ -1098,6 +1127,7 @@ trait HandlesDocumentCrud
         $teamUsers = $this->teamUsersForSelection();
         $shareableUsers = $this->shareableDepartmentUsersFor($document->user);
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
+        $managementAssignedTasks = $this->managementAssignedTasksForDocument($document);
         $reportMeetingRows = [];
         if ($document->type === Document::TYPE_WEEKLY_REPORT && $document->period_id) {
             $existingMeetingRows = is_array($document->content) ? ($document->content['key_meetings'] ?? []) : [];
@@ -1138,6 +1168,7 @@ trait HandlesDocumentCrud
                 'name' => $shareableUser->name,
             ])->values(),
             'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'managementAssignedTasks' => $managementAssignedTasks,
             'carriedActivities' => $carriedActivities,
             'incomingMeetings' => $incomingMeetings,
             'reportMeetingRows' => $reportMeetingRows,
@@ -1253,6 +1284,11 @@ trait HandlesDocumentCrud
             $validationRules['content.budget_statuses'] = ['nullable', 'array'];
             $validationRules['content.budget_statuses.*.status'] = ['nullable', 'string', 'in:Not started,Pending,Received,Paid'];
             $validationRules['content.budget_statuses.*.notes'] = ['nullable', 'string', 'max:2000'];
+
+            $validationRules['content.management_task_progress'] = ['nullable', 'array'];
+            $validationRules['content.management_task_progress.*.management_task_recipient_id'] = ['nullable', 'string', 'short_id'];
+            $validationRules['content.management_task_progress.*.progress'] = ['nullable', 'string', 'in:Not started,In progress,Done,Partially done'];
+            $validationRules['content.management_task_progress.*.report_feedback'] = ['nullable', 'string', 'max:4000'];
         }
 
         // Add validation for monthly reports
@@ -1448,12 +1484,17 @@ trait HandlesDocumentCrud
             $updateData['review_rejection_reason'] = null;
         }
 
+        $managementTaskProgressRows = is_array($templateContent['management_task_progress'] ?? null)
+            ? $templateContent['management_task_progress']
+            : [];
+
         try {
             DB::transaction(function () use (
                 $document,
                 $updateData,
                 $sharedUserIds,
-                $actingUser
+                $actingUser,
+                $managementTaskProgressRows
 
             ) {
                 $document->update($updateData);
@@ -1466,6 +1507,7 @@ trait HandlesDocumentCrud
                 $this->syncWeeklyPlanAssignments($document);
 
                 if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+                    $this->syncManagementTaskProgressFromReport($document, $managementTaskProgressRows);
                     $this->syncNextWeeklyPlanCarryOverFromReport($document->fresh());
                 }
             });

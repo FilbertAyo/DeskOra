@@ -59,8 +59,31 @@ type ProgressRow = {
     next_step: string;
 };
 type ChallengeRow = { challenge: string; action_taken_planned: string };
+type ManagementTaskProgressRow = {
+    management_task_recipient_id: string;
+    task_id?: string;
+    title: string;
+    description?: string;
+    deadline?: string | null;
+    assigned_by?: string;
+    status?: string;
+    progress: string;
+    report_feedback: string;
+};
+type ManagementAssignedTask = {
+    recipient_id: string;
+    task_id?: string;
+    title: string;
+    description?: string;
+    deadline?: string | null;
+    assigned_by?: string;
+    status?: string;
+    progress?: string | null;
+    report_feedback?: string | null;
+};
 
 const BUDGET_STATUS_OPTIONS = ['Not started', 'Pending', 'Received', 'Paid'] as const;
+const MANAGEMENT_PROGRESS = ['Not started', 'In progress', 'Done', 'Partially done'] as const;
 
 type DocumentPayload = {
     id?: string;
@@ -86,6 +109,7 @@ type Props = {
     reportMeetingRows?: MeetingRow[];
     teamUsers?: StaffUser[];
     shareableUsers?: StaffUser[];
+    managementAssignedTasks?: ManagementAssignedTask[];
     currentUserId?: string;
     indexUrl?: string;
     submitUrl: string;
@@ -429,6 +453,7 @@ export default function DocumentsForm({
     reportMeetingRows = [],
     teamUsers = [],
     shareableUsers = [],
+    managementAssignedTasks = [],
     currentUserId = '',
     indexUrl = '/documents',
     submitUrl,
@@ -553,6 +578,37 @@ export default function DocumentsForm({
         );
     }, [isReport, relatedPlan]);
 
+    const initialManagementTaskProgress: ManagementTaskProgressRow[] = useMemo(() => {
+        if (!isReport) {
+            return [];
+        }
+
+        const existing = Array.isArray(content.management_task_progress)
+            ? (content.management_task_progress as ManagementTaskProgressRow[])
+            : [];
+        const existingById = new Map(
+            existing
+                .filter((row) => String(row.management_task_recipient_id ?? '').trim() !== '')
+                .map((row) => [String(row.management_task_recipient_id), row]),
+        );
+
+        return managementAssignedTasks.map((task) => {
+            const existingRow = existingById.get(String(task.recipient_id));
+
+            return {
+                management_task_recipient_id: String(task.recipient_id),
+                task_id: String(task.task_id ?? ''),
+                title: String(task.title ?? ''),
+                description: String(task.description ?? ''),
+                deadline: task.deadline ?? null,
+                assigned_by: String(task.assigned_by ?? ''),
+                status: String(task.status ?? ''),
+                progress: String(existingRow?.progress || task.progress || ''),
+                report_feedback: String(existingRow?.report_feedback || task.report_feedback || ''),
+            };
+        });
+    }, [isReport, content.management_task_progress, managementAssignedTasks]);
+
     const initialBudgetStatuses: BudgetStatusRow[] = useMemo(() => {
         if (!isReport) {
             return [];
@@ -595,11 +651,18 @@ export default function DocumentsForm({
             budget: initialBudget,
             summary: String(content.summary ?? ''),
             activity_progress: initialProgress,
+            management_task_progress: initialManagementTaskProgress,
             key_achievements: initialAchievements,
             challenges_mitigation: initialChallenges,
             budget_statuses: initialBudgetStatuses,
         },
     });
+
+    const updateManagementTaskProgress = (index: number, patch: Partial<ManagementTaskProgressRow>) => {
+        const rows = [...form.data.content.management_task_progress];
+        rows[index] = { ...rows[index], ...patch };
+        form.setData('content', { ...form.data.content, management_task_progress: rows });
+    };
 
     const [collabOpen, setCollabOpen] = useState(form.data.shared_user_ids.length > 0);
     const periodLabel = workPeriods.find((period) => period.id === form.data.period_id);
@@ -898,6 +961,40 @@ export default function DocumentsForm({
                                 </div>
                             </section>
 
+                            {managementAssignedTasks.length > 0 && (
+                                <section className="space-y-3 rounded-lg border border-dashed p-4">
+                                    <h3 className="font-medium">Management assigned tasks</h3>
+                                    <p className="text-muted-foreground text-sm">
+                                        These tasks were assigned by management for this week and cannot be edited here.
+                                    </p>
+                                    <div className="space-y-2">
+                                        {managementAssignedTasks.map((task) => (
+                                            <div key={task.recipient_id} className="rounded-md border p-3 text-sm">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="bg-muted rounded px-1.5 py-0.5 text-xs font-medium">
+                                                        Management
+                                                    </span>
+                                                    <span className="font-medium">{task.title}</span>
+                                                </div>
+                                                {task.description ? (
+                                                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap text-xs">
+                                                        {task.description}
+                                                    </p>
+                                                ) : null}
+                                                <div className="text-muted-foreground mt-1 text-xs">
+                                                    {[
+                                                        task.assigned_by ? `Assigned by ${task.assigned_by}` : null,
+                                                        task.deadline ? `Deadline ${task.deadline}` : null,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(' · ')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
                             <section className="space-y-3 rounded-lg border p-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <h3 className="font-medium">3. Key Meetings / Engagements</h3>
@@ -1193,6 +1290,76 @@ export default function DocumentsForm({
                                     })}
                                 </div>
                             </section>
+
+                            {form.data.content.management_task_progress.length > 0 && (
+                                <section className="space-y-3 rounded-lg border border-dashed p-4">
+                                    <h3 className="font-medium">Management assigned tasks</h3>
+                                    <p className="text-muted-foreground text-sm">
+                                        Update progress and feedback for tasks assigned by management this week.
+                                    </p>
+                                    <div className="space-y-4">
+                                        {form.data.content.management_task_progress.map((row, index) => (
+                                            <div
+                                                key={row.management_task_recipient_id}
+                                                className="grid gap-3 rounded-md border p-3 md:grid-cols-2"
+                                            >
+                                                <div className="space-y-1 text-sm md:col-span-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="bg-muted rounded px-1.5 py-0.5 text-xs font-medium">
+                                                            Management
+                                                        </span>
+                                                        <span className="font-medium">{row.title}</span>
+                                                    </div>
+                                                    {row.description ? (
+                                                        <p className="text-muted-foreground whitespace-pre-wrap text-xs">
+                                                            {row.description}
+                                                        </p>
+                                                    ) : null}
+                                                    <p className="text-muted-foreground text-xs">
+                                                        {[
+                                                            row.assigned_by ? `Assigned by ${row.assigned_by}` : null,
+                                                            row.deadline ? `Deadline ${row.deadline}` : null,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                    </p>
+                                                </div>
+                                                <label className="space-y-1 text-sm">
+                                                    <span className="font-medium">Progress</span>
+                                                    <select
+                                                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                                        value={row.progress}
+                                                        onChange={(event) =>
+                                                            updateManagementTaskProgress(index, {
+                                                                progress: event.target.value,
+                                                            })
+                                                        }
+                                                    >
+                                                        <option value="">-- Select --</option>
+                                                        {MANAGEMENT_PROGRESS.map((option) => (
+                                                            <option key={option} value={option}>
+                                                                {option}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                <label className="space-y-1 text-sm md:col-span-2">
+                                                    <span className="font-medium">Report / feedback</span>
+                                                    <Textarea
+                                                        rows={3}
+                                                        value={row.report_feedback}
+                                                        onChange={(event) =>
+                                                            updateManagementTaskProgress(index, {
+                                                                report_feedback: event.target.value,
+                                                            })
+                                                        }
+                                                    />
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             <section className="space-y-3 rounded-lg border p-4">
                                 <div className="flex items-center justify-between gap-3">

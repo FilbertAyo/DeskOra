@@ -68,10 +68,12 @@ class PortalNav
             self::link('Dashboard', 'dashboard', [], 'LayoutDashboard', request()->routeIs('dashboard')),
         ];
 
+        $canAssignTasks = $user->can('task assignment');
         $canSeeManagement = $canReviewSubmissions
             || $user->can('manage anonymous feedback')
             || $user->can('view appreciation nominations')
-            || $user->can('manage work periods');
+            || $user->can('manage work periods')
+            || $canAssignTasks;
 
         if ($canSeeManagement) {
             $management = [
@@ -95,6 +97,16 @@ class PortalNav
 
             if ($user->can('view appreciation nominations')) {
                 $management[] = self::link('Staff Appreciation', 'management.appreciation.index', [], null, request()->routeIs('management.appreciation.*'));
+            }
+
+            if ($canAssignTasks) {
+                $management[] = self::link(
+                    'Assigned Tasks',
+                    'management.assigned-tasks.index',
+                    [],
+                    null,
+                    request()->routeIs('management.assigned-tasks.*')
+                );
             }
 
             if ($user->can('manage work periods')) {

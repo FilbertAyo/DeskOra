@@ -13,6 +13,7 @@ use App\Services\Documents\DocumentDomainSyncService;
 use App\Services\Documents\DocumentListingService;
 use App\Services\Documents\WeeklyBudgetReviewService;
 use App\Services\MonthlyReportYearPlanActivities;
+use App\Services\ManagementTaskAssignmentService;
 use App\Services\WeeklyActivityAssignmentService;
 use App\Services\WeeklyBudgetNotificationService;
 use App\Services\WeeklySubmissionReminderService;
@@ -35,6 +36,7 @@ class DocumentController extends Controller
         protected readonly WorkPeriodService $workPeriodService,
         protected readonly WeeklySubmissionReminderService $weeklySubmissionReminderService,
         protected readonly WeeklyActivityAssignmentService $weeklyActivityAssignmentService,
+        protected readonly ManagementTaskAssignmentService $managementTaskAssignmentService,
         protected readonly WorkflowEmailNotificationService $workflowEmailNotificationService,
         protected readonly WeeklyBudgetNotificationService $weeklyBudgetNotificationService,
         protected readonly DocumentListingService $documentListingService,
@@ -89,6 +91,81 @@ class DocumentController extends Controller
         return $this->weeklyActivityAssignmentService->assignmentsForUsers(
             $planParticipantIds,
             (string) $document->period_id
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function managementAssignedTasksForDocument(Document $document): array
+    {
+        if (! $document->period_id) {
+            return [];
+        }
+
+        if ($document->type === Document::TYPE_WEEKLY_PLAN) {
+            $document->loadMissing('sharedUsers:id');
+            $participantIds = collect($document->allEditableUserIds())
+                ->map(static fn ($id) => (string) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            return $this->managementTaskAssignmentService
+                ->forAssignees($participantIds, (string) $document->period_id)
+                ->map(fn ($recipient) => $this->managementTaskAssignmentService->recipientPlanPayload($recipient))
+                ->values()
+                ->all();
+        }
+
+        if ($document->type === Document::TYPE_WEEKLY_REPORT) {
+            return $this->managementTaskAssignmentService
+                ->forAssignee((string) $document->user_id, (string) $document->period_id)
+                ->map(fn ($recipient) => $this->managementTaskAssignmentService->recipientPlanPayload($recipient))
+                ->values()
+                ->all();
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function managementAssignedTasksForUserPeriod(string $userId, ?string $periodId): array
+    {
+        if (! $periodId) {
+            return [];
+        }
+
+        return $this->managementTaskAssignmentService
+            ->forAssignee($userId, $periodId)
+            ->map(fn ($recipient) => $this->managementTaskAssignmentService->recipientPlanPayload($recipient))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>|null  $rows
+     */
+    protected function syncManagementTaskProgressFromReport(Document $document, ?array $rows = null): void
+    {
+        if ($document->type !== Document::TYPE_WEEKLY_REPORT) {
+            return;
+        }
+
+        if ($rows === null) {
+            $content = is_array($document->content) ? $document->content : [];
+            $rows = is_array($content['management_task_progress'] ?? null)
+                ? $content['management_task_progress']
+                : [];
+        }
+
+        $this->managementTaskAssignmentService->syncRecipientProgressFromReport(
+            (string) $document->id,
+            (string) $document->user_id,
+            $rows
         );
     }
 
@@ -857,6 +934,42 @@ class DocumentController extends Controller
                 $content['budget_statuses'] ?? [],
                 ['budget_uid', 'status', 'notes']
             );
+
+            $managementTaskProgress = is_array($content['management_task_progress'] ?? null)
+                ? $content['management_task_progress']
+                : [];
+            $content['management_task_progress'] = array_values(array_filter(array_map(function ($row) {
+                if (! is_array($row)) {
+                    return null;
+                }
+
+                $recipientId = trim((string) ($row['management_task_recipient_id'] ?? ''));
+                if ($recipientId === '') {
+                    return null;
+                }
+
+                $progress = trim((string) ($row['progress'] ?? ''));
+                if ($progress !== '' && ! in_array($progress, [
+                    'Not started',
+                    'In progress',
+                    'Done',
+                    'Partially done',
+                ], true)) {
+                    $progress = '';
+                }
+
+                return [
+                    'management_task_recipient_id' => $recipientId,
+                    'task_id' => trim((string) ($row['task_id'] ?? '')),
+                    'title' => trim((string) ($row['title'] ?? '')),
+                    'description' => trim((string) ($row['description'] ?? '')),
+                    'deadline' => trim((string) ($row['deadline'] ?? '')) ?: null,
+                    'assigned_by' => trim((string) ($row['assigned_by'] ?? '')),
+                    'status' => trim((string) ($row['status'] ?? '')),
+                    'progress' => $progress,
+                    'report_feedback' => trim((string) ($row['report_feedback'] ?? '')),
+                ];
+            }, $managementTaskProgress)));
         }
 
         return $content;

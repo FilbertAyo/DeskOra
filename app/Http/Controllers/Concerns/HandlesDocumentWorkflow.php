@@ -45,6 +45,7 @@ trait HandlesDocumentWorkflow
         }
 
         $assignedWeeklyActivities = $this->assignedWeeklyActivitiesForWeeklyPlanDocument($document);
+        $managementAssignedTasks = $this->managementAssignedTasksForDocument($document);
 
         $teamUsers = $this->teamUsersForSelection();
 
@@ -65,6 +66,7 @@ trait HandlesDocumentWorkflow
             'reviewerPresentation' => $reviewerPresentation,
             'showWeeklyRelatedPanel' => $showWeeklyRelatedPanel,
             'assignedWeeklyActivities' => $assignedWeeklyActivities,
+            'managementAssignedTasks' => $managementAssignedTasks,
             'carriedActivities' => $carriedActivities,
             'incomingMeetings' => $incomingMeetings,
             'teamUsers' => $teamUsers->map(fn ($teamUser) => [

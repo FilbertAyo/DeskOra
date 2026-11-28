@@ -246,6 +246,7 @@ export default function DocumentsShow({
     reportMeetingRows = [],
     incomingMeetings = [],
     assignedWeeklyActivities = [],
+    managementAssignedTasks = [],
     carriedActivities = [],
     indexUrl = '/documents',
 }: {
@@ -258,6 +259,16 @@ export default function DocumentsShow({
     reportMeetingRows?: MeetingRow[];
     incomingMeetings?: MeetingRow[];
     assignedWeeklyActivities?: Array<Record<string, unknown>>;
+    managementAssignedTasks?: Array<{
+        recipient_id: string;
+        title: string;
+        description?: string;
+        deadline?: string | null;
+        assigned_by?: string;
+        status?: string;
+        progress?: string | null;
+        report_feedback?: string | null;
+    }>;
     carriedActivities?: Array<Record<string, unknown>>;
     indexUrl?: string;
     [key: string]: unknown;
@@ -615,8 +626,45 @@ export default function DocumentsShow({
                                     )}
                                 </Section>
 
-                                {(assignedWeeklyActivities.length > 0 || incomingMeetings.length > 0) && (
+                                {(assignedWeeklyActivities.length > 0 ||
+                                    incomingMeetings.length > 0 ||
+                                    managementAssignedTasks.length > 0) && (
                                     <Section title="Assigned by others" icon={<UsersIcon className="text-muted-foreground size-4" />}>
+                                        {managementAssignedTasks.length > 0 && (
+                                            <div className="mb-4 space-y-2">
+                                                <h4 className="text-sm font-medium">Management assigned tasks</h4>
+                                                {managementAssignedTasks.map((task) => (
+                                                    <div key={task.recipient_id} className="rounded-md border p-3 text-sm">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span className="bg-muted rounded px-1.5 py-0.5 text-xs font-medium">
+                                                                Management
+                                                            </span>
+                                                            <span className="font-medium">{task.title}</span>
+                                                        </div>
+                                                        {task.description ? (
+                                                            <div className="text-muted-foreground mt-1 whitespace-pre-wrap text-xs">
+                                                                {task.description}
+                                                            </div>
+                                                        ) : null}
+                                                        <div className="text-muted-foreground mt-1 text-xs">
+                                                            {[
+                                                                task.assigned_by ? `Assigned by ${task.assigned_by}` : null,
+                                                                task.deadline ? `Deadline ${task.deadline}` : null,
+                                                                task.status ? `Status ${task.status}` : null,
+                                                                task.progress ? `Progress ${task.progress}` : null,
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(' · ')}
+                                                        </div>
+                                                        {task.report_feedback ? (
+                                                            <div className="mt-1 text-xs whitespace-pre-wrap">
+                                                                {task.report_feedback}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                         {assignedWeeklyActivities.length > 0 && (
                                             <div className="mb-4 space-y-2">
                                                 <h4 className="text-sm font-medium">Assigned activities</h4>
@@ -810,6 +858,46 @@ export default function DocumentsShow({
                                         </DataTable>
                                     )}
                                 </Section>
+
+                                {managementAssignedTasks.length > 0 && (
+                                    <Section
+                                        title="Management assigned tasks"
+                                        icon={<ListChecksIcon className="text-muted-foreground size-4" />}
+                                    >
+                                        <div className="space-y-2">
+                                            {managementAssignedTasks.map((task) => (
+                                                <div key={task.recipient_id} className="rounded-md border p-3 text-sm">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="bg-muted rounded px-1.5 py-0.5 text-xs font-medium">
+                                                            Management
+                                                        </span>
+                                                        <span className="font-medium">{task.title}</span>
+                                                    </div>
+                                                    {task.description ? (
+                                                        <div className="text-muted-foreground mt-1 whitespace-pre-wrap text-xs">
+                                                            {task.description}
+                                                        </div>
+                                                    ) : null}
+                                                    <div className="text-muted-foreground mt-1 text-xs">
+                                                        {[
+                                                            task.assigned_by ? `Assigned by ${task.assigned_by}` : null,
+                                                            task.deadline ? `Deadline ${task.deadline}` : null,
+                                                            task.progress ? `Progress ${task.progress}` : null,
+                                                            task.status ? `Status ${task.status}` : null,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                    </div>
+                                                    {task.report_feedback ? (
+                                                        <div className="mt-1 whitespace-pre-wrap text-xs">
+                                                            {task.report_feedback}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Section>
+                                )}
 
                                 <Section title="Key Achievements" icon={<TrophyIcon className="text-muted-foreground size-4" />}>
                                     {keyAchievements.length === 0 ? (

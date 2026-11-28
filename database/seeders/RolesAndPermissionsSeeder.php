@@ -112,6 +112,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'create action logs',
             'manage action logs',
 
+            // Management task assignment
+            'task assignment',
+
             // Meeting minutes permissions
             'manage minutes',
 
@@ -187,6 +190,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $managementPermissions = [
             'approve documents',
             'view all documents',
+            'task assignment',
         ];
         $staffPermissions = [
             'create weekly plan',

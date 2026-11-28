@@ -34,6 +34,7 @@ use App\Http\Controllers\InventoryStockItemController;
 use App\Http\Controllers\InventorySupplierController;
 use App\Http\Controllers\InventoryVerificationController;
 use App\Http\Controllers\ManageAnonymousFeedbackController;
+use App\Http\Controllers\ManageAssignedTasksController;
 use App\Http\Controllers\ManageStaffAppreciationController;
 use App\Http\Controllers\MeetingCallController;
 use App\Http\Controllers\MeetingMinuteController;
@@ -691,6 +692,14 @@ Route::middleware(['auth', 'permission:view appreciation nominations'])->group(f
         ->name('management.appreciation.index');
     Route::get('/management/staff-appreciation/{nomination_period}', [ManageStaffAppreciationController::class, 'show'])
         ->name('management.appreciation.show');
+});
+
+// Management Task Assignment
+Route::middleware(['auth', 'permission:task assignment'])->prefix('management/assigned-tasks')->name('management.assigned-tasks.')->group(function () {
+    Route::get('/', [ManageAssignedTasksController::class, 'index'])->name('index');
+    Route::get('/create', [ManageAssignedTasksController::class, 'create'])->name('create');
+    Route::post('/', [ManageAssignedTasksController::class, 'store'])->name('store');
+    Route::get('/{task}', [ManageAssignedTasksController::class, 'show'])->name('show');
 });
 
 // Bonus Petty Cash Routes - View Permission

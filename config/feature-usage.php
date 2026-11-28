@@ -88,6 +88,7 @@ return [
         'documents.reviewer-show' => ['module' => 'Management', 'feature_key' => 'module.management.submissions'],
         'anonymous-feedback.*' => ['module' => 'Management', 'feature_key' => 'module.management.anonymous_feedback'],
         'management.appreciation.*' => ['module' => 'Management', 'feature_key' => 'module.management.staff_appreciation'],
+        'management.assigned-tasks.*' => ['module' => 'Management', 'feature_key' => 'module.management.assigned_tasks'],
         'work-periods.*' => ['module' => 'Management', 'feature_key' => 'module.management.work_periods'],
 
         'year-plan.*' => ['module' => 'Year Plan', 'feature_key' => 'module.year_plan'],

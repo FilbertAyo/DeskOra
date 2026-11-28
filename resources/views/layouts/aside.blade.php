@@ -19,10 +19,12 @@
                 @php
                     $canReviewSubmissions = Auth::user()->can('approve documents');
                     $canWeeklyBudgetReview = Auth::user()->can('view weekly budgets');
+                    $canAssignTasks = Auth::user()->can('task assignment');
                     $canSeeManagement = $canReviewSubmissions
                         || Auth::user()->can('manage anonymous feedback')
                         || Auth::user()->can('view appreciation nominations')
-                        || Auth::user()->can('manage work periods');
+                        || Auth::user()->can('manage work periods')
+                        || $canAssignTasks;
 
                     $reviewActivitiesSubmittedCount = 0;
                     $reviewActivitiesPendingBudgetCount = 0;
@@ -94,6 +96,14 @@
                                 <li class="{{ Request::routeIs('management.appreciation.*') ? 'active' : '' }}">
                                     <a href="{{ route('management.appreciation.index') }}" class="pc-link">
                                         <span class="pc-mtext">Staff Appreciation</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('task assignment')
+                                <li class="{{ Request::routeIs('management.assigned-tasks.*') ? 'active' : '' }}">
+                                    <a href="{{ route('management.assigned-tasks.index') }}" class="pc-link">
+                                        <span class="pc-mtext">Assigned Tasks</span>
                                     </a>
                                 </li>
                             @endcan
