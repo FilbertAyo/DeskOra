@@ -1,12 +1,24 @@
-import { router } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { router, useForm } from '@inertiajs/react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLink from '@/components/shared/AppLink';
 import AppLayout from '@/Layouts/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { notify } from '@/lib/notify';
 
 type Period = { id: string; label: string; date_range?: string };
 type StaffUser = { id: string; name: string };
@@ -31,7 +43,8 @@ type Props = {
     periods: Period[];
     staffUsers: StaffUser[];
     statusOptions: StatusOption[];
-    createUrl: string;
+    defaultPeriodId: string;
+    submitUrl: string;
     indexUrl: string;
 };
 
@@ -69,9 +82,26 @@ export default function AssignedTasksIndex({
     periods,
     staffUsers,
     statusOptions,
-    createUrl,
+    defaultPeriodId,
+    submitUrl,
     indexUrl,
 }: Props) {
+    const [open, setOpen] = useState(false);
+    const form = useForm({
+        title: '',
+        description: '',
+        period_id: defaultPeriodId,
+        deadline: '',
+        assignee_user_ids: [] as string[],
+    });
+
+    const closeAssignModal = () => {
+        setOpen(false);
+        form.reset();
+        form.setData('period_id', defaultPeriodId);
+        form.clearErrors();
+    };
+
     const apply = (key: string, value: string) => {
         router.get(
             indexUrl,
@@ -85,6 +115,17 @@ export default function AssignedTasksIndex({
         );
     };
 
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.post(submitUrl, {
+            preserveScroll: true,
+            onSuccess: () => {
+                notify('success', 'Task assigned successfully.');
+                closeAssignModal();
+            },
+        });
+    };
+
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -94,7 +135,9 @@ export default function AssignedTasksIndex({
                         Monitor tasks assigned by management and staff progress from weekly reports.
                     </p>
                 </div>
-                <Button render={<AppLink href={createUrl} />}>Assign Task</Button>
+                <Button type="button" onClick={() => setOpen(true)}>
+                    Assign Task
+                </Button>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -195,6 +238,118 @@ export default function AssignedTasksIndex({
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog
+                open={open}
+                onOpenChange={(next) => {
+                    if (!next) {
+                        closeAssignModal();
+                    } else {
+                        setOpen(true);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Assign Task</DialogTitle>
+                        <DialogDescription>
+                            Assign a management task to one or more staff members for a selected work week.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submit} className="space-y-4">
+                        <Field>
+                            <FieldLabel htmlFor="task-title">Title</FieldLabel>
+                            <Input
+                                id="task-title"
+                                value={form.data.title}
+                                onChange={(event) => form.setData('title', event.target.value)}
+                                required
+                            />
+                            <FieldError>{form.errors.title}</FieldError>
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="task-description">Description</FieldLabel>
+                            <Textarea
+                                id="task-description"
+                                value={form.data.description}
+                                onChange={(event) => form.setData('description', event.target.value)}
+                                rows={4}
+                            />
+                            <FieldError>{form.errors.description}</FieldError>
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="task-period">Week</FieldLabel>
+                            <select
+                                id="task-period"
+                                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                value={form.data.period_id}
+                                onChange={(event) => form.setData('period_id', event.target.value)}
+                                required
+                            >
+                                <option value="" disabled>
+                                    Select week
+                                </option>
+                                {periods.map((period) => (
+                                    <option key={period.id} value={period.id}>
+                                        {period.label}
+                                        {period.date_range ? ` (${period.date_range})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <FieldError>{form.errors.period_id}</FieldError>
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="task-deadline">Deadline (optional)</FieldLabel>
+                            <Input
+                                id="task-deadline"
+                                type="date"
+                                value={form.data.deadline}
+                                onChange={(event) => form.setData('deadline', event.target.value)}
+                            />
+                            <FieldError>{form.errors.deadline}</FieldError>
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="task-assignees">Assign to</FieldLabel>
+                            <select
+                                id="task-assignees"
+                                multiple
+                                className="border-input bg-background min-h-40 w-full rounded-md border px-3 py-2 text-sm"
+                                value={form.data.assignee_user_ids}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'assignee_user_ids',
+                                        Array.from(event.target.selectedOptions, (option) => option.value),
+                                    )
+                                }
+                                required
+                            >
+                                {staffUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple staff members.
+                            </p>
+                            <FieldError>{form.errors.assignee_user_ids}</FieldError>
+                        </Field>
+
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={closeAssignModal}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={form.processing} loading={form.processing}>
+                                Assign task
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

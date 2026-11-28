@@ -52,28 +52,17 @@ class ManageAssignedTasksController extends Controller
                 ['value' => 'completed', 'label' => 'Completed'],
                 ['value' => 'overdue', 'label' => 'Overdue'],
             ],
-            'currentPeriodId' => $currentPeriod ? (string) $currentPeriod->id : null,
-            'createUrl' => route('management.assigned-tasks.create'),
+            'defaultPeriodId' => $currentPeriod
+                ? (string) $currentPeriod->id
+                : ($periods->first()?->id ? (string) $periods->first()->id : ''),
+            'submitUrl' => route('management.assigned-tasks.store'),
             'indexUrl' => route('management.assigned-tasks.index'),
         ]);
     }
 
-    public function create(): Response
+    public function create(): RedirectResponse
     {
-        $periods = $this->service->periodOptions();
-        $currentPeriod = WorkPeriod::getCurrent();
-
-        return Inertia::render('Management/AssignedTasks/Create', [
-            'periods' => $periods->map(fn (WorkPeriod $period) => [
-                'id' => (string) $period->id,
-                'label' => $period->display_name,
-                'date_range' => $period->date_range,
-            ])->values(),
-            'staffUsers' => $this->staffOptions(),
-            'defaultPeriodId' => $currentPeriod ? (string) $currentPeriod->id : ($periods->first()?->id ? (string) $periods->first()->id : ''),
-            'submitUrl' => route('management.assigned-tasks.store'),
-            'indexUrl' => route('management.assigned-tasks.index'),
-        ]);
+        return redirect()->route('management.assigned-tasks.index');
     }
 
     public function store(Request $request): RedirectResponse
@@ -104,7 +93,7 @@ class ManageAssignedTasksController extends Controller
         );
 
         return redirect()
-            ->route('management.assigned-tasks.show', $task)
+            ->route('management.assigned-tasks.index', ['period_id' => $task->period_id])
             ->with('success', 'Task assigned successfully.');
     }
 

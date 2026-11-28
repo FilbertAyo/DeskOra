@@ -60,7 +60,9 @@ class ManagementAssignedTasksTest extends TestCase
         ]);
 
         $task = ManagementAssignedTask::query()->firstOrFail();
-        $response->assertRedirect(route('management.assigned-tasks.show', $task));
+        $response->assertRedirect(route('management.assigned-tasks.index', [
+            'period_id' => $task->period_id,
+        ]));
 
         $this->assertDatabaseHas('management_assigned_tasks', [
             'id' => $task->id,
