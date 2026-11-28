@@ -17,9 +17,9 @@ export type StaffUser = {
     title?: string | null;
 };
 
-function staffSummary(users: StaffUser[], value: string[]): string {
+function staffSummary(users: StaffUser[], value: string[], emptyLabel: string): string {
     if (value.length === 0) {
-        return 'Select participants…';
+        return emptyLabel;
     }
 
     const names = value
@@ -83,7 +83,7 @@ export default function StaffPicker({
             >
                 <UsersIcon className="text-muted-foreground size-4 shrink-0" />
                 <span className={`min-w-0 flex-1 truncate ${value.length === 0 ? 'text-muted-foreground' : ''}`}>
-                    {staffSummary(users, value)}
+                    {staffSummary(users, value, `Select ${label.toLowerCase()}…`)}
                 </span>
                 {value.length > 0 && (
                     <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums">

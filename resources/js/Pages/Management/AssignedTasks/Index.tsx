@@ -2,6 +2,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 
 import AppLink from '@/components/shared/AppLink';
+import StaffPicker from '@/components/shared/StaffPicker';
 import AppLayout from '@/Layouts/AppLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -249,7 +250,7 @@ export default function AssignedTasksIndex({
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-4xl">
                     <DialogHeader>
                         <DialogTitle>Assign Task</DialogTitle>
                         <DialogDescription>
@@ -274,76 +275,65 @@ export default function AssignedTasksIndex({
                                 id="task-description"
                                 value={form.data.description}
                                 onChange={(event) => form.setData('description', event.target.value)}
-                                rows={4}
+                                rows={3}
                             />
                             <FieldError>{form.errors.description}</FieldError>
                         </Field>
 
-                        <Field>
-                            <FieldLabel htmlFor="task-period">Week</FieldLabel>
-                            <select
-                                id="task-period"
-                                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                                value={form.data.period_id}
-                                onChange={(event) => form.setData('period_id', event.target.value)}
-                                required
-                            >
-                                <option value="" disabled>
-                                    Select week
-                                </option>
-                                {periods.map((period) => (
-                                    <option key={period.id} value={period.id}>
-                                        {period.label}
-                                        {period.date_range ? ` (${period.date_range})` : ''}
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Field>
+                                <FieldLabel htmlFor="task-period">Week</FieldLabel>
+                                <select
+                                    id="task-period"
+                                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                                    value={form.data.period_id}
+                                    onChange={(event) => form.setData('period_id', event.target.value)}
+                                    required
+                                >
+                                    <option value="" disabled>
+                                        Select week
                                     </option>
-                                ))}
-                            </select>
-                            <FieldError>{form.errors.period_id}</FieldError>
-                        </Field>
+                                    {periods.map((period) => (
+                                        <option key={period.id} value={period.id}>
+                                            {period.label}
+                                            {period.date_range ? ` (${period.date_range})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <FieldError>{form.errors.period_id}</FieldError>
+                            </Field>
 
-                        <Field>
-                            <FieldLabel htmlFor="task-deadline">Deadline (optional)</FieldLabel>
-                            <Input
-                                id="task-deadline"
-                                type="date"
-                                value={form.data.deadline}
-                                onChange={(event) => form.setData('deadline', event.target.value)}
-                            />
-                            <FieldError>{form.errors.deadline}</FieldError>
-                        </Field>
+                            <Field>
+                                <FieldLabel htmlFor="task-deadline">Deadline</FieldLabel>
+                                <Input
+                                    id="task-deadline"
+                                    type="date"
+                                    value={form.data.deadline}
+                                    onChange={(event) => form.setData('deadline', event.target.value)}
+                                />
+                                <FieldError>{form.errors.deadline}</FieldError>
+                            </Field>
 
-                        <Field>
-                            <FieldLabel htmlFor="task-assignees">Assign to</FieldLabel>
-                            <select
-                                id="task-assignees"
-                                multiple
-                                className="border-input bg-background min-h-40 w-full rounded-md border px-3 py-2 text-sm"
-                                value={form.data.assignee_user_ids}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'assignee_user_ids',
-                                        Array.from(event.target.selectedOptions, (option) => option.value),
-                                    )
-                                }
-                                required
-                            >
-                                {staffUsers.map((user) => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-muted-foreground mt-1 text-xs">
-                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple staff members.
-                            </p>
-                            <FieldError>{form.errors.assignee_user_ids}</FieldError>
-                        </Field>
+                            <Field>
+                                <StaffPicker
+                                    users={staffUsers}
+                                    value={form.data.assignee_user_ids}
+                                    onChange={(ids) => form.setData('assignee_user_ids', ids)}
+                                    label="Assign to"
+                                />
+                                <FieldError>{form.errors.assignee_user_ids}</FieldError>
+                            </Field>
+                        </div>
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={closeAssignModal}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={form.processing} loading={form.processing}>
+                            <Button
+                                type="submit"
+                                disabled={form.processing || form.data.assignee_user_ids.length === 0}
+                                loading={form.processing}
+                            >
                                 Assign task
                             </Button>
                         </DialogFooter>
