@@ -23,19 +23,16 @@ return new class extends Migration
 
         Permission::firstOrCreate(['name' => self::PERMISSION, 'guard_name' => 'web']);
 
+        // Additive only: never sync/replace the role's existing permissions.
         foreach (['management', 'superadmin'] as $roleName) {
             $role = Role::query()->where('name', $roleName)->where('guard_name', 'web')->first();
             if (! $role) {
                 continue;
             }
 
-            $merged = collect($role->permissions()->pluck('name'))
-                ->push(self::PERMISSION)
-                ->unique()
-                ->values()
-                ->all();
-
-            $role->syncPermissions($merged);
+            if (! $role->hasPermissionTo(self::PERMISSION)) {
+                $role->givePermissionTo(self::PERMISSION);
+            }
         }
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

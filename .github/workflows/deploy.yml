@@ -33,11 +33,13 @@ jobs:
             git reset --hard "origin/${BRANCH}"
             # Leftover untracked migrations abort `artisan migrate` when they collide
             # with tables already created by the tracked migration history.
-            if [ -n "$(git ls-files --others --exclude-standard -- database/migrations)" ]; then
-              echo "==> Removing untracked migration leftovers..."
-              git ls-files --others --exclude-standard -- database/migrations | while IFS= read -r stray; do
-                echo "    rm $stray"
-                rm -f -- "$stray"
-              done
-            fi
+            # Use process substitution (not a pipe) so `set -o pipefail` does not
+            # treat the normal EOF from `read` as a deploy failure.
+            echo "==> Removing untracked migration leftovers (if any)..."
+            while IFS= read -r stray; do
+              [ -n "$stray" ] || continue
+              echo "    rm $stray"
+              rm -f -- "$stray"
+            done < <(git ls-files --others --exclude-standard -- database/migrations)
+            echo "==> Starting deploy.sh (forward-only migrate; no data wipe)..."
             bash ./deploy.sh

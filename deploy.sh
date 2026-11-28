@@ -53,18 +53,19 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   git status --porcelain --untracked-files=no
   git reset --hard "$REMOTE"
 else
-  git pull --ff-only "$REMOTE" || git reset --hard "$REMOTE"
+  # "$REMOTE" is origin/<branch>; pull needs remote + branch name separately.
+  git pull --ff-only origin "$BRANCH" || git reset --hard "$REMOTE"
 fi
 
 # Same cleanup as the GitHub Actions SSH wrapper: stray make:migration files on
 # the server are still discovered by artisan and can fail deploy mid-migrate.
-if [ -n "$(git ls-files --others --exclude-standard -- database/migrations)" ]; then
-  echo "==> Removing untracked migration files..."
-  git ls-files --others --exclude-standard -- database/migrations | while IFS= read -r stray; do
-    echo "    rm $stray"
-    rm -f -- "$stray"
-  done
-fi
+# Avoid `cmd | while read` under `set -o pipefail` — EOF from read exits 1.
+echo "==> Removing untracked migration files (if any)..."
+while IFS= read -r stray; do
+  [ -n "$stray" ] || continue
+  echo "    rm $stray"
+  rm -f -- "$stray"
+done < <(git ls-files --others --exclude-standard -- database/migrations)
 
 echo "==> Installing production dependencies..."
 "${COMPOSER_CMD[@]}" install --no-dev --optimize-autoloader --no-interaction
@@ -99,18 +100,8 @@ if grep -qE '^APP_ENV=production' .env 2>/dev/null; then
   echo "    db:wipe, and full db:seed (DatabaseSeeder / UsersSeeder) are never run here."
 fi
 
-# Stray untracked migrations on the server (e.g. one-off artisan make:migration
-# leftovers) are still loaded by `migrate` and can abort deploy when they collide
-# with tables that already exist from the tracked history.
-if [ -n "$(git ls-files --others --exclude-standard -- database/migrations)" ]; then
-  echo "==> Removing untracked migration files before migrate..."
-  git ls-files --others --exclude-standard -- database/migrations | while IFS= read -r stray; do
-    echo "    rm $stray"
-    rm -f -- "$stray"
-  done
-fi
-
 echo "==> Running database migrations (forward-only)..."
+echo "    Safe mode: migrate --force only. Never migrate:fresh/refresh/reset or db:wipe."
 "$PHP_BIN" artisan migrate --force
 
 echo "==> Ensuring documents union view exists..."
