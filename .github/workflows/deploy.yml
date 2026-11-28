@@ -21,10 +21,6 @@ jobs:
             set -euo pipefail
             cd ~/portal
             git fetch origin
-            BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-            echo "==> Syncing tracked files to origin/${BRANCH}"
-            echo "    Local edits to tracked files are discarded so deploy can proceed."
-            echo "    Untracked files such as .env and uploads are kept."
-            git status --porcelain || true
-            git reset --hard "origin/${BRANCH}"
-            ./deploy.sh
+            git checkout -B main origin/main
+            git reset --hard origin/main
+            bash ./deploy.sh

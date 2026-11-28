@@ -39,21 +39,43 @@ if [ "$CUTOVER_MODE" = "1" ]; then
   "$PHP_BIN" artisan down || true
 fi
 
-echo "==> Pulling latest code..."
+echo "==> Syncing latest code..."
 git fetch origin
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-REMOTE="origin/${BRANCH}"
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-  echo "    Discarding local changes to tracked files so deploy can proceed:"
-  git status --porcelain --untracked-files=no
-  git reset --hard "$REMOTE"
-else
-  git pull --ff-only
+if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then
+  BRANCH="main"
 fi
+# Always hard-reset to origin/<branch>. Do not use `git pull` — on this host the
+# branch upstream has been flaky after prior checkout -B attempts, and pull aborts
+# the whole deploy under `set -e` before migrations run. Untracked files (.env,
+# uploads, storage) are preserved by reset --hard.
+echo "    Resetting tracked files to origin/${BRANCH} (untracked .env/uploads kept)"
+git reset --hard "origin/${BRANCH}"
 
-echo "==> Removing untracked migration files (if any)..."
-# Scoped ONLY to database/migrations. Never touches .env, storage, uploads, or DB data.
-git clean -fd -- database/migrations || true
+echo "==> Quarantining untracked migration files (if any)..."
+# Stray make:migration files on the server are still discovered by artisan and can
+# fail migrate (e.g. create_jobs_table when `jobs` already exists). Scope is ONLY
+# database/migrations — never .env, storage, uploads, or DB data.
+QUARANTINE_DIR="$SCRIPT_DIR/storage/app/deploy-migration-quarantine"
+mkdir -p "$QUARANTINE_DIR"
+git ls-files --others --exclude-standard -- database/migrations > "$QUARANTINE_DIR/list.txt" || true
+if [ -s "$QUARANTINE_DIR/list.txt" ]; then
+  echo "    Found untracked migrations:"
+  cat "$QUARANTINE_DIR/list.txt"
+  while IFS= read -r stray || [ -n "${stray:-}" ]; do
+    [ -n "${stray:-}" ] || continue
+    base="$(basename "$stray")"
+    echo "    moving $stray -> $QUARANTINE_DIR/$base"
+    mv -f -- "$stray" "$QUARANTINE_DIR/$base"
+  done < "$QUARANTINE_DIR/list.txt"
+fi
+left="$(git ls-files --others --exclude-standard -- database/migrations || true)"
+if [ -n "$left" ]; then
+  echo "ERROR: Could not quarantine untracked migrations:"
+  printf '%s\n' "$left"
+  echo "Remove them on the server under database/migrations, then redeploy."
+  exit 1
+fi
 
 echo "==> Removing stale untracked Vite build leftovers (if any)..."
 # Only untracked hashed chunks under public/build; tracked assets and .env/uploads stay.
